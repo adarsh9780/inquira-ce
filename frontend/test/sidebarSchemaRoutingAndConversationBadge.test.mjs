@@ -49,3 +49,14 @@ test('activating a conversation returns the shell to workspace chat', () => {
   assert.equal(globalTreeSource.includes("appStore.setActiveTab('workspace')"), true)
   assert.equal(globalTreeSource.includes('await appStore.fetchConversationTurns({ reset: true })'), true)
 })
+
+test('selecting a workspace row returns the shell to workspace chat', () => {
+  const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
+  const selectWorkspaceIndex = sidebarSource.indexOf('async function selectWorkspace(workspaceId) {')
+  assert.notEqual(selectWorkspaceIndex, -1)
+  const createConversationIndex = sidebarSource.indexOf('async function createConversation(', selectWorkspaceIndex)
+  const selectWorkspaceBlock = sidebarSource.slice(selectWorkspaceIndex, createConversationIndex)
+
+  assert.equal(selectWorkspaceBlock.includes("appStore.setWorkspacePane('chat')"), true)
+  assert.equal(selectWorkspaceBlock.includes("appStore.setActiveTab('workspace')"), true)
+})

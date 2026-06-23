@@ -1,3 +1,5 @@
+import { writeFile } from '@tauri-apps/plugin-fs'
+
 export async function persistExportFile({
   defaultFileName,
   mimeType,
@@ -12,7 +14,6 @@ export async function persistExportFile({
       filters: Array.isArray(tauriFilters) ? tauriFilters : []
     })
     if (!savePath) return false
-    const { writeFile } = await import('@tauri-apps/plugin-fs')
     await writeFile(savePath, payload)
     return true
   }

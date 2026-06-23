@@ -84,13 +84,11 @@ export async function executeCommand(text, { appStore, apiService: api = null } 
     throw new Error('Create/select a workspace before running commands.')
   }
 
-  let resolvedApi = api
-  if (!resolvedApi) {
-    const apiModule = await import('./apiService.js')
-    resolvedApi = apiModule.default
+  if (!api) {
+    throw new Error('Command execution requires an API client.')
   }
 
-  const response = await resolvedApi.v1ExecuteWorkspaceCommand(workspaceId, {
+  const response = await api.v1ExecuteWorkspaceCommand(workspaceId, {
     text: parsed.text,
     name: parsed.name,
     raw_args: parsed.rawArgs,

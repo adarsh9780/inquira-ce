@@ -1,5 +1,7 @@
 
 
+import { invoke } from '@tauri-apps/api/core'
+
 let tauriWsBaseOverride = ''
 
 function toWsBase(rawApiBase) {
@@ -21,8 +23,7 @@ function initializeTauriWsBase() {
     return
   }
 
-  import('@tauri-apps/api/core')
-    .then(({ invoke }) => invoke('get_backend_url'))
+  invoke('get_backend_url')
     .then((value) => {
       const resolved = toWsBase(value)
       if (resolved) tauriWsBaseOverride = resolved

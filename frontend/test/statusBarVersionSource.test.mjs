@@ -12,6 +12,11 @@ test('status bar version label is sourced from frontend package version define',
   assert.equal(viteConfigSource.includes("readFileSync(resolve(frontendRoot, 'package.json'), 'utf-8')"), true)
   assert.equal(viteConfigSource.includes('__APP_VERSION__'), true)
   assert.equal(viteConfigSource.includes('JSON.stringify(frontendVersion)'), true)
+  assert.equal(viteConfigSource.includes('chunkSizeWarningLimit: 5000'), true)
+  assert.equal(viteConfigSource.includes('function manualChunks(id)'), true)
+  assert.equal(viteConfigSource.includes('rolldownOptions:'), true)
+  assert.equal(viteConfigSource.includes('pluginTimings: false'), true)
+  assert.equal(viteConfigSource.includes('manualChunks,'), true)
 
   assert.equal(statusBarSource.includes('const uiVersion = String('), true)
   assert.equal(statusBarSource.includes("typeof __APP_VERSION__ !== 'undefined'"), true)

@@ -39,4 +39,6 @@ test('table csv export uses save dialog flow instead of forcing downloads folder
   assert.equal(tableTab.includes("toast.success('Export complete'"), true)
   assert.equal(exportUtil.includes('window.showSaveFilePicker'), true)
   assert.equal(exportUtil.includes("await import('@tauri-apps/plugin-dialog')"), true)
+  assert.equal(exportUtil.includes("import { writeFile } from '@tauri-apps/plugin-fs'"), true)
+  assert.equal(exportUtil.includes("await import('@tauri-apps/plugin-fs')"), false)
 })

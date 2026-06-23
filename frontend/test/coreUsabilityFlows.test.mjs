@@ -30,9 +30,10 @@ test('critical workflow helper sets up workspace and dataset before higher-level
   const source = readFileSync(resolve(process.cwd(), 'e2e/support/criticalWorkflow.js'), 'utf-8')
 
   assert.equal(source.includes('export async function setupCriticalWorkspace(page) {'), true)
-  assert.equal(source.includes("await page.getByTitle('Add Dataset').click()"), true)
+  assert.equal(source.includes("const addDatasetButton = page.getByRole('button', { name: 'Add dataset' })"), true)
+  assert.equal(source.includes("await expect(addDatasetButton).toBeEnabled({ timeout: 30_000 })"), true)
   assert.equal(source.includes('await importDatasetFromNativePathBridge(page)'), true)
-  assert.equal(source.includes('await expect(page.getByText(`Loaded "${datasetFileName}"`)).toBeVisible'), true)
+  assert.equal(source.includes('await expect(page.getByText(datasetFileName, { exact: true })).toBeVisible'), true)
 })
 
 test('manual code workflow uses an exact Code tab selector before editing the script', () => {

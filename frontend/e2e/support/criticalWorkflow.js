@@ -106,11 +106,19 @@ export async function installCriticalWorkflowMocks(page, options = {}) {
     mockSchemaRegenerate = true,
     mockChatStream = true,
     mockWorkspaceRuntime = true,
+    mockDatasetIngestion = true,
   } = options
   const state = {
     basePreferences: null,
     lastSchema: null,
     generatedSchema: null,
+    datasetEntries: [],
+    datasetIngestionJob: null,
+    conversations: [],
+    turns: [],
+    currentTurn: null,
+    lastConversationId: '',
+    lastTurnId: '',
   }
   const registeredRoutes = []
 
@@ -173,12 +181,10 @@ export async function installCriticalWorkflowMocks(page, options = {}) {
         return
       }
 
-      const payload = await fetchRouteResponse(route)
-      if (!payload) return
-      const { response, json } = payload
-      state.lastSchema = json
+      state.lastSchema = buildGeneratedSchema(state.lastSchema)
       await fulfillRoute(route, {
-        response,
+        status: 200,
+        contentType: 'application/json',
         json: state.lastSchema,
       })
     })
@@ -212,8 +218,210 @@ export async function installCriticalWorkflowMocks(page, options = {}) {
     })
   }
 
+  if (mockDatasetIngestion) {
+    await registerRoute('**/api/v1/workspaces/*/datasets/batch', async (route) => {
+      const body = route.request().postDataJSON()
+      const sourcePaths = Array.isArray(body?.source_paths)
+        ? body.source_paths.map((item) => String(item || '').trim()).filter(Boolean)
+        : []
+      const items = sourcePaths.map((sourcePath, index) => ({
+        source_path: sourcePath,
+        table_name: index === 0 ? datasetTableName : `${datasetTableName}_${index + 1}`,
+        status: 'completed',
+        row_count: 3,
+        file_type: 'csv',
+      }))
+
+      state.datasetEntries = items.map((item) => ({
+        table_name: item.table_name,
+        source_path: item.source_path,
+        row_count: item.row_count,
+        file_type: item.file_type,
+        schema_status: 'ready',
+        schema_updated_at: new Date().toISOString(),
+      }))
+      state.datasetIngestionJob = {
+        job_id: 'e2e-dataset-ingestion',
+        status: 'completed',
+        total_count: items.length,
+        completed_count: items.length,
+        failed_count: 0,
+        items,
+      }
+
+      await fulfillRoute(route, {
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          job_id: state.datasetIngestionJob.job_id,
+          status: 'queued',
+          total_count: items.length,
+          completed_count: 0,
+          failed_count: 0,
+          items: [],
+        }),
+      })
+    })
+
+    await registerRoute('**/api/v1/workspaces/*/datasets/ingestions/*', async (route) => {
+      await fulfillRoute(route, {
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(state.datasetIngestionJob || {
+          job_id: 'e2e-dataset-ingestion',
+          status: 'completed',
+          total_count: 0,
+          completed_count: 0,
+          failed_count: 0,
+          items: [],
+        }),
+      })
+    })
+
+    const datasetListRoute = /\/api\/v1\/workspaces\/[^/]+\/datasets(?:\?.*)?$/
+    await registerRoute(datasetListRoute, async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue()
+        return
+      }
+      await fulfillRoute(route, {
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ datasets: state.datasetEntries }),
+      })
+    })
+  }
+
+  const conversationsRoute = /\/api\/v1\/workspaces\/[^/]+\/conversations(?:\?.*)?$/
+  await registerRoute(conversationsRoute, async (route) => {
+    const method = route.request().method()
+    if (method === 'POST') {
+      const body = route.request().postDataJSON()
+      const now = new Date().toISOString()
+      const conversationId = `e2e-conversation-${Date.now()}`
+      const conversation = {
+        id: conversationId,
+        title: String(body?.title || 'New chat'),
+        created_at: now,
+        updated_at: now,
+        workspace_id: 'e2e-workspace',
+      }
+      state.lastConversationId = conversationId
+      state.conversations = [
+        conversation,
+        ...state.conversations.filter((item) => item.id !== conversationId),
+      ]
+      await fulfillRoute(route, {
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(conversation),
+      })
+      return
+    }
+
+    if (method === 'GET') {
+      await fulfillRoute(route, {
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ conversations: state.conversations }),
+      })
+      return
+    }
+
+    await route.continue()
+  })
+
+  const turnsRoute = /\/api\/v1\/conversations\/[^/]+\/turns(?:\?.*)?$/
+  await registerRoute(turnsRoute, async (route) => {
+    await fulfillRoute(route, {
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ turns: state.turns, next_cursor: null }),
+    })
+  })
+
+  await registerRoute('**/api/v1/conversations/*/turns/*/relations', async (route) => {
+    await fulfillRoute(route, {
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        current: state.currentTurn,
+        parent_turn: null,
+        previous_turn: null,
+        next_turn: null,
+        siblings: [],
+      }),
+    })
+  })
+
+  await registerRoute('**/api/v1/conversations/*/turns/*/artifacts**', async (route) => {
+    await fulfillRoute(route, {
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ artifacts: [] }),
+    })
+  })
+
+  await registerRoute('**/api/v1/conversations/*/turn-tree**', async (route) => {
+    await fulfillRoute(route, {
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ nodes: state.turns, edges: [], current_turn_id: state.lastTurnId || null }),
+    })
+  })
+
+  await registerRoute('**/api/v1/workspaces/*/turn-tree', async (route) => {
+    await fulfillRoute(route, {
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ nodes: state.turns, edges: [], current_turn_id: state.lastTurnId || null }),
+    })
+  })
+
+  await registerRoute('**/api/v1/conversations/*/final-turn', async (route) => {
+    await fulfillRoute(route, {
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(state.currentTurn || {}),
+    })
+  })
+
+  await registerRoute('**/api/v1/conversations/*/usage', async (route) => {
+    await fulfillRoute(route, {
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        conversation_id: state.lastConversationId || 'e2e-conversation',
+        usage: {
+          input_tokens: 0,
+          output_tokens: 0,
+          total_tokens: 0,
+          cost_usd: 0,
+        },
+      }),
+    })
+  })
+
   if (mockChatStream) {
     await registerRoute('**/api/v1/chat/stream', async (route) => {
+      const body = route.request().postDataJSON()
+      const conversationId = String(body?.conversation_id || state.lastConversationId || 'e2e-conversation')
+      const turnId = `e2e-turn-${Date.now()}`
+      const now = new Date().toISOString()
+      state.lastConversationId = conversationId
+      state.lastTurnId = turnId
+      state.currentTurn = {
+        id: turnId,
+        conversation_id: conversationId,
+        question: String(body?.question || ''),
+        answer: mockAnswerText,
+        explanation: mockAnswerText,
+        code_snapshot: '',
+        tool_events: [],
+        created_at: now,
+        updated_at: now,
+      }
+      state.turns = [state.currentTurn]
       const sseBody = buildSsePayload([
         {
           event: 'status',
@@ -226,6 +434,8 @@ export async function installCriticalWorkflowMocks(page, options = {}) {
           event: 'final',
           data: {
             is_safe: true,
+            conversation_id: conversationId,
+            turn_id: turnId,
             code: '',
             current_code: '',
             explanation: mockAnswerText,
@@ -317,11 +527,10 @@ async function clickWhenReady(page, locator, options = {}) {
   }
 }
 
-async function openSidebarForWorkspaceCreation(page) {
-  const toggle = page.getByRole('button', { name: 'Open sidebar' })
-  const createWorkspaceButton = page.getByTitle('Create Workspace')
+async function openWorkspaceSettingsForCreation(page) {
+  const workspaceSettingsButton = page.getByTitle('Workspace settings')
+  const expandSidebarButton = page.getByTitle('Expand sidebar')
   await waitForAppReady(page)
-  await expect(toggle).toBeVisible({ timeout: 90_000 })
 
   const preferenceSync = page
     .waitForResponse(
@@ -331,14 +540,41 @@ async function openSidebarForWorkspaceCreation(page) {
     )
     .catch(() => null)
 
-  if (!(await createWorkspaceButton.isVisible().catch(() => false))) {
-    await clickWhenReady(page, toggle, { timeout: 15_000 })
+  if (!(await workspaceSettingsButton.isVisible().catch(() => false))) {
+    await expect(expandSidebarButton).toBeVisible({ timeout: 30_000 })
+    await clickWhenReady(page, expandSidebarButton, { timeout: 15_000 })
   }
-  await expect(createWorkspaceButton).toBeVisible({ timeout: 30_000 })
+  await expect(workspaceSettingsButton).toBeVisible({ timeout: 30_000 })
+  await clickWhenReady(page, workspaceSettingsButton, { timeout: 15_000 })
   await preferenceSync
   await waitForAppReady(page)
-  await expect(createWorkspaceButton).toBeVisible({ timeout: 30_000 })
-  return createWorkspaceButton
+  await expect(page.getByText('Manage Workspaces')).toBeVisible({ timeout: 30_000 })
+}
+
+async function createWorkspaceFromSettings(page, workspaceName) {
+  await openWorkspaceSettingsForCreation(page)
+  await clickWhenReady(page, page.getByRole('button', { name: '+ New' }))
+  const newWorkspaceInput = page.getByPlaceholder('New workspace name')
+  await expect(newWorkspaceInput).toBeVisible({ timeout: 10_000 })
+  await newWorkspaceInput.fill(workspaceName)
+  await newWorkspaceInput.press('Enter')
+  await expect(page.getByTitle(workspaceName).first()).toBeVisible({ timeout: 30_000 })
+  const addDatasetButton = page.getByRole('button', { name: 'Add dataset' })
+  if (!(await addDatasetButton.isEnabled().catch(() => false))) {
+    const activateWorkspaceButton = page.getByRole('button', { name: 'Activate' })
+    await activateWorkspaceButton.click({ timeout: 3_000 }).catch((error) => {
+      const message = String(error?.message || '')
+      if (
+        !message.includes('element(s) not found') &&
+        !message.includes('Element is not attached') &&
+        !message.includes('element was detached') &&
+        !message.includes('Timeout')
+      ) {
+        throw error
+      }
+    })
+  }
+  await expect(addDatasetButton).toBeEnabled({ timeout: 30_000 })
 }
 
 async function importDatasetFromNativePathBridge(page) {
@@ -366,20 +602,16 @@ export async function setupCriticalWorkspace(page) {
   await page.goto('/')
   await waitForAppReady(page)
 
-  const createWorkspaceButton = await openSidebarForWorkspaceCreation(page)
-  await clickWhenReady(page, createWorkspaceButton)
-  await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 })
-  await page.getByLabel('Workspace Name').fill(workspaceName)
-  await page.getByRole('dialog').getByRole('button', { name: 'Create Workspace' }).click()
+  await createWorkspaceFromSettings(page, workspaceName)
 
-  await expect(page.getByRole('button', { name: workspaceName })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByTitle(workspaceName).first()).toBeVisible({ timeout: 30_000 })
 
-  await page.getByTitle('Add Dataset').click()
-  await expect(page.getByText('Data Configuration')).toBeVisible()
+  const addDatasetButton = page.getByRole('button', { name: 'Add dataset' })
+  await expect(addDatasetButton).toBeEnabled({ timeout: 30_000 })
 
   await importDatasetFromNativePathBridge(page)
 
-  await expect(page.getByText(`Loaded "${datasetFileName}"`)).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByText(datasetFileName, { exact: true })).toBeVisible({ timeout: 60_000 })
   const closeSettingsButton = page.getByLabel('Close settings')
   await expect(closeSettingsButton).toBeEnabled({ timeout: 30_000 })
   await clickWhenReady(page, closeSettingsButton)
@@ -399,21 +631,21 @@ export async function runCriticalWorkflow(page, options = {}) {
   })
 
   try {
-    await setupCriticalWorkspace(page)
+    const { workspaceName } = await setupCriticalWorkspace(page)
 
-    await page.getByTitle('Switch to Schema Editor').click()
-    await expect(page.getByText('Schema Editor')).toBeVisible()
-    await expect(page.getByLabel('Select dataset for schema editor')).toContainText(datasetTableName, { timeout: 30_000 })
+    await clickWhenReady(page, page.getByTitle(/Schema editor/i))
+    await expect(page.getByText('Workspace Schema')).toBeVisible()
+    await expect(page.getByRole('heading', { name: datasetTableName, exact: true })).toBeVisible({ timeout: 30_000 })
 
     const regenerateButton = page.getByRole('button', { name: 'Regenerate', exact: true })
     await expect(regenerateButton).toBeEnabled({ timeout: 30_000 })
     await clickWhenReady(page, regenerateButton)
-    await expect(page.getByText('Generated 4 descriptions')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('Table schema regenerated')).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText('order_id')).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText('Revenue amount in USD for the order.')).toBeVisible()
 
-    await page.getByTitle('Switch to Workspace').click()
-    await page.getByRole('button', { name: 'Chat' }).click()
+    await clickWhenReady(page, page.getByTitle(workspaceName).first())
+    await page.getByRole('button', { name: 'Chat', exact: true }).click()
     await expect(page.getByPlaceholder('How can I help you today?')).toBeVisible()
 
     const composer = page.getByPlaceholder('How can I help you today?')

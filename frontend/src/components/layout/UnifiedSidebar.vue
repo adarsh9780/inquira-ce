@@ -719,6 +719,8 @@ async function selectWorkspace(workspaceId) {
     await appStore.fetchConversations()
     updateSidebarConversationCache(normalizedWorkspaceId, appStore.conversations)
     await loadSidebarConversations(normalizedWorkspaceId, { force: true })
+    appStore.setWorkspacePane('chat')
+    appStore.setActiveTab('workspace')
   } catch (error) {
     toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to open workspace'))
   }

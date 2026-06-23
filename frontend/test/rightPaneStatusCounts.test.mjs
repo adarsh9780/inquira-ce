@@ -9,6 +9,12 @@ test('workspace right pane supports labeled tabs and compact dropdown switcher w
 
   assert.equal(source.includes('v-if="useCompactPaneSwitcher"'), true)
   assert.equal(source.includes('HeaderDropdown'), true)
+  assert.equal(source.includes('defineAsyncComponent'), true)
+  assert.equal(source.includes("defineAsyncComponent(() => import('../analysis/TableTab.vue'))"), true)
+  assert.equal(source.includes("defineAsyncComponent(() => import('../analysis/FigureTab.vue'))"), true)
+  assert.equal(source.includes("defineAsyncComponent(() => import('../analysis/OutputTab.vue'))"), true)
+  assert.equal(source.includes("import TableTab from '../analysis/TableTab.vue'"), false)
+  assert.equal(source.includes("import FigureTab from '../analysis/FigureTab.vue'"), false)
   assert.equal(source.includes('COMPACT_SWITCHER_THRESHOLD_PX'), true)
   assert.equal(source.includes('ResizeObserver'), true)
   assert.equal(source.includes('class="inline-flex items-center gap-1"'), true)

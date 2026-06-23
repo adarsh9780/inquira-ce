@@ -29,3 +29,10 @@ test('workspace dataset flow relies on persisted schema status', () => {
   assert.equal(source.includes('function syncDatasetSchemaPolling() {'), true)
   assert.equal(source.includes('async function generateWorkspaceSchemas('), false)
 })
+
+test('workspace dataset e2e bridge is gated to Playwright mode', () => {
+  assert.equal(source.includes("const isE2EMode = import.meta.env.VITE_E2E === '1'"), true)
+  assert.equal(source.includes("window.addEventListener('inquira:e2e-select-data-path', handleE2eDatasetSelection)"), true)
+  assert.equal(source.includes("window.removeEventListener('inquira:e2e-select-data-path', handleE2eDatasetSelection)"), true)
+  assert.equal(source.includes('await startBatchDatasetIngestion(sourcePaths)'), true)
+})

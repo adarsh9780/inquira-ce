@@ -5,6 +5,8 @@ import { parseSseBuffer } from '../utils/sseParser'
 import { inferTableNameFromDataPath } from '../utils/chatBootstrap'
 import { normalizeExecutionResponse } from '../utils/runtimeExecution'
 import { extractApiErrorMessage } from '../utils/apiError'
+import { useAppStore } from '../stores/appStore'
+import { invoke } from '@tauri-apps/api/core'
 
 
 // ------------------------------------------------------------------
@@ -68,8 +70,7 @@ function initializeTauriApiBase() {
     return
   }
 
-  import('@tauri-apps/api/core')
-    .then(({ invoke }) => invoke('get_backend_url'))
+  invoke('get_backend_url')
     .then((value) => {
       setResolvedApiBase(value)
     })
@@ -304,7 +305,6 @@ export const apiService = {
 
   // Settings management
   async getSettings() {
-    const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
     const hasWorkspace = !!appStore.hasWorkspace
     return {
@@ -330,14 +330,12 @@ export const apiService = {
   },
 
   async setContext(context) {
-    const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
     appStore.setSchemaContext(context || '')
     return { detail: 'Context saved.' }
   },
 
   async setApiKeySettings(apiKeyOrPayload, provider = 'openrouter') {
-    const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
     const payload = apiKeyOrPayload && typeof apiKeyOrPayload === 'object' && !Array.isArray(apiKeyOrPayload)
       ? apiKeyOrPayload
@@ -355,7 +353,6 @@ export const apiService = {
 
   // Generate schema with context
   async generateSchema(filepath, context = null, forceRegenerate = false) {
-    const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
     const workspaceId = appStore.activeWorkspaceId
     const tableName = (appStore.ingestedTableName || inferTableNameFromDataPath(filepath || appStore.dataFilePath || '')).trim()
@@ -380,7 +377,6 @@ export const apiService = {
    * The frontend sends columns from DuckDB-WASM directly — no file path needed.
    */
   async generateSchemaFromColumns(tableName, columns, context = null) {
-    const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
     if (!appStore.activeWorkspaceId) {
       throw new Error('Create/select a workspace before generating schema.')
@@ -398,7 +394,6 @@ export const apiService = {
 
   // Load existing schema
   async loadSchema(filepath) {
-    const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
     const workspaceId = appStore.activeWorkspaceId
     const tableName = (appStore.ingestedTableName || inferTableNameFromDataPath(filepath || appStore.dataFilePath || '')).trim()
@@ -410,7 +405,6 @@ export const apiService = {
 
   // Save schema
   async saveSchema(filepath, context, columns) {
-    const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
     const workspaceId = appStore.activeWorkspaceId
     const tableName = (appStore.ingestedTableName || inferTableNameFromDataPath(filepath || appStore.dataFilePath || '')).trim()
@@ -422,7 +416,6 @@ export const apiService = {
 
   // Get database and schema paths
   async getDatabasePaths() {
-    const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
     if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) {
       return { database_path: null, schema_path: null, base_directory: null }
@@ -437,7 +430,6 @@ export const apiService = {
   },
 
   async getWorkspaceColumns(workspaceId = null) {
-    const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
     const targetWorkspaceId = String(workspaceId || appStore.activeWorkspaceId || '').trim()
     if (!targetWorkspaceId) {
@@ -452,7 +444,6 @@ export const apiService = {
 
   // Code execution (server-side)
   async executeCode(code, timeout = 60, workspaceId = null) {
-    const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
     const activeWorkspaceId = workspaceId || appStore.activeWorkspaceId
     if (!activeWorkspaceId) {
@@ -696,7 +687,6 @@ export const apiService = {
 
   // File data loading — inspect file for columns, then trigger background DuckDB conversion
   async uploadDataPath(filePath) {
-    const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
     if (!appStore.activeWorkspaceId) {
       throw new Error('Create/select a workspace before loading a dataset.')

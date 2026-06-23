@@ -143,6 +143,8 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { useAppStore } from './stores/appStore'
 import { useAuthStore } from './stores/authStore'
 import { settingsWebSocket } from './services/websocketService'
@@ -579,7 +581,6 @@ async function readDesktopStartupState() {
   }
 
   try {
-    const { invoke } = await import('@tauri-apps/api/core')
     return await invoke('get_startup_state')
   } catch (error) {
     console.warn('⚠️ Failed to read desktop startup state from Tauri:', error)
@@ -597,7 +598,6 @@ async function invokeDesktopRecovery(command) {
     return
   }
   try {
-    const { invoke } = await import('@tauri-apps/api/core')
     await invoke(command)
   } catch (error) {
     startupRecoveryMessage.value = String(error?.message || error || 'Recovery action failed.')
@@ -629,7 +629,6 @@ async function subscribeDesktopStartupEvents(onMessage) {
   }
 
   try {
-    const { listen } = await import('@tauri-apps/api/event')
     const unlisten = await listen('backend-status', (event) => {
       const payload = String(event?.payload || '').trim()
       if (!payload || payload.toLowerCase() === 'ready') return

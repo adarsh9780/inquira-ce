@@ -76,11 +76,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref } from 'vue'
 import { useAppStore } from '../../stores/appStore'
-import TableTab from '../analysis/TableTab.vue'
-import FigureTab from '../analysis/FigureTab.vue'
-import OutputTab from '../analysis/OutputTab.vue'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import {
   TableCellsIcon,
@@ -93,6 +90,9 @@ const headerRef = ref(null)
 const useCompactPaneSwitcher = ref(false)
 let switcherResizeObserver = null
 const COMPACT_SWITCHER_THRESHOLD_PX = 660
+const TableTab = defineAsyncComponent(() => import('../analysis/TableTab.vue'))
+const FigureTab = defineAsyncComponent(() => import('../analysis/FigureTab.vue'))
+const OutputTab = defineAsyncComponent(() => import('../analysis/OutputTab.vue'))
 
 const dataPaneOptions = [
   { value: 'table', label: 'Table' },

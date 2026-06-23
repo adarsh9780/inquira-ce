@@ -229,7 +229,7 @@ import ChatAssistantMessage from './ChatAssistantMessage.vue'
 import ChatUserMessage from './ChatUserMessage.vue'
 import { toolOutputHasRenderableContent } from '../../utils/toolOutputPreview'
 import MarkdownIt from 'markdown-it'
-import markdownItKatex from 'markdown-it-katex'
+import markdownItKatexModule from '@vscode/markdown-it-katex'
 import DOMPurify from 'dompurify'
 import Prism from 'prismjs'
 import 'prismjs/components/prism-python'
@@ -371,6 +371,7 @@ function renderQuestionWithHighlights(question) {
 }
 
 // Markdown parser
+const markdownItKatex = markdownItKatexModule.default || markdownItKatexModule
 const md = new MarkdownIt({
   html: false,
   linkify: true,

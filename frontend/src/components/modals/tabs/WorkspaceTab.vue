@@ -203,6 +203,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { stat } from '@tauri-apps/plugin-fs'
 import { apiService } from '../../../services/apiService'
 import { previewService } from '../../../services/previewService'
 import { settingsWebSocket } from '../../../services/websocketService'
@@ -267,6 +268,7 @@ let unsubscribeProgress = null
 let unsubscribeRuntimeError = null
 let unsubscribeRuntimeComplete = null
 let datasetSchemaPoller = null
+const isE2EMode = import.meta.env.VITE_E2E === '1'
 
 const isCreatingWorkspace = ref(false)
 const isCreatingWorkspaceRuntime = ref(false)
@@ -456,6 +458,9 @@ onMounted(async () => {
   unsubscribeRuntimeError = settingsWebSocket.subscribeError(handleRuntimeSocketError)
   unsubscribeRuntimeComplete = settingsWebSocket.subscribeComplete(handleRuntimeSocketComplete)
   window.addEventListener('dataset-switched', handleExternalDatasetRefresh)
+  if (isE2EMode) {
+    window.addEventListener('inquira:e2e-select-data-path', handleE2eDatasetSelection)
+  }
   await hydrateWorkspaceCards()
   await loadActiveDatasetDeletionJobs()
   syncSetupIdentity()
@@ -475,6 +480,9 @@ onUnmounted(() => {
     unsubscribeRuntimeComplete = null
   }
   window.removeEventListener('dataset-switched', handleExternalDatasetRefresh)
+  if (isE2EMode) {
+    window.removeEventListener('inquira:e2e-select-data-path', handleE2eDatasetSelection)
+  }
   clearWorkspaceOperation()
   stopDatasetDeletionPollers()
   stopDatasetIngestionPollers()
@@ -484,6 +492,18 @@ onUnmounted(() => {
 function handleExternalDatasetRefresh() {
   if (!isWorkspaceActive.value) return
   void loadWorkspaceDatasets()
+}
+
+async function handleE2eDatasetSelection(event) {
+  if (!isE2EMode || !isWorkspaceActive.value) return
+  const detail = event?.detail || {}
+  const sourcePaths = [
+    ...(Array.isArray(detail.sourcePaths) ? detail.sourcePaths : []),
+    detail.sourcePath,
+    detail.filePath,
+    detail.fileName,
+  ].map((item) => String(item || '').trim()).filter(Boolean)
+  await startBatchDatasetIngestion(sourcePaths)
 }
 
 async function hydrateWorkspaceCards() {
@@ -1232,7 +1252,6 @@ async function resolveDatasetFileSize(path) {
   const normalized = String(path || '').trim()
   if (!normalized || normalized.startsWith('browser://')) return null
   if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) return null
-  const { stat } = await import('@tauri-apps/plugin-fs')
   const info = await stat(normalized)
   const bytes = Number(info?.size || 0)
   return Number.isFinite(bytes) && bytes > 0 ? bytes : null

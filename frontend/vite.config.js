@@ -11,6 +11,27 @@ const frontendPackage = JSON.parse(
 )
 const frontendVersion = String(frontendPackage.version || '0.0.0').trim() || '0.0.0'
 
+const manualChunkGroups = {
+  'vue-vendor': ['node_modules/vue/', 'node_modules/@vue/devtools-api/'],
+  'pinia-store': ['node_modules/pinia/'],
+  'ui-components': ['node_modules/ag-grid-community/', 'node_modules/ag-grid-vue3/'],
+  'ui-icons': ['node_modules/@heroicons/vue/'],
+  'ui-headless': ['node_modules/@headlessui/vue/'],
+  'plotly-charts': ['node_modules/plotly.js-dist-min/'],
+  'axios-http': ['node_modules/axios/'],
+  'utils': ['node_modules/markdown-it/', 'node_modules/dompurify/'],
+}
+
+function manualChunks(id) {
+  const normalizedId = String(id || '').replaceAll('\\', '/')
+  for (const [chunkName, packagePaths] of Object.entries(manualChunkGroups)) {
+    if (packagePaths.some((packagePath) => normalizedId.includes(packagePath))) {
+      return chunkName
+    }
+  }
+  return undefined
+}
+
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -73,30 +94,13 @@ export default defineConfig({
     outDir: '../src/inquira/frontend/dist',
     assetsDir: 'assets',
     emptyOutDir: true,
-    chunkSizeWarningLimit: 1000, // Increase warning limit to 1000kb
-    rollupOptions: {
+    chunkSizeWarningLimit: 5000,
+    rolldownOptions: {
+      checks: {
+        pluginTimings: false,
+      },
       output: {
-        manualChunks: {
-          // Core Vue ecosystem
-          'vue-vendor': ['vue', '@vue/devtools-api'],
-          'pinia-store': ['pinia'],
-
-          // UI Libraries
-          'ui-components': ['ag-grid-community', 'ag-grid-vue3'],
-          'ui-icons': ['@heroicons/vue'],
-          'ui-headless': ['@headlessui/vue'],
-
-
-          // Data Visualization
-          'plotly-charts': ['plotly.js-dist-min'],
-
-          // HTTP & Utilities
-          'axios-http': ['axios'],
-          'utils': ['markdown-it', 'dompurify'],
-
-          // Large third-party libraries (add as needed)
-          // 'vendor-large': ['@codemirror/theme-one-dark', '@codemirror/commands']
-        }
+        manualChunks,
       }
     }
   }

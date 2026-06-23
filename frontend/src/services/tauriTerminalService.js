@@ -1,12 +1,11 @@
+import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
+
 function isTauriRuntime() {
   return typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
 }
 
 async function getTauriCore() {
-  const [{ invoke }, { listen }] = await Promise.all([
-    import('@tauri-apps/api/core'),
-    import('@tauri-apps/api/event'),
-  ])
   return { invoke, listen }
 }
 

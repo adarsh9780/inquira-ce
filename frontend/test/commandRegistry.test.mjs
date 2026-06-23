@@ -68,11 +68,24 @@ test('executeCommand dispatches to backend endpoint with workspace context', asy
   assert.equal(result?.result_type, 'table')
 })
 
+test('executeCommand requires injected API client to avoid bundling api service into source tests', async () => {
+  await assert.rejects(
+    executeCommand('/shape sales', {
+      appStore: {
+        activeWorkspaceId: 'ws-1',
+        ingestedTableName: 'sales',
+      },
+    }),
+    /requires an API client/,
+  )
+})
+
 test('chat input routes slash commands through the command handler path', () => {
   const componentPath = resolve(process.cwd(), 'src/components/chat/ChatInput.vue')
   const source = readFileSync(componentPath, 'utf-8')
 
   assert.equal(source.includes('import { executeCommand, getRegisteredCommands, isCommand } from'), true)
+  assert.equal(source.includes("import apiService from '../../services/apiService'"), true)
   assert.equal(source.includes('if (isCommand(questionText)) {'), true)
   assert.equal(source.includes('await handleSlashCommand(questionText)'), true)
   assert.equal(source.includes('const result = await executeCommand(questionText'), true)
