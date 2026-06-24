@@ -346,6 +346,17 @@ function resolveSlowRequestWarningTimeoutMs(seconds) {
   return clampedSeconds * 1000
 }
 
+async function refreshRuntimeStatusAfterExplicitWork(workspaceId) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  if (!normalizedWorkspaceId) return
+  try {
+    const payload = await apiService.v1GetWorkspaceRuntimeStatus(normalizedWorkspaceId)
+    appStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, payload?.status || 'missing')
+  } catch (_error) {
+    // Runtime status is informational; keep the completed chat response intact.
+  }
+}
+
 function parseArtifactTimestampMs(value) {
   const raw = String(value || '').trim()
   if (!raw) return 0
@@ -1633,6 +1644,7 @@ async function handleSubmit() {
   } finally {
     if (warningTimer) clearTimeout(warningTimer)
     if (cancelTimer) clearTimeout(cancelTimer)
+    await refreshRuntimeStatusAfterExplicitWork(appStore.activeWorkspaceId)
     const nextStopped = new Set(stoppedConversationIds.value)
     nextStopped.delete(requestConversationId)
     stoppedConversationIds.value = nextStopped

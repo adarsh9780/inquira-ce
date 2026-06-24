@@ -588,7 +588,6 @@ function isUnauthorizedError(error) {
 async function handleUnauthorizedPollingError() {
   stopArtifactUsageStream()
   settingsWebSocket.setWorkspaceRuntimeStatusWorkspace('')
-  appStore.setWorkspaceRuntimeStatus(appStore.activeWorkspaceId, 'connecting')
   appStore.setRuntimeError('Background auth check failed. Reconnecting your session...')
   if (authStore.isAuthenticated) {
     await authStore.checkAuth({ preserveSession: true })
@@ -787,9 +786,9 @@ function syncWorkspaceRealtimeSubscriptions() {
     return
   }
 
-  appStore.setWorkspaceRuntimeStatus(workspaceId, 'connecting')
+  const currentStatus = appStore.getWorkspaceRuntimeStatus(workspaceId)
   settingsWebSocket.setWorkspaceRuntimeStatusWorkspace(workspaceId)
-  void refreshWorkspaceRuntimeStatusFromApi(workspaceId, 'connecting')
+  void refreshWorkspaceRuntimeStatusFromApi(workspaceId, currentStatus)
   void startArtifactUsageStream()
 }
 

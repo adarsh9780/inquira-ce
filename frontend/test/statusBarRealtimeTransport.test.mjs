@@ -11,5 +11,7 @@ test('status bar uses websocket runtime updates and artifact SSE', () => {
   assert.equal(source.includes('settingsWebSocket.setWorkspaceRuntimeStatusWorkspace(workspaceId)'), true)
   assert.equal(source.includes('apiService.subscribeWorkspaceArtifactUsage'), true)
   assert.equal(source.includes('function syncWorkspaceRealtimeSubscriptions()'), true)
-  assert.equal(source.includes('refreshWorkspaceRuntimeStatusFromApi(workspaceId, \'connecting\')'), true)
+  assert.equal(source.includes('const currentStatus = appStore.getWorkspaceRuntimeStatus(workspaceId)'), true)
+  assert.equal(source.includes('refreshWorkspaceRuntimeStatusFromApi(workspaceId, currentStatus)'), true)
+  assert.equal(source.includes("appStore.setWorkspaceRuntimeStatus(workspaceId, 'connecting')"), false)
 })
