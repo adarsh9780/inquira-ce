@@ -32,7 +32,12 @@ class TurnArtifactReadService:
         kind: str | None = None,
     ) -> list[dict[str, Any]]:
         rows = await TurnArtifactRepository.list_for_workspace(session, workspace_id, kind=kind)
-        return [await TurnArtifactReadService._summary_from_row(session, row) for row in rows]
+        summaries = []
+        for row in rows:
+            summary = await TurnArtifactReadService._summary_from_row(session, row)
+            if summary is not None:
+                summaries.append(summary)
+        return summaries
 
     @staticmethod
     async def list_turn_artifacts(
@@ -42,7 +47,12 @@ class TurnArtifactReadService:
         kind: str | None = None,
     ) -> list[dict[str, Any]]:
         rows = await TurnArtifactRepository.list_for_turn(session, turn_id, kind=kind)
-        return [await TurnArtifactReadService._summary_from_row(session, row) for row in rows]
+        summaries = []
+        for row in rows:
+            summary = await TurnArtifactReadService._summary_from_row(session, row)
+            if summary is not None:
+                summaries.append(summary)
+        return summaries
 
     @staticmethod
     async def get_workspace_artifact(
@@ -96,6 +106,8 @@ class TurnArtifactReadService:
         if row is None or row.payload_format != "parquet":
             return None
         storage_path = await TurnArtifactReadService._owned_storage_path(session, row)
+        if not storage_path.exists():
+            return None
         return await asyncio.to_thread(
             TurnArtifactReadService._read_parquet_rows,
             row,
@@ -127,6 +139,8 @@ class TurnArtifactReadService:
         if row is None or row.payload_format != "parquet":
             return None
         storage_path = await TurnArtifactReadService._owned_storage_path(session, row)
+        if not storage_path.exists():
+            return None
         return await asyncio.to_thread(
             TurnArtifactReadService._read_parquet_rows,
             row,
@@ -224,10 +238,13 @@ class TurnArtifactReadService:
         }
 
     @staticmethod
-    async def _summary_from_row(session: AsyncSession, row) -> dict[str, Any]:
+    async def _summary_from_row(session: AsyncSession, row) -> dict[str, Any] | None:
         path = await TurnArtifactReadService._owned_storage_path(session, row)
         row_count = None
         schema = None
+        payload_format = str(row.payload_format or "").strip().lower()
+        if payload_format and not path.exists():
+            return None
         if row.payload_format == "parquet" and path.exists():
             row_count, schema = await asyncio.to_thread(TurnArtifactReadService._read_parquet_stats, path)
         return {

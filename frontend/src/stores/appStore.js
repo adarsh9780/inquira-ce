@@ -1883,13 +1883,25 @@ export const useAppStore = defineStore('app', () => {
       return columnCatalog.value
     }
     try {
-      const runtimeReady = await ensureWorkspaceRuntimeReady(workspaceId)
-      if (!runtimeReady) {
-        columnCatalog.value = []
-        return []
-      }
-      const response = await apiService.getWorkspaceColumns(workspaceId)
-      const columns = Array.isArray(response?.columns) ? response.columns : []
+      const response = await apiService.v1ListDatasets(workspaceId)
+      const datasets = Array.isArray(response?.datasets) ? response.datasets : []
+      const schemaResults = await Promise.allSettled(
+        datasets.map(async (dataset) => {
+          const tableName = String(dataset?.table_name || '').trim()
+          if (!tableName) return []
+          const schema = await apiService.v1GetDatasetSchema(workspaceId, tableName)
+          const schemaColumns = Array.isArray(schema?.columns) ? schema.columns : []
+          return schemaColumns
+            .map((column) => ({
+              table_name: String(schema?.table_name || tableName).trim(),
+              column_name: String(column?.name || column?.column_name || '').trim(),
+              dtype: String(column?.dtype || column?.type || ''),
+            }))
+            .filter((column) => column.table_name && column.column_name)
+        })
+      )
+      const columns = schemaResults
+        .flatMap((result) => (result.status === 'fulfilled' ? result.value : []))
       columnCatalog.value = columns
       return columns
     } catch (_error) {

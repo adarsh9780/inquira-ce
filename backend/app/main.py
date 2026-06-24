@@ -143,7 +143,6 @@ async def lifespan(app: FastAPI):
         langgraph_manager=app.state.workspace_langgraph_manager
     )
     await app.state.dataset_deletion_service.resume_pending_jobs()
-    await app.state.dataset_ingestion_service.resume_pending_jobs()
     await app.state.dataset_schema_generation_service.resume_pending_jobs()
 
     # Start session cleanup task

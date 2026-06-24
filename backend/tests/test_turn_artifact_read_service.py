@@ -164,6 +164,76 @@ async def test_turn_artifact_read_service_uses_turn_scope_for_duplicate_artifact
 
 
 @pytest.mark.asyncio
+async def test_turn_artifact_read_service_filters_missing_payload_summaries(monkeypatch, tmp_path) -> None:
+    row = SimpleNamespace(
+        id="row-1",
+        artifact_id="missing-artifact",
+        workspace_id="workspace-1",
+        conversation_id="conversation-1",
+        turn_id="turn-1",
+        logical_name="missing_df",
+        kind="dataframe",
+        payload_format="parquet",
+        storage_path=str(tmp_path / "missing.parquet"),
+        created_at=SimpleNamespace(isoformat=lambda: "2026-05-17T00:00:00+00:00"),
+        status="active",
+    )
+
+    async def fake_list_for_turn(session, turn_id, *, kind=None, statuses=("active",)):
+        _ = (session, turn_id, kind, statuses)
+        return [row]
+
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_read_service.TurnArtifactRepository.list_for_turn",
+        fake_list_for_turn,
+    )
+
+    summaries = await TurnArtifactReadService.list_turn_artifacts(
+        SimpleNamespace(),
+        turn_id="turn-1",
+        kind="dataframe",
+    )
+
+    assert summaries == []
+
+
+@pytest.mark.asyncio
+async def test_turn_artifact_read_service_returns_none_for_missing_dataframe_rows(monkeypatch, tmp_path) -> None:
+    row = SimpleNamespace(
+        id="row-1",
+        artifact_id="missing-artifact",
+        workspace_id="workspace-1",
+        conversation_id="conversation-1",
+        turn_id="turn-1",
+        logical_name="missing_df",
+        kind="dataframe",
+        payload_format="parquet",
+        storage_path=str(tmp_path / "missing.parquet"),
+        created_at=SimpleNamespace(isoformat=lambda: "2026-05-17T00:00:00+00:00"),
+        status="active",
+    )
+
+    async def fake_get_for_turn(session, *, turn_id, artifact_id, statuses=("active",)):
+        _ = (session, turn_id, artifact_id, statuses)
+        return row
+
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_read_service.TurnArtifactRepository.get_for_turn",
+        fake_get_for_turn,
+    )
+
+    rows = await TurnArtifactReadService.get_turn_dataframe_rows(
+        SimpleNamespace(),
+        turn_id="turn-1",
+        artifact_id="missing-artifact",
+        offset=0,
+        limit=100,
+    )
+
+    assert rows is None
+
+
+@pytest.mark.asyncio
 async def test_turn_artifact_read_service_delete_removes_file_and_manifest_entry(monkeypatch, tmp_path) -> None:
     artifact_path = tmp_path / "artifact.json"
     artifact_path.write_text('{"figure": {"data": []}}', encoding="utf-8")

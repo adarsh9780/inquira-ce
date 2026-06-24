@@ -121,6 +121,38 @@ class DatasetIngestionService:
                     username=username,
                 )
 
+    async def resume_pending_jobs_for_workspace(
+        self,
+        session: AsyncSession,
+        *,
+        principal_id: str,
+        workspace_id: str,
+        username: str,
+    ):
+        """Resume active ingestion jobs for one workspace after an explicit user action."""
+        workspace = await WorkspaceRepository.get_by_id(session, workspace_id, principal_id)
+        if workspace is None:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        await DatasetIngestionRepository.reset_claims_for_workspace(
+            session,
+            principal_id=principal_id,
+            workspace_id=workspace_id,
+        )
+        jobs = await DatasetIngestionRepository.list_active_for_workspace(
+            session=session,
+            principal_id=principal_id,
+            workspace_id=workspace_id,
+        )
+        for job in jobs:
+            await self._schedule_job(
+                job_id=str(job.id),
+                workspace_id=str(job.workspace_id),
+                principal_id=str(job.owner_principal_id),
+                username=username,
+            )
+        return jobs
+
     async def _schedule_job(
         self,
         *,

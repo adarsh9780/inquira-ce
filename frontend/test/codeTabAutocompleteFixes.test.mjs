@@ -14,5 +14,5 @@ test('code tab completion source supports full token matching, explicit trigger,
   assert.equal(source.includes('Array.isArray(appStore.ingestedColumns)'), true)
   assert.equal(source.includes('String(appStore.ingestedTableName || \'\').trim()'), true)
   assert.equal(source.includes("validFor: /^[A-Za-z_][\\w.\\[\\]\"']*$/"), true)
-  assert.equal(source.includes('await appStore.fetchColumnCatalog({ force: true })'), true)
+  assert.equal(source.includes('await appStore.fetchColumnCatalog({ force: true })'), false)
 })

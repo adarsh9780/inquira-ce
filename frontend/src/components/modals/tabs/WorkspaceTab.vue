@@ -1560,9 +1560,6 @@ async function createWorkspace() {
     isEditingContext.value = true
     isCreatingWorkspace.value = false
     clearWorkspaceOperation()
-    setTimeout(() => {
-      void warmWorkspaceRuntimeInBackground(workspaceId)
-    }, 0)
   } catch (error) {
     toast.error('Create failed', extractApiErrorMessage(error, 'Failed to create workspace.'))
   } finally {
@@ -1573,29 +1570,6 @@ async function createWorkspace() {
     }
     workspaceCreateMessage.value = 'Saving the workspace name. You will add context next.'
     clearWorkspaceOperation()
-  }
-}
-
-async function warmWorkspaceRuntimeInBackground(workspaceId) {
-  const targetWorkspaceId = String(workspaceId || '').trim()
-  if (!targetWorkspaceId) return
-  clearRuntimeProgress()
-  try {
-    const ready = await appStore.ensureWorkspaceRuntimeReady(targetWorkspaceId)
-    if (!ready) {
-      runtimeProgressError.value = String(appStore.runtimeError || 'Workspace runtime bootstrap failed.')
-      appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
-      return
-    }
-    clearRuntimeProgress()
-  } catch (error) {
-    runtimeProgressError.value = extractApiErrorMessage(error, 'Workspace runtime bootstrap failed.')
-    appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
-    appStore.setWorkspaceRuntimeStatus(targetWorkspaceId, 'error')
-  } finally {
-    if (runtimeActionMode.value === 'create') {
-      runtimeActionMode.value = ''
-    }
   }
 }
 

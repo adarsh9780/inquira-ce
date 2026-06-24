@@ -98,6 +98,25 @@ class DatasetIngestionRepository:
         await session.commit()
 
     @staticmethod
+    async def reset_claims_for_workspace(
+        session: AsyncSession,
+        *,
+        principal_id: str,
+        workspace_id: str,
+    ) -> None:
+        await session.execute(
+            update(WorkspaceDatasetIngestionJob)
+            .execution_options(synchronize_session=False)
+            .where(
+                WorkspaceDatasetIngestionJob.owner_principal_id == principal_id,
+                WorkspaceDatasetIngestionJob.workspace_id == workspace_id,
+                WorkspaceDatasetIngestionJob.status.in_(DatasetIngestionRepository.ACTIVE_STATUSES),
+            )
+            .values(claimed_by=None, lease_expires_at=None, last_heartbeat_at=None)
+        )
+        await session.commit()
+
+    @staticmethod
     async def claim_job(
         session: AsyncSession,
         *,

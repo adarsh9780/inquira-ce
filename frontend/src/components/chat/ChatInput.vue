@@ -1659,9 +1659,6 @@ function handleNewLine(event) {
 
 onMounted(() => {
   initializeVoiceInput()
-  if (appStore.activeWorkspaceId) {
-    void appStore.fetchColumnCatalog({ force: true })
-  }
   window.addEventListener('resize', updateSuggestionPlacement)
 })
 
@@ -1674,9 +1671,6 @@ onUnmounted(() => {
 
 watch(() => appStore.activeWorkspaceId, () => {
   clearSuggestions()
-  if (appStore.activeWorkspaceId) {
-    void appStore.fetchColumnCatalog({ force: true })
-  }
 })
 
 watch(() => appStore.ingestedTableName, () => {

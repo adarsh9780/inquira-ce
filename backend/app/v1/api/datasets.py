@@ -140,6 +140,27 @@ async def list_workspace_dataset_ingestions(
     return DatasetIngestionJobListResponse(jobs=[_ingestion_job_response(job) for job in jobs])
 
 
+@router.post(
+    "/workspaces/{workspace_id}/datasets/ingestions/resume",
+    response_model=DatasetIngestionJobListResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def resume_workspace_dataset_ingestions(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+    dataset_ingestion_service: DatasetIngestionService = Depends(get_dataset_ingestion_service),
+):
+    """Explicitly resume queued/running dataset ingestion jobs for this workspace."""
+    jobs = await dataset_ingestion_service.resume_pending_jobs_for_workspace(
+        session=session,
+        principal_id=current_user.id,
+        workspace_id=workspace_id,
+        username=str(getattr(current_user, "username", "") or getattr(current_user, "username_cached", "") or ""),
+    )
+    return DatasetIngestionJobListResponse(jobs=[_ingestion_job_response(job) for job in jobs])
+
+
 @router.get(
     "/workspaces/{workspace_id}/datasets/ingestions/{job_id}",
     response_model=DatasetIngestionJobResponse,

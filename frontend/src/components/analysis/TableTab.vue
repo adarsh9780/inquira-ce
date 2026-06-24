@@ -418,6 +418,29 @@ function isAbortError(error) {
   return error?.name === 'AbortError'
 }
 
+function isArtifactMissingError(error) {
+  const status = Number(error?.response?.status ?? error?.status ?? 0)
+  if (status === 404) return true
+  const detail = String(error?.response?.data?.detail || error?.message || '').toLowerCase()
+  return detail.includes('artifact not found')
+}
+
+function clearMissingSelectedArtifact(artifactId) {
+  const normalizedArtifactId = String(artifactId || selectedArtifactId.value || '').trim()
+  if (!normalizedArtifactId) return
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (workspaceId && String(appStore.getSelectedTableArtifact(workspaceId) || '').trim() === normalizedArtifactId) {
+    appStore.setSelectedTableArtifact(workspaceId, '')
+  }
+  if (String(selectedArtifactId.value || '').trim() === normalizedArtifactId) {
+    selectedArtifactId.value = null
+  }
+  workspaceArtifacts.value = workspaceArtifacts.value.filter(
+    (artifact) => String(artifact?.artifact_id || '').trim() !== normalizedArtifactId,
+  )
+  resetTableState()
+}
+
 function enqueueSerializedRequest(task) {
   const next = serializedRequestQueue.catch(() => {}).then(task)
   serializedRequestQueue = next.catch(() => {})
@@ -840,6 +863,10 @@ async function loadInitialServerPage(artifactId) {
     appStore.setTableViewport(windowStart.value, windowEnd.value, rowCountValue.value)
   } catch (error) {
     if (isAbortError(error)) return
+    if (isArtifactMissingError(error)) {
+      clearMissingSelectedArtifact(artifactId)
+      return
+    }
     console.error('Failed to load initial dataframe page:', error)
     tableError.value = error?.message || 'Failed to load table data.'
     serverRows.value = []
@@ -919,6 +946,11 @@ async function attachInfiniteDatasource(artifactId) {
         appStore.setTableViewport(windowStart.value, windowEnd.value, rowCountValue.value)
       } catch (error) {
         if (isAbortError(error)) return
+        if (isArtifactMissingError(error)) {
+          clearMissingSelectedArtifact(aid)
+          params.successCallback([], 0)
+          return
+        }
         console.error('Failed to load dataframe page:', error)
         if (!isGridAlive() || datasourceTag !== currentDatasourceToken) return
         tableError.value = error?.message || 'Failed to load paginated table data.'

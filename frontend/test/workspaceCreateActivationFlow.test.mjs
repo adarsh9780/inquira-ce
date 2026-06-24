@@ -18,7 +18,7 @@ test('workspace creation activates the new workspace centrally in the store', ()
   assert.equal(block.includes('await fetchWorkspaces()'), true)
 })
 
-test('workspace creation opens inline context editing on the active workspace summary while warming runtime', () => {
+test('workspace creation opens inline context editing without warming runtime', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
   const settings = read('src/components/modals/SettingsModal.vue')
 
@@ -26,8 +26,8 @@ test('workspace creation opens inline context editing on the active workspace su
   assert.equal(workspace.includes('await appStore.createWorkspace(name, context)'), true)
   assert.equal(workspace.includes('isEditingContext.value = true'), true)
   assert.equal(workspace.includes('workspaceSurface'), false)
-  assert.equal(workspace.includes('async function warmWorkspaceRuntimeInBackground(workspaceId)'), true)
-  assert.equal(workspace.includes('void warmWorkspaceRuntimeInBackground(workspaceId)'), true)
+  assert.equal(workspace.includes('async function warmWorkspaceRuntimeInBackground(workspaceId)'), false)
+  assert.equal(workspace.includes('void warmWorkspaceRuntimeInBackground(workspaceId)'), false)
   assert.equal(settings.includes('@workspace-created="handleWorkspaceCreated"'), true)
   assert.equal(settings.includes("currentPanel.value = 'ws-detail'"), false)
 })

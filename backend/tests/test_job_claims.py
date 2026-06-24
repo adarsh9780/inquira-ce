@@ -212,6 +212,117 @@ async def test_dataset_ingestion_service_resumes_pending_jobs(job_session_factor
 
 
 @pytest.mark.asyncio
+async def test_dataset_ingestion_service_resumes_jobs_for_explicit_workspace_only(
+    job_session_factory,
+    monkeypatch,
+) -> None:
+    async with job_session_factory() as session:
+        session.add(Principal(id="principal-1", username_cached="alice", plan_cached="FREE"))
+        session.add(
+            Workspace(
+                id="ws-1",
+                owner_principal_id="principal-1",
+                name="Data Lab",
+                name_normalized="data lab",
+                duckdb_path="/tmp/ws-1/workspace.db",
+                is_active=1,
+            )
+        )
+        session.add(
+            Workspace(
+                id="ws-2",
+                owner_principal_id="principal-1",
+                name="Other Lab",
+                name_normalized="other lab",
+                duckdb_path="/tmp/ws-2/workspace.db",
+                is_active=0,
+            )
+        )
+        session.add_all(
+            [
+                WorkspaceDatasetIngestionJob(
+                    id="ingest-1",
+                    owner_principal_id="principal-1",
+                    workspace_id="ws-1",
+                    status="running",
+                    total_count=1,
+                    completed_count=0,
+                    failed_count=0,
+                    items_json=json.dumps([{"source_path": "/tmp/a.csv", "status": "running"}]),
+                    claimed_by="stale-worker",
+                ),
+                WorkspaceDatasetIngestionJob(
+                    id="ingest-2",
+                    owner_principal_id="principal-1",
+                    workspace_id="ws-1",
+                    status="queued",
+                    total_count=1,
+                    completed_count=0,
+                    failed_count=0,
+                    items_json=json.dumps([{"source_path": "/tmp/b.csv", "status": "queued"}]),
+                    claimed_by="stale-worker",
+                ),
+                WorkspaceDatasetIngestionJob(
+                    id="ingest-other-workspace",
+                    owner_principal_id="principal-1",
+                    workspace_id="ws-2",
+                    status="running",
+                    total_count=1,
+                    completed_count=0,
+                    failed_count=0,
+                    items_json=json.dumps([{"source_path": "/tmp/c.csv", "status": "running"}]),
+                    claimed_by="stale-worker",
+                ),
+                WorkspaceDatasetIngestionJob(
+                    id="ingest-complete",
+                    owner_principal_id="principal-1",
+                    workspace_id="ws-1",
+                    status="completed",
+                    total_count=1,
+                    completed_count=1,
+                    failed_count=0,
+                    items_json=json.dumps([{"source_path": "/tmp/d.csv", "status": "completed"}]),
+                    claimed_by="completed-worker",
+                ),
+            ]
+        )
+        await session.commit()
+
+    scheduled: list[tuple[str, str, str, str]] = []
+    service = DatasetIngestionService()
+
+    async def fake_schedule_job(*, job_id: str, workspace_id: str, principal_id: str, username: str) -> None:
+        scheduled.append((job_id, workspace_id, principal_id, username))
+
+    monkeypatch.setattr(service, "_schedule_job", fake_schedule_job)
+
+    async with job_session_factory() as session:
+        resumed = await service.resume_pending_jobs_for_workspace(
+            session,
+            principal_id="principal-1",
+            workspace_id="ws-1",
+            username="alice",
+        )
+
+    assert {job.id for job in resumed} == {"ingest-1", "ingest-2"}
+    assert sorted(scheduled) == [
+        ("ingest-1", "ws-1", "principal-1", "alice"),
+        ("ingest-2", "ws-1", "principal-1", "alice"),
+    ]
+
+    async with job_session_factory() as session:
+        ingest_1 = await DatasetIngestionRepository.get_by_id(session, "ingest-1")
+        ingest_2 = await DatasetIngestionRepository.get_by_id(session, "ingest-2")
+        other_workspace = await DatasetIngestionRepository.get_by_id(session, "ingest-other-workspace")
+        completed = await DatasetIngestionRepository.get_by_id(session, "ingest-complete")
+
+    assert ingest_1.claimed_by is None
+    assert ingest_2.claimed_by is None
+    assert other_workspace.claimed_by == "stale-worker"
+    assert completed.claimed_by == "completed-worker"
+
+
+@pytest.mark.asyncio
 async def test_dataset_ingestion_service_serializes_same_workspace_but_allows_other_workspaces(
     job_session_factory,
     monkeypatch,

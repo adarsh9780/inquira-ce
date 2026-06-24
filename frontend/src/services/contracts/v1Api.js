@@ -39,6 +39,8 @@ export const v1Api = {
       axios.delete(`/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}`),
     ingestions: (workspaceId) =>
       axios.get(`/api/v1/workspaces/${workspaceId}/datasets/ingestions`),
+    resumeIngestions: (workspaceId) =>
+      axios.post(`/api/v1/workspaces/${workspaceId}/datasets/ingestions/resume`),
     ingestionById: (workspaceId, jobId) =>
       axios.get(`/api/v1/workspaces/${workspaceId}/datasets/ingestions/${jobId}`),
     deletions: (workspaceId) =>

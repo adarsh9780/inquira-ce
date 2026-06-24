@@ -877,6 +877,10 @@ export const apiService = {
     return v1Api.datasets.ingestions(workspaceId)
   },
 
+  async v1ResumeDatasetIngestionJobs(workspaceId) {
+    return v1Api.datasets.resumeIngestions(workspaceId)
+  },
+
   async v1GetDatasetIngestionJob(workspaceId, jobId) {
     return v1Api.datasets.ingestionById(workspaceId, jobId)
   },

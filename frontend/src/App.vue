@@ -727,8 +727,6 @@ async function handleAuthenticated(userData) {
     appBootstrap.message = 'Selecting your workspace...'
     await appStore.fetchWorkspaces()
     if (appStore.activeWorkspaceId) {
-      appBootstrap.message = 'Starting your workspace runtime...'
-      await appStore.ensureWorkspaceRuntimeReady(appStore.activeWorkspaceId)
       appBootstrap.message = 'Loading workspace history...'
       await appStore.fetchConversations()
       if (appStore.activeConversationId) {

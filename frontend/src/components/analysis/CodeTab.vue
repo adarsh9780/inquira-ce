@@ -909,7 +909,6 @@ onMounted(async () => {
   await nextTick()
   await fetchSettings()
   await fetchDatabasePaths()
-  await appStore.fetchColumnCatalog({ force: true })
 
   await initializeEditor()
 })
@@ -946,7 +945,9 @@ watch(() => authStore.userId, async (newUserId, oldUserId) => {
 })
 
 watch(() => appStore.activeWorkspaceId, async () => {
-  await appStore.fetchColumnCatalog({ force: true })
+  if (appStore.columnCatalog.length > 0) {
+    appStore.setColumnCatalog([])
+  }
 })
 
 watch(() => appStore.uiCodeFont, () => {

@@ -20,5 +20,5 @@ test('code tab uses appStore column catalog in custom completion source', () => 
   assert.equal(source.includes('function completionSource(context)'), true)
   assert.equal(source.includes('autocompletion({ override: [completionSource] })'), true)
   assert.equal(source.includes('Array.isArray(appStore.columnCatalog)'), true)
-  assert.equal(source.includes('await appStore.fetchColumnCatalog({ force: true })'), true)
+  assert.equal(source.includes('await appStore.fetchColumnCatalog({ force: true })'), false)
 })

@@ -209,3 +209,4 @@ def test_backend_startup_wires_dataset_schema_generation_service() -> None:
     assert "app.state.dataset_schema_generation_service = DatasetSchemaGenerationService()" in source
     assert "DatasetIngestionService(schema_generation_service=app.state.dataset_schema_generation_service)" in source
     assert "await app.state.dataset_schema_generation_service.resume_pending_jobs()" in source
+    assert "await app.state.dataset_ingestion_service.resume_pending_jobs()" not in source
