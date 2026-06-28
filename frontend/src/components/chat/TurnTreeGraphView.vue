@@ -1,7 +1,8 @@
 <template>
   <div :class="rootClass">
-    <div v-if="isEmpty" class="rounded-lg border border-dashed border-[var(--color-border)] px-4 py-8 text-center text-sm text-[var(--color-text-muted)]">
-      {{ emptyLabel }}
+    <div v-if="isEmpty" class="turn-tree-empty-state">
+      <p class="text-sm font-medium text-[var(--color-text-main)]">{{ emptyLabel }}</p>
+      <p class="mt-1 text-xs text-[var(--color-text-muted)]">Ask a question in Chat to build this tree.</p>
     </div>
     <div v-else class="space-y-4">
       <section v-for="conversation in graphConversations" :key="conversation.id" class="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-base)]">
@@ -29,17 +30,18 @@
           :class="variant === 'page' ? 'h-[360px]' : 'h-[300px]'"
           :data-turn-tree-graph="conversation.id"
           @wheel.prevent="handleWheel(conversation.id, $event)"
+          @pointerdown="startPan(conversation.id, $event)"
+          @pointermove="movePan(conversation.id, $event)"
+          @pointerup="stopPan(conversation.id, $event)"
+          @pointercancel="stopPan(conversation.id, $event)"
         >
           <svg
-            class="h-full w-full touch-none select-none"
+            class="turn-tree-edge-layer absolute inset-0 h-full w-full touch-none select-none"
+            data-turn-tree-edge-layer
             role="img"
             :viewBox="svgViewBox(conversation.id)"
             preserveAspectRatio="none"
             :aria-label="`${conversation.title || 'Untitled'} conversation graph`"
-            @pointerdown="startPan(conversation.id, $event)"
-            @pointermove="movePan(conversation.id, $event)"
-            @pointerup="stopPan(conversation.id, $event)"
-            @pointercancel="stopPan(conversation.id, $event)"
           >
             <g :transform="viewportTransform(conversation.id)">
               <path
@@ -53,42 +55,57 @@
                 stroke-linejoin="round"
                 vector-effect="non-scaling-stroke"
               />
-              <foreignObject
-                v-for="node in conversation.layout.nodes"
-                :key="node.id"
-                :x="node.x"
-                :y="node.y"
-                :width="NODE_WIDTH"
-                :height="NODE_HEIGHT"
-              >
-                <div class="h-full" data-graph-interactive>
-                  <div class="relative h-full rounded-lg border transition-colors" :class="nodeClass(conversation, node)">
-                    <button
-                      type="button"
-                      class="flex h-full w-full flex-col overflow-hidden rounded-lg px-3 py-2 pr-8 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
-                      :aria-label="`Open turn ${node.display_no || node.id}`"
-                      :title="nodeUsageTooltip(node)"
-                      @click="selectNode(conversation.id, node.id)"
-                      @contextmenu.prevent="openNodeMenu(conversation.id, node.id, $event)"
-                    >
-                      <span class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
-                        Turn {{ node.display_no || '?' }}
-                        <span v-if="isFinal(conversation, node)" class="rounded-full border border-[var(--color-border)] px-1.5 py-0.5 normal-case tracking-normal">Final</span>
-                      </span>
-                      <span class="mt-1 truncate text-[12px] font-medium text-[var(--color-text-main)]">{{ questionLine(node) }}</span>
-                      <span class="mt-0.5 truncate text-[10px] text-[var(--color-text-muted)]">{{ answerLine(node) }}</span>
-                    </button>
-                    <button
-                      type="button"
-                      class="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-md text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-panel-muted)] hover:text-[var(--color-text-main)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
-                      :aria-label="`Actions for turn ${node.display_no || node.id}`"
-                      @click.stop="openNodeMenu(conversation.id, node.id, $event)"
-                    >
-                      ⋯
-                    </button>
-                  </div>
-                </div>
-              </foreignObject>
+            </g>
+          </svg>
+
+          <div
+            class="turn-tree-node-layer absolute inset-0 touch-none select-none"
+            data-turn-tree-node-layer
+            :style="viewportLayerStyle(conversation.id)"
+          >
+            <div
+              v-for="node in conversation.layout.nodes"
+              :key="node.id"
+              class="turn-tree-node-shell absolute"
+              :style="nodeStyle(node)"
+              data-graph-interactive
+            >
+              <div class="relative h-full rounded-lg border transition-colors" :class="nodeClass(conversation, node)">
+                <button
+                  type="button"
+                  class="flex h-full w-full flex-col overflow-hidden rounded-lg px-3 py-2 pr-8 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+                  :aria-label="`Open turn ${node.display_no || node.id}`"
+                  :title="nodeUsageTooltip(node)"
+                  @click="selectNode(conversation.id, node.id)"
+                  @contextmenu.prevent="openNodeMenu(conversation.id, node.id, $event)"
+                >
+                  <span class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                    Turn {{ node.display_no || '?' }}
+                    <span v-if="isFinal(conversation, node)" class="rounded-full border border-[var(--color-border)] px-1.5 py-0.5 normal-case tracking-normal">Final</span>
+                  </span>
+                  <span class="mt-1 truncate text-[12px] font-medium text-[var(--color-text-main)]">{{ questionLine(node) }}</span>
+                  <span class="mt-0.5 truncate text-[10px] text-[var(--color-text-muted)]">{{ answerLine(node) }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-md text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-panel-muted)] hover:text-[var(--color-text-main)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+                  :aria-label="`Actions for turn ${node.display_no || node.id}`"
+                  @click.stop="openNodeMenu(conversation.id, node.id, $event)"
+                >
+                  ⋯
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <svg
+            class="turn-tree-port-layer pointer-events-none absolute inset-0 h-full w-full touch-none select-none"
+            data-turn-tree-port-layer
+            :viewBox="svgViewBox(conversation.id)"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <g :transform="viewportTransform(conversation.id)">
               <g
                 v-for="node in conversation.layout.nodes"
                 :key="`${node.id}-ports`"
@@ -112,7 +129,7 @@
               </g>
             </g>
           </svg>
-          <div class="absolute bottom-2 right-2 flex items-center gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-panel-elevated)] p-1 shadow-sm" data-graph-interactive>
+          <div class="absolute bottom-2 right-2 z-10 flex items-center gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-panel-elevated)] p-1 shadow-sm" data-graph-interactive>
             <button type="button" class="graph-control" aria-label="Zoom in" title="Zoom in" @click="zoomBy(conversation.id, 1.2)">+</button>
             <button type="button" class="graph-control" aria-label="Zoom out" title="Zoom out" @click="zoomBy(conversation.id, 1 / 1.2)">−</button>
             <button type="button" class="graph-control px-2" aria-label="Reset graph view" title="Fit graph to view" @click="fitToView(conversation.id)">Fit</button>
@@ -256,6 +273,23 @@ function svgViewBox(conversationId) {
 function viewportTransform(conversationId) {
   const viewport = ensureViewport(conversationId)
   return `translate(${viewport.x} ${viewport.y}) scale(${viewport.scale})`
+}
+
+function viewportLayerStyle(conversationId) {
+  const viewport = ensureViewport(conversationId)
+  return {
+    transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})`,
+    transformOrigin: '0 0',
+  }
+}
+
+function nodeStyle(node) {
+  return {
+    left: `${node.x}px`,
+    top: `${node.y}px`,
+    width: `${NODE_WIDTH}px`,
+    height: `${NODE_HEIGHT}px`,
+  }
 }
 
 function conversationById(conversationId) {
@@ -420,6 +454,31 @@ defineExpose({ fitToView, zoomBy })
 </script>
 
 <style scoped>
+.turn-tree-empty-state {
+  border: 1px dashed var(--color-border);
+  border-radius: 0.5rem;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.turn-tree-edge-layer {
+  z-index: 0;
+}
+
+.turn-tree-node-layer {
+  z-index: 1;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.turn-tree-node-shell {
+  pointer-events: auto;
+}
+
+.turn-tree-port-layer {
+  z-index: 2;
+}
+
 .graph-control {
   display: inline-flex;
   min-width: 1.75rem;

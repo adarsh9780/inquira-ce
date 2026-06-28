@@ -195,8 +195,8 @@
       <!-- Empty state: no artifacts at all -->
       <TableEmptyState
         v-else
-        title="No data to display"
-        subtitle="Run code to generate table data"
+        title="No saved tables"
+        subtitle="Run code that creates a dataframe."
       >
         <template #icon>
           <TableCellsIcon class="h-12 w-12 mx-auto mb-3" style="color: var(--color-border);" />

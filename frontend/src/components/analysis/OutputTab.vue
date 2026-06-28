@@ -28,9 +28,9 @@
 
     <div class="min-h-0 flex-1 overflow-hidden">
       <div v-if="filteredEvents.length === 0" class="flex h-full items-center justify-center text-center" style="color: var(--color-text-muted);">
-        <div>
-          <p class="text-sm">No events yet</p>
-          <p class="mt-1 text-xs">Run code to see logs, table outputs, and chart outputs.</p>
+        <div class="max-w-sm px-6">
+          <p class="text-sm font-medium text-[var(--color-text-main)]">No output yet</p>
+          <p class="mt-1 text-xs leading-5">Run code to see logs, errors, tables, and charts.</p>
         </div>
       </div>
 

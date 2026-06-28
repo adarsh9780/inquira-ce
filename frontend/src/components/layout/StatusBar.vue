@@ -146,18 +146,62 @@
 
       <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
 
-      <!-- Workspace Layout Toggle -->
-      <button
-        @click="appStore.cycleWorkspaceLayoutMode()"
-        class="flex items-center gap-1.5 h-full px-1.5 hover:bg-[var(--color-base)] transition-colors"
-        :class="'text-[var(--color-accent)] font-medium'"
-        :title="workspaceLayoutTitle"
-        :aria-label="workspaceLayoutTitle"
+      <!-- Workspace Layout Presets -->
+      <div
+        class="flex h-full items-center gap-0.5"
+        role="group"
+        aria-label="Workspace layout presets"
         :aria-keyshortcuts="workspaceLayoutAriaShortcut"
       >
-        <ViewColumnsIcon class="w-3.5 h-3.5" />
-        <span>{{ workspaceLayoutLabel }}</span>
-      </button>
+        <button
+          type="button"
+          class="status-layout-preset"
+          :class="layoutPresetClass('view')"
+          title="Default view"
+          aria-label="Default view"
+          :aria-pressed="isLayoutPresetActive('view')"
+          @click="setLayoutPreset('view')"
+        >
+          <ViewColumnsIcon class="w-3.5 h-3.5" />
+          <span>View</span>
+        </button>
+        <button
+          type="button"
+          class="status-layout-preset"
+          :class="layoutPresetClass('chat')"
+          title="Chat focus"
+          aria-label="Chat focus"
+          :aria-pressed="isLayoutPresetActive('chat')"
+          @click="setLayoutPreset('chat')"
+        >
+          <ChatBubbleLeftRightIcon class="w-3.5 h-3.5" />
+          <span>Chat</span>
+        </button>
+        <button
+          type="button"
+          class="status-layout-preset"
+          :class="layoutPresetClass('code')"
+          title="Code focus"
+          aria-label="Code focus"
+          :aria-pressed="isLayoutPresetActive('code')"
+          @click="setLayoutPreset('code')"
+        >
+          <CodeBracketIcon class="w-3.5 h-3.5" />
+          <span>Code</span>
+        </button>
+        <button
+          type="button"
+          class="status-layout-preset"
+          :class="layoutPresetClass('output')"
+          title="Data focus"
+          aria-label="Data focus"
+          :aria-pressed="isLayoutPresetActive('output')"
+          @click="setLayoutPreset('output')"
+        >
+          <TableCellsIcon class="w-3.5 h-3.5" />
+          <span>Data</span>
+        </button>
+      </div>
       <span class="sr-only" aria-live="polite">{{ workspaceLayoutAnnouncement }}</span>
 
       <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
@@ -280,13 +324,17 @@ import { settingsWebSocket } from '../../services/websocketService'
 import { formatUsageCompact, formatUsageTooltip } from '../../utils/usageFormat'
 import {
   BellIcon,
+  ChatBubbleLeftRightIcon,
   ChevronUpDownIcon,
+  CodeBracketIcon,
   CommandLineIcon,
   ViewColumnsIcon,
   ExclamationTriangleIcon,
+  TableCellsIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import { toast, useToast } from '../../composables/useToast'
+import { WORKSPACE_LAYOUT_MODES } from '../../utils/workspaceLayout'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -325,18 +373,56 @@ const artifactUsage = ref({
 const workspaceResourceRecommendation = ref(null)
 
 const workspaceLayoutLabel = computed(() => {
-  if (appStore.workspaceLayoutMode === 'chat') return 'Chat'
-  if (appStore.workspaceLayoutMode === 'output') return 'Output'
+  if (appStore.workspaceLayoutMode === WORKSPACE_LAYOUT_MODES.CHAT) {
+    if (appStore.workspacePane === 'code') return 'Code'
+    if (appStore.workspacePane === 'ctree') return 'Tree'
+    return 'Chat'
+  }
+  if (appStore.workspaceLayoutMode === WORKSPACE_LAYOUT_MODES.OUTPUT) return 'Data'
   return 'View'
-})
-
-const workspaceLayoutTitle = computed(() => {
-  return `${workspaceLayoutLabel.value} layout. Click to cycle View, Chat, and Output.`
 })
 
 const workspaceLayoutAriaShortcut = 'Control+Alt+V Meta+Alt+V Control+Alt+C Meta+Alt+C Control+Alt+O Meta+Alt+O'
 
 const workspaceLayoutAnnouncement = computed(() => `${workspaceLayoutLabel.value} layout active`)
+
+function setLayoutPreset(preset) {
+  if (preset === 'view') {
+    appStore.setWorkspaceLayoutMode(WORKSPACE_LAYOUT_MODES.VIEW)
+    return
+  }
+  if (preset === 'chat') {
+    appStore.setWorkspaceLayoutMode(WORKSPACE_LAYOUT_MODES.CHAT)
+    appStore.setWorkspacePane('chat')
+    return
+  }
+  if (preset === 'code') {
+    appStore.setWorkspaceLayoutMode(WORKSPACE_LAYOUT_MODES.CHAT)
+    appStore.setWorkspacePane('code')
+    return
+  }
+  if (preset === 'output') {
+    appStore.setWorkspaceLayoutMode(WORKSPACE_LAYOUT_MODES.OUTPUT)
+  }
+}
+
+function isLayoutPresetActive(preset) {
+  if (preset === 'view') return appStore.workspaceLayoutMode === WORKSPACE_LAYOUT_MODES.VIEW
+  if (preset === 'output') return appStore.workspaceLayoutMode === WORKSPACE_LAYOUT_MODES.OUTPUT
+  if (preset === 'code') {
+    return appStore.workspaceLayoutMode === WORKSPACE_LAYOUT_MODES.CHAT && appStore.workspacePane === 'code'
+  }
+  if (preset === 'chat') {
+    return appStore.workspaceLayoutMode === WORKSPACE_LAYOUT_MODES.CHAT && appStore.workspacePane === 'chat'
+  }
+  return false
+}
+
+function layoutPresetClass(preset) {
+  return isLayoutPresetActive(preset)
+    ? 'text-[var(--color-accent)] bg-[var(--color-base)]'
+    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] hover:bg-[var(--color-base)]'
+}
 
 const unreadNotificationBadge = computed(() => {
   const count = Number(unreadNotificationCount.value || 0)
@@ -878,3 +964,15 @@ watch(() => authStore.isAuthenticated, (authenticated) => {
   }
 })
 </script>
+
+<style scoped>
+.status-layout-preset {
+  align-items: center;
+  border-radius: 0.375rem;
+  display: inline-flex;
+  gap: 0.25rem;
+  height: 1.5rem;
+  padding: 0 0.375rem;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+</style>

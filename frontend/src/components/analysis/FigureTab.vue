@@ -92,7 +92,7 @@
       >
         <div class="max-w-xl px-6 text-center">
           <ChartBarIcon class="h-12 w-12 mx-auto mb-3" style="color: var(--color-border);" />
-          <p class="text-sm" style="color: var(--color-text-muted);">No chart to display</p>
+          <p class="text-sm font-medium" style="color: var(--color-text-main);">No saved charts</p>
           <p
             v-if="artifactListError"
             class="mt-3 rounded-md px-4 py-3 text-sm"
@@ -105,7 +105,7 @@
             class="text-xs mt-1"
             style="color: var(--color-text-muted);"
           >
-            Run code that generates a Plotly figure
+            Run code that creates a Plotly figure.
           </p>
         </div>
       </div>

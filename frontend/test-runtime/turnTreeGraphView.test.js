@@ -90,6 +90,26 @@ describe('TurnTreeGraphView', () => {
     expect(wrapper.get('svg g').attributes('transform')).not.toBe(before)
   })
 
+  it('keeps edge, node, and port layers on the same viewport transform', async () => {
+    const wrapper = mount(TurnTreeGraphView, { props: { conversations: [conversations[0]] } })
+    const graph = wrapper.get('[data-turn-tree-graph="conversation-1"]').element
+    Object.defineProperty(graph, 'clientWidth', { value: 600 })
+    Object.defineProperty(graph, 'clientHeight', { value: 360 })
+    graph.getBoundingClientRect = () => ({ left: 0, top: 0, width: 600, height: 360 })
+
+    await wrapper.get('button[aria-label="Reset graph view"]').trigger('click')
+    await wrapper.get('button[aria-label="Zoom in"]').trigger('click')
+
+    const edgeTransform = wrapper.get('[data-turn-tree-edge-layer] g').attributes('transform')
+    const portTransform = wrapper.get('[data-turn-tree-port-layer] g').attributes('transform')
+    const nodeLayerStyle = wrapper.get('[data-turn-tree-node-layer]').attributes('style')
+    const match = edgeTransform.match(/^translate\(([-\d.]+) ([-\d.]+)\) scale\(([-\d.]+)\)$/)
+
+    expect(portTransform).toBe(edgeTransform)
+    expect(match).toBeTruthy()
+    expect(nodeLayerStyle).toContain(`translate(${match[1]}px, ${match[2]}px) scale(${match[3]})`)
+  })
+
   it('collapses and expands each conversation from its header', async () => {
     const wrapper = mount(TurnTreeGraphView, { props: { conversations: [conversations[0]] } })
     await wrapper.vm.$nextTick()

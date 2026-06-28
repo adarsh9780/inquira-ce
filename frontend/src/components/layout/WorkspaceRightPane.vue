@@ -2,7 +2,7 @@
   <div class="flex h-full w-full min-h-0 min-w-0 flex-col" style="background-color: var(--color-workspace-surface);">
     <div
       ref="headerRef"
-      class="workspace-toolbar-shell flex-shrink-0 h-16 px-3 flex items-center"
+      class="workspace-toolbar-shell flex-shrink-0 h-12 px-3 flex items-center"
       style="background-color: var(--color-workspace-surface);"
     >
       <div class="workspace-toolbar-zone workspace-toolbar-zone-left">
@@ -18,9 +18,8 @@
           <button
             @click="appStore.setDataPane('table')"
             class="data-pane-tab"
-            :style="appStore.dataPane === 'table'
-              ? 'color: var(--color-text-main); box-shadow: inset 0 -2px 0 0 var(--color-accent);'
-              : 'color: var(--color-text-muted);'"
+            :class="appStore.dataPane === 'table' ? 'data-pane-tab-active' : ''"
+            :aria-pressed="appStore.dataPane === 'table'"
             title="Table"
             aria-label="Table"
           >
@@ -30,9 +29,8 @@
           <button
             @click="appStore.setDataPane('figure')"
             class="data-pane-tab"
-            :style="appStore.dataPane === 'figure'
-              ? 'color: var(--color-text-main); box-shadow: inset 0 -2px 0 0 var(--color-accent);'
-              : 'color: var(--color-text-muted);'"
+            :class="appStore.dataPane === 'figure' ? 'data-pane-tab-active' : ''"
+            :aria-pressed="appStore.dataPane === 'figure'"
             title="Chart"
             aria-label="Chart"
           >
@@ -42,9 +40,8 @@
           <button
             @click="appStore.setDataPane('output')"
             class="data-pane-tab"
-            :style="appStore.dataPane === 'output'
-              ? 'color: var(--color-text-main); box-shadow: inset 0 -2px 0 0 var(--color-accent);'
-              : 'color: var(--color-text-muted);'"
+            :class="appStore.dataPane === 'output' ? 'data-pane-tab-active' : ''"
+            :aria-pressed="appStore.dataPane === 'output'"
             title="Output"
             aria-label="Output"
           >
@@ -160,11 +157,33 @@ onUnmounted(() => {
   justify-content: center;
   gap: 0.375rem;
   border-radius: 0;
-  padding: 0.625rem 0.75rem 0.5rem;
-  transition: color 150ms ease, box-shadow 150ms ease;
+  color: var(--color-text-muted);
+  height: 2rem;
+  padding: 0 0.625rem;
+  position: relative;
+  transition: color 150ms ease;
+}
+
+.data-pane-tab::after {
+  background: transparent;
+  bottom: -0.5rem;
+  content: '';
+  height: 2px;
+  left: 0.5rem;
+  position: absolute;
+  right: 0.5rem;
+  transition: background-color 150ms ease;
 }
 
 .data-pane-tab:hover {
   color: var(--color-text-main);
+}
+
+.data-pane-tab-active {
+  color: var(--color-text-main);
+}
+
+.data-pane-tab-active::after {
+  background: var(--color-accent);
 }
 </style>
