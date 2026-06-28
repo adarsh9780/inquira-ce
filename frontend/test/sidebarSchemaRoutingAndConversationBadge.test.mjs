@@ -47,6 +47,7 @@ test('activating a conversation returns the shell to workspace chat', () => {
   assert.equal(globalTreeSource.includes('if (targetConversationId !== appStore.activeConversationId) {'), true)
   assert.equal(globalTreeSource.includes('appStore.setActiveConversationId(targetConversationId)'), true)
   assert.equal(globalTreeSource.includes("appStore.setActiveTab('workspace')"), true)
+  assert.equal(globalTreeSource.includes("appStore.setWorkspacePane?.('chat')"), true)
   assert.equal(globalTreeSource.includes('await appStore.fetchConversationTurns({ reset: true })'), true)
 })
 

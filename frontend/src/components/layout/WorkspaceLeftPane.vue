@@ -20,6 +20,15 @@
         >
           Chat
         </button>
+        <button
+          @click="appStore.setWorkspacePane('ctree')"
+          class="workspace-pane-tab"
+          :style="appStore.workspacePane === 'ctree'
+            ? 'color: var(--color-text-main); box-shadow: inset 0 -2px 0 0 var(--color-accent);'
+            : 'color: var(--color-text-muted);'"
+        >
+          Ctree
+        </button>
       </div>
       
       <!-- Teleport Target for Code/Chat Toolbar -->
@@ -37,6 +46,9 @@
       <div v-show="appStore.workspacePane === 'chat'" class="h-full">
         <ChatTab />
       </div>
+      <div v-show="appStore.workspacePane === 'ctree'" class="h-full">
+        <SidebarGlobalTurnTree variant="page" />
+      </div>
       </div>
 
       <div class="flex-shrink-0 pt-2 sm:pt-3" style="background-color: var(--color-workspace-surface);">
@@ -52,6 +64,7 @@ import { useAppStore } from '../../stores/appStore'
 import CodeTab from '../analysis/CodeTab.vue'
 import ChatTab from '../chat/ChatTab.vue'
 import ChatInput from '../chat/ChatInput.vue'
+import SidebarGlobalTurnTree from './sidebar/SidebarGlobalTurnTree.vue'
 
 const appStore = useAppStore()
 const isChatOnlyMode = computed(() => appStore.workspacePane === 'chat' && appStore.workspaceLayoutMode === 'chat')

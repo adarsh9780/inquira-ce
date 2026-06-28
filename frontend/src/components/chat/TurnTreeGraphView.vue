@@ -33,6 +33,8 @@
           <svg
             class="h-full w-full touch-none select-none"
             role="img"
+            :viewBox="svgViewBox(conversation.id)"
+            preserveAspectRatio="none"
             :aria-label="`${conversation.title || 'Untitled'} conversation graph`"
             @pointerdown="startPan(conversation.id, $event)"
             @pointermove="movePan(conversation.id, $event)"
@@ -45,8 +47,8 @@
                 :key="edge.id"
                 :d="edgePath(conversation, edge)"
                 fill="none"
-                stroke="var(--color-border-hover)"
-                stroke-width="2"
+                class="turn-tree-edge"
+                :class="activeEdgeIds(conversation).has(edge.id) ? 'turn-tree-edge-active' : ''"
                 stroke-linecap="round"
                 stroke-linejoin="round"
                 vector-effect="non-scaling-stroke"
@@ -159,6 +161,7 @@ const emit = defineEmits(['select', 'mark-final', 'delete-turn'])
 const nodeActionsRef = ref(null)
 const canvasRefs = new Map()
 const viewports = reactive({})
+const canvasSizes = reactive({})
 const expandedConversationIds = ref(new Set())
 let resizeObserver = null
 
@@ -226,11 +229,28 @@ function setCanvasRef(conversationId, element) {
   if (previous && resizeObserver) resizeObserver.unobserve(previous)
   if (!element) {
     canvasRefs.delete(conversationId)
+    delete canvasSizes[conversationId]
     return
   }
   canvasRefs.set(conversationId, element)
   ensureViewport(conversationId)
+  updateCanvasSize(conversationId, element)
   if (resizeObserver) resizeObserver.observe(element)
+}
+
+function updateCanvasSize(conversationId, element = canvasRefs.get(conversationId)) {
+  if (!element) return
+  const rect = element.getBoundingClientRect?.()
+  const width = Math.max(1, Math.round(element.clientWidth || rect?.width || 1))
+  const height = Math.max(1, Math.round(element.clientHeight || rect?.height || 1))
+  const current = canvasSizes[conversationId]
+  if (current?.width === width && current?.height === height) return
+  canvasSizes[conversationId] = { width, height }
+}
+
+function svgViewBox(conversationId) {
+  const size = canvasSizes[conversationId] || { width: 1, height: 1 }
+  return `0 0 ${size.width} ${size.height}`
 }
 
 function viewportTransform(conversationId) {
@@ -248,6 +268,21 @@ function edgePath(conversation, edge) {
   return turnTreeGraphEdgePath(parent, child)
 }
 
+function activeEdgeIds(conversation) {
+  const activeId = String(props.currentTurnId || '').trim()
+  if (!activeId) return new Set()
+  const childToEdge = new Map(conversation.layout.edges.map((edge) => [edge.childId, edge]))
+  const ids = new Set()
+  let cursor = activeId
+  while (cursor) {
+    const edge = childToEdge.get(cursor)
+    if (!edge || ids.has(edge.id)) break
+    ids.add(edge.id)
+    cursor = edge.parentId
+  }
+  return ids
+}
+
 function nodeInputPort(node) {
   return turnTreeGraphPort(node, 'input')
 }
@@ -260,8 +295,9 @@ function fitToView(conversationId) {
   const element = canvasRefs.get(conversationId)
   const conversation = conversationById(conversationId)
   if (!element || !conversation || conversation.layout.bounds.width === 0) return
-  const width = element.clientWidth || 1
-  const height = element.clientHeight || 1
+  updateCanvasSize(conversationId, element)
+  const width = canvasSizes[conversationId]?.width || 1
+  const height = canvasSizes[conversationId]?.height || 1
   const scale = clamp(Math.min(width / conversation.layout.bounds.width, height / conversation.layout.bounds.height) * 0.92, MIN_SCALE, 1.5)
   const viewport = ensureViewport(conversationId)
   viewport.scale = scale
@@ -361,7 +397,10 @@ onMounted(() => {
     resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const match = [...canvasRefs.entries()].find(([, element]) => element === entry.target)
-        if (match) fitToView(match[0])
+        if (match) {
+          updateCanvasSize(match[0], entry.target)
+          fitToView(match[0])
+        }
       }
     })
     for (const element of canvasRefs.values()) resizeObserver.observe(element)
@@ -401,6 +440,17 @@ defineExpose({ fitToView, zoomBy })
 .graph-control:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 1px;
+}
+
+.turn-tree-edge {
+  stroke: color-mix(in srgb, var(--color-border-hover) 78%, transparent);
+  stroke-width: 2;
+  transition: stroke 160ms ease, stroke-width 160ms ease, opacity 160ms ease;
+}
+
+.turn-tree-edge-active {
+  stroke: var(--color-accent);
+  stroke-width: 2.75;
 }
 
 .turn-tree-port {

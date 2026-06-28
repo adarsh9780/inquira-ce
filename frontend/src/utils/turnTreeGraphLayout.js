@@ -101,8 +101,17 @@ export function turnTreeGraphEdgePath(parent, child) {
   if (!parent || !child) return ''
   const { x: startX, y: startY } = turnTreeGraphPort(parent, 'output')
   const { x: endX, y: endY } = turnTreeGraphPort(child, 'input')
-  const middleX = startX + ((endX - startX) / 2)
-  return `M ${startX} ${startY} H ${middleX} V ${endY} H ${endX}`
+  const deltaX = endX - startX
+  const deltaY = endY - startY
+  const midX = startX + (deltaX / 2)
+  const midY = startY + (deltaY / 2)
+  const waveDirection = deltaY < 0 ? -1 : 1
+  const wave = clamp(Math.abs(deltaY) * 0.18, 8, 24) * waveDirection
+  return [
+    `M ${startX} ${startY}`,
+    `C ${startX + (deltaX * 0.28)} ${startY + wave} ${midX - (deltaX * 0.12)} ${midY - wave} ${midX} ${midY}`,
+    `C ${midX + (deltaX * 0.12)} ${midY + wave} ${endX - (deltaX * 0.28)} ${endY - wave} ${endX} ${endY}`,
+  ].join(' ')
 }
 
 export function turnTreeGraphPort(node, side) {
@@ -111,4 +120,8 @@ export function turnTreeGraphPort(node, side) {
     x: side === 'output' ? node.x + TURN_TREE_GRAPH_NODE_WIDTH : node.x,
     y: node.y + (TURN_TREE_GRAPH_NODE_HEIGHT / 2),
   }
+}
+
+function clamp(value, minimum, maximum) {
+  return Math.min(maximum, Math.max(minimum, value))
 }

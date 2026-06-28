@@ -8,6 +8,7 @@ test('workspace left pane hosts a shared chat composer below both code and chat 
   const source = readFileSync(leftPanePath, 'utf-8')
 
   assert.equal(source.includes("import ChatInput from '../chat/ChatInput.vue'"), true)
+  assert.equal(source.includes("import SidebarGlobalTurnTree from './sidebar/SidebarGlobalTurnTree.vue'"), true)
   assert.equal(source.includes('<ChatInput />'), true)
   assert.equal(source.includes('class="inline-flex items-center gap-1 flex-shrink-0"'), true)
   assert.equal(source.includes('class="workspace-pane-tab"'), true)
@@ -17,6 +18,9 @@ test('workspace left pane hosts a shared chat composer below both code and chat 
   assert.equal(source.includes("class=\"flex-shrink-0 pt-2 sm:pt-3\""), true)
   assert.equal(source.includes("v-show=\"appStore.workspacePane === 'code'\""), true)
   assert.equal(source.includes("v-show=\"appStore.workspacePane === 'chat'\""), true)
+  assert.equal(source.includes("v-show=\"appStore.workspacePane === 'ctree'\""), true)
+  assert.equal(source.includes("appStore.setWorkspacePane('ctree')"), true)
+  assert.equal(source.includes('<SidebarGlobalTurnTree variant="page" />'), true)
 })
 
 test('chat tab keeps history content but no longer owns its own composer instance', () => {

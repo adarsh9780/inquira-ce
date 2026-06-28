@@ -36,7 +36,7 @@ describe('turn tree graph layout', () => {
 
     expect(layout.nodes.map((node) => node.id).sort()).toEqual(['root', 'valid'])
     expect(layout.edges).toHaveLength(1)
-    expect(turnTreeGraphEdgePath(layout.nodes[1], layout.nodes[0])).toContain(' H ')
+    expect(turnTreeGraphEdgePath(layout.nodes[1], layout.nodes[0])).toContain(' C ')
   })
 
   it('assigns contiguous display numbers when stored sequence numbers have gaps', () => {
@@ -51,13 +51,14 @@ describe('turn tree graph layout', () => {
     expect(byId['turn-6'].display_no).toBe(3)
   })
 
-  it('draws connected elbow edges from the parent boundary to the child boundary', () => {
+  it('draws connected curved edges from the parent boundary to the child boundary', () => {
     const parent = { x: 10, y: 20 }
     const child = { x: 400, y: 140 }
     const path = turnTreeGraphEdgePath(parent, child)
 
     expect(path.startsWith('M 230 64')).toBe(true)
-    expect(path.endsWith('H 400')).toBe(true)
+    expect(path).toContain(' C ')
+    expect(path.endsWith('400 184')).toBe(true)
   })
 
   it('returns empty bounds for an empty tree', () => {

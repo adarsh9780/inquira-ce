@@ -29,6 +29,8 @@ describe('TurnTreeGraphView', () => {
 
     expect(wrapper.findAll('[data-turn-tree-graph]')).toHaveLength(2)
     expect(wrapper.findAll('svg[role="img"]')).toHaveLength(2)
+    expect(wrapper.get('svg').attributes('viewBox')).toMatch(/^0 0 /)
+    expect(wrapper.findAll('.turn-tree-edge-active')).toHaveLength(1)
     expect(wrapper.text()).toContain('Final')
     expect(wrapper.findAll('button[aria-label^="Open turn"]')).toHaveLength(3)
 

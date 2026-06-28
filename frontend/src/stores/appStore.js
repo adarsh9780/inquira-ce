@@ -233,6 +233,12 @@ export const useAppStore = defineStore('app', () => {
   const MAX_TERMINAL_STREAM_CHARS = 200000
   const MAX_TERMINAL_TOTAL_CHARS = 2000000
   const MAX_QUESTION_HISTORY = 30
+  const WORKSPACE_PANES = new Set(['code', 'chat', 'ctree'])
+
+  function normalizeWorkspacePane(pane) {
+    const normalized = String(pane || '').trim().toLowerCase()
+    return WORKSPACE_PANES.has(normalized) ? normalized : 'chat'
+  }
 
   function cloneConversationValue(value) {
     if (Array.isArray(value)) return value.map((item) => cloneConversationValue(item))
@@ -653,6 +659,9 @@ export const useAppStore = defineStore('app', () => {
       } else if (restoredTab === 'chat') {
         activeTab.value = 'workspace'
         workspacePane.value = 'chat'
+      } else if (restoredTab === 'ctree') {
+        activeTab.value = 'workspace'
+        workspacePane.value = 'ctree'
       } else if (restoredTab === 'preview') {
         activeTab.value = 'workspace'
       } else {
@@ -660,7 +669,7 @@ export const useAppStore = defineStore('app', () => {
       }
     }
     if (typeof ui.workspace_pane === 'string' && ui.workspace_pane.trim()) {
-      workspacePane.value = ui.workspace_pane === 'chat' ? 'chat' : 'code'
+      workspacePane.value = normalizeWorkspacePane(ui.workspace_pane)
     }
     if (typeof ui.data_pane === 'string' && ui.data_pane.trim()) {
       dataPane.value = ['table', 'figure', 'output'].includes(ui.data_pane) ? ui.data_pane : 'table'
@@ -3293,6 +3302,9 @@ export const useAppStore = defineStore('app', () => {
     } else if (normalized === 'chat') {
       activeTab.value = 'workspace'
       workspacePane.value = 'chat'
+    } else if (normalized === 'ctree') {
+      activeTab.value = 'workspace'
+      workspacePane.value = 'ctree'
     } else if (['table', 'figure', 'output'].includes(normalized)) {
       // Route data-related tabs to the right pane instead of a full-screen view
       activeTab.value = 'workspace'
@@ -3309,7 +3321,7 @@ export const useAppStore = defineStore('app', () => {
     saveLocalConfig()
   }
   function setWorkspacePane(pane) {
-    workspacePane.value = pane === 'chat' ? 'chat' : 'code'
+    workspacePane.value = normalizeWorkspacePane(pane)
     activeTab.value = 'workspace'
     saveLocalConfig()
   }

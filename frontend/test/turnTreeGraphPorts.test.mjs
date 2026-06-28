@@ -32,14 +32,13 @@ test('turn tree edge paths connect visible parent and child port centers', () =>
     const child = layout.nodes.find((node) => node.id === edge.childId)
     const output = turnTreeGraphPort(parent, 'output')
     const input = turnTreeGraphPort(child, 'input')
-    const middleX = output.x + ((input.x - output.x) / 2)
+    const path = turnTreeGraphEdgePath(parent, child)
 
     assert.equal(output.x, parent.x + TURN_TREE_GRAPH_NODE_WIDTH)
     assert.equal(input.x, child.x)
-    assert.equal(
-      turnTreeGraphEdgePath(parent, child),
-      `M ${output.x} ${output.y} H ${middleX} V ${input.y} H ${input.x}`,
-    )
+    assert.equal(path.startsWith(`M ${output.x} ${output.y}`), true)
+    assert.equal(path.includes(' C '), true)
+    assert.equal(path.endsWith(`${input.x} ${input.y}`), true)
   }
 })
 
@@ -52,4 +51,6 @@ test('turn tree graph renders explicit ports above flush node cards and keeps wh
   assert.equal(graphViewSource.includes("turnTreeGraphPort(node, 'input')"), true)
   assert.equal(graphViewSource.includes("turnTreeGraphPort(node, 'output')"), true)
   assert.equal(graphViewSource.includes('@wheel.prevent="handleWheel(conversation.id, $event)"'), true)
+  assert.equal(graphViewSource.includes(':viewBox="svgViewBox(conversation.id)"'), true)
+  assert.equal(graphViewSource.includes('turn-tree-edge-active'), true)
 })

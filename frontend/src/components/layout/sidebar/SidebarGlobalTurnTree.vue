@@ -90,6 +90,7 @@ async function selectTurn(payload) {
     }
     await appStore.loadActiveTurnRelations(targetTurnId)
     appStore.setActiveTab('workspace')
+    appStore.setWorkspacePane?.('chat')
   } catch (error) {
     toast.error('Turn load failed', extractApiErrorMessage(error, 'Unable to open this turn.'))
   }
