@@ -1,5 +1,6 @@
 
 import asyncio
+import argparse
 import aiosqlite
 import pickle
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -10,11 +11,19 @@ if not hasattr(aiosqlite.Connection, "is_alive"):
         return True
     aiosqlite.Connection.is_alive = is_alive
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Inspect a local LangGraph checkpoint database.")
+    parser.add_argument("--db-path", default=None, help="Path to chat_history.db. Defaults to ~/.inquira/chat_history.db.")
+    parser.add_argument("--thread-id", default="", help="Optional checkpoint thread id to inspect.")
+    return parser.parse_args()
+
+
 async def inspect_db():
+    args = parse_args()
     # Path found in main.py logs or standard location
     # User's home / .inquira / chat_history.db
     import pathlib
-    db_path = pathlib.Path.home() / ".inquira" / "chat_history.db"
+    db_path = pathlib.Path(args.db_path).expanduser() if args.db_path else pathlib.Path.home() / ".inquira" / "chat_history.db"
     
     print(f"Inspecting DB at: {db_path}")
     
@@ -35,10 +44,10 @@ async def inspect_db():
             except Exception as e:
                 print(f"Error querying table: {e}")
                 
-        # Let's try to guess the thread_id based on logs or standard format
-        # User ID: 12e2bcd0-ce81-4cec-8272-12bca7d0b7dc
-        # Data Path: /Users/adarshmaurya/Downloads/data/Spotify Youtube Dataset.csv
-        thread_id = "12e2bcd0-ce81-4cec-8272-12bca7d0b7dc:/Users/adarshmaurya/Downloads/data/Spotify Youtube Dataset.csv"
+        thread_id = str(args.thread_id or "").strip()
+        if not thread_id:
+            print("\nNo --thread-id provided; skipping targeted checkpoint read.")
+            return
         print(f"\nTargeting Thread ID: {thread_id}")
         
         config = {"configurable": {"thread_id": thread_id}}

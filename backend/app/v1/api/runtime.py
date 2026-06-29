@@ -376,21 +376,38 @@ _DEFAULT_TERMINAL_DENYLIST = [
     r"(^|\s)rm\s+-rf\s+/",
     r":\(\)\s*\{\s*:\|:\s*&\s*\};:",
 ]
-_DEFAULT_TERMINAL_ALLOWLIST = {
+_COMMON_TERMINAL_ALLOWLIST = {
     "uv",
     "python",
-    "python3",
     "py",
     "pip",
+    "cd",
+}
+_POSIX_TERMINAL_ALLOWLIST = {
+    "python3",
     "pip3",
     "ls",
     "grep",
-    "cd",
+    "pwd",
+}
+_WINDOWS_TERMINAL_ALLOWLIST = {
+    "dir",
+    "type",
+    "where",
+    "get-childitem",
+    "select-string",
     "pwd",
 }
 _BLOCKED_TERMINAL_SYNTAX_RE = re.compile(r"(&&|\|\||;|>|<|`|\$\(|\r|\n)")
 _ARTIFACT_DUCKDB_WARNING_THRESHOLD_BYTES = 1024 * 1024 * 1024
 _ARTIFACT_FIGURE_WARNING_THRESHOLD_COUNT = 20
+
+
+def _default_terminal_allowlist(os_name: str | None = None) -> set[str]:
+    platform_name = os_name or os.name
+    if platform_name == "nt":
+        return _COMMON_TERMINAL_ALLOWLIST | _WINDOWS_TERMINAL_ALLOWLIST
+    return _COMMON_TERMINAL_ALLOWLIST | _POSIX_TERMINAL_ALLOWLIST
 
 
 def _normalize_table_name(raw: str) -> str:
@@ -2513,7 +2530,7 @@ def _enforce_terminal_command_policy(command: str, config: Any) -> None:
         for a in (config.terminal_command_allowlist or [])
         if str(a).strip()
     }
-    effective_allowlist = allowlist or _DEFAULT_TERMINAL_ALLOWLIST
+    effective_allowlist = allowlist or _default_terminal_allowlist()
 
     segments = [seg.strip() for seg in trimmed.split("|") if seg.strip()]
     for segment in segments:

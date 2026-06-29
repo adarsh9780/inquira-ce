@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from dotenv import load_dotenv
 
@@ -22,6 +22,11 @@ def _load_env_files() -> None:
 
 
 _load_env_files()
+
+
+def sqlite_async_url(path: PurePath) -> str:
+    """Build a SQLAlchemy async SQLite URL with portable path separators."""
+    return f"sqlite+aiosqlite:///{path.as_posix()}"
 
 
 @dataclass(frozen=True)
@@ -38,8 +43,8 @@ class V1Settings:
     def load() -> "V1Settings":
         default_dir = Path.home() / ".inquira"
         default_dir.mkdir(parents=True, exist_ok=True)
-        default_auth_db = f"sqlite+aiosqlite:///{default_dir / 'auth_v1.db'}"
-        default_appdata_db = f"sqlite+aiosqlite:///{default_dir / 'appdata_v1.db'}"
+        default_auth_db = sqlite_async_url(default_dir / "auth_v1.db")
+        default_appdata_db = sqlite_async_url(default_dir / "appdata_v1.db")
 
         return V1Settings(
             auth_db_url=os.getenv("INQUIRA_AUTH_DB_URL", default_auth_db),

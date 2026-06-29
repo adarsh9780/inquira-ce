@@ -108,6 +108,7 @@ import { computed, ref, watch } from 'vue'
 import { useLLMConfig } from '../../composables/useLLMConfig'
 import { useAppStore } from '../../stores/appStore'
 import { toast } from '../../composables/useToast'
+import { filenameFromPath } from '../../utils/pathUtils'
 import LLMSettingsTab from './tabs/LLMSettingsTab.vue'
 import WorkspaceTab from './tabs/WorkspaceTab.vue'
 import AppearanceTab from './tabs/AppearanceTab.vue'
@@ -165,7 +166,7 @@ const workspaceItems = computed(() => {
   const items = Array.isArray(appStore.workspaces) ? appStore.workspaces : []
   return items.map((workspace) => {
     const duckdbPath = String(workspace?.duckdb_path || '').trim()
-    const filename = duckdbPath.split('/').pop() || 'workspace.duckdb'
+    const filename = filenameFromPath(duckdbPath, 'workspace.duckdb')
     return {
       ...workspace,
       filename,

@@ -1,5 +1,6 @@
 
 import asyncio
+import argparse
 import aiosqlite
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from src.app.agent.graph import build_graph
@@ -10,12 +11,20 @@ if not hasattr(aiosqlite.Connection, "is_alive"):
         return True
     aiosqlite.Connection.is_alive = is_alive
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Inspect LangGraph state history for a thread.")
+    parser.add_argument("--db-path", default=None, help="Path to chat_history.db. Defaults to ~/.inquira/chat_history.db.")
+    parser.add_argument("--thread-id", required=True, help="Checkpoint thread id to inspect.")
+    parser.add_argument("--limit", type=int, default=10, help="Maximum snapshots to print.")
+    return parser.parse_args()
+
+
 async def inspect_full_history():
+    args = parse_args()
     import pathlib
-    db_path = pathlib.Path.home() / ".inquira" / "chat_history.db"
-    
-    # Target thread from previous inspection
-    thread_id = "12e2bcd0-ce81-4cec-8272-12bca7d0b7dc:/Users/adarshmaurya/Downloads/data/Spotify Youtube Dataset.csv"
+    db_path = pathlib.Path(args.db_path).expanduser() if args.db_path else pathlib.Path.home() / ".inquira" / "chat_history.db"
+
+    thread_id = str(args.thread_id).strip()
     config = {"configurable": {"thread_id": thread_id}}
     
     print(f"Inspecting Full History for: {thread_id}")
@@ -46,8 +55,8 @@ async def inspect_full_history():
             if "messages" in values:
                 print(f"  MESSAGES: {len(values['messages'])} msgs")
                 
-            if count >= 10:
-                print("... stopping after 10 snapshots ...")
+            if count >= max(1, int(args.limit)):
+                print(f"... stopping after {max(1, int(args.limit))} snapshots ...")
                 break
 
 if __name__ == "__main__":

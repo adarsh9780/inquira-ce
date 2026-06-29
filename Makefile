@@ -75,7 +75,8 @@ status:
 
 check: test-fast verify-version
 
-doctor: check
+doctor:
+	uv run python scripts/maintenance/ce_ops.py doctor
 
 check-input-version:
 	@test -n "$(EFFECTIVE_VERSION)" || (echo "Usage: make setv 0.5.24"; exit 1)

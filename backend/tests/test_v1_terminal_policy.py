@@ -23,6 +23,30 @@ def test_terminal_policy_allows_uv_python_ls_grep_and_cd():
     runtime_api._enforce_terminal_command_policy("cd src", config)
 
 
+def test_default_terminal_allowlist_is_platform_aware():
+    posix = runtime_api._default_terminal_allowlist("posix")
+    windows = runtime_api._default_terminal_allowlist("nt")
+
+    assert {"ls", "grep", "python3", "pip3"}.issubset(posix)
+    assert {"dir", "type", "where", "get-childitem", "select-string"}.issubset(windows)
+    assert "python3" not in windows
+    assert "dir" not in posix
+
+
+def test_terminal_policy_allows_windows_default_commands(monkeypatch):
+    monkeypatch.setattr(runtime_api.os, "name", "nt", raising=False)
+    config = _runtime_config()
+
+    runtime_api._enforce_terminal_command_policy("dir", config)
+    runtime_api._enforce_terminal_command_policy("type README.md", config)
+    runtime_api._enforce_terminal_command_policy("where python", config)
+    runtime_api._enforce_terminal_command_policy("Get-ChildItem", config)
+    runtime_api._enforce_terminal_command_policy("Select-String py README.md", config)
+
+    with pytest.raises(HTTPException):
+        runtime_api._enforce_terminal_command_policy("python3 -V", config)
+
+
 def test_terminal_policy_blocks_disallowed_commands():
     config = _runtime_config()
     with pytest.raises(HTTPException):

@@ -35,4 +35,6 @@ def test_ci_workflow_runs_agent_and_tauri_tests():
     assert "\n  agent:" in text
     assert "pytest tests -q" in text
     assert "\n  tauri:" in text
+    assert "os: [ubuntu-latest, macos-latest, windows-latest]" in text
+    assert "if: runner.os == 'Linux'" in text
     assert "cargo test" in text

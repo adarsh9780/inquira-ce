@@ -216,6 +216,7 @@ import {
   getDroppedDatasetPaths,
   SUPPORTED_DATASET_EXTENSIONS,
 } from '../../../utils/datasetImport'
+import { filenameFromPath } from '../../../utils/pathUtils'
 import ConfirmationModal from '../ConfirmationModal.vue'
 import WorkspaceContextSection from './workspace/WorkspaceContextSection.vue'
 import WorkspaceDatasetSection from './workspace/WorkspaceDatasetSection.vue'
@@ -301,7 +302,7 @@ const workspaceCards = computed(() => {
     const id = String(workspace?.id || '').trim()
     const name = String(workspace?.name || '').trim()
     const duckdbPath = String(workspace?.duckdb_path || '').trim()
-    const filename = duckdbPath.split('/').pop() || 'workspace.duckdb'
+    const filename = filenameFromPath(duckdbPath, 'workspace.duckdb')
     const summary = workspaceSummaries.value?.[id] || {}
     const conversationCount = Number(summary?.conversation_count || 0)
     const lastActive = String(workspace?.updated_at || '').trim()
@@ -1622,8 +1623,7 @@ function syncDatasetSchemaPolling() {
 function formatFilename(raw) {
   const value = String(raw || '').trim()
   if (!value) return 'dataset'
-  const last = value.split('/').pop() || value
-  return last
+  return filenameFromPath(value, value)
 }
 
 function formatCreatedDate(raw) {

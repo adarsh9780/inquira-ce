@@ -1148,6 +1148,23 @@ fn needs_python_bootstrap(
     }
 }
 
+fn configured_python_spec(config: &InquiraConfig) -> Option<String> {
+    config
+        .python
+        .as_ref()
+        .and_then(|p| p.python_path.clone())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .or_else(|| {
+            config
+                .python
+                .as_ref()
+                .and_then(|p| p.version.clone())
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+        })
+}
+
 fn bootstrap_python(
     uv_bin: &PathBuf,
     project_dir: &Path,
@@ -1156,19 +1173,21 @@ fn bootstrap_python(
     project_label: &str,
     install_project: bool,
 ) -> Result<(), String> {
-    let python_version = config
-        .python
-        .as_ref()
-        .and_then(|p| p.version.clone())
-        .unwrap_or_else(|| "3.12".to_string());
+    let python_spec = configured_python_spec(config).unwrap_or_else(|| "3.12".to_string());
 
     // Check if a custom python-path is configured
-    if let Some(ref _custom_python) = config.python.as_ref().and_then(|p| p.python_path.clone()) {
-        log::info!("Using custom Python path, skipping UV python install");
+    if config
+        .python
+        .as_ref()
+        .and_then(|p| p.python_path.clone())
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+    {
+        log::info!("Using custom Python path for UV sync, skipping UV python install");
     } else {
-        log::info!("Installing Python {} via UV...", python_version);
+        log::info!("Installing Python {} via UV...", python_spec);
         let mut cmd = Command::new(uv_bin);
-        cmd.args(["python", "install", &python_version]);
+        cmd.args(["python", "install", &python_spec]);
         apply_proxy_env(&mut cmd, config);
         let status = cmd
             .status()
@@ -1180,8 +1199,12 @@ fn bootstrap_python(
 
     log::info!("Syncing {project_label} Python environment...");
     let mut cmd = Command::new(uv_bin);
-    cmd.args(build_uv_sync_args(project_dir, install_project))
-        .env("UV_PROJECT_ENVIRONMENT", venv_path.to_str().unwrap());
+    cmd.args(build_uv_sync_args(
+        project_dir,
+        install_project,
+        Some(&python_spec),
+    ))
+    .env("UV_PROJECT_ENVIRONMENT", venv_path.to_str().unwrap());
     apply_uv_package_env(&mut cmd, config);
     let status = cmd.status().map_err(|e| format!("uv sync failed: {}", e))?;
     if !status.success() {
@@ -1191,7 +1214,11 @@ fn bootstrap_python(
     Ok(())
 }
 
-fn build_uv_sync_args(project_dir: &Path, install_project: bool) -> Vec<String> {
+fn build_uv_sync_args(
+    project_dir: &Path,
+    install_project: bool,
+    python_spec: Option<&str>,
+) -> Vec<String> {
     let mut args = vec![
         "sync".to_string(),
         "--no-dev".to_string(),
@@ -1201,7 +1228,50 @@ fn build_uv_sync_args(project_dir: &Path, install_project: bool) -> Vec<String> 
     if !install_project {
         args.push("--no-install-project".to_string());
     }
+    if let Some(spec) = python_spec.map(str::trim).filter(|value| !value.is_empty()) {
+        args.push("--python".to_string());
+        args.push(spec.to_string());
+    }
     args
+}
+
+fn split_command_line(raw: &str) -> Result<Vec<String>, String> {
+    let mut args: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut quote: Option<char> = None;
+
+    for ch in raw.chars() {
+        if let Some(active_quote) = quote {
+            if ch == active_quote {
+                quote = None;
+            } else {
+                current.push(ch);
+            }
+            continue;
+        }
+
+        match ch {
+            '\'' | '"' => quote = Some(ch),
+            ch if ch.is_whitespace() => {
+                if !current.is_empty() {
+                    args.push(current);
+                    current = String::new();
+                }
+            }
+            _ => current.push(ch),
+        }
+    }
+
+    if quote.is_some() {
+        return Err("Invalid command override: unmatched quote.".to_string());
+    }
+    if !current.is_empty() {
+        args.push(current);
+    }
+    if args.is_empty() {
+        return Err("Invalid command override: no executable provided.".to_string());
+    }
+    Ok(args)
 }
 
 fn apply_proxy_env(cmd: &mut Command, config: &InquiraConfig) {
@@ -1628,12 +1698,12 @@ fn start_agent_runtime(
             c
         }
     } else {
-        let mut parts = command_override.split_whitespace();
+        let parts = split_command_line(&command_override)?;
         let head = parts
-            .next()
+            .first()
             .ok_or_else(|| "Invalid agent_service.command".to_string())?;
         let mut c = Command::new(head);
-        for part in parts {
+        for part in parts.iter().skip(1) {
             c.arg(part);
         }
         command_summary = command_override.clone();
@@ -2065,13 +2135,14 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_pythonpath_entries, build_uv_sync_args, bundled_uv_candidates, default_backend_host,
-        default_uv_search_paths, desktop_python_env_paths, detect_default_shell,
-        langgraph_bin_from_venv, missing_uv_binary_error, needs_python_bootstrap,
-        parse_lsof_pid_lines, parse_netstat_listening_pids, python_bin_from_venv, resolve_pty_cwd,
-        resolve_resource_path, resolve_runtime_config_path, resolve_runtime_state_dir,
-        resolve_shared_console_log_level, resolve_uv_index_url, startup_log_paths,
-        stop_child_process, uv_binary_file_name, uv_search_candidates, vc_redist_download_url,
+        build_pythonpath_entries, build_uv_sync_args, bundled_uv_candidates,
+        configured_python_spec, default_backend_host, default_uv_search_paths,
+        desktop_python_env_paths, detect_default_shell, langgraph_bin_from_venv,
+        missing_uv_binary_error, needs_python_bootstrap, parse_lsof_pid_lines,
+        parse_netstat_listening_pids, python_bin_from_venv, resolve_pty_cwd, resolve_resource_path,
+        resolve_runtime_config_path, resolve_runtime_state_dir, resolve_shared_console_log_level,
+        resolve_uv_index_url, split_command_line, startup_log_paths, stop_child_process,
+        uv_binary_file_name, uv_search_candidates, vc_redist_download_url,
         vc_redist_installer_path, vc_redist_marker_path, vc_redist_success_exit_code,
         venv_executable_path, InquiraConfig, LoggingConfig, PythonConfig, MAIN_WINDOW_LABEL,
         SPLASH_WINDOW_LABEL,
@@ -2096,14 +2167,67 @@ mod tests {
 
     #[test]
     fn build_uv_sync_args_can_skip_installing_project() {
-        let args = build_uv_sync_args(Path::new("/tmp/backend"), false);
+        let args = build_uv_sync_args(Path::new("/tmp/backend"), false, None);
         assert!(args.iter().any(|arg| arg == "--no-install-project"));
     }
 
     #[test]
     fn build_uv_sync_args_installs_project_by_default() {
-        let args = build_uv_sync_args(Path::new("/tmp/backend"), true);
+        let args = build_uv_sync_args(Path::new("/tmp/backend"), true, None);
         assert!(!args.iter().any(|arg| arg == "--no-install-project"));
+    }
+
+    #[test]
+    fn build_uv_sync_args_passes_configured_python_spec() {
+        let args = build_uv_sync_args(
+            Path::new(r"C:\Program Files\Inquira\backend"),
+            true,
+            Some(r"C:\Python312\python.exe"),
+        );
+        assert!(args
+            .windows(2)
+            .any(|pair| { pair[0] == "--python" && pair[1] == r"C:\Python312\python.exe" }));
+    }
+
+    #[test]
+    fn configured_python_spec_prefers_python_path_over_version() {
+        let config = InquiraConfig {
+            python: Some(PythonConfig {
+                version: Some("3.12".to_string()),
+                index_url: None,
+                python_path: Some(r"C:\Program Files\Python312\python.exe".to_string()),
+            }),
+            proxy: None,
+            backend: None,
+            execution: None,
+            agent_service: None,
+            logging: None,
+        };
+        assert_eq!(
+            configured_python_spec(&config),
+            Some(r"C:\Program Files\Python312\python.exe".to_string())
+        );
+    }
+
+    #[test]
+    fn split_command_line_preserves_quoted_windows_paths() {
+        let parts = split_command_line(
+            r#""C:\Program Files\Inquira Agent\agent.exe" --config "C:\Users\me\agent config.json""#,
+        )
+        .expect("split command");
+        assert_eq!(
+            parts,
+            vec![
+                r"C:\Program Files\Inquira Agent\agent.exe".to_string(),
+                "--config".to_string(),
+                r"C:\Users\me\agent config.json".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn split_command_line_rejects_unmatched_quote() {
+        assert!(split_command_line(r#""C:\Program Files\agent.exe"#).is_err());
     }
 
     #[test]

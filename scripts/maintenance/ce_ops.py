@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -90,6 +91,16 @@ def cmd_status(_: argparse.Namespace) -> int:
     return run(["git", "status"], cwd=ROOT)
 
 
+def cmd_doctor(_: argparse.Namespace) -> int:
+    required_tools = ["bash", "make", "uv", "npm", "cargo"]
+    missing = [tool for tool in required_tools if shutil.which(tool) is None]
+    if missing:
+        print("Missing developer tools: " + ", ".join(missing), file=sys.stderr)
+        return 1
+    print("Developer tools found: bash, make, uv, npm, cargo")
+    return 0
+
+
 def cmd_dev(_: argparse.Namespace) -> int:
     env = runtime_env()
     if ENV_FILE.exists():
@@ -149,6 +160,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("status").set_defaults(func=cmd_status)
+    sub.add_parser("doctor").set_defaults(func=cmd_doctor)
     sub.add_parser("dev").set_defaults(func=cmd_dev)
 
     commit = sub.add_parser("commit")

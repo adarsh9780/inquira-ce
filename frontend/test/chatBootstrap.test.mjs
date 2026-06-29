@@ -31,3 +31,7 @@ test('inferTableNameFromDataPath resolves legacy /browser:/ table paths', () => 
 test('inferTableNameFromDataPath falls back to filename without extension', () => {
   assert.equal(inferTableNameFromDataPath('/tmp/My Dataset.csv'), 'My Dataset')
 })
+
+test('inferTableNameFromDataPath handles Windows file paths', () => {
+  assert.equal(inferTableNameFromDataPath('C:\\Users\\me\\Downloads\\My Dataset.csv'), 'My Dataset')
+})

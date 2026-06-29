@@ -1,9 +1,10 @@
+from pathlib import PureWindowsPath
 from types import SimpleNamespace
 
 import pytest
 
 from app.v1.api.deps import ensure_appdata_principal
-from app.v1.core.settings import V1Settings
+from app.v1.core.settings import V1Settings, sqlite_async_url
 
 
 def test_v1_settings_load_reads_split_db_env_vars(monkeypatch):
@@ -21,6 +22,13 @@ def test_v1_settings_load_reads_split_db_env_vars(monkeypatch):
     assert loaded.reset_enabled is True
     assert loaded.reset_token == "token-1"
     assert loaded.allow_schema_bootstrap is True
+
+
+def test_sqlite_async_url_uses_portable_path_separators():
+    url = sqlite_async_url(PureWindowsPath("C:/Users/me/.inquira/auth_v1.db"))
+
+    assert url == "sqlite+aiosqlite:///C:/Users/me/.inquira/auth_v1.db"
+    assert "\\" not in url
 
 
 @pytest.mark.asyncio

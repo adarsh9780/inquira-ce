@@ -1,3 +1,5 @@
+import { filenameFromPath } from './pathUtils.js'
+
 export const SUPPORTED_DATASET_EXTENSIONS = ['csv', 'tsv', 'parquet', 'json', 'xlsx', 'xls']
 export const SUPPORTED_DATASET_EXTENSION_SET = new Set(
   SUPPORTED_DATASET_EXTENSIONS.map((extension) => `.${extension}`)
@@ -24,7 +26,7 @@ export function datasetImportLabel(paths) {
     ? paths.map((item) => String(item || '').trim()).filter(Boolean)
     : []
   if (sourcePaths.length === 1) {
-    return sourcePaths[0].split('/').pop() || 'Selected dataset'
+    return filenameFromPath(sourcePaths[0], 'Selected dataset')
   }
   return `${sourcePaths.length} selected files`
 }

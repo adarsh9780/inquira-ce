@@ -1,3 +1,5 @@
+import { filenameFromPath } from './pathUtils.js'
+
 export function buildBrowserDataPath(tableName) {
   const normalized = typeof tableName === 'string' ? tableName.trim() : ''
   if (!normalized) return ''
@@ -27,7 +29,7 @@ export function inferTableNameFromDataPath(dataPath) {
     return value.slice('browser:/'.length).trim()
   }
 
-  const base = value.split('/').pop() || ''
+  const base = filenameFromPath(value)
   return base.replace(/\.[^.]+$/, '').trim()
 }
 
