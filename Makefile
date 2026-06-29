@@ -1,4 +1,8 @@
+ifeq ($(OS),Windows_NT)
+SHELL := bash
+else
 SHELL := /bin/bash
+endif
 
 VERSION ?=
 POS_VERSION := $(word 2,$(MAKECMDGOALS))
