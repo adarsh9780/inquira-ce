@@ -7,42 +7,44 @@ endif
 VERSION ?=
 POS_VERSION := $(word 2,$(MAKECMDGOALS))
 EFFECTIVE_VERSION := $(if $(VERSION),$(VERSION),$(POS_VERSION))
-INLINE_GIT_COMMIT_MESSAGE := $(strip $(filter-out git-commit,$(MAKECMDGOALS)))
+msg ?=
+MSG ?=
+file ?=
+FILE ?=
+tag ?=
+TAG ?=
 
-.PHONY: help help-push check-version check-version-pretty check-message check-input-version check-input-version-greater check-version-file set-version test test-fast test-slow test-pretty ruff-test ruff-test-pretty mypy-test mypy-test-pretty test-backend test-backend-pretty test-agent test-rust test-frontend test-frontend-pretty test-e2e test-packaged-smoke build build-frontend sync-frontend-dist build-wheel git-add git-commit git-push push
+ifneq ($(filter setv bump-all tag,$(MAKECMDGOALS)),)
+%:
+	@:
+endif
+
+.PHONY: help status check doctor verify-version check-version check-version-pretty check-input-version check-input-version-greater check-version-file setv bump-all test test-fast test-slow test-pretty ruff-test ruff-test-pretty mypy-test mypy-test-pretty test-backend test-backend-pretty test-agent test-rust test-frontend test-frontend-pretty test-e2e test-packaged-smoke dev build build-frontend sync-frontend-dist build-wheel commit push tag
 
 help:
 	@echo "Usage:"
-	@echo "  make test"
-	@echo "  make test-pretty"
-	@echo "  make ruff-test"
-	@echo "  make ruff-test-pretty"
-	@echo "  make mypy-test"
-	@echo "  make mypy-test-pretty"
-	@echo "  make test-backend-pretty"
-	@echo "  make test-frontend-pretty"
-	@echo "  make test-agent"
-	@echo "  make test-rust"
-	@echo "  make test-e2e"
-	@echo "  make test-packaged-smoke"
-	@echo "  make check-version-pretty"
+	@echo "  make dev"
 	@echo "  make build"
-	@echo "  make build-frontend"
-	@echo "  make sync-frontend-dist"
-	@echo "  make build-wheel"
-	@echo "  make git-add"
-	@echo "  make git-commit"
-	@echo "  make git-push"
-	@echo "  make set-version 0.5.24"
+	@echo "  make setv 0.5.24"
+	@echo "  make test"
+	@echo "  make check"
 	@echo "  make check-version"
+	@echo "  make doctor"
+	@echo "  make status"
+	@echo "  make commit msg='fix: describe the change'"
+	@echo "  make commit file=commit_message.txt"
 	@echo "  make push"
+	@echo "  make tag tag=v0.5.24"
 	@echo ""
 	@echo "Targets:"
 	@echo "  help               Show available commands"
-	@echo "  help-push          Show details for push workflow"
-	@echo "  set-version        Update VERSION and apply across backend/frontend/tauri source files"
+	@echo "  status             Show CE git status"
+	@echo "  check              Run required validation suites and verify aligned versions"
+	@echo "  doctor             Run the broad CE health check"
+	@echo "  verify-version     Fail if source-owned version files are not aligned"
 	@echo "  check-version      Print current versions from source-owned version files"
 	@echo "  check-version-pretty Pretty formatted version check output (rich text + wrapping)"
+	@echo "  setv               Update VERSION and apply across backend/frontend/tauri source files"
 	@echo "  test               Run all fast required validation suites and frontend build"
 	@echo "  test-fast          Run required PR validation suites"
 	@echo "  test-slow          Run browser E2E tests"
@@ -58,37 +60,25 @@ help:
 	@echo "  test-frontend      Run frontend npm test suite"
 	@echo "  test-frontend-pretty Rich-formatted frontend test run"
 	@echo "  test-e2e           Run frontend Playwright end-to-end tests"
+	@echo "  test-packaged-smoke Require a packaged app path for smoke test handoff"
+	@echo "  dev                Run frontend Vite dev server and cargo tauri dev"
 	@echo "  build              Build the CE desktop app with bundled uv for local desktop runs"
 	@echo "  build-frontend     Build frontend assets into src/inquira/frontend/dist"
 	@echo "  sync-frontend-dist Copy frontend assets to backend/app/frontend/dist for wheel packaging"
 	@echo "  build-wheel        Build backend Python wheel with bundled frontend assets"
-	@echo "  git-add            Stage all changes"
-	@echo "  git-commit         Commit using commit_message.txt with validations"
-	@echo "  git-push           Push current branch"
-	@echo "  push               Validate message, test, commit, and push"
+	@echo "  commit             Stage all changes and commit with msg=... or file=..."
+	@echo "  push               Push current branch"
+	@echo "  tag                Create and push an annotated CE source tag"
 
-help-push:
-	@echo "Manual push flow:"
-	@echo "1) make test"
-	@echo "2) make git-add"
-	@echo "3) make git-commit"
-	@echo "4) make git-push"
-	@echo ""
-	@echo "Shortcut: make push"
-	@echo "- if there are local changes: check-message -> test -> git-add -> git-commit -> git-push"
-	@echo "- if there are no local changes: git-push only"
+status:
+	@uv run python scripts/maintenance/ce_ops.py status
 
-check-message:
-	@test -s commit_message.txt || (echo "commit_message.txt is missing or empty."; exit 1)
-	@last_msg="$$(git log -1 --pretty=%B 2>/dev/null || true)"; \
-	current_msg="$$(cat commit_message.txt)"; \
-	if [ -n "$$last_msg" ] && [ "$$current_msg" = "$$last_msg" ]; then \
-		echo "commit_message.txt matches the latest commit message. Please write a new message."; \
-		exit 1; \
-	fi
+check: test-fast verify-version
+
+doctor: check
 
 check-input-version:
-	@test -n "$(EFFECTIVE_VERSION)" || (echo "Usage: make set-version 0.5.24"; exit 1)
+	@test -n "$(EFFECTIVE_VERSION)" || (echo "Usage: make setv 0.5.24"; exit 1)
 	@uv run python scripts/maintenance/version_guard.py validate --version "$(EFFECTIVE_VERSION)"
 
 check-input-version-greater: check-input-version check-version-file
@@ -97,14 +87,19 @@ check-input-version-greater: check-input-version check-version-file
 check-version-file:
 	@uv run python scripts/maintenance/version_guard.py validate-file --path VERSION
 
+verify-version:
+	uv run python scripts/maintenance/show_versions.py --verify
+
 check-version:
 	uv run python scripts/maintenance/show_versions.py
 
 check-version-pretty:
 	uv run --with rich python scripts/maintenance/pretty_make.py check-version-pretty
 
-set-version: check-input-version-greater
+setv: check-input-version-greater
 	uv run python scripts/maintenance/bump_versions.py --version "$(EFFECTIVE_VERSION)" --write-version-file
+
+bump-all: setv
 
 test: test-fast
 
@@ -152,6 +147,9 @@ test-packaged-smoke:
 	@echo "Packaged desktop smoke tests require a built installer and platform runner."
 	@test -n "$(INQUIRA_PACKAGED_APP)" || (echo "Set INQUIRA_PACKAGED_APP to the packaged application path."; exit 1)
 
+dev:
+	uv run python scripts/maintenance/ce_ops.py dev
+
 build:
 	uv run python scripts/maintenance/bundle_uv.py
 	cd src-tauri && cargo tauri build
@@ -168,50 +166,13 @@ sync-frontend-dist:
 build-wheel: build-frontend sync-frontend-dist
 	cd backend && uv build --wheel
 
-git-add:
-	git add .
-
-git-commit:
-	@inline_msg='$(INLINE_GIT_COMMIT_MESSAGE)'; \
-	explicit_msg='$(MESSAGE)'; \
-	commit_msg="$$explicit_msg"; \
-	if [ -z "$$commit_msg" ]; then \
-		commit_msg="$$inline_msg"; \
-	fi; \
-	last_msg="$$(git log -1 --pretty=%B 2>/dev/null || true)"; \
-	if [ -n "$$commit_msg" ]; then \
-		if [ -n "$$last_msg" ] && [ "$$commit_msg" = "$$last_msg" ]; then \
-			echo "Inline commit message matches the latest commit message. Please write a new message."; \
-			exit 1; \
-		fi; \
-		git commit -m "$$commit_msg"; \
-	else \
-		test -s commit_message.txt || (echo "commit_message.txt is missing or empty."; exit 1); \
-		current_msg="$$(cat commit_message.txt)"; \
-		if [ -n "$$last_msg" ] && [ "$$current_msg" = "$$last_msg" ]; then \
-			echo "commit_message.txt matches the latest commit message. Please write a new message."; \
-			exit 1; \
-		fi; \
-		git commit -F commit_message.txt; \
-		: > commit_message.txt; \
-	fi
-
-git-push:
-	@branch="$$(git rev-parse --abbrev-ref HEAD)"; \
-	git push origin "$$branch"
+commit:
+	@uv run python scripts/maintenance/ce_ops.py commit --msg "$(or $(msg),$(MSG))" --file "$(or $(file),$(FILE))"
 
 push:
-	@if git diff --quiet && git diff --cached --quiet; then \
-		echo "No local changes to commit; running git-push only."; \
-		$(MAKE) --no-print-directory git-push; \
-	else \
-		$(MAKE) --no-print-directory check-message; \
-		$(MAKE) --no-print-directory test; \
-		$(MAKE) --no-print-directory git-add; \
-		$(MAKE) --no-print-directory git-commit; \
-		$(MAKE) --no-print-directory git-push; \
-	fi
+	@uv run python scripts/maintenance/ce_ops.py push
 
-# Allow positional version args, e.g. `make set-version 0.5.24`.
-%:
-	@:
+tag:
+	@release_tag="$(or $(tag),$(TAG),$(EFFECTIVE_VERSION))"; \
+	test -n "$$release_tag" || (echo "Usage: make tag tag=vX.Y.Z"; exit 1); \
+	uv run python scripts/maintenance/ce_ops.py tag --tag "$$release_tag"

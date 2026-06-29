@@ -3,14 +3,17 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
+import sys
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
 VERSION_FILE = ROOT / "VERSION"
 BACKEND_PYPROJECT = ROOT / "backend" / "pyproject.toml"
+BACKEND_LOCK = ROOT / "backend" / "uv.lock"
 BACKEND_MAIN = ROOT / "backend" / "app" / "main.py"
 TAURI_CARGO = ROOT / "src-tauri" / "Cargo.toml"
 TAURI_CONF = ROOT / "src-tauri" / "tauri.conf.json"
@@ -48,12 +51,22 @@ def _read_frontend_lock_root_version(path: Path) -> str | None:
     return None
 
 
+def _read_backend_lock_project_version(path: Path) -> str | None:
+    return _read_regex(
+        path,
+        r'\[\[package\]\]\nname = "inquira-ce"\nversion = "([^"]+)"',
+    )
+
+
 def collect_versions() -> dict[str, str]:
     values: dict[str, str] = {}
     values["VERSION"] = VERSION_FILE.read_text(encoding="utf-8").strip()
     values["backend/pyproject.toml.version"] = _read_regex(
         BACKEND_PYPROJECT, r'^version\s*=\s*"([^"]+)"'
     ) or "<missing>"
+    values["backend/uv.lock.inquira-ce.version"] = (
+        _read_backend_lock_project_version(BACKEND_LOCK) or "<missing>"
+    )
     values["backend/app/main.py.APP_VERSION"] = _read_regex(
         BACKEND_MAIN, r'^APP_VERSION\s*=\s*"([^"]+)"'
     ) or "<missing>"
@@ -75,9 +88,25 @@ def collect_versions() -> dict[str, str]:
     return values
 
 
-def main() -> int:
-    for key, value in collect_versions().items():
+def versions_aligned(values: dict[str, str]) -> bool:
+    return len(set(values.values())) == 1
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Print current version values.")
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="Exit non-zero when source-owned version files are not aligned.",
+    )
+    args = parser.parse_args(argv)
+
+    values = collect_versions()
+    for key, value in values.items():
         print(f"{key}={value}")
+    if args.verify and not versions_aligned(values):
+        print("version mismatch detected", file=sys.stderr)
+        return 1
     return 0
 
 

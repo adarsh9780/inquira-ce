@@ -15,7 +15,7 @@ def test_readme_is_docs_table_of_contents():
     assert "## Current Product Highlights" in text
     assert "Desktop packaging, release automation, and product docs now live in" in text
     assert "https://github.com/adarsh9780/inquira-ee" in text
-    assert "create a local root `commit_message.txt` file" in text
+    assert "make commit msg='fix: describe the change'" in text
     assert "https://docs.inquiraai.com/docs/architecture" in text
     assert "https://docs.inquiraai.com/docs/development" in text
     assert "https://docs.inquiraai.com/docs/roadmap" in text

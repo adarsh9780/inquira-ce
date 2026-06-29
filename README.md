@@ -49,8 +49,7 @@ trusted workspaces and prompts, and maintain backups of important data.
 ```bash
 git clone https://github.com/adarsh9780/inquira-ce.git
 cd inquira-ce
-cd src-tauri
-cargo tauri dev
+make dev
 ```
 
 For a local CE desktop package from the CE repo root:
@@ -59,7 +58,7 @@ For a local CE desktop package from the CE repo root:
 make build
 ```
 
-Before running `make git-commit`, create a local root `commit_message.txt` file and write your commit message in it. Check the Developer Documentation for full Makefile rules.
+Use `make commit msg='fix: describe the change'` to stage and commit local changes. Check the Developer Documentation for full Makefile rules.
 
 ## Official Documentation Map
 
