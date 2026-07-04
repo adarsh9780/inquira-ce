@@ -8,7 +8,7 @@ test('sidebar uses native title tooltips for current navigation actions', () => 
   const rowSource = readFileSync(resolve(process.cwd(), 'src/components/layout/sidebar/SidebarConversationRow.vue'), 'utf-8')
 
   assert.equal(source.includes('title="New conversation"'), true)
-  assert.equal(source.includes('Search conversations'), true)
+  assert.equal(source.includes('Search conversations'), false)
   assert.equal(rowSource.includes('title="Conversation actions"'), true)
   assert.equal(source.includes('Open conversation tree'), true)
   assert.equal(source.includes('title="Settings"'), true)

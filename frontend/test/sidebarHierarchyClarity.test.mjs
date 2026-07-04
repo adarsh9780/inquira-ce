@@ -11,7 +11,7 @@ test('sidebar communicates active workspace context, chats, and bottom actions',
   assert.equal(source.includes('workspaceRuntimeLabel'), false)
   assert.equal(source.includes('sidebarConversationsByWorkspace'), true)
   assert.equal(source.includes('visibleConversationsForSidebar(workspace)'), true)
-  assert.equal(source.includes('Search conversations'), true)
+  assert.equal(source.includes('Search conversations'), false)
   assert.equal(source.includes('New conversation'), true)
   assert.equal(menuSource.includes('data-conversation-actions-menu'), true)
   assert.equal(source.includes('Conversation Tree'), true)

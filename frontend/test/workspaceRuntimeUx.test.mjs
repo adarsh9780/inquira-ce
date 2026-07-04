@@ -10,7 +10,7 @@ test('sidebar renders grouped workspaces with lazy conversation caches', () => {
   assert.equal(source.includes('sidebarConversationsByWorkspace'), true)
   assert.equal(source.includes('loadSidebarConversations'), true)
   assert.equal(source.includes('selectConversation(workspace.id, conv.id)'), true)
-  assert.equal(source.includes('normalizedSidebarSearchQuery'), true)
+  assert.equal(source.includes('normalizedSidebarSearchQuery'), false)
   assert.equal(source.includes('appStore.conversations.length'), false)
 })
 

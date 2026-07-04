@@ -41,12 +41,16 @@ test('shortcut registry drives global shortcuts and keyboard shortcuts panel', (
   const sidebar = read('src/components/layout/UnifiedSidebar.vue')
   const modal = read('src/components/modals/KeyboardShortcutsModal.vue')
 
-  for (const id of ['conversation-tree', 'schema', 'keyboard-shortcuts', 'dataset-import', 'sidebar', 'terminal', 'layout-cycle']) {
+  for (const id of ['conversation-tree', 'schema', 'settings', 'dataset-import', 'command-palette', 'sidebar', 'terminal']) {
     assert.equal(shortcuts.includes(`id: '${id}'`), true)
     assert.equal(app.includes(`matchShortcut(event, '${id}')`), true)
   }
+  assert.equal(shortcuts.includes("id: 'keyboard-shortcuts'"), false)
+  assert.equal(shortcuts.includes("id: 'layout-cycle'"), false)
   assert.equal(sidebar.includes('Keyboard Shortcuts'), true)
-  assert.equal(sidebar.includes('KeyboardShortcutsModal'), true)
+  assert.equal(sidebar.includes("shortcutTooltip('keyboard-shortcuts'"), false)
+  assert.equal(sidebar.includes('KeyboardShortcutsModal'), false)
+  assert.equal(app.includes('KeyboardShortcutsModal'), true)
   assert.equal(sidebar.includes("shortcutTooltip('schema'"), true)
   assert.equal(sidebar.includes("shortcutTooltip('conversation-tree'"), true)
   assert.equal(modal.includes('shortcutsByCategory'), true)

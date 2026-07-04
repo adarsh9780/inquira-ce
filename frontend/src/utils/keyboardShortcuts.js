@@ -1,14 +1,11 @@
 export const SHORTCUTS = [
   { id: 'conversation-tree', category: 'Navigation', label: 'Open Conversation Tree', keys: ['mod', 't'], title: 'Conversation Tree' },
   { id: 'schema', category: 'Navigation', label: 'Open Schema', keys: ['mod', 's'], title: 'Schema' },
-  { id: 'keyboard-shortcuts', category: 'Navigation', label: 'Open Keyboard Shortcuts', keys: ['mod', 'k'], title: 'Keyboard Shortcuts' },
+  { id: 'settings', category: 'Navigation', label: 'Open Settings', keys: ['mod', ','], title: 'Settings' },
   { id: 'dataset-import', category: 'Data', label: 'Import Dataset', keys: ['mod', 'o'], title: 'Import Dataset' },
+  { id: 'command-palette', category: 'Workspace', label: 'Open Command Palette', keys: ['mod', 'k'], title: 'Command Palette' },
   { id: 'sidebar', category: 'Workspace', label: 'Toggle Sidebar', keys: ['mod', 'b'], title: 'Sidebar' },
   { id: 'terminal', category: 'Workspace', label: 'Toggle Terminal', keys: ['mod', 'j'], title: 'Terminal' },
-  { id: 'layout-cycle', category: 'Layout', label: 'Cycle Workspace Layout', keys: ['mod', 'shift', 'd'], title: 'Cycle Layout' },
-  { id: 'layout-view', category: 'Layout', label: 'View Layout', keys: ['mod', 'alt', 'v'], title: 'View Layout' },
-  { id: 'layout-chat', category: 'Layout', label: 'Chat Layout', keys: ['mod', 'alt', 'c'], title: 'Chat Layout' },
-  { id: 'layout-output', category: 'Layout', label: 'Output Layout', keys: ['mod', 'alt', 'o'], title: 'Output Layout' },
 ]
 
 export function shortcutLabel(shortcut, platform = '') {
@@ -53,4 +50,3 @@ export function shortcutsByCategory() {
     return groups
   }, {})
 }
-

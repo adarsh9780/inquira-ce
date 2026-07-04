@@ -1,50 +1,24 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {
-  nextWorkspaceLayoutMode,
-  normalizeWorkspaceLayoutMode,
-  resolveWorkspaceLayoutShortcut,
-  workspaceLayoutVisibility,
-} from '../src/utils/workspaceLayout.js'
+import { existsSync, readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
-test('workspace layout normalizes current, legacy, missing, and invalid modes', () => {
-  assert.equal(normalizeWorkspaceLayoutMode('view'), 'view')
-  assert.equal(normalizeWorkspaceLayoutMode('chat'), 'chat')
-  assert.equal(normalizeWorkspaceLayoutMode('output'), 'output')
-  assert.equal(normalizeWorkspaceLayoutMode('split'), 'view')
-  assert.equal(normalizeWorkspaceLayoutMode('data'), 'output')
-  assert.equal(normalizeWorkspaceLayoutMode('invalid'), 'view')
-  assert.equal(normalizeWorkspaceLayoutMode(), 'view')
-})
+test('workspace layout keeps only the default split view', () => {
+  const layoutUtilityPath = resolve(process.cwd(), 'src/utils/workspaceLayout.js')
+  const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
+  const storeSource = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf-8')
+  const shortcutsSource = readFileSync(resolve(process.cwd(), 'src/utils/keyboardShortcuts.js'), 'utf-8')
+  const panelSource = readFileSync(resolve(process.cwd(), 'src/components/layout/RightPanel.vue'), 'utf-8')
 
-test('workspace layout cycles View to Chat to Output', () => {
-  assert.equal(nextWorkspaceLayoutMode('view'), 'chat')
-  assert.equal(nextWorkspaceLayoutMode('chat'), 'output')
-  assert.equal(nextWorkspaceLayoutMode('output'), 'view')
-})
-
-test('workspace layout visibility matches canonical presets', () => {
-  assert.deepEqual(workspaceLayoutVisibility('view'), {
-    showSidebar: true,
-    showLeftPane: true,
-    showRightPane: true,
-  })
-  assert.deepEqual(workspaceLayoutVisibility('chat'), {
-    showSidebar: false,
-    showLeftPane: true,
-    showRightPane: false,
-  })
-  assert.deepEqual(workspaceLayoutVisibility('output'), {
-    showSidebar: false,
-    showLeftPane: false,
-    showRightPane: true,
-  })
-})
-
-test('workspace layout resolves primary Alt shortcuts using event.code', () => {
-  assert.equal(resolveWorkspaceLayoutShortcut({ metaKey: true, altKey: true, code: 'KeyV' }), 'view')
-  assert.equal(resolveWorkspaceLayoutShortcut({ ctrlKey: true, altKey: true, code: 'KeyC' }), 'chat')
-  assert.equal(resolveWorkspaceLayoutShortcut({ ctrlKey: true, altKey: true, code: 'KeyO' }), 'output')
-  assert.equal(resolveWorkspaceLayoutShortcut({ ctrlKey: true, code: 'KeyV' }), '')
-  assert.equal(resolveWorkspaceLayoutShortcut({ ctrlKey: true, altKey: true, shiftKey: true, code: 'KeyV' }), '')
+  assert.equal(existsSync(layoutUtilityPath), false)
+  assert.equal(appSource.includes('resolveWorkspaceLayoutShortcut'), false)
+  assert.equal(storeSource.includes('workspaceLayoutMode'), false)
+  assert.equal(storeSource.includes('showLeftPane'), false)
+  assert.equal(storeSource.includes('showRightPane'), false)
+  assert.equal(shortcutsSource.includes('layout-cycle'), false)
+  assert.equal(shortcutsSource.includes('layout-view'), false)
+  assert.equal(shortcutsSource.includes('layout-chat'), false)
+  assert.equal(shortcutsSource.includes('layout-output'), false)
+  assert.equal(panelSource.includes('const leftPaneWidth = computed(() => appStore.leftPaneWidth)'), true)
+  assert.equal(panelSource.includes('const rightPaneWidth = computed(() => 100 - appStore.leftPaneWidth)'), true)
 })

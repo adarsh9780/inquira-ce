@@ -32,7 +32,7 @@ test('sidebar owns the profile and bottom action stack', () => {
   assert.equal(sidebarSource.includes('<SidebarConversations'), false)
   assert.equal(sidebarSource.includes('v-for="workspace in filteredSidebarWorkspaces"'), true)
   assert.equal(sidebarSource.includes('visibleConversationsForSidebar(workspace)'), true)
-  assert.equal(sidebarSource.includes('Search conversations'), true)
+  assert.equal(sidebarSource.includes('Search conversations'), false)
   assert.equal(sidebarSource.includes('Conversation Tree'), true)
   assert.equal(sidebarSource.includes('Datasets</p>'), false)
   assert.equal(sidebarSource.includes('CircleStackIcon'), true)

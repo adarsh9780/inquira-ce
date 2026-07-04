@@ -1,6 +1,6 @@
 <template>
   <div
-    class="group/sidebar-conversation relative flex min-h-8 cursor-pointer select-none items-center rounded-md px-2 py-1.5 transition-colors hover:bg-[var(--color-text-main)]/5"
+    class="group/sidebar-conversation relative flex min-h-7 cursor-pointer select-none items-center rounded-md px-2 py-1 transition-colors hover:bg-[var(--color-text-main)]/5"
     :class="active ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]'"
     :title="conversationTitle"
     role="button"
@@ -25,7 +25,7 @@
 
     <template v-else>
       <p
-        class="min-w-0 flex-1 truncate text-[13px] font-medium leading-snug"
+        class="min-w-0 flex-1 truncate text-[12px] font-medium leading-snug"
         :class="active
           ? 'text-[var(--color-text-main)]'
           : 'text-[var(--color-text-muted)] group-hover/sidebar-conversation:text-[var(--color-text-main)]'"
@@ -33,16 +33,16 @@
       >
         {{ conversationTitle }}
       </p>
-      <div class="relative ml-2 flex h-6 w-8 shrink-0 items-center justify-end">
+      <div class="relative ml-1.5 flex h-5 w-7 shrink-0 items-center justify-end">
         <span
-          class="sidebar-conversation-time text-[12px] leading-none text-[var(--color-text-muted)] transition-opacity motion-fast"
+          class="sidebar-conversation-time text-[11px] leading-none text-[var(--color-text-muted)] transition-opacity motion-fast"
           :class="menuOpen ? 'opacity-0' : 'opacity-100 group-hover/sidebar-conversation:opacity-0 group-focus-within/sidebar-conversation:opacity-0'"
         >
           {{ compactTimestamp }}
         </span>
         <button
           type="button"
-          class="sidebar-conversation-action absolute right-0 flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-[opacity,background-color,color] motion-fast hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
+          class="sidebar-conversation-action absolute right-0 flex h-5 w-5 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-[opacity,background-color,color] motion-fast hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
           :class="menuOpen
             ? 'pointer-events-auto opacity-100'
             : 'pointer-events-none opacity-0 group-hover/sidebar-conversation:pointer-events-auto group-hover/sidebar-conversation:opacity-100 group-focus-within/sidebar-conversation:pointer-events-auto group-focus-within/sidebar-conversation:opacity-100'"
@@ -52,7 +52,7 @@
           @keydown.enter.stop
           @keydown.space.stop
         >
-          <EllipsisHorizontalIcon class="h-4 w-4" />
+          <EllipsisHorizontalIcon class="h-3.5 w-3.5" />
         </button>
       </div>
     </template>

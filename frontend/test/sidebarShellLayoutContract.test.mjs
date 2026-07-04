@@ -8,8 +8,8 @@ test('app shell owns sidebar rail sizing while UnifiedSidebar fills the provided
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
   assert.equal(appSource.includes('class="h-full shrink-0 app-nav-pane"'), true)
-  assert.equal(appSource.includes("'app-nav-pane-collapsed': appStore.showSidebar && appStore.isSidebarCollapsed"), true)
-  assert.equal(appSource.includes("'app-nav-pane-hidden': !appStore.showSidebar"), true)
+  assert.equal(appSource.includes("'app-nav-pane-collapsed': appStore.isSidebarCollapsed"), true)
+  assert.equal(appSource.includes('app-nav-pane-hidden'), false)
   assert.equal(appSource.includes('.app-nav-pane {'), true)
   assert.equal(appSource.includes('width: 260px;'), true)
   assert.equal(appSource.includes('.app-nav-pane-collapsed {'), true)
@@ -34,7 +34,7 @@ test('workspace shell owns pane sizing while child panes stay fluid', () => {
     true,
   )
   assert.equal(
-    panelSource.includes(`:style="{ width: leftPaneWidth + '%', borderColor: appStore.showRightPane ? 'var(--color-border)' : 'transparent' }"`),
+    panelSource.includes(`:style="{ width: leftPaneWidth + '%', borderColor: 'var(--color-border)' }"`),
     true,
   )
   assert.equal(
@@ -42,11 +42,11 @@ test('workspace shell owns pane sizing while child panes stay fluid', () => {
     true,
   )
   assert.equal(
-    panelSource.includes("width: appStore.showRightPane ? `${rightPaneWidth}%` : '0%'"),
+    panelSource.includes('width: `${rightPaneWidth}%`'),
     true,
   )
-  assert.equal(panelSource.includes('v-if="appStore.showLeftPane"'), true)
-  assert.equal(panelSource.includes(':aria-hidden="!appStore.showRightPane"'), true)
+  assert.equal(panelSource.includes('v-if="appStore.showLeftPane"'), false)
+  assert.equal(panelSource.includes(':aria-hidden="!appStore.showRightPane"'), false)
 
   assert.equal(
     leftPaneSource.includes('class="flex h-full w-full min-h-0 min-w-0 flex-col"'),

@@ -77,11 +77,8 @@
         <div
           class="h-full shrink-0 app-nav-pane"
           :class="{
-            'app-nav-pane-collapsed': appStore.showSidebar && appStore.isSidebarCollapsed,
-            'app-nav-pane-hidden': !appStore.showSidebar,
+            'app-nav-pane-collapsed': appStore.isSidebarCollapsed,
           }"
-          :aria-hidden="!appStore.showSidebar"
-          :inert="!appStore.showSidebar"
         >
           <UnifiedSidebar />
         </div>
@@ -93,6 +90,14 @@
       <SettingsModal
         v-model="appStore.isSettingsOpen"
         :initial-tab="appStore.settingsInitialTab"
+      />
+      <CommandPaletteModal
+        :is-open="appStore.isCommandPaletteOpen"
+        @close="appStore.closeCommandPalette()"
+      />
+      <KeyboardShortcutsModal
+        :is-open="appStore.isKeyboardShortcutsOpen"
+        @close="appStore.closeKeyboardShortcuts()"
       />
     </div>
 
@@ -157,7 +162,6 @@ import { normalizeThemeId } from './constants/themes'
 import { normalizeAppFontId, normalizeCodeFontId } from './constants/fonts'
 import { filterSupportedDatasetPaths, getDroppedDatasetPaths, SUPPORTED_DATASET_EXTENSIONS } from './utils/datasetImport'
 import { matchShortcut } from './utils/keyboardShortcuts'
-import { resolveWorkspaceLayoutShortcut, WORKSPACE_LAYOUT_MODES } from './utils/workspaceLayout'
 import logo from './assets/favicon.svg'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
 import RightPanel from './components/layout/RightPanel.vue'
@@ -165,6 +169,8 @@ import StatusBar from './components/layout/StatusBar.vue'
 import ToastContainer from './components/ui/ToastContainer.vue'
 import StartupFailureActions from './components/startup/StartupFailureActions.vue'
 import SettingsModal from './components/modals/SettingsModal.vue'
+import CommandPaletteModal from './components/modals/CommandPaletteModal.vue'
+import KeyboardShortcutsModal from './components/modals/KeyboardShortcutsModal.vue'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -430,15 +436,6 @@ function applyDocumentCodeFont(fontId) {
   document.documentElement.setAttribute('data-code-font', normalized)
 }
 
-function toggleSidebarVisibility() {
-  if (!appStore.showSidebar) {
-    appStore.setSidebarCollapsed(false)
-    appStore.setWorkspaceLayoutMode(WORKSPACE_LAYOUT_MODES.VIEW)
-    return
-  }
-  appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
-}
-
 async function startGlobalDatasetImport(paths, source = 'drop') {
   if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) {
     toast.error('Workspace Required', 'Create or select a workspace before importing datasets.')
@@ -525,17 +522,29 @@ function handleGlobalShortcuts(event) {
   if (event.repeat) return
 
   const hasPrimaryModifier = event.metaKey || event.ctrlKey
-  const layoutShortcut = resolveWorkspaceLayoutShortcut(event)
-  if (layoutShortcut) {
-    event.preventDefault()
-    appStore.setWorkspaceLayoutMode(layoutShortcut)
-    return
-  }
   if (!hasPrimaryModifier || event.altKey) return
 
   if (matchShortcut(event, 'conversation-tree')) {
     event.preventDefault()
     appStore.setActiveTab('conversation-tree')
+    return
+  }
+
+  if (matchShortcut(event, 'command-palette')) {
+    event.preventDefault()
+    appStore.toggleCommandPalette()
+    return
+  }
+
+  if (matchShortcut(event, 'settings')) {
+    event.preventDefault()
+    appStore.openSettings('llm')
+    return
+  }
+
+  if (matchShortcut(event, 'sidebar')) {
+    event.preventDefault()
+    appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
     return
   }
 
@@ -545,21 +554,9 @@ function handleGlobalShortcuts(event) {
     return
   }
 
-  if (matchShortcut(event, 'keyboard-shortcuts')) {
-    event.preventDefault()
-    appStore.openKeyboardShortcuts()
-    return
-  }
-
   if (matchShortcut(event, 'dataset-import')) {
     event.preventDefault()
     void openGlobalDatasetPicker()
-    return
-  }
-
-  if (matchShortcut(event, 'sidebar')) {
-    event.preventDefault()
-    toggleSidebarVisibility()
     return
   }
 
@@ -569,10 +566,10 @@ function handleGlobalShortcuts(event) {
     return
   }
 
-  if (matchShortcut(event, 'layout-cycle')) {
-    event.preventDefault()
-    appStore.cycleWorkspaceLayoutMode()
-  }
+}
+
+function handleOpenDatasetPickerRequest() {
+  void openGlobalDatasetPicker()
 }
 
 async function readDesktopStartupState() {
@@ -819,6 +816,7 @@ onMounted(async () => {
   document.addEventListener('keydown', handleGlobalShortcuts)
   document.addEventListener('dragover', handleAppDatasetDragOver)
   document.addEventListener('drop', handleAppDatasetDrop)
+  window.addEventListener('inquira:open-dataset-picker', handleOpenDatasetPickerRequest)
   void subscribeAppNativeDatasetDrops()
   wsUnsubscribers.value.push(
     settingsWebSocket.subscribeProgress((data) => {
@@ -936,6 +934,7 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleGlobalShortcuts)
   document.removeEventListener('dragover', handleAppDatasetDragOver)
   document.removeEventListener('drop', handleAppDatasetDrop)
+  window.removeEventListener('inquira:open-dataset-picker', handleOpenDatasetPickerRequest)
   if (typeof unsubscribeAppNativeDragDrop === 'function') {
     unsubscribeAppNativeDragDrop()
     unsubscribeAppNativeDragDrop = null
@@ -984,13 +983,6 @@ onUnmounted(() => {
 
 .app-nav-pane-collapsed {
   width: 64px;
-}
-
-.app-nav-pane-hidden {
-  width: 0;
-  border-right-color: transparent;
-  pointer-events: none;
-  box-shadow: none;
 }
 
 .app-workspace-pane {

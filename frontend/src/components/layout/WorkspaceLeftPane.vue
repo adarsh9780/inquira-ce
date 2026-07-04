@@ -24,36 +24,29 @@
           <ChatBubbleLeftRightIcon class="h-3.5 w-3.5" />
           <span>Chat</span>
         </button>
-        <button
-          type="button"
-          @click="appStore.setWorkspacePane('ctree')"
-          class="workspace-pane-tab"
-          :class="appStore.workspacePane === 'ctree' ? 'workspace-pane-tab-active' : ''"
-          :aria-pressed="appStore.workspacePane === 'ctree'"
-          title="Conversation Tree"
-        >
-          <ShareIcon class="h-3.5 w-3.5" />
-          <span>Tree</span>
-        </button>
       </div>
+
+      <button
+        type="button"
+        class="workspace-pane-icon-button"
+        :title="commandPaletteTooltip"
+        aria-label="Open command palette"
+        @click="appStore.openCommandPalette()"
+      >
+        <MagnifyingGlassIcon class="h-4 w-4" />
+      </button>
       
       <!-- Teleport Target for Code/Chat Toolbar -->
       <div id="workspace-left-pane-toolbar" class="flex-1 min-w-0 flex items-center justify-end"></div>
     </div>
 
-    <div
-      class="min-h-0 flex-1 flex flex-col p-3 sm:p-4 pb-0"
-      :class="['workspace-left-content', { 'workspace-left-content-chat-only': isChatOnlyMode }]"
-    >
+    <div class="workspace-left-content min-h-0 flex-1 flex flex-col p-3 sm:p-4 pb-0">
       <div class="min-h-0 flex-1">
       <div v-show="appStore.workspacePane === 'code'" class="h-full">
         <CodeTab />
       </div>
       <div v-show="appStore.workspacePane === 'chat'" class="h-full">
         <ChatTab />
-      </div>
-      <div v-show="appStore.workspacePane === 'ctree'" class="h-full">
-        <SidebarGlobalTurnTree variant="page" />
       </div>
       </div>
 
@@ -70,15 +63,15 @@ import { useAppStore } from '../../stores/appStore'
 import CodeTab from '../analysis/CodeTab.vue'
 import ChatTab from '../chat/ChatTab.vue'
 import ChatInput from '../chat/ChatInput.vue'
-import SidebarGlobalTurnTree from './sidebar/SidebarGlobalTurnTree.vue'
+import { shortcutTitle } from '../../utils/keyboardShortcuts'
 import {
   ChatBubbleLeftRightIcon,
   CodeBracketIcon,
-  ShareIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
-const isChatOnlyMode = computed(() => appStore.workspacePane === 'chat' && appStore.workspaceLayoutMode === 'chat')
+const commandPaletteTooltip = computed(() => shortcutTitle('command-palette', 'Command Palette', typeof navigator !== 'undefined' ? navigator.platform : ''))
 </script>
 
 <style scoped>
@@ -121,9 +114,22 @@ const isChatOnlyMode = computed(() => appStore.workspacePane === 'chat' && appSt
   background: var(--color-accent);
 }
 
-.workspace-left-content-chat-only {
-  width: min(100%, 920px);
-  margin-left: auto;
-  margin-right: auto;
+.workspace-pane-icon-button {
+  align-items: center;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  display: inline-flex;
+  height: 2rem;
+  justify-content: center;
+  width: 2rem;
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-standard),
+    color var(--motion-duration-fast) var(--motion-ease-standard);
 }
+
+.workspace-pane-icon-button:hover {
+  background: color-mix(in srgb, var(--color-text-main) 7%, transparent);
+  color: var(--color-text-main);
+}
+
 </style>
