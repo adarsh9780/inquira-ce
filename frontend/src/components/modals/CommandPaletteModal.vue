@@ -10,7 +10,7 @@
     <div class="modal-card command-palette-card relative flex w-full max-w-3xl flex-col overflow-hidden" @click.stop @keydown="handlePaletteKeydown">
       <div class="flex items-center gap-3 border-b border-[var(--color-border)] px-4 py-3">
         <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--color-selected-surface)] text-[var(--color-text-main)]">
-          <CommandLineIcon class="h-4 w-4" />
+          <MagnifyingGlassIcon class="h-4 w-4" />
         </div>
         <div class="min-w-0 flex-1">
           <h3 id="command-palette-title" class="truncate text-sm font-semibold text-[var(--color-text-main)]">Command Palette</h3>
@@ -95,7 +95,6 @@ import { computed, nextTick, ref, watch } from 'vue'
 import {
   ArrowPathIcon,
   CheckIcon,
-  CommandLineIcon,
   MagnifyingGlassIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'

@@ -12,7 +12,7 @@ test('layout defines elevated light surfaces for sidebar and active workspace pa
   assert.equal(styleSource.includes('--color-workspace-surface: #FAF9F6;'), true)
   assert.equal(appSource.includes('class="flex-1 flex overflow-hidden app-shell-frame relative"'), true)
   assert.equal(appSource.includes('class="h-full shrink-0 app-nav-pane"'), true)
-  assert.equal(appSource.includes("'app-nav-pane-collapsed': appStore.showSidebar && appStore.isSidebarCollapsed"), true)
+  assert.equal(appSource.includes("'app-nav-pane-collapsed': appStore.isSidebarCollapsed"), true)
   assert.equal(appSource.includes('.app-nav-pane-collapsed {'), true)
   assert.equal(appSource.includes('class="flex-1 flex flex-col overflow-hidden app-workspace-pane"'), true)
   assert.equal(appSource.includes('.app-nav-pane {'), true)
@@ -32,7 +32,7 @@ test('chat keeps composer pinned as footer and improves assistant readability', 
   const leftPaneSource = readFileSync(resolve(process.cwd(), 'src/components/layout/WorkspaceLeftPane.vue'), 'utf-8')
   const chatHistorySource = readFileSync(resolve(process.cwd(), 'src/components/chat/ChatHistory.vue'), 'utf-8')
 
-  assert.equal(leftPaneSource.includes('class="min-h-0 flex-1 flex flex-col p-3 sm:p-4 pb-0"'), true)
+  assert.equal(leftPaneSource.includes('class="workspace-left-content min-h-0 flex-1 flex flex-col p-3 sm:p-4 pb-0"'), true)
   assert.equal(leftPaneSource.includes(':style="leftPaneBodyStyle"'), false)
   assert.equal(chatHistorySource.includes('class="chat-markdown-content final-response-body max-w-none"'), true)
   assert.equal(chatHistorySource.includes('class="ephemeral-trace-list"'), true)

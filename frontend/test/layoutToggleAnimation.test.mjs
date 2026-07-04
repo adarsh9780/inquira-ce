@@ -11,12 +11,12 @@ test('right panel animates terminal open and close via height and opacity transi
   assert.equal(panelSource.includes('transition-[height] motion-slow'), true)
   assert.equal(panelSource.includes('transition-[height,opacity,border-color] motion-slow'), true)
   assert.equal(panelSource.includes('h-0 pointer-events-none opacity-0'), true)
-  assert.equal(panelSource.includes('v-if="appStore.showLeftPane"'), true)
-  assert.equal(panelSource.includes(':aria-hidden="!appStore.showRightPane"'), true)
-  assert.equal(panelSource.includes("'workspace-data-pane-hidden': !appStore.showRightPane"), true)
-  assert.equal(panelSource.includes('const leftPaneWidth = computed(() => appStore.showRightPane ? appStore.leftPaneWidth : 100)'), true)
-  assert.equal(panelSource.includes('const rightPaneWidth = computed(() => appStore.showLeftPane ? (100 - appStore.leftPaneWidth) : 100)'), true)
-  assert.equal(panelSource.includes("width: appStore.showRightPane ? `${rightPaneWidth}%` : '0%'"), true)
+  assert.equal(panelSource.includes('v-if="appStore.showLeftPane"'), false)
+  assert.equal(panelSource.includes(':aria-hidden="!appStore.showRightPane"'), false)
+  assert.equal(panelSource.includes('workspace-data-pane-hidden'), false)
+  assert.equal(panelSource.includes('const leftPaneWidth = computed(() => appStore.leftPaneWidth)'), true)
+  assert.equal(panelSource.includes('const rightPaneWidth = computed(() => 100 - appStore.leftPaneWidth)'), true)
+  assert.equal(panelSource.includes('width: `${rightPaneWidth}%`'), true)
 })
 
 test('sidebar keeps the current animated text-collapse and scroll layout', () => {
@@ -33,11 +33,12 @@ test('sidebar keeps the current animated text-collapse and scroll layout', () =>
 
 test('sidebar icons keep fixed sizing during collapse/expand', () => {
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
+  const styleSource = readFileSync(resolve(process.cwd(), 'src/style.css'), 'utf-8')
 
   assert.equal(sidebarSource.includes('.sidebar-row-icon'), true)
-  assert.equal(sidebarSource.includes('height: 1.5rem;'), true)
-  assert.equal(sidebarSource.includes('width: 1.5rem;'), true)
-  assert.equal(sidebarSource.includes('height: 2.25rem;'), true)
+  assert.equal(styleSource.includes('--size-sidebar-inline-icon: 1rem;'), true)
+  assert.equal(sidebarSource.includes('height: calc(var(--size-sidebar-inline-icon) + 0.5rem);'), true)
+  assert.equal(sidebarSource.includes('width: calc(var(--size-sidebar-inline-icon) + 0.5rem);'), true)
   assert.equal(sidebarSource.includes('.sidebar-row-icon :deep(svg)'), true)
   assert.equal(sidebarSource.includes('Cog6ToothIcon class="h-5 w-5"'), true)
   assert.equal(sidebarSource.includes('ChevronDoubleRightIcon'), false)

@@ -20,7 +20,7 @@ test('status bar renders provider token placeholders from pinia and formats pric
   assert.equal(formatter.includes('Cost unavailable'), true)
   assert.equal(source.includes(':title="tokenUsageHoverLabel"'), true)
   assert.equal(source.includes('v-if="authStore.isAuthenticated"'), true)
-  assert.equal(source.includes('class="flex items-center gap-1 h-full px-1 text-[10px] text-[var(--color-text-muted)]"'), true)
+  assert.equal(source.includes('class="flex items-center gap-1 h-full px-1 text-[11px] text-[var(--color-text-muted)]"'), true)
 })
 
 test('chat history no longer renders token usage footer', () => {

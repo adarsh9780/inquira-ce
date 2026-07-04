@@ -5,10 +5,6 @@ export const SHORTCUTS = [
   { id: 'dataset-import', category: 'Data', label: 'Import Dataset', keys: ['mod', 'o'], title: 'Import Dataset' },
   { id: 'command-palette', category: 'Workspace', label: 'Open Command Palette', keys: ['mod', 'b'], title: 'Command Palette' },
   { id: 'terminal', category: 'Workspace', label: 'Toggle Terminal', keys: ['mod', 'j'], title: 'Terminal' },
-  { id: 'layout-cycle', category: 'Layout', label: 'Cycle Workspace Layout', keys: ['mod', 'shift', 'd'], title: 'Cycle Layout' },
-  { id: 'layout-view', category: 'Layout', label: 'View Layout', keys: ['mod', 'alt', 'v'], title: 'View Layout' },
-  { id: 'layout-chat', category: 'Layout', label: 'Chat Layout', keys: ['mod', 'alt', 'c'], title: 'Chat Layout' },
-  { id: 'layout-output', category: 'Layout', label: 'Output Layout', keys: ['mod', 'alt', 'o'], title: 'Output Layout' },
 ]
 
 export function shortcutLabel(shortcut, platform = '') {

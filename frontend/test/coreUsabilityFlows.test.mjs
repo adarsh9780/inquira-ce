@@ -14,13 +14,14 @@ test('code tab runs manual code through execution service and surfaces output in
   assert.equal(source.includes('applyExecutionArtifactsToStore(orderedViewModel)'), true)
 })
 
-test('chat tab exposes conversation lifecycle controls for usable analysis sessions', () => {
+test('chat tab relies on sidebar lifecycle controls for usable analysis sessions', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/chat/ChatTab.vue'), 'utf-8')
 
-  assert.equal(source.includes('title="New Conversation"'), true)
+  assert.equal(source.includes('title="New Conversation"'), false)
+  assert.equal(source.includes('PlusIcon'), false)
   assert.equal(source.includes('title="Clear Conversation"'), false)
   assert.equal(source.includes('title="Delete Conversation"'), false)
-  assert.equal(source.includes('await appStore.createConversation()'), true)
+  assert.equal(source.includes('await appStore.createConversation()'), false)
   assert.equal(source.includes('await appStore.fetchConversationTurns({ reset: true })'), true)
   assert.equal(source.includes('await appStore.clearActiveConversation()'), false)
   assert.equal(source.includes('await appStore.deleteActiveConversation()'), false)

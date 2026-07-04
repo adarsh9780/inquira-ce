@@ -1,12 +1,11 @@
 <template>
-  <div class="h-7 w-full bg-[var(--color-surface)] border-t border-[var(--color-border)] flex items-center justify-between px-3 text-[12px] text-[var(--color-text-muted)] select-none z-50 shrink-0">
+  <div class="h-7 w-full bg-[var(--color-surface)] border-t border-[var(--color-border)] flex items-center justify-between px-3 text-[11px] font-medium text-[var(--color-text-muted)] select-none z-50 shrink-0">
 
     <!-- Left Section: Token usage, runtime status, and editor position -->
     <div class="flex items-center gap-3 h-full">
       <div
         v-if="authStore.isAuthenticated"
-        class="flex items-center gap-1 h-full px-1 text-[10px] text-[var(--color-text-muted)]"
-        style="font-family: var(--font-mono);"
+        class="flex items-center gap-1 h-full px-1 text-[11px] text-[var(--color-text-muted)]"
         :title="tokenUsageHoverLabel"
       >
         <span class="truncate">{{ tokenUsageSummaryLabel }}</span>
@@ -30,7 +29,7 @@
           <span class="truncate font-medium text-[var(--color-text-main)]">
             {{ activeWorkspaceName }}
           </span>
-          <span class="hidden text-[10px] font-medium sm:inline" :class="workspaceRuntimeStatusMeta.textClass">
+          <span class="hidden text-[11px] font-semibold sm:inline" :class="workspaceRuntimeStatusMeta.textClass">
             {{ workspaceRuntimeStatusMeta.label }}
           </span>
           <ChevronUpDownIcon class="h-3.5 w-3.5 shrink-0 text-[var(--color-text-muted)]" />
@@ -69,7 +68,7 @@
 
       <template v-if="appStore.isEditorFocused">
         <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
-        <div class="flex items-center text-[var(--color-text-muted)] tracking-tight gap-1 px-1" style="font-family: var(--font-mono);">
+        <div class="flex items-center text-[11px] text-[var(--color-text-muted)] tracking-tight gap-1 px-1">
           <span>Ln {{ appStore.editorLine }},</span>
           <span>Col {{ appStore.editorCol }}</span>
         </div>
@@ -80,7 +79,7 @@
     <div class="flex items-center gap-2 h-full">
       <!-- Data pane error takes priority -->
       <template v-if="appStore.dataPaneError">
-        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-[var(--color-error)]/10 text-[var(--color-error)] max-w-[280px] truncate"
+        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--color-error)]/10 text-[var(--color-error)] max-w-[280px] truncate"
              :title="appStore.dataPaneError">
           <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-error)] shrink-0"></span>
           <span class="truncate">{{ appStore.dataPaneError }}</span>
@@ -89,7 +88,7 @@
       <template v-else>
         <div
           v-if="primaryBackgroundOperation"
-          class="flex max-w-[360px] items-center gap-1.5 rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-text-muted)]"
+          class="flex max-w-[360px] items-center gap-1.5 rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-text-muted)]"
           :title="primaryBackgroundOperationTitle"
           data-background-operation-status
         >
@@ -106,11 +105,11 @@
           <span class="truncate">{{ primaryBackgroundOperationLabel }}</span>
           <span v-if="backgroundOperationCountLabel" class="shrink-0 text-[var(--color-text-sub)]">{{ backgroundOperationCountLabel }}</span>
         </div>
-        <div v-if="appStore.activeWorkspaceId && paneArtifactCountLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium"
+        <div v-if="appStore.activeWorkspaceId && paneArtifactCountLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium"
              :class="artifactCountClass">
           <span>{{ paneArtifactCountLabel }}</span>
         </div>
-        <div v-if="appStore.activeWorkspaceId && tableViewportLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium" :class="artifactCountClass">
+        <div v-if="appStore.activeWorkspaceId && tableViewportLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium" :class="artifactCountClass">
           <span>{{ tableViewportLabel }}</span>
         </div>
         <div
@@ -132,11 +131,11 @@
       </template>
     </div>
 
-    <!-- Right Section: Layout, Terminal & Version -->
+    <!-- Right Section: Terminal, alerts & version -->
     <div class="flex items-center gap-3 h-full">
       <div
         data-websocket-status
-        class="flex items-center gap-1.5 h-full px-1 text-[10px] font-medium"
+        class="flex items-center gap-1.5 h-full px-1 text-[11px] font-medium"
         :class="wsConnectionMeta.textClass"
         :title="`Realtime connection: ${wsConnectionMeta.label}`"
       >
@@ -146,59 +145,10 @@
 
       <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
 
-      <!-- Workspace Layout View Menu -->
-      <div class="relative h-full" data-status-view-menu>
-        <button
-          type="button"
-          class="status-view-menu-button"
-          :title="`View: ${workspaceLayoutLabel} active`"
-          aria-label="View"
-          aria-haspopup="menu"
-          :aria-expanded="layoutMenuOpen ? 'true' : 'false'"
-          :aria-keyshortcuts="workspaceLayoutAriaShortcut"
-          @click="toggleLayoutMenu"
-        >
-          <ViewColumnsIcon class="w-3.5 h-3.5" />
-          <span>View</span>
-          <ChevronUpDownIcon class="w-3.5 h-3.5 text-[var(--color-text-muted)]" />
-        </button>
-
-        <div
-          v-if="layoutMenuOpen"
-          class="layer-modal-dropdown status-view-menu absolute right-0 bottom-full mb-2 w-60 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-[var(--shadow-lifted)]"
-          role="menu"
-          aria-label="View options"
-        >
-          <div class="border-b border-[var(--color-border)] px-3 py-2">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">View</p>
-          </div>
-          <button
-            v-for="option in layoutPresetOptions"
-            :key="option.id"
-            type="button"
-            class="status-view-menu-item"
-            :class="layoutMenuItemClass(option.id)"
-            role="menuitemradio"
-            :aria-checked="isLayoutPresetActive(option.id)"
-            @click="selectLayoutPreset(option.id)"
-          >
-            <component :is="option.icon" class="h-4 w-4 shrink-0" />
-            <span class="min-w-0 flex-1">
-              <span class="block truncate text-[12px] font-semibold">{{ option.label }}</span>
-              <span class="mt-0.5 block truncate text-[10px] text-[var(--color-text-muted)]">{{ option.description }}</span>
-            </span>
-            <CheckIcon v-if="isLayoutPresetActive(option.id)" class="h-3.5 w-3.5 shrink-0 text-[var(--color-accent)]" />
-          </button>
-        </div>
-      </div>
-      <span class="sr-only" aria-live="polite">{{ workspaceLayoutAnnouncement }}</span>
-
-      <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
-
       <!-- Terminal Toggle -->
       <button
         @click="appStore.toggleTerminal()"
-        class="flex items-center gap-1.5 h-full px-1.5 hover:bg-[var(--color-base)] transition-colors"
+        class="flex items-center gap-1.5 h-full px-1.5 text-[11px] font-medium hover:bg-[var(--color-base)] transition-colors"
         :class="appStore.isTerminalOpen ? 'text-[var(--color-accent)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
         title="Toggle terminal panel (Cmd/Ctrl+J)"
       >
@@ -211,7 +161,7 @@
       <div class="relative" data-notification-center>
         <button
           type="button"
-          class="relative flex items-center gap-1.5 h-full px-1.5 hover:bg-[var(--color-base)] transition-colors text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+          class="relative flex items-center gap-1.5 h-full px-1.5 text-[11px] font-medium hover:bg-[var(--color-base)] transition-colors text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
           title="Session notifications"
           @click="toggleNotificationsPanel"
         >
@@ -292,8 +242,7 @@
         href="https://inquiraai.com"
         @click.prevent="openInquiraSite"
         target="_blank"
-        class="text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] transition-colors"
-        style="font-family: var(--font-mono);"
+        class="text-[11px] font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] transition-colors"
         title="Visit inquiraai.com"
       >
         Inquira v{{ uiVersion }}
@@ -313,18 +262,12 @@ import { settingsWebSocket } from '../../services/websocketService'
 import { formatUsageCompact, formatUsageTooltip } from '../../utils/usageFormat'
 import {
   BellIcon,
-  ChatBubbleLeftRightIcon,
-  CheckIcon,
   ChevronUpDownIcon,
-  CodeBracketIcon,
   CommandLineIcon,
-  ViewColumnsIcon,
   ExclamationTriangleIcon,
-  TableCellsIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import { toast, useToast } from '../../composables/useToast'
-import { WORKSPACE_LAYOUT_MODES } from '../../utils/workspaceLayout'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -341,7 +284,6 @@ const uiVersion = String(
 // --- Workspace Status Management ---
 const workspaceRuntimeStatus = computed(() => appStore.activeWorkspaceRuntimeStatus)
 const workspaceSwitcherOpen = ref(false)
-const layoutMenuOpen = ref(false)
 
 const isWebSocketConnected = ref(false)
 const isWebSocketMonitoringActive = ref(false)
@@ -362,89 +304,6 @@ const artifactUsage = ref({
   warning: false,
 })
 const workspaceResourceRecommendation = ref(null)
-
-const workspaceLayoutLabel = computed(() => {
-  if (appStore.workspaceLayoutMode === WORKSPACE_LAYOUT_MODES.CHAT) {
-    if (appStore.workspacePane === 'code') return 'Code'
-    return 'Chat'
-  }
-  if (appStore.workspaceLayoutMode === WORKSPACE_LAYOUT_MODES.OUTPUT) return 'Data'
-  return 'View'
-})
-
-const workspaceLayoutAriaShortcut = 'Control+Alt+V Meta+Alt+V Control+Alt+C Meta+Alt+C Control+Alt+O Meta+Alt+O'
-
-const workspaceLayoutAnnouncement = computed(() => `${workspaceLayoutLabel.value} layout active`)
-
-const layoutPresetOptions = [
-  {
-    id: 'view',
-    label: 'Default view',
-    description: 'Chat and data panes',
-    icon: ViewColumnsIcon,
-  },
-  {
-    id: 'chat',
-    label: 'Chat focus',
-    description: 'Conversation first',
-    icon: ChatBubbleLeftRightIcon,
-  },
-  {
-    id: 'code',
-    label: 'Code focus',
-    description: 'Editor first',
-    icon: CodeBracketIcon,
-  },
-  {
-    id: 'output',
-    label: 'Data focus',
-    description: 'Tables and charts',
-    icon: TableCellsIcon,
-  },
-]
-
-function setLayoutPreset(preset) {
-  if (preset === 'view') {
-    appStore.setWorkspaceLayoutMode(WORKSPACE_LAYOUT_MODES.VIEW)
-    return
-  }
-  if (preset === 'chat') {
-    appStore.setWorkspaceLayoutMode(WORKSPACE_LAYOUT_MODES.CHAT)
-    appStore.setWorkspacePane('chat')
-    return
-  }
-  if (preset === 'code') {
-    appStore.setWorkspaceLayoutMode(WORKSPACE_LAYOUT_MODES.CHAT)
-    appStore.setWorkspacePane('code')
-    return
-  }
-  if (preset === 'output') {
-    appStore.setWorkspaceLayoutMode(WORKSPACE_LAYOUT_MODES.OUTPUT)
-  }
-}
-
-function selectLayoutPreset(preset) {
-  setLayoutPreset(preset)
-  closeLayoutMenu()
-}
-
-function isLayoutPresetActive(preset) {
-  if (preset === 'view') return appStore.workspaceLayoutMode === WORKSPACE_LAYOUT_MODES.VIEW
-  if (preset === 'output') return appStore.workspaceLayoutMode === WORKSPACE_LAYOUT_MODES.OUTPUT
-  if (preset === 'code') {
-    return appStore.workspaceLayoutMode === WORKSPACE_LAYOUT_MODES.CHAT && appStore.workspacePane === 'code'
-  }
-  if (preset === 'chat') {
-    return appStore.workspaceLayoutMode === WORKSPACE_LAYOUT_MODES.CHAT && appStore.workspacePane === 'chat'
-  }
-  return false
-}
-
-function layoutMenuItemClass(preset) {
-  return isLayoutPresetActive(preset)
-    ? 'text-[var(--color-text-main)] bg-[var(--color-selected-surface)]'
-    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] hover:bg-[var(--color-base)]'
-}
 
 const unreadNotificationBadge = computed(() => {
   const count = Number(unreadNotificationCount.value || 0)
@@ -868,39 +727,18 @@ function toggleNotificationsPanel() {
   openNotificationsPanel()
 }
 
-function openLayoutMenu() {
-  closeWorkspaceSwitcher()
-  closeNotificationsPanel()
-  layoutMenuOpen.value = true
-}
-
-function closeLayoutMenu() {
-  layoutMenuOpen.value = false
-}
-
-function toggleLayoutMenu() {
-  if (layoutMenuOpen.value) {
-    closeLayoutMenu()
-    return
-  }
-  openLayoutMenu()
-}
-
 function handleGlobalPointerDown(event) {
   const target = event?.target
   if (!(target instanceof Element)) return
   if (target.closest('[data-notification-center]')) return
   if (target.closest('[data-workspace-switcher]')) return
-  if (target.closest('[data-status-view-menu]')) return
   closeWorkspaceSwitcher()
-  closeLayoutMenu()
   closeNotificationsPanel()
 }
 
 function handleStatusBarEscape(event) {
   if (event.key === 'Escape') {
     closeWorkspaceSwitcher()
-    closeLayoutMenu()
     closeNotificationsPanel()
   }
 }
@@ -1007,34 +845,3 @@ watch(() => authStore.isAuthenticated, (authenticated) => {
   }
 })
 </script>
-
-<style scoped>
-.status-view-menu-button {
-  align-items: center;
-  border-radius: 0.375rem;
-  color: var(--color-text-muted);
-  display: inline-flex;
-  gap: 0.375rem;
-  height: 100%;
-  padding: 0 0.375rem;
-  transition: background-color 150ms ease, color 150ms ease;
-}
-
-.status-view-menu-button:hover {
-  background: var(--color-base);
-  color: var(--color-text-main);
-}
-
-.status-view-menu-item {
-  align-items: center;
-  display: flex;
-  gap: 0.625rem;
-  min-height: 3rem;
-  padding: 0.5rem 0.75rem;
-  text-align: left;
-  transition:
-    background-color var(--motion-duration-fast) var(--motion-ease-standard),
-    color var(--motion-duration-fast) var(--motion-ease-standard);
-  width: 100%;
-}
-</style>

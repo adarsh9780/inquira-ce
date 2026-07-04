@@ -57,34 +57,6 @@
 
         <button
           type="button"
-          class="sidebar-nav-row sidebar-primary-row justify-start px-2.5"
-          :title="sidebarSearchOpen ? 'Close search' : 'Search conversations'"
-          @click="toggleSidebarSearch"
-        >
-          <span class="sidebar-row-icon">
-            <MagnifyingGlassIcon v-if="!sidebarSearchOpen" class="h-5 w-5" />
-            <XMarkIcon v-else class="h-5 w-5" />
-          </span>
-          <span
-            class="sidebar-row-label"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[176px] opacity-100 ml-2.5'"
-          >
-            {{ sidebarSearchOpen ? 'Close search' : 'Search' }}
-          </span>
-        </button>
-
-        <div v-if="sidebarSearchOpen && !appStore.isSidebarCollapsed" class="px-1.5 pb-1 pt-1">
-          <input
-            v-model="sidebarSearchQuery"
-            class="sidebar-search-input"
-            type="search"
-            placeholder="Search conversations"
-            aria-label="Search conversations"
-          />
-        </div>
-
-        <button
-          type="button"
           class="sidebar-nav-row justify-start px-2.5"
           :class="[
             appStore.activeTab === 'schema-editor' ? 'sidebar-nav-row-active' : '',
@@ -154,11 +126,7 @@
             Create a workspace to start.
           </div>
 
-          <div v-else-if="filteredSidebarWorkspaces.length === 0 && !appStore.isSidebarCollapsed" class="px-2.5 py-3 text-[12px] text-[var(--color-text-muted)]">
-            No matching conversations.
-          </div>
-
-          <div v-else class="mt-2 space-y-4">
+          <div v-else class="mt-2 space-y-2">
             <div v-for="workspace in filteredSidebarWorkspaces" :key="workspace.id" class="space-y-1">
               <div class="group relative flex min-h-8 select-none items-center">
                 <button
@@ -186,14 +154,14 @@
                 </button>
               </div>
 
-              <div v-if="!appStore.isSidebarCollapsed" class="space-y-0.5 pl-7 pr-1">
-                <div v-if="isWorkspaceConversationsLoading(workspace.id)" class="px-2 py-1.5 text-[12px] font-medium text-[var(--color-text-muted)]">
+              <div v-if="!appStore.isSidebarCollapsed" class="space-y-px pl-6 pr-1">
+                <div v-if="isWorkspaceConversationsLoading(workspace.id)" class="px-2 py-1 text-[12px] font-medium text-[var(--color-text-muted)]">
                   Loading conversations
                 </div>
                 <button
                   v-else-if="visibleConversationsForSidebar(workspace).length === 0"
                   type="button"
-                  class="w-full rounded-md px-2 py-1.5 text-left text-[12px] font-medium text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/5 hover:text-[var(--color-text-main)]"
+                  class="w-full rounded-md px-2 py-1 text-left text-[12px] font-medium text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/5 hover:text-[var(--color-text-main)]"
                   @click="createConversation(workspace.id)"
                 >
                   New conversation
@@ -217,7 +185,7 @@
                   <button
                     v-if="hasHiddenConversationsForSidebar(workspace)"
                     type="button"
-                    class="rounded-md px-2 py-1.5 text-left text-[12px] font-medium text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/5 hover:text-[var(--color-text-main)]"
+                    class="rounded-md px-2 py-1 text-left text-[12px] font-medium text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/5 hover:text-[var(--color-text-main)]"
                     @click="showMoreConversations(workspace.id)"
                   >
                     Show more
@@ -298,10 +266,6 @@
       :is-open="isTermsOpen"
       @close="isTermsOpen = false"
     />
-    <KeyboardShortcutsModal
-      :is-open="appStore.isKeyboardShortcutsOpen"
-      @close="appStore.closeKeyboardShortcuts()"
-    />
     <Teleport to="body">
       <div
         v-if="profileMenuOpen"
@@ -361,7 +325,6 @@ import { extractApiErrorMessage } from '../../utils/apiError'
 import { formatCompactRelativeTimestamp, formatExactTimestamp } from '../../utils/dateUtils'
 import { shortcutTitle } from '../../utils/keyboardShortcuts'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
-import KeyboardShortcutsModal from '../modals/KeyboardShortcutsModal.vue'
 import TermsModal from '../modals/TermsModal.vue'
 import SidebarConversationActionsMenu from './sidebar/SidebarConversationActionsMenu.vue'
 import SidebarConversationRow from './sidebar/SidebarConversationRow.vue'
@@ -378,9 +341,7 @@ import {
   ShareIcon,
   Cog6ToothIcon,
   ChevronDoubleLeftIcon,
-  MagnifyingGlassIcon,
   PencilSquareIcon,
-  XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -398,8 +359,6 @@ const profileMenuOpen      = ref(false)
 const profileMenuRef       = ref(null)
 const profileMenuButtonRef = ref(null)
 const profileMenuPosition  = ref({ left: 0, top: 0 })
-const sidebarSearchOpen = ref(false)
-const sidebarSearchQuery = ref('')
 const sidebarConversationsByWorkspace = ref({})
 const loadingConversationsByWorkspace = ref({})
 const visibleConversationCountByWorkspace = ref({})
@@ -444,15 +403,9 @@ const activeConversationMenuExactDate = computed(() => (
   formatExactTimestamp(conversationTimestampValue(activeConversationMenuTarget.value))
 ))
 
-const normalizedSidebarSearchQuery = computed(() => (
-  String(sidebarSearchQuery.value || '').trim().toLowerCase()
-))
-
 const filteredSidebarWorkspaces = computed(() => {
   const workspaces = Array.isArray(appStore.workspaces) ? appStore.workspaces : []
-  const query = normalizedSidebarSearchQuery.value
-  if (!query) return workspaces
-  return workspaces.filter((workspace) => workspaceMatchesSidebarSearch(workspace, query))
+  return workspaces
 })
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -467,48 +420,16 @@ function conversationsForWorkspace(workspaceId) {
     : []
 }
 
-function conversationMatchesSidebarSearch(conversation, query = normalizedSidebarSearchQuery.value) {
-  const normalizedQuery = String(query || '').trim().toLowerCase()
-  if (!normalizedQuery) return true
-  return String(conversation?.title || 'Untitled').toLowerCase().includes(normalizedQuery)
-}
-
-function workspaceMatchesSidebarSearch(workspace, query = normalizedSidebarSearchQuery.value) {
-  const normalizedQuery = String(query || '').trim().toLowerCase()
-  if (!normalizedQuery) return true
-  const workspaceName = String(workspace?.name || 'Untitled workspace').toLowerCase()
-  if (workspaceName.includes(normalizedQuery)) return true
-  return conversationsForWorkspace(workspace?.id).some((conversation) => (
-    conversationMatchesSidebarSearch(conversation, normalizedQuery)
-  ))
-}
-
 function visibleConversationsForSidebar(workspace) {
   const workspaceId = String(workspace?.id || '').trim()
   const conversations = conversationsForWorkspace(workspaceId)
-  const query = normalizedSidebarSearchQuery.value
-  if (!query) return conversations.slice(0, visibleConversationCount(workspaceId))
-  const workspaceName = String(workspace?.name || 'Untitled workspace').toLowerCase()
-  if (workspaceName.includes(query)) {
-    return conversations.slice(0, visibleConversationCount(workspaceId))
-  }
-  return conversations
-    .filter((conversation) => conversationMatchesSidebarSearch(conversation, query))
-    .slice(0, visibleConversationCount(workspaceId))
+  return conversations.slice(0, visibleConversationCount(workspaceId))
 }
 
 function hasHiddenConversationsForSidebar(workspace) {
   const workspaceId = String(workspace?.id || '').trim()
   if (!workspaceId) return false
-  const query = normalizedSidebarSearchQuery.value
-  if (!query) return hasHiddenConversations(workspaceId)
-  const workspaceName = String(workspace?.name || 'Untitled workspace').toLowerCase()
-  const matches = workspaceName.includes(query)
-    ? conversationsForWorkspace(workspaceId)
-    : conversationsForWorkspace(workspaceId).filter((conversation) => (
-      conversationMatchesSidebarSearch(conversation, query)
-    ))
-  return matches.length > visibleConversationCount(workspaceId)
+  return conversationsForWorkspace(workspaceId).length > visibleConversationCount(workspaceId)
 }
 
 function visibleConversationCount(workspaceId) {
@@ -517,14 +438,6 @@ function visibleConversationCount(workspaceId) {
   return Number.isFinite(value) && value > 0
     ? Math.max(DEFAULT_VISIBLE_CONVERSATION_COUNT, Math.floor(value))
     : DEFAULT_VISIBLE_CONVERSATION_COUNT
-}
-
-function visibleConversationsForWorkspace(workspaceId) {
-  return conversationsForWorkspace(workspaceId).slice(0, visibleConversationCount(workspaceId))
-}
-
-function hasHiddenConversations(workspaceId) {
-  return conversationsForWorkspace(workspaceId).length > visibleConversationCount(workspaceId)
 }
 
 function showMoreConversations(workspaceId) {
@@ -614,18 +527,6 @@ async function loadAllSidebarConversations({ force = false } = {}) {
 // ─── Brand / collapse ─────────────────────────────────────────────────────────
 function handleBrandClick() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
-}
-
-function toggleSidebarSearch() {
-  if (appStore.isSidebarCollapsed) {
-    appStore.setSidebarCollapsed(false)
-    sidebarSearchOpen.value = true
-    return
-  }
-  sidebarSearchOpen.value = !sidebarSearchOpen.value
-  if (!sidebarSearchOpen.value) {
-    sidebarSearchQuery.value = ''
-  }
 }
 
 function openSchemaEditor() {
@@ -963,8 +864,6 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
   if (collapsed) {
     closeProfileMenu()
     closeConversationMenu()
-    sidebarSearchOpen.value = false
-    sidebarSearchQuery.value = ''
   }
 })
 </script>
@@ -1098,30 +997,6 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
   color: color-mix(in srgb, var(--color-text-muted) 78%, var(--color-base) 22%);
   letter-spacing: 0.02em;
   text-transform: uppercase;
-}
-
-.sidebar-search-input {
-  min-height: 2.125rem;
-  width: 100%;
-  border-radius: 0.5rem;
-  border: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--color-base) 78%, var(--color-surface) 22%);
-  padding: 0 0.625rem;
-  color: var(--color-text-main);
-  font-size: 0.8125rem;
-  outline: none;
-  transition:
-    border-color var(--motion-duration-standard) var(--motion-ease-standard),
-    background-color var(--motion-duration-standard) var(--motion-ease-standard);
-}
-
-.sidebar-search-input::placeholder {
-  color: color-mix(in srgb, var(--color-text-muted) 72%, var(--color-base) 28%);
-}
-
-.sidebar-search-input:focus {
-  border-color: var(--color-selected-border);
-  background: var(--color-base);
 }
 
 .custom-scrollbar::-webkit-scrollbar {

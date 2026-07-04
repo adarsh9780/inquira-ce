@@ -77,11 +77,8 @@
         <div
           class="h-full shrink-0 app-nav-pane"
           :class="{
-            'app-nav-pane-collapsed': appStore.showSidebar && appStore.isSidebarCollapsed,
-            'app-nav-pane-hidden': !appStore.showSidebar,
+            'app-nav-pane-collapsed': appStore.isSidebarCollapsed,
           }"
-          :aria-hidden="!appStore.showSidebar"
-          :inert="!appStore.showSidebar"
         >
           <UnifiedSidebar />
         </div>
@@ -97,6 +94,10 @@
       <CommandPaletteModal
         :is-open="appStore.isCommandPaletteOpen"
         @close="appStore.closeCommandPalette()"
+      />
+      <KeyboardShortcutsModal
+        :is-open="appStore.isKeyboardShortcutsOpen"
+        @close="appStore.closeKeyboardShortcuts()"
       />
     </div>
 
@@ -161,7 +162,6 @@ import { normalizeThemeId } from './constants/themes'
 import { normalizeAppFontId, normalizeCodeFontId } from './constants/fonts'
 import { filterSupportedDatasetPaths, getDroppedDatasetPaths, SUPPORTED_DATASET_EXTENSIONS } from './utils/datasetImport'
 import { matchShortcut } from './utils/keyboardShortcuts'
-import { resolveWorkspaceLayoutShortcut } from './utils/workspaceLayout'
 import logo from './assets/favicon.svg'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
 import RightPanel from './components/layout/RightPanel.vue'
@@ -170,6 +170,7 @@ import ToastContainer from './components/ui/ToastContainer.vue'
 import StartupFailureActions from './components/startup/StartupFailureActions.vue'
 import SettingsModal from './components/modals/SettingsModal.vue'
 import CommandPaletteModal from './components/modals/CommandPaletteModal.vue'
+import KeyboardShortcutsModal from './components/modals/KeyboardShortcutsModal.vue'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -521,12 +522,6 @@ function handleGlobalShortcuts(event) {
   if (event.repeat) return
 
   const hasPrimaryModifier = event.metaKey || event.ctrlKey
-  const layoutShortcut = resolveWorkspaceLayoutShortcut(event)
-  if (layoutShortcut) {
-    event.preventDefault()
-    appStore.setWorkspaceLayoutMode(layoutShortcut)
-    return
-  }
   if (!hasPrimaryModifier || event.altKey) return
 
   if (matchShortcut(event, 'conversation-tree')) {
@@ -565,10 +560,6 @@ function handleGlobalShortcuts(event) {
     return
   }
 
-  if (matchShortcut(event, 'layout-cycle')) {
-    event.preventDefault()
-    appStore.cycleWorkspaceLayoutMode()
-  }
 }
 
 async function readDesktopStartupState() {
@@ -980,13 +971,6 @@ onUnmounted(() => {
 
 .app-nav-pane-collapsed {
   width: 64px;
-}
-
-.app-nav-pane-hidden {
-  width: 0;
-  border-right-color: transparent;
-  pointer-events: none;
-  box-shadow: none;
 }
 
 .app-workspace-pane {

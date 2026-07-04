@@ -33,17 +33,14 @@
         aria-label="Open command palette"
         @click="appStore.openCommandPalette()"
       >
-        <CommandLineIcon class="h-4 w-4" />
+        <MagnifyingGlassIcon class="h-4 w-4" />
       </button>
       
       <!-- Teleport Target for Code/Chat Toolbar -->
       <div id="workspace-left-pane-toolbar" class="flex-1 min-w-0 flex items-center justify-end"></div>
     </div>
 
-    <div
-      class="min-h-0 flex-1 flex flex-col p-3 sm:p-4 pb-0"
-      :class="['workspace-left-content', { 'workspace-left-content-chat-only': isChatOnlyMode }]"
-    >
+    <div class="workspace-left-content min-h-0 flex-1 flex flex-col p-3 sm:p-4 pb-0">
       <div class="min-h-0 flex-1">
       <div v-show="appStore.workspacePane === 'code'" class="h-full">
         <CodeTab />
@@ -70,11 +67,10 @@ import { shortcutTitle } from '../../utils/keyboardShortcuts'
 import {
   ChatBubbleLeftRightIcon,
   CodeBracketIcon,
-  CommandLineIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
-const isChatOnlyMode = computed(() => appStore.workspacePane === 'chat' && appStore.workspaceLayoutMode === 'chat')
 const commandPaletteTooltip = computed(() => shortcutTitle('command-palette', 'Command Palette', typeof navigator !== 'undefined' ? navigator.platform : ''))
 </script>
 
@@ -136,9 +132,4 @@ const commandPaletteTooltip = computed(() => shortcutTitle('command-palette', 'C
   color: var(--color-text-main);
 }
 
-.workspace-left-content-chat-only {
-  width: min(100%, 920px);
-  margin-left: auto;
-  margin-right: auto;
-}
 </style>

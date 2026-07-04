@@ -9,16 +9,14 @@
     >
       <!-- Left Pane (Chat / Code) -->
       <div 
-        v-if="appStore.showLeftPane"
         class="flex h-full min-w-0 flex-col border-r workspace-center-pane" 
-        :style="{ width: leftPaneWidth + '%', borderColor: appStore.showRightPane ? 'var(--color-border)' : 'transparent' }"
+        :style="{ width: leftPaneWidth + '%', borderColor: 'var(--color-border)' }"
       >
         <WorkspaceLeftPane />
       </div>
 
       <!-- Vertical Resizer Handle (Left/Right panes) -->
       <div 
-        v-if="appStore.showLeftPane && appStore.showRightPane"
         class="pane-resizer-x relative z-10 -mx-[1px] h-full w-[3px] cursor-col-resize bg-transparent transition-all motion-fast hover:w-1"
         @mousedown="startResizeX"
       ></div>
@@ -26,11 +24,9 @@
       <!-- Right Pane (Table / Figure / Output) -->
       <div 
         class="flex h-full min-w-0 flex-col overflow-hidden workspace-data-pane"
-        :class="{ 'workspace-data-pane-hidden': !appStore.showRightPane }"
-        :aria-hidden="!appStore.showRightPane"
         :style="{
-          width: appStore.showRightPane ? `${rightPaneWidth}%` : '0%',
-          opacity: appStore.showRightPane ? 1 : 0
+          width: `${rightPaneWidth}%`,
+          opacity: 1
         }"
       >
         <WorkspaceRightPane />
@@ -115,8 +111,8 @@ import { CommandLineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
 const isWorkspaceActive = computed(() => appStore.activeTab === 'workspace')
-const leftPaneWidth = computed(() => appStore.showRightPane ? appStore.leftPaneWidth : 100)
-const rightPaneWidth = computed(() => appStore.showLeftPane ? (100 - appStore.leftPaneWidth) : 100)
+const leftPaneWidth = computed(() => appStore.leftPaneWidth)
+const rightPaneWidth = computed(() => 100 - appStore.leftPaneWidth)
 const terminalVisualHeight = computed(() => {
   if (!isWorkspaceActive.value) return 0
   return appStore.isTerminalOpen ? appStore.terminalHeight : 0
@@ -195,11 +191,6 @@ onUnmounted(() => {
   box-shadow: inset 1px 0 0 color-mix(in srgb, var(--color-text-main) 2%, transparent);
   transition: width 220ms ease, opacity 180ms ease;
   will-change: width, opacity;
-}
-
-.workspace-data-pane-hidden {
-  pointer-events: none;
-  box-shadow: none;
 }
 
 .pane-resizer-x:hover,

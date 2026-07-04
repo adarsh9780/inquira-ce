@@ -1,26 +1,6 @@
 <template>
   <div class="flex h-full min-w-0 rounded-xl overflow-hidden" style="background-color: var(--color-base);">
     <div class="flex-1 min-w-0 flex flex-col">
-    <Teleport to="#workspace-left-pane-toolbar" v-if="isMounted && appStore.workspacePane === 'chat'">
-      <div class="flex items-center w-full justify-end">
-          <div
-            class="flex items-center gap-1 rounded-xl border p-1"
-            style="background-color: var(--color-control-surface); border-color: var(--color-border);"
-          >
-            <button
-              type="button"
-              class="btn-icon hover:text-[var(--color-accent)]"
-              style="--chat-toolbar-selected-surface: var(--color-selected-surface);"
-              @click="createConversation"
-              :disabled="!appStore.hasWorkspace"
-              title="New Conversation"
-            >
-              <PlusIcon class="h-4 w-4" />
-            </button>
-          </div>
-      </div>
-    </Teleport>
-
       <div class="chat-scroll-shell flex-1 min-h-0 overflow-y-auto" style="background-color: var(--color-base);" data-chat-scroll-container>
         <div v-if="!appStore.hasWorkspace" class="flex items-center justify-center h-full px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-2 sm:pb-3 lg:pb-4">
           <div class="text-center max-w-md">
@@ -62,30 +42,14 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import ChatHistory from './ChatHistory.vue'
-import { 
-  ChatBubbleLeftRightIcon, 
-  PlusIcon
-} from '@heroicons/vue/24/outline'
-import { toast } from '../../composables/useToast'
-import { extractApiErrorMessage } from '../../utils/apiError'
+import { ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
-const isMounted = ref(false)
-
-async function createConversation() {
-  try {
-    await appStore.createConversation()
-    await appStore.fetchConversationTurns({ reset: true })
-  } catch (error) {
-    toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to create conversation'))
-  }
-}
 
 onMounted(async () => {
-  isMounted.value = true
   try {
     await appStore.fetchWorkspaces()
     if (!appStore.activeWorkspaceId) return
