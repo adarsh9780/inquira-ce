@@ -94,6 +94,10 @@
         v-model="appStore.isSettingsOpen"
         :initial-tab="appStore.settingsInitialTab"
       />
+      <CommandPaletteModal
+        :is-open="appStore.isCommandPaletteOpen"
+        @close="appStore.closeCommandPalette()"
+      />
     </div>
 
     <Teleport to="body">
@@ -157,7 +161,7 @@ import { normalizeThemeId } from './constants/themes'
 import { normalizeAppFontId, normalizeCodeFontId } from './constants/fonts'
 import { filterSupportedDatasetPaths, getDroppedDatasetPaths, SUPPORTED_DATASET_EXTENSIONS } from './utils/datasetImport'
 import { matchShortcut } from './utils/keyboardShortcuts'
-import { resolveWorkspaceLayoutShortcut, WORKSPACE_LAYOUT_MODES } from './utils/workspaceLayout'
+import { resolveWorkspaceLayoutShortcut } from './utils/workspaceLayout'
 import logo from './assets/favicon.svg'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
 import RightPanel from './components/layout/RightPanel.vue'
@@ -165,6 +169,7 @@ import StatusBar from './components/layout/StatusBar.vue'
 import ToastContainer from './components/ui/ToastContainer.vue'
 import StartupFailureActions from './components/startup/StartupFailureActions.vue'
 import SettingsModal from './components/modals/SettingsModal.vue'
+import CommandPaletteModal from './components/modals/CommandPaletteModal.vue'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -430,15 +435,6 @@ function applyDocumentCodeFont(fontId) {
   document.documentElement.setAttribute('data-code-font', normalized)
 }
 
-function toggleSidebarVisibility() {
-  if (!appStore.showSidebar) {
-    appStore.setSidebarCollapsed(false)
-    appStore.setWorkspaceLayoutMode(WORKSPACE_LAYOUT_MODES.VIEW)
-    return
-  }
-  appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
-}
-
 async function startGlobalDatasetImport(paths, source = 'drop') {
   if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) {
     toast.error('Workspace Required', 'Create or select a workspace before importing datasets.')
@@ -539,6 +535,12 @@ function handleGlobalShortcuts(event) {
     return
   }
 
+  if (matchShortcut(event, 'command-palette')) {
+    event.preventDefault()
+    appStore.toggleCommandPalette()
+    return
+  }
+
   if (matchShortcut(event, 'schema')) {
     event.preventDefault()
     appStore.setActiveTab('schema-editor')
@@ -554,12 +556,6 @@ function handleGlobalShortcuts(event) {
   if (matchShortcut(event, 'dataset-import')) {
     event.preventDefault()
     void openGlobalDatasetPicker()
-    return
-  }
-
-  if (matchShortcut(event, 'sidebar')) {
-    event.preventDefault()
-    toggleSidebarVisibility()
     return
   }
 

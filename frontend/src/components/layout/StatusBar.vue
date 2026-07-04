@@ -146,61 +146,50 @@
 
       <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
 
-      <!-- Workspace Layout Presets -->
-      <div
-        class="flex h-full items-center gap-0.5"
-        role="group"
-        aria-label="Workspace layout presets"
-        :aria-keyshortcuts="workspaceLayoutAriaShortcut"
-      >
+      <!-- Workspace Layout View Menu -->
+      <div class="relative h-full" data-status-view-menu>
         <button
           type="button"
-          class="status-layout-preset"
-          :class="layoutPresetClass('view')"
-          title="Default view"
-          aria-label="Default view"
-          :aria-pressed="isLayoutPresetActive('view')"
-          @click="setLayoutPreset('view')"
+          class="status-view-menu-button"
+          :title="`View: ${workspaceLayoutLabel} active`"
+          aria-label="View"
+          aria-haspopup="menu"
+          :aria-expanded="layoutMenuOpen ? 'true' : 'false'"
+          :aria-keyshortcuts="workspaceLayoutAriaShortcut"
+          @click="toggleLayoutMenu"
         >
           <ViewColumnsIcon class="w-3.5 h-3.5" />
           <span>View</span>
+          <ChevronUpDownIcon class="w-3.5 h-3.5 text-[var(--color-text-muted)]" />
         </button>
-        <button
-          type="button"
-          class="status-layout-preset"
-          :class="layoutPresetClass('chat')"
-          title="Chat focus"
-          aria-label="Chat focus"
-          :aria-pressed="isLayoutPresetActive('chat')"
-          @click="setLayoutPreset('chat')"
+
+        <div
+          v-if="layoutMenuOpen"
+          class="layer-modal-dropdown status-view-menu absolute right-0 bottom-full mb-2 w-60 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-[var(--shadow-lifted)]"
+          role="menu"
+          aria-label="View options"
         >
-          <ChatBubbleLeftRightIcon class="w-3.5 h-3.5" />
-          <span>Chat</span>
-        </button>
-        <button
-          type="button"
-          class="status-layout-preset"
-          :class="layoutPresetClass('code')"
-          title="Code focus"
-          aria-label="Code focus"
-          :aria-pressed="isLayoutPresetActive('code')"
-          @click="setLayoutPreset('code')"
-        >
-          <CodeBracketIcon class="w-3.5 h-3.5" />
-          <span>Code</span>
-        </button>
-        <button
-          type="button"
-          class="status-layout-preset"
-          :class="layoutPresetClass('output')"
-          title="Data focus"
-          aria-label="Data focus"
-          :aria-pressed="isLayoutPresetActive('output')"
-          @click="setLayoutPreset('output')"
-        >
-          <TableCellsIcon class="w-3.5 h-3.5" />
-          <span>Data</span>
-        </button>
+          <div class="border-b border-[var(--color-border)] px-3 py-2">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">View</p>
+          </div>
+          <button
+            v-for="option in layoutPresetOptions"
+            :key="option.id"
+            type="button"
+            class="status-view-menu-item"
+            :class="layoutMenuItemClass(option.id)"
+            role="menuitemradio"
+            :aria-checked="isLayoutPresetActive(option.id)"
+            @click="selectLayoutPreset(option.id)"
+          >
+            <component :is="option.icon" class="h-4 w-4 shrink-0" />
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-[12px] font-semibold">{{ option.label }}</span>
+              <span class="mt-0.5 block truncate text-[10px] text-[var(--color-text-muted)]">{{ option.description }}</span>
+            </span>
+            <CheckIcon v-if="isLayoutPresetActive(option.id)" class="h-3.5 w-3.5 shrink-0 text-[var(--color-accent)]" />
+          </button>
+        </div>
       </div>
       <span class="sr-only" aria-live="polite">{{ workspaceLayoutAnnouncement }}</span>
 
@@ -325,6 +314,7 @@ import { formatUsageCompact, formatUsageTooltip } from '../../utils/usageFormat'
 import {
   BellIcon,
   ChatBubbleLeftRightIcon,
+  CheckIcon,
   ChevronUpDownIcon,
   CodeBracketIcon,
   CommandLineIcon,
@@ -351,6 +341,7 @@ const uiVersion = String(
 // --- Workspace Status Management ---
 const workspaceRuntimeStatus = computed(() => appStore.activeWorkspaceRuntimeStatus)
 const workspaceSwitcherOpen = ref(false)
+const layoutMenuOpen = ref(false)
 
 const isWebSocketConnected = ref(false)
 const isWebSocketMonitoringActive = ref(false)
@@ -375,7 +366,6 @@ const workspaceResourceRecommendation = ref(null)
 const workspaceLayoutLabel = computed(() => {
   if (appStore.workspaceLayoutMode === WORKSPACE_LAYOUT_MODES.CHAT) {
     if (appStore.workspacePane === 'code') return 'Code'
-    if (appStore.workspacePane === 'ctree') return 'Tree'
     return 'Chat'
   }
   if (appStore.workspaceLayoutMode === WORKSPACE_LAYOUT_MODES.OUTPUT) return 'Data'
@@ -385,6 +375,33 @@ const workspaceLayoutLabel = computed(() => {
 const workspaceLayoutAriaShortcut = 'Control+Alt+V Meta+Alt+V Control+Alt+C Meta+Alt+C Control+Alt+O Meta+Alt+O'
 
 const workspaceLayoutAnnouncement = computed(() => `${workspaceLayoutLabel.value} layout active`)
+
+const layoutPresetOptions = [
+  {
+    id: 'view',
+    label: 'Default view',
+    description: 'Chat and data panes',
+    icon: ViewColumnsIcon,
+  },
+  {
+    id: 'chat',
+    label: 'Chat focus',
+    description: 'Conversation first',
+    icon: ChatBubbleLeftRightIcon,
+  },
+  {
+    id: 'code',
+    label: 'Code focus',
+    description: 'Editor first',
+    icon: CodeBracketIcon,
+  },
+  {
+    id: 'output',
+    label: 'Data focus',
+    description: 'Tables and charts',
+    icon: TableCellsIcon,
+  },
+]
 
 function setLayoutPreset(preset) {
   if (preset === 'view') {
@@ -406,6 +423,11 @@ function setLayoutPreset(preset) {
   }
 }
 
+function selectLayoutPreset(preset) {
+  setLayoutPreset(preset)
+  closeLayoutMenu()
+}
+
 function isLayoutPresetActive(preset) {
   if (preset === 'view') return appStore.workspaceLayoutMode === WORKSPACE_LAYOUT_MODES.VIEW
   if (preset === 'output') return appStore.workspaceLayoutMode === WORKSPACE_LAYOUT_MODES.OUTPUT
@@ -418,9 +440,9 @@ function isLayoutPresetActive(preset) {
   return false
 }
 
-function layoutPresetClass(preset) {
+function layoutMenuItemClass(preset) {
   return isLayoutPresetActive(preset)
-    ? 'text-[var(--color-accent)] bg-[var(--color-base)]'
+    ? 'text-[var(--color-text-main)] bg-[var(--color-selected-surface)]'
     : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] hover:bg-[var(--color-base)]'
 }
 
@@ -846,18 +868,39 @@ function toggleNotificationsPanel() {
   openNotificationsPanel()
 }
 
+function openLayoutMenu() {
+  closeWorkspaceSwitcher()
+  closeNotificationsPanel()
+  layoutMenuOpen.value = true
+}
+
+function closeLayoutMenu() {
+  layoutMenuOpen.value = false
+}
+
+function toggleLayoutMenu() {
+  if (layoutMenuOpen.value) {
+    closeLayoutMenu()
+    return
+  }
+  openLayoutMenu()
+}
+
 function handleGlobalPointerDown(event) {
   const target = event?.target
   if (!(target instanceof Element)) return
   if (target.closest('[data-notification-center]')) return
   if (target.closest('[data-workspace-switcher]')) return
+  if (target.closest('[data-status-view-menu]')) return
   closeWorkspaceSwitcher()
+  closeLayoutMenu()
   closeNotificationsPanel()
 }
 
 function handleStatusBarEscape(event) {
   if (event.key === 'Escape') {
     closeWorkspaceSwitcher()
+    closeLayoutMenu()
     closeNotificationsPanel()
   }
 }
@@ -966,13 +1009,32 @@ watch(() => authStore.isAuthenticated, (authenticated) => {
 </script>
 
 <style scoped>
-.status-layout-preset {
+.status-view-menu-button {
   align-items: center;
   border-radius: 0.375rem;
+  color: var(--color-text-muted);
   display: inline-flex;
-  gap: 0.25rem;
-  height: 1.5rem;
+  gap: 0.375rem;
+  height: 100%;
   padding: 0 0.375rem;
   transition: background-color 150ms ease, color 150ms ease;
+}
+
+.status-view-menu-button:hover {
+  background: var(--color-base);
+  color: var(--color-text-main);
+}
+
+.status-view-menu-item {
+  align-items: center;
+  display: flex;
+  gap: 0.625rem;
+  min-height: 3rem;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-standard),
+    color var(--motion-duration-fast) var(--motion-ease-standard);
+  width: 100%;
 }
 </style>

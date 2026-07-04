@@ -7,7 +7,7 @@ test('app keeps one sidebar container with separate hidden and collapsed states'
   const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
-  assert.equal(appSource.includes('function toggleSidebarVisibility() {'), true)
+  assert.equal(appSource.includes('function toggleSidebarVisibility() {'), false)
   assert.equal(appSource.includes('class="h-full shrink-0 app-nav-pane"'), true)
   assert.equal(appSource.includes("'app-nav-pane-collapsed': appStore.showSidebar && appStore.isSidebarCollapsed"), true)
   assert.equal(appSource.includes("'app-nav-pane-hidden': !appStore.showSidebar"), true)

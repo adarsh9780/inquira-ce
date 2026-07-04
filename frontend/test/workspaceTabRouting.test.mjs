@@ -9,10 +9,12 @@ test('app store maps legacy code/chat tabs into workspace pane routing', () => {
 
   assert.equal(source.includes("const activeTab = ref('workspace')"), true)
   assert.equal(source.includes("const workspacePane = ref('chat')"), true)
-  assert.equal(source.includes("const WORKSPACE_PANES = new Set(['code', 'chat', 'ctree'])"), true)
+  assert.equal(source.includes("const WORKSPACE_PANES = new Set(['code', 'chat'])"), true)
   assert.equal(source.includes("if (normalized === 'code')"), true)
   assert.equal(source.includes("if (normalized === 'chat')"), true)
   assert.equal(source.includes("if (normalized === 'ctree')"), true)
+  assert.equal(source.includes("workspacePane.value = 'ctree'"), false)
+  assert.equal(source.includes("workspacePane.value = 'chat'"), true)
   assert.equal(source.includes('normalizeWorkspacePane(pane)'), true)
   assert.equal(source.includes("'conversation-tree'"), true)
   assert.equal(source.includes("activeTab.value = 'workspace'"), true)

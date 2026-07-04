@@ -149,6 +149,7 @@ export const useAppStore = defineStore('app', () => {
   const workspaceLayoutMode = ref(WORKSPACE_LAYOUT_MODES.VIEW)
   const hideShortcutsModal = ref(false)
   const isKeyboardShortcutsOpen = ref(false)
+  const isCommandPaletteOpen = ref(false)
 
   // Editor State
   const editorLine = ref(1)
@@ -233,7 +234,7 @@ export const useAppStore = defineStore('app', () => {
   const MAX_TERMINAL_STREAM_CHARS = 200000
   const MAX_TERMINAL_TOTAL_CHARS = 2000000
   const MAX_QUESTION_HISTORY = 30
-  const WORKSPACE_PANES = new Set(['code', 'chat', 'ctree'])
+  const WORKSPACE_PANES = new Set(['code', 'chat'])
 
   function normalizeWorkspacePane(pane) {
     const normalized = String(pane || '').trim().toLowerCase()
@@ -661,7 +662,7 @@ export const useAppStore = defineStore('app', () => {
         workspacePane.value = 'chat'
       } else if (restoredTab === 'ctree') {
         activeTab.value = 'workspace'
-        workspacePane.value = 'ctree'
+        workspacePane.value = 'chat'
       } else if (restoredTab === 'preview') {
         activeTab.value = 'workspace'
       } else {
@@ -3304,7 +3305,7 @@ export const useAppStore = defineStore('app', () => {
       workspacePane.value = 'chat'
     } else if (normalized === 'ctree') {
       activeTab.value = 'workspace'
-      workspacePane.value = 'ctree'
+      workspacePane.value = 'chat'
     } else if (['table', 'figure', 'output'].includes(normalized)) {
       // Route data-related tabs to the right pane instead of a full-screen view
       activeTab.value = 'workspace'
@@ -3412,6 +3413,18 @@ export const useAppStore = defineStore('app', () => {
 
   function closeKeyboardShortcuts() {
     isKeyboardShortcutsOpen.value = false
+  }
+
+  function openCommandPalette() {
+    isCommandPaletteOpen.value = true
+  }
+
+  function closeCommandPalette() {
+    isCommandPaletteOpen.value = false
+  }
+
+  function toggleCommandPalette() {
+    isCommandPaletteOpen.value = !isCommandPaletteOpen.value
   }
 
   // Editor tracking
@@ -3869,6 +3882,7 @@ export const useAppStore = defineStore('app', () => {
     isDataFocusMode,
     hideShortcutsModal,
     isKeyboardShortcutsOpen,
+    isCommandPaletteOpen,
     editorLine,
     editorCol,
     isEditorFocused,
@@ -4040,6 +4054,9 @@ export const useAppStore = defineStore('app', () => {
     setHideShortcutsModal,
     openKeyboardShortcuts,
     closeKeyboardShortcuts,
+    openCommandPalette,
+    closeCommandPalette,
+    toggleCommandPalette,
     setEditorPosition,
     setEditorFocused,
     loadUserPreferences,

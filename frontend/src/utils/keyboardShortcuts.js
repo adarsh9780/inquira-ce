@@ -3,7 +3,7 @@ export const SHORTCUTS = [
   { id: 'schema', category: 'Navigation', label: 'Open Schema', keys: ['mod', 's'], title: 'Schema' },
   { id: 'keyboard-shortcuts', category: 'Navigation', label: 'Open Keyboard Shortcuts', keys: ['mod', 'k'], title: 'Keyboard Shortcuts' },
   { id: 'dataset-import', category: 'Data', label: 'Import Dataset', keys: ['mod', 'o'], title: 'Import Dataset' },
-  { id: 'sidebar', category: 'Workspace', label: 'Toggle Sidebar', keys: ['mod', 'b'], title: 'Sidebar' },
+  { id: 'command-palette', category: 'Workspace', label: 'Open Command Palette', keys: ['mod', 'b'], title: 'Command Palette' },
   { id: 'terminal', category: 'Workspace', label: 'Toggle Terminal', keys: ['mod', 'j'], title: 'Terminal' },
   { id: 'layout-cycle', category: 'Layout', label: 'Cycle Workspace Layout', keys: ['mod', 'shift', 'd'], title: 'Cycle Layout' },
   { id: 'layout-view', category: 'Layout', label: 'View Layout', keys: ['mod', 'alt', 'v'], title: 'View Layout' },
@@ -53,4 +53,3 @@ export function shortcutsByCategory() {
     return groups
   }, {})
 }
-

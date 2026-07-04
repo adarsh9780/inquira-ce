@@ -14,14 +14,18 @@ test('collapsed sidebar relies on app-shell width and visually hidden label copy
 
 test('collapsed sidebar rows keep a stable fixed-size icon rail', () => {
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
+  const styleSource = readFileSync(resolve(process.cwd(), 'src/style.css'), 'utf-8')
 
   assert.ok(sidebarSource.includes('class="sidebar-nav-row sidebar-primary-row justify-start px-2.5"'))
   assert.ok(sidebarSource.includes('class="sidebar-workspace-row justify-start px-2.5"'))
   assert.ok(sidebarSource.includes('.sidebar-row-icon'))
-  assert.ok(sidebarSource.includes('height: 1.5rem;'))
-  assert.ok(sidebarSource.includes('width: 1.5rem;'))
+  assert.ok(sidebarSource.includes('height: calc(var(--size-sidebar-inline-icon) + 0.5rem);'))
+  assert.ok(sidebarSource.includes('width: calc(var(--size-sidebar-inline-icon) + 0.5rem);'))
   assert.ok(sidebarSource.includes('height: 2.25rem;'))
   assert.ok(sidebarSource.includes('.sidebar-row-icon :deep(svg)'))
+  assert.ok(sidebarSource.includes('workspaceInitials(workspace.name)'))
+  assert.ok(sidebarSource.includes('.sidebar-workspace-initials'))
+  assert.ok(styleSource.includes('--size-sidebar-inline-icon: 1rem;'))
   assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'justify-center' : 'justify-start'"), false)
   assert.equal(sidebarSource.includes('transition: all var(--motion-duration-slow) var(--motion-ease-emphasized)'), false)
 })

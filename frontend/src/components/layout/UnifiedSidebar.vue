@@ -171,7 +171,9 @@
                   @click="selectWorkspace(workspace.id)"
                 >
                   <span class="sidebar-row-icon">
-                    <FolderOpenIcon class="h-[18px] w-[18px]" />
+                    <span class="sidebar-workspace-initials" aria-hidden="true">
+                      {{ workspaceInitials(workspace.name) }}
+                    </span>
                   </span>
                   <div
                     class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
@@ -369,9 +371,9 @@ import SidebarWorkspaceConversations from './sidebar/SidebarWorkspaceConversatio
 import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
 import { sidebarConversationPageSize, useSidebarConversations } from '../../composables/useSidebarConversations'
+import { workspaceInitials } from '../../utils/workspaceDisplay'
 
 import {
-  FolderOpenIcon,
   CircleStackIcon,
   ShareIcon,
   Cog6ToothIcon,
@@ -1047,16 +1049,32 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
 
 .sidebar-row-icon {
   display: inline-flex;
-  height: 1.5rem;
-  width: 1.5rem;
+  height: calc(var(--size-sidebar-inline-icon) + 0.5rem);
+  width: calc(var(--size-sidebar-inline-icon) + 0.5rem);
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
 }
 
 .sidebar-row-icon :deep(svg) {
-  height: 1.25rem;
-  width: 1.25rem;
+  height: var(--size-sidebar-inline-icon);
+  width: var(--size-sidebar-inline-icon);
+}
+
+.sidebar-workspace-initials {
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid color-mix(in srgb, var(--color-border) 88%, var(--color-text-main) 12%);
+  border-radius: 0.375rem;
+  color: var(--color-text-main);
+  display: inline-flex;
+  font-size: 0.625rem;
+  font-weight: 800;
+  height: calc(var(--size-sidebar-inline-icon) + 0.375rem);
+  justify-content: center;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  width: calc(var(--size-sidebar-inline-icon) + 0.375rem);
 }
 
 .sidebar-row-label {
