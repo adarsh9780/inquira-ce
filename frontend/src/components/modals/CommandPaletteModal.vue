@@ -35,34 +35,30 @@
         </label>
       </div>
 
-      <div class="min-h-[18rem] overflow-y-auto px-2 py-2">
-        <div v-if="filteredCommandActions.length > 0" class="pb-2">
+      <div class="command-palette-scroll min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        <div v-if="filteredCommandActions.length > 0" class="pb-3">
           <p class="command-palette-section-label">Commands</p>
-          <button
-            v-for="(row, index) in filteredCommandActions"
-            :key="row.id"
-            type="button"
-            class="command-palette-row"
-            :class="[
-              index === activeIndex ? 'command-palette-row-highlighted' : '',
-              row.disabled ? 'command-palette-row-disabled' : '',
-            ]"
-            :disabled="row.disabled || Boolean(commandActionBusyId)"
-            @mouseenter="activeIndex = index"
-            @click="runCommandAction(row)"
-          >
-            <span class="command-palette-action-icon">
-              <component :is="row.icon" class="h-4 w-4" />
-            </span>
-            <span class="min-w-0 flex-1">
-              <span class="flex min-w-0 items-center gap-2">
-                <span class="truncate text-[13px] font-semibold text-[var(--color-text-main)]">{{ row.title }}</span>
-                <span v-if="row.statusLabel" class="command-palette-pill">{{ row.statusLabel }}</span>
-              </span>
-              <span class="mt-1 block truncate text-[11px] text-[var(--color-text-muted)]">{{ row.subtitle }}</span>
-            </span>
-            <ArrowPathIcon v-if="commandActionBusyId === row.id" class="h-4 w-4 shrink-0 animate-spin text-[var(--color-text-muted)]" />
-          </button>
+          <div class="command-palette-quick-row">
+            <button
+              v-for="(row, index) in filteredCommandActions"
+              :key="row.id"
+              type="button"
+              class="command-palette-quick-pill"
+              :class="[
+                index === activeIndex ? 'command-palette-quick-pill-active' : '',
+                row.disabled ? 'command-palette-row-disabled' : '',
+              ]"
+              :disabled="row.disabled || Boolean(commandActionBusyId)"
+              :title="row.subtitle"
+              @mouseenter="activeIndex = index"
+              @click="runCommandAction(row)"
+            >
+              <component :is="row.icon" class="h-3.5 w-3.5 shrink-0" />
+              <span class="truncate">{{ row.title }}</span>
+              <span v-if="row.statusLabel" class="command-palette-shortcut">{{ row.statusLabel }}</span>
+              <ArrowPathIcon v-if="commandActionBusyId === row.id" class="h-3.5 w-3.5 shrink-0 animate-spin" />
+            </button>
+          </div>
         </div>
 
         <div v-if="loading" class="flex h-32 items-center justify-center gap-2 text-[13px] text-[var(--color-text-muted)]">
@@ -78,37 +74,48 @@
         </div>
 
         <template v-else>
-          <p v-if="filteredConversationRows.length > 0" class="command-palette-section-label">Conversations</p>
-          <button
-            v-for="(row, index) in filteredConversationRows"
-            :key="`${row.workspaceId}:${row.id}`"
-            type="button"
-            class="command-palette-row"
-            :class="[
-              row.id === appStore.activeConversationId ? 'command-palette-row-active' : '',
-              conversationStartIndex + index === activeIndex ? 'command-palette-row-highlighted' : '',
-            ]"
-            :disabled="Boolean(selectingConversationId)"
-            @mouseenter="activeIndex = conversationStartIndex + index"
-            @click="selectConversation(row)"
-          >
-            <span class="command-palette-initials" :title="row.workspaceName">{{ workspaceInitials(row.workspaceName) }}</span>
-            <span class="min-w-0 flex-1">
-              <span class="flex min-w-0 items-center gap-2">
-                <span class="truncate text-[13px] font-semibold text-[var(--color-text-main)]">{{ row.title }}</span>
-                <span v-if="row.id === appStore.activeConversationId" class="command-palette-pill command-palette-pill-active">Active</span>
-                <span class="command-palette-pill" :class="row.isRunning ? 'command-palette-pill-running' : ''">
-                  {{ row.statusLabel }}
+          <div v-if="groupedConversationSections.length > 0" class="space-y-3">
+            <section
+              v-for="section in groupedConversationSections"
+              :key="section.workspaceId"
+              class="command-palette-workspace-section"
+            >
+              <div class="command-palette-workspace-header">
+                <span class="command-palette-workspace-initials">{{ workspaceInitials(section.workspaceName) }}</span>
+                <span class="min-w-0 flex-1 truncate">{{ section.workspaceName }}</span>
+                <span class="command-palette-workspace-count">{{ section.rows.length }} {{ section.rows.length === 1 ? 'conversation' : 'conversations' }}</span>
+              </div>
+              <button
+                v-for="row in section.rows"
+                :key="`${row.workspaceId}:${row.id}`"
+                type="button"
+                class="command-palette-row command-palette-conversation-row"
+                :class="[
+                  row.id === appStore.activeConversationId ? 'command-palette-row-active' : '',
+                  row.paletteIndex === activeIndex ? 'command-palette-row-highlighted' : '',
+                ]"
+                :disabled="Boolean(selectingConversationId)"
+                @mouseenter="activeIndex = row.paletteIndex"
+                @click="selectConversation(row)"
+              >
+                <span class="command-palette-initials" :title="row.workspaceName">{{ workspaceInitials(row.workspaceName) }}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="flex min-w-0 items-center gap-2">
+                    <span class="truncate text-[13px] font-semibold text-[var(--color-text-main)]">{{ row.title }}</span>
+                    <span v-if="row.id === appStore.activeConversationId" class="command-palette-pill command-palette-pill-active">Active</span>
+                    <span class="command-palette-pill" :class="row.isRunning ? 'command-palette-pill-running' : ''">
+                      {{ row.statusLabel }}
+                    </span>
+                  </span>
+                  <span class="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--color-text-muted)]">
+                    <span :title="row.createdTitle">{{ row.createdLabel }}</span>
+                    <span v-if="row.lastActiveLabel" :title="row.lastActiveTitle">{{ row.lastActiveLabel }}</span>
+                  </span>
                 </span>
-              </span>
-              <span class="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--color-text-muted)]">
-                <span class="truncate">{{ row.workspaceName }}</span>
-                <span :title="row.createdTitle">{{ row.createdLabel }}</span>
-                <span v-if="row.lastActiveLabel" :title="row.lastActiveTitle">{{ row.lastActiveLabel }}</span>
-              </span>
-            </span>
-            <CheckIcon v-if="row.id === appStore.activeConversationId" class="h-4 w-4 shrink-0 text-[var(--color-accent)]" />
-          </button>
+                <CheckIcon v-if="row.id === appStore.activeConversationId" class="h-4 w-4 shrink-0 text-[var(--color-accent)]" />
+              </button>
+            </section>
+          </div>
         </template>
       </div>
 
@@ -279,9 +286,17 @@ const commandActions = computed(() => [
   },
 ])
 
+const commonCommandIds = new Set([
+  'open-settings',
+  'toggle-sidebar',
+  'toggle-terminal',
+  'new-conversation',
+  'show-shortcuts',
+])
+
 const filteredCommandActions = computed(() => {
   const queryText = normalizedQuery.value
-  if (!queryText) return commandActions.value
+  if (!queryText) return commandActions.value.filter((row) => commonCommandIds.has(row.id))
   return commandActions.value.filter((row) => (
     `${row.title} ${row.subtitle} ${row.keywords} ${row.statusLabel}`.toLowerCase().includes(queryText)
   ))
@@ -329,7 +344,7 @@ const allConversationRows = computed(() => {
   })
 })
 
-const filteredConversationRows = computed(() => {
+const matchingConversationRows = computed(() => {
   const queryText = normalizedQuery.value
   if (!queryText) return allConversationRows.value
   return allConversationRows.value.filter((row) => (
@@ -339,9 +354,47 @@ const filteredConversationRows = computed(() => {
 
 const conversationStartIndex = computed(() => filteredCommandActions.value.length)
 
+const groupedConversationSections = computed(() => {
+  let paletteIndex = conversationStartIndex.value
+  const workspaceOrder = new Map(workspaceItems.value.map((workspace, index) => [
+    String(workspace?.id || '').trim(),
+    index,
+  ]))
+  const sectionsByWorkspace = new Map()
+
+  for (const row of matchingConversationRows.value) {
+    const workspaceId = String(row.workspaceId || '').trim()
+    const section = sectionsByWorkspace.get(workspaceId) || {
+      workspaceId,
+      workspaceName: row.workspaceName,
+      workspaceOrder: workspaceOrder.has(workspaceId) ? workspaceOrder.get(workspaceId) : Number.MAX_SAFE_INTEGER,
+      rows: [],
+    }
+    section.rows.push({ ...row })
+    sectionsByWorkspace.set(workspaceId, section)
+  }
+
+  return Array.from(sectionsByWorkspace.values())
+    .sort((left, right) => {
+      if (left.workspaceOrder !== right.workspaceOrder) return left.workspaceOrder - right.workspaceOrder
+      return left.workspaceName.localeCompare(right.workspaceName)
+    })
+    .map((section) => ({
+      ...section,
+      rows: section.rows.map((row) => ({
+        ...row,
+        paletteIndex: paletteIndex++,
+      })),
+    }))
+})
+
+const displayedConversationRows = computed(() => (
+  groupedConversationSections.value.flatMap((section) => section.rows)
+))
+
 const paletteRows = computed(() => [
   ...filteredCommandActions.value,
-  ...filteredConversationRows.value,
+  ...displayedConversationRows.value,
 ])
 
 const emptyStateText = computed(() => (
@@ -352,7 +405,7 @@ const emptyStateText = computed(() => (
 
 const footerLabel = computed(() => {
   const commandCount = filteredCommandActions.value.length
-  const conversationCount = filteredConversationRows.value.length
+  const conversationCount = displayedConversationRows.value.length
   const commandSuffix = commandCount === 1 ? 'command' : 'commands'
   const conversationSuffix = conversationCount === 1 ? 'conversation' : 'conversations'
   return `${commandCount} ${commandSuffix} · ${conversationCount} ${conversationSuffix}`
@@ -512,7 +565,14 @@ watch(paletteRows, (rows) => {
 <style scoped>
 .command-palette-card {
   background: var(--color-panel-elevated);
+  height: min(78vh, 42rem);
+  max-height: calc(100vh - 4rem);
   box-shadow: var(--shadow-modal);
+}
+
+.command-palette-scroll {
+  scrollbar-color: color-mix(in srgb, var(--color-text-muted) 34%, transparent) transparent;
+  scrollbar-width: thin;
 }
 
 .command-palette-search {
@@ -545,8 +605,8 @@ watch(paletteRows, (rows) => {
   color: var(--color-text-main);
   display: flex;
   gap: 0.75rem;
-  min-height: 4rem;
-  padding: 0.625rem 0.75rem;
+  min-height: 3.5rem;
+  padding: 0.5rem 0.625rem;
   text-align: left;
   width: 100%;
   transition:
@@ -572,22 +632,109 @@ watch(paletteRows, (rows) => {
   color: var(--color-text-muted);
   font-size: 0.6875rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  padding: 0.375rem 0.75rem 0.25rem;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  padding: 0.25rem 0.25rem 0.5rem;
 }
 
-.command-palette-action-icon {
+.command-palette-quick-row {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.125rem 0 0.25rem;
+  scrollbar-width: none;
+  white-space: nowrap;
+}
+
+.command-palette-quick-row::-webkit-scrollbar {
+  display: none;
+}
+
+.command-palette-quick-pill {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-panel-elevated) 72%, var(--color-surface) 28%);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 650;
+  flex-shrink: 0;
+  gap: 0.375rem;
+  height: 2.125rem;
+  justify-content: center;
+  max-width: 12rem;
+  min-width: 0;
+  padding: 0 0.75rem;
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-standard),
+    border-color var(--motion-duration-fast) var(--motion-ease-standard),
+    color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.command-palette-quick-pill:hover,
+.command-palette-quick-pill-active {
+  background: var(--color-selected-surface);
+  border-color: var(--color-selected-border);
+  color: var(--color-text-main);
+}
+
+.command-palette-shortcut {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.125rem 0.375rem;
+}
+
+.command-palette-workspace-section {
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
+  padding-top: 0.625rem;
+}
+
+.command-palette-workspace-section:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.command-palette-workspace-header {
+  align-items: center;
+  color: var(--color-text-muted);
+  display: flex;
+  font-size: 0.75rem;
+  font-weight: 700;
+  gap: 0.5rem;
+  min-height: 1.75rem;
+  padding: 0 0.25rem 0.375rem;
+}
+
+.command-palette-workspace-initials {
   align-items: center;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-main);
   display: inline-flex;
   flex-shrink: 0;
-  height: 2rem;
+  font-size: 0.625rem;
+  font-weight: 800;
+  height: 1.375rem;
   justify-content: center;
-  width: 2rem;
+  letter-spacing: 0;
+  width: 1.375rem;
+}
+
+.command-palette-workspace-count {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.command-palette-conversation-row + .command-palette-conversation-row {
+  margin-top: 0.125rem;
 }
 
 .command-palette-initials {
@@ -602,7 +749,7 @@ watch(paletteRows, (rows) => {
   font-weight: 800;
   height: 2rem;
   justify-content: center;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   width: 2rem;
 }
 
