@@ -290,7 +290,7 @@
         <button
           type="button"
           class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
-          :title="shortcutTooltip('keyboard-shortcuts', 'Keyboard Shortcuts')"
+          title="Keyboard Shortcuts"
           @click="openKeyboardShortcuts"
         >
           Keyboard Shortcuts

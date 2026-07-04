@@ -536,15 +536,21 @@ function handleGlobalShortcuts(event) {
     return
   }
 
-  if (matchShortcut(event, 'schema')) {
+  if (matchShortcut(event, 'settings')) {
     event.preventDefault()
-    appStore.setActiveTab('schema-editor')
+    appStore.openSettings('llm')
     return
   }
 
-  if (matchShortcut(event, 'keyboard-shortcuts')) {
+  if (matchShortcut(event, 'sidebar')) {
     event.preventDefault()
-    appStore.openKeyboardShortcuts()
+    appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
+    return
+  }
+
+  if (matchShortcut(event, 'schema')) {
+    event.preventDefault()
+    appStore.setActiveTab('schema-editor')
     return
   }
 
@@ -560,6 +566,10 @@ function handleGlobalShortcuts(event) {
     return
   }
 
+}
+
+function handleOpenDatasetPickerRequest() {
+  void openGlobalDatasetPicker()
 }
 
 async function readDesktopStartupState() {
@@ -806,6 +816,7 @@ onMounted(async () => {
   document.addEventListener('keydown', handleGlobalShortcuts)
   document.addEventListener('dragover', handleAppDatasetDragOver)
   document.addEventListener('drop', handleAppDatasetDrop)
+  window.addEventListener('inquira:open-dataset-picker', handleOpenDatasetPickerRequest)
   void subscribeAppNativeDatasetDrops()
   wsUnsubscribers.value.push(
     settingsWebSocket.subscribeProgress((data) => {
@@ -923,6 +934,7 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleGlobalShortcuts)
   document.removeEventListener('dragover', handleAppDatasetDragOver)
   document.removeEventListener('drop', handleAppDatasetDrop)
+  window.removeEventListener('inquira:open-dataset-picker', handleOpenDatasetPickerRequest)
   if (typeof unsubscribeAppNativeDragDrop === 'function') {
     unsubscribeAppNativeDragDrop()
     unsubscribeAppNativeDragDrop = null

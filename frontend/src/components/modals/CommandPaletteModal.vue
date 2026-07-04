@@ -14,7 +14,7 @@
         </div>
         <div class="min-w-0 flex-1">
           <h3 id="command-palette-title" class="truncate text-sm font-semibold text-[var(--color-text-main)]">Command Palette</h3>
-          <p class="truncate text-[12px] text-[var(--color-text-muted)]">Switch conversations across workspaces.</p>
+          <p class="truncate text-[12px] text-[var(--color-text-muted)]">Run commands or switch conversations across workspaces.</p>
         </div>
         <button type="button" class="btn-icon h-8 w-8" aria-label="Close command palette" @click="emit('close')">
           <XMarkIcon class="h-4 w-4" />
@@ -29,26 +29,56 @@
             v-model="query"
             type="search"
             class="command-palette-search"
-            placeholder="Search conversations or workspaces"
-            aria-label="Search conversations"
+            placeholder="Search commands, conversations, or workspaces"
+            aria-label="Search commands and conversations"
           />
         </label>
       </div>
 
       <div class="min-h-[18rem] overflow-y-auto px-2 py-2">
-        <div v-if="loading" class="flex h-56 items-center justify-center gap-2 text-[13px] text-[var(--color-text-muted)]">
+        <div v-if="filteredCommandActions.length > 0" class="pb-2">
+          <p class="command-palette-section-label">Commands</p>
+          <button
+            v-for="(row, index) in filteredCommandActions"
+            :key="row.id"
+            type="button"
+            class="command-palette-row"
+            :class="[
+              index === activeIndex ? 'command-palette-row-highlighted' : '',
+              row.disabled ? 'command-palette-row-disabled' : '',
+            ]"
+            :disabled="row.disabled || Boolean(commandActionBusyId)"
+            @mouseenter="activeIndex = index"
+            @click="runCommandAction(row)"
+          >
+            <span class="command-palette-action-icon">
+              <component :is="row.icon" class="h-4 w-4" />
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="flex min-w-0 items-center gap-2">
+                <span class="truncate text-[13px] font-semibold text-[var(--color-text-main)]">{{ row.title }}</span>
+                <span v-if="row.statusLabel" class="command-palette-pill">{{ row.statusLabel }}</span>
+              </span>
+              <span class="mt-1 block truncate text-[11px] text-[var(--color-text-muted)]">{{ row.subtitle }}</span>
+            </span>
+            <ArrowPathIcon v-if="commandActionBusyId === row.id" class="h-4 w-4 shrink-0 animate-spin text-[var(--color-text-muted)]" />
+          </button>
+        </div>
+
+        <div v-if="loading" class="flex h-32 items-center justify-center gap-2 text-[13px] text-[var(--color-text-muted)]">
           <ArrowPathIcon class="h-4 w-4 animate-spin" />
           <span>Loading conversations</span>
         </div>
 
-        <div v-else-if="filteredConversationRows.length === 0" class="flex h-56 items-center justify-center px-6 text-center">
+        <div v-else-if="paletteRows.length === 0" class="flex h-56 items-center justify-center px-6 text-center">
           <div>
-            <p class="text-sm font-medium text-[var(--color-text-main)]">No conversations found</p>
+            <p class="text-sm font-medium text-[var(--color-text-main)]">No results found</p>
             <p class="mt-1 text-[12px] text-[var(--color-text-muted)]">{{ emptyStateText }}</p>
           </div>
         </div>
 
         <template v-else>
+          <p v-if="filteredConversationRows.length > 0" class="command-palette-section-label">Conversations</p>
           <button
             v-for="(row, index) in filteredConversationRows"
             :key="`${row.workspaceId}:${row.id}`"
@@ -56,10 +86,10 @@
             class="command-palette-row"
             :class="[
               row.id === appStore.activeConversationId ? 'command-palette-row-active' : '',
-              index === activeIndex ? 'command-palette-row-highlighted' : '',
+              conversationStartIndex + index === activeIndex ? 'command-palette-row-highlighted' : '',
             ]"
             :disabled="Boolean(selectingConversationId)"
-            @mouseenter="activeIndex = index"
+            @mouseenter="activeIndex = conversationStartIndex + index"
             @click="selectConversation(row)"
           >
             <span class="command-palette-initials" :title="row.workspaceName">{{ workspaceInitials(row.workspaceName) }}</span>
@@ -95,7 +125,15 @@ import { computed, nextTick, ref, watch } from 'vue'
 import {
   ArrowPathIcon,
   CheckIcon,
+  CircleStackIcon,
+  Cog6ToothIcon,
+  CommandLineIcon,
+  FolderOpenIcon,
+  ListBulletIcon,
   MagnifyingGlassIcon,
+  PencilSquareIcon,
+  RectangleGroupIcon,
+  ShareIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import { useAppStore } from '../../stores/appStore'
@@ -103,6 +141,7 @@ import apiService from '../../services/apiService'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { formatCompactRelativeTimestamp, formatExactTimestamp, parseTimestamp } from '../../utils/dateUtils'
+import { SHORTCUTS, shortcutLabel } from '../../utils/keyboardShortcuts'
 import { workspaceInitials } from '../../utils/workspaceDisplay'
 
 const props = defineProps({
@@ -116,15 +155,137 @@ const loading = ref(false)
 const loadError = ref('')
 const activeIndex = ref(0)
 const selectingConversationId = ref('')
+const commandActionBusyId = ref('')
 const searchInputRef = ref(null)
 const conversationsByWorkspace = ref({})
 let loadRequestId = 0
 
 const normalizedQuery = computed(() => String(query.value || '').trim().toLowerCase())
+const platform = typeof navigator !== 'undefined' ? navigator.platform : ''
 
 const workspaceItems = computed(() => (
   Array.isArray(appStore.workspaces) ? appStore.workspaces : []
 ))
+
+function shortcutText(shortcutId) {
+  const shortcut = SHORTCUTS.find((item) => item.id === shortcutId)
+  return shortcut ? shortcutLabel(shortcut, platform) : ''
+}
+
+const commandActions = computed(() => [
+  {
+    type: 'action',
+    id: 'open-settings',
+    title: 'Open Settings',
+    subtitle: 'LLM, workspace, account, appearance, and preferences.',
+    keywords: 'settings preferences api llm account appearance theme workspace',
+    statusLabel: shortcutText('settings'),
+    icon: Cog6ToothIcon,
+    run: () => {
+      emit('close')
+      appStore.openSettings('llm')
+    },
+  },
+  {
+    type: 'action',
+    id: 'show-shortcuts',
+    title: 'Show Keyboard Shortcuts',
+    subtitle: 'Review all global shortcuts available in this workspace.',
+    keywords: 'keyboard shortcuts help commands',
+    statusLabel: '',
+    icon: ListBulletIcon,
+    run: () => {
+      emit('close')
+      appStore.openKeyboardShortcuts()
+    },
+  },
+  {
+    type: 'action',
+    id: 'toggle-sidebar',
+    title: appStore.isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar',
+    subtitle: 'Show or hide the workspace sidebar.',
+    keywords: 'sidebar navigation collapse expand',
+    statusLabel: shortcutText('sidebar'),
+    icon: RectangleGroupIcon,
+    run: () => {
+      appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
+      emit('close')
+    },
+  },
+  {
+    type: 'action',
+    id: 'toggle-terminal',
+    title: appStore.isTerminalOpen ? 'Close Terminal' : 'Open Terminal',
+    subtitle: 'Toggle the terminal panel.',
+    keywords: 'terminal shell console command line',
+    statusLabel: shortcutText('terminal'),
+    icon: CommandLineIcon,
+    run: () => {
+      appStore.toggleTerminal()
+      emit('close')
+    },
+  },
+  {
+    type: 'action',
+    id: 'open-schema',
+    title: 'Open Schema',
+    subtitle: 'Inspect tables, columns, aliases, and schema metadata.',
+    keywords: 'schema tables columns metadata',
+    statusLabel: shortcutText('schema'),
+    icon: CircleStackIcon,
+    run: () => {
+      appStore.setActiveTab('schema-editor')
+      emit('close')
+    },
+  },
+  {
+    type: 'action',
+    id: 'open-conversation-tree',
+    title: 'Open Conversation Tree',
+    subtitle: 'Browse turns, branches, and saved outputs.',
+    keywords: 'conversation tree turns branches graph',
+    statusLabel: shortcutText('conversation-tree'),
+    icon: ShareIcon,
+    run: () => {
+      appStore.setActiveTab('conversation-tree')
+      emit('close')
+    },
+  },
+  {
+    type: 'action',
+    id: 'import-dataset',
+    title: 'Import Dataset',
+    subtitle: 'Choose CSV, TSV, Parquet, JSON, XLSX, or XLS files.',
+    keywords: 'dataset import data file upload add',
+    statusLabel: shortcutText('dataset-import'),
+    icon: FolderOpenIcon,
+    run: () => {
+      emit('close')
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('inquira:open-dataset-picker'))
+      }
+    },
+  },
+  {
+    type: 'action',
+    id: 'new-conversation',
+    title: 'New Conversation',
+    subtitle: appStore.hasWorkspace ? 'Start a fresh conversation in the active workspace.' : 'Select or create a workspace first.',
+    keywords: 'new conversation chat thread',
+    statusLabel: appStore.hasWorkspace ? '' : 'Workspace required',
+    icon: PencilSquareIcon,
+    disabled: !appStore.hasWorkspace,
+    run: createConversationFromPalette,
+  },
+])
+
+const filteredCommandActions = computed(() => {
+  const queryText = normalizedQuery.value
+  if (!queryText) return commandActions.value
+  return commandActions.value.filter((row) => (
+    `${row.title} ${row.subtitle} ${row.keywords} ${row.statusLabel}`.toLowerCase().includes(queryText)
+  ))
+})
 
 const allConversationRows = computed(() => {
   const rows = []
@@ -144,6 +305,7 @@ const allConversationRows = computed(() => {
       const run = appStore.getConversationRun(id)
       const isRunning = appStore.isConversationRunning(id)
       rows.push({
+        type: 'conversation',
         id,
         workspaceId,
         workspaceName,
@@ -175,16 +337,25 @@ const filteredConversationRows = computed(() => {
   ))
 })
 
+const conversationStartIndex = computed(() => filteredCommandActions.value.length)
+
+const paletteRows = computed(() => [
+  ...filteredCommandActions.value,
+  ...filteredConversationRows.value,
+])
+
 const emptyStateText = computed(() => (
   normalizedQuery.value
-    ? 'Try a different title or workspace name.'
-    : 'Create a conversation from the chat header or sidebar.'
+    ? 'Try a different command, title, or workspace name.'
+    : 'Create a conversation from the sidebar or the New Conversation command.'
 ))
 
 const footerLabel = computed(() => {
-  const total = filteredConversationRows.value.length
-  const suffix = total === 1 ? 'conversation' : 'conversations'
-  return `${total} ${suffix}`
+  const commandCount = filteredCommandActions.value.length
+  const conversationCount = filteredConversationRows.value.length
+  const commandSuffix = commandCount === 1 ? 'command' : 'commands'
+  const conversationSuffix = conversationCount === 1 ? 'conversation' : 'conversations'
+  return `${commandCount} ${commandSuffix} · ${conversationCount} ${conversationSuffix}`
 })
 
 function conversationTimestampValue(conversation) {
@@ -264,8 +435,32 @@ async function selectConversation(row) {
   }
 }
 
+async function createConversationFromPalette() {
+  if (!appStore.hasWorkspace) return
+  const conversation = await appStore.createConversation()
+  if (conversation?.id) {
+    appStore.setActiveConversationId(conversation.id)
+  }
+  appStore.setWorkspacePane('chat')
+  appStore.setActiveTab('workspace')
+  await appStore.fetchConversationTurns({ reset: true })
+  emit('close')
+}
+
+async function runCommandAction(row) {
+  if (!row?.run || row.disabled || commandActionBusyId.value) return
+  commandActionBusyId.value = row.id
+  try {
+    await row.run()
+  } catch (error) {
+    toast.error('Command Failed', extractApiErrorMessage(error, `Failed to run ${row.title}`))
+  } finally {
+    commandActionBusyId.value = ''
+  }
+}
+
 function moveActiveIndex(step) {
-  const total = filteredConversationRows.value.length
+  const total = paletteRows.value.length
   if (total === 0) return
   activeIndex.value = (activeIndex.value + step + total) % total
 }
@@ -287,9 +482,13 @@ function handlePaletteKeydown(event) {
     return
   }
   if (event.key === 'Enter') {
-    const row = filteredConversationRows.value[activeIndex.value]
+    const row = paletteRows.value[activeIndex.value]
     if (!row) return
     event.preventDefault()
+    if (row.type === 'action') {
+      void runCommandAction(row)
+      return
+    }
     void selectConversation(row)
   }
 }
@@ -303,7 +502,7 @@ watch(() => props.isOpen, async (open) => {
   void loadConversations()
 })
 
-watch(filteredConversationRows, (rows) => {
+watch(paletteRows, (rows) => {
   if (activeIndex.value >= rows.length) {
     activeIndex.value = Math.max(0, rows.length - 1)
   }
@@ -362,6 +561,33 @@ watch(filteredConversationRows, (rows) => {
 
 .command-palette-row-active {
   background: var(--color-selected-surface);
+}
+
+.command-palette-row-disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.command-palette-section-label {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.375rem 0.75rem 0.25rem;
+  text-transform: uppercase;
+}
+
+.command-palette-action-icon {
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 2rem;
+  justify-content: center;
+  width: 2rem;
 }
 
 .command-palette-initials {

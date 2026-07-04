@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 
 const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
-test('command palette is app-level and uses Cmd/Ctrl+B for conversation switching', () => {
+test('command palette is app-level, uses Cmd/Ctrl+K, and launches common commands', () => {
   const app = read('src/App.vue')
   const store = read('src/stores/appStore.js')
   const shortcuts = read('src/utils/keyboardShortcuts.js')
@@ -13,7 +13,12 @@ test('command palette is app-level and uses Cmd/Ctrl+B for conversation switchin
   const leftPane = read('src/components/layout/WorkspaceLeftPane.vue')
 
   assert.equal(shortcuts.includes("id: 'command-palette'"), true)
+  assert.equal(shortcuts.includes("keys: ['mod', 'k']"), true)
+  assert.equal(shortcuts.includes("id: 'sidebar'"), true)
   assert.equal(shortcuts.includes("keys: ['mod', 'b']"), true)
+  assert.equal(shortcuts.includes("id: 'settings'"), true)
+  assert.equal(shortcuts.includes("keys: ['mod', ',']"), true)
+  assert.equal(shortcuts.includes("id: 'keyboard-shortcuts'"), false)
   assert.equal(app.includes('CommandPaletteModal'), true)
   assert.equal(app.includes("matchShortcut(event, 'command-palette')"), true)
   assert.equal(app.includes('appStore.toggleCommandPalette()'), true)
@@ -26,7 +31,14 @@ test('command palette is app-level and uses Cmd/Ctrl+B for conversation switchin
   assert.equal(leftPane.includes('CommandLineIcon'), false)
   assert.equal(modal.includes('Command Palette'), true)
   assert.equal(modal.includes('MagnifyingGlassIcon'), true)
-  assert.equal(modal.includes('CommandLineIcon'), false)
+  assert.equal(modal.includes('CommandLineIcon'), true)
+  assert.equal(modal.includes('Open Settings'), true)
+  assert.equal(modal.includes('Show Keyboard Shortcuts'), true)
+  assert.equal(modal.includes('Toggle the terminal panel.'), true)
+  assert.equal(modal.includes("appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)"), true)
+  assert.equal(modal.includes('appStore.openKeyboardShortcuts()'), true)
+  assert.equal(modal.includes("window.dispatchEvent(new CustomEvent('inquira:open-dataset-picker'))"), true)
+  assert.equal(modal.includes('createConversationFromPalette'), true)
   assert.equal(modal.includes('apiService.v1ListConversations(workspaceId, 200)'), true)
   assert.equal(modal.includes('appStore.isConversationRunning(id)'), true)
   assert.equal(modal.includes('formatCreatedLabel(createdAt)'), true)
