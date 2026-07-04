@@ -98,7 +98,6 @@
                 @mouseenter="activeIndex = row.paletteIndex"
                 @click="selectConversation(row)"
               >
-                <span class="command-palette-initials" :title="row.workspaceName">{{ workspaceInitials(row.workspaceName) }}</span>
                 <span class="min-w-0 flex-1">
                   <span class="flex min-w-0 items-center gap-2">
                     <span class="truncate text-[13px] font-semibold text-[var(--color-text-main)]">{{ row.title }}</span>
@@ -735,22 +734,6 @@ watch(paletteRows, (rows) => {
 
 .command-palette-conversation-row + .command-palette-conversation-row {
   margin-top: 0.125rem;
-}
-
-.command-palette-initials {
-  align-items: center;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text-main);
-  display: inline-flex;
-  flex-shrink: 0;
-  font-size: 0.6875rem;
-  font-weight: 800;
-  height: 2rem;
-  justify-content: center;
-  letter-spacing: 0;
-  width: 2rem;
 }
 
 .command-palette-pill {
