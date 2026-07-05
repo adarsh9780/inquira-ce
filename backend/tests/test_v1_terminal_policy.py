@@ -15,7 +15,8 @@ def _runtime_config(**kwargs):
     return SimpleNamespace(**defaults)
 
 
-def test_terminal_policy_allows_uv_python_ls_grep_and_cd():
+def test_terminal_policy_allows_uv_python_ls_grep_and_cd(monkeypatch):
+    monkeypatch.setattr(runtime_api.os, "name", "posix", raising=False)
     config = _runtime_config()
     runtime_api._enforce_terminal_command_policy("uv add pandas", config)
     runtime_api._enforce_terminal_command_policy("python -V", config)

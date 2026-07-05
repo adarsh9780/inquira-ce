@@ -390,6 +390,11 @@ async def test_dataset_ingestion_service_serializes_same_workspace_but_allows_ot
     active_per_workspace: dict[str, int] = {}
     max_per_workspace: dict[str, int] = {}
     overall_active = {"count": 0, "max": 0}
+    release_ingestion = asyncio.Event()
+    entered_workspace = {
+        "ws-1": asyncio.Event(),
+        "ws-2": asyncio.Event(),
+    }
 
     async def fake_add_dataset(*, session, user, workspace_id: str, source_path: str):
         _ = (session, user, source_path)
@@ -400,9 +405,12 @@ async def test_dataset_ingestion_service_serializes_same_workspace_but_allows_ot
             active_per_workspace[workspace_id],
         )
         overall_active["max"] = max(overall_active["max"], overall_active["count"])
-        await asyncio.sleep(0.05)
-        active_per_workspace[workspace_id] -= 1
-        overall_active["count"] -= 1
+        entered_workspace[workspace_id].set()
+        try:
+            await asyncio.wait_for(release_ingestion.wait(), timeout=2)
+        finally:
+            active_per_workspace[workspace_id] -= 1
+            overall_active["count"] -= 1
         return SimpleNamespace(table_name=f"table_{workspace_id}", row_count=1)
 
     monkeypatch.setattr("app.v1.services.dataset_ingestion_service.DatasetService.add_dataset", fake_add_dataset)
@@ -412,11 +420,41 @@ async def test_dataset_ingestion_service_serializes_same_workspace_but_allows_ot
     )
 
     service = DatasetIngestionService()
-    await asyncio.gather(
-        service._run_ingestion_job(job_id="ingest-a", workspace_id="ws-1", principal_id="principal-1", username="alice"),
-        service._run_ingestion_job(job_id="ingest-b", workspace_id="ws-1", principal_id="principal-1", username="alice"),
-        service._run_ingestion_job(job_id="ingest-c", workspace_id="ws-2", principal_id="principal-1", username="alice"),
-    )
+    tasks = [
+        asyncio.create_task(
+            service._run_ingestion_job(
+                job_id="ingest-a",
+                workspace_id="ws-1",
+                principal_id="principal-1",
+                username="alice",
+            )
+        ),
+        asyncio.create_task(
+            service._run_ingestion_job(
+                job_id="ingest-b",
+                workspace_id="ws-1",
+                principal_id="principal-1",
+                username="alice",
+            )
+        ),
+        asyncio.create_task(
+            service._run_ingestion_job(
+                job_id="ingest-c",
+                workspace_id="ws-2",
+                principal_id="principal-1",
+                username="alice",
+            )
+        ),
+    ]
+    task_results = []
+    try:
+        await asyncio.wait_for(entered_workspace["ws-1"].wait(), timeout=2)
+        await asyncio.wait_for(entered_workspace["ws-2"].wait(), timeout=2)
+    finally:
+        release_ingestion.set()
+        task_results = await asyncio.gather(*tasks, return_exceptions=True)
 
+    for result in task_results:
+        assert not isinstance(result, Exception), result
     assert max_per_workspace["ws-1"] == 1
     assert overall_active["max"] >= 2

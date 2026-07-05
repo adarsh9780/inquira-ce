@@ -1,6 +1,4 @@
 import asyncio
-import time
-
 import duckdb
 import pytest
 
@@ -87,46 +85,80 @@ async def test_readonly_python_runtime_rejects_dynamic_write_sql(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_readonly_python_worker_allows_parallel_runs_across_conversations(tmp_path):
+async def test_readonly_python_worker_allows_parallel_runs_across_conversations(monkeypatch, tmp_path):
     db_path = _workspace_db(tmp_path)
     service = ReadOnlyPythonExecutionService(max_parallel_per_workspace=2)
-    base_code = 'import time\ntime.sleep(0.8)\nresult = conn.execute("SELECT COUNT(*) FROM numbers").fetchone()[0]\nexport_scalar(result, "count_" + _RUN_ID)'
+    active_count = 0
+    max_active = 0
+    entered_count = 0
+    both_entered = asyncio.Event()
+    release_runs = asyncio.Event()
 
-    started = time.perf_counter()
-    first, second = await asyncio.gather(
-        service.execute(
-            workspace_id="workspace-1",
-            workspace_duckdb_path=str(db_path),
-            code=build_run_wrapped_code(
-                base_code,
-                "run-a",
-                [],
-                conversation_id="conversation-1",
-                turn_id="turn-a",
-                artifact_dir=str(tmp_path / "turn-a"),
-            ),
-            timeout=10,
-            run_id="run-a",
+    async def fake_execute_process(
+        self,
+        *,
+        workspace_id,
+        workspace_duckdb_path,
+        code,
+        timeout,
+        run_id,
+    ):
+        _ = (self, workspace_id, workspace_duckdb_path, code, timeout)
+        nonlocal active_count, max_active, entered_count
+        active_count += 1
+        entered_count += 1
+        max_active = max(max_active, active_count)
+        if entered_count == 2:
+            both_entered.set()
+        try:
+            await asyncio.wait_for(release_runs.wait(), timeout=2)
+        finally:
+            active_count -= 1
+        return {
+            "success": True,
+            "stdout": "",
+            "stderr": "",
+            "error": None,
+            "result": None,
+            "result_type": None,
+            "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
+            "artifacts": [],
+            "run_id": run_id,
+        }
+
+    monkeypatch.setattr(ReadOnlyPythonExecutionService, "_execute_process", fake_execute_process)
+    tasks = [
+        asyncio.create_task(
+            service.execute(
+                workspace_id="workspace-1",
+                workspace_duckdb_path=str(db_path),
+                code="result = 1",
+                timeout=10,
+                run_id="run-a",
+            )
         ),
-        service.execute(
-            workspace_id="workspace-1",
-            workspace_duckdb_path=str(db_path),
-            code=build_run_wrapped_code(
-                base_code,
-                "run-b",
-                [],
-                conversation_id="conversation-1",
-                turn_id="turn-b",
-                artifact_dir=str(tmp_path / "turn-b"),
-            ),
-            timeout=10,
-            run_id="run-b",
+        asyncio.create_task(
+            service.execute(
+                workspace_id="workspace-1",
+                workspace_duckdb_path=str(db_path),
+                code="result = 1",
+                timeout=10,
+                run_id="run-b",
+            )
         ),
-    )
+    ]
+    try:
+        await asyncio.wait_for(both_entered.wait(), timeout=2)
+    finally:
+        release_runs.set()
+        if not both_entered.is_set():
+            await asyncio.gather(*tasks, return_exceptions=True)
+    first, second = await asyncio.gather(*tasks)
 
     assert first["success"] is True
     assert second["success"] is True
-    assert time.perf_counter() - started < 1.5
+    assert {first["run_id"], second["run_id"]} == {"run-a", "run-b"}
+    assert max_active == 2
 
 
 @pytest.mark.asyncio

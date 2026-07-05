@@ -134,13 +134,15 @@ async def test_execute_workspace_code_defaults_artifact_dir_for_turn_rerun(monke
 
     assert response.success is True
     wrapped = str(captured["code"])
-    expected_dir = runtime_api.TurnBundleService.build_turn_artifacts_dir(
-        "user-1",
-        "ws-1",
-        "conv-1",
-        "turn-1",
+    expected_dir = str(
+        runtime_api.TurnBundleService.build_turn_artifacts_dir(
+            "user-1",
+            "ws-1",
+            "conv-1",
+            "turn-1",
+        )
     )
-    assert f"artifact_dir='{expected_dir}'" in wrapped
+    assert f"artifact_dir={expected_dir!r}" in wrapped
     assert "export_dataframe" in wrapped
     assert captured["persist"]["conversation_id"] == "conv-1"
     assert captured["persist"]["turn_id"] == "turn-1"
