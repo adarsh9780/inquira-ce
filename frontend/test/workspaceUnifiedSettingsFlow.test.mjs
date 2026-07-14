@@ -80,7 +80,7 @@ test('selected summary puts actions in the header and uses context instead of du
   assert.equal(template.match(/@click="beginInlineCreate"/g)?.length, 2)
 })
 
-test('settings sidebar is flat, ordered, and starts with LLM settings', () => {
+test('settings sidebar is flat, ordered, and starts with model settings', () => {
   const settings = read('src/components/modals/SettingsModal.vue')
   const template = settings.slice(0, settings.indexOf('<script setup>'))
 
@@ -88,8 +88,8 @@ test('settings sidebar is flat, ordered, and starts with LLM settings', () => {
   assert.equal(template.includes('App Config'), false)
   assert.equal(template.includes('User &amp; System'), false)
   assert.equal(template.includes('Switch &amp; Create'), false)
-  assert.equal(template.indexOf('LLM &amp; API Keys') < template.indexOf('<span>Workspace</span>'), true)
-  assert.equal(template.indexOf('<span>Workspace</span>') < template.indexOf('<span>Appearance</span>'), true)
+  assert.equal(template.indexOf('<span>Models</span>') < template.indexOf('<span>Workspaces</span>'), true)
+  assert.equal(template.indexOf('<span>Workspaces</span>') < template.indexOf('<span>Appearance</span>'), true)
   assert.equal(template.indexOf('<span>Appearance</span>') < template.indexOf('<span>Account</span>'), true)
 })
 

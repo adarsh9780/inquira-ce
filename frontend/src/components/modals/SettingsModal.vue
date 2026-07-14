@@ -39,7 +39,7 @@
                 @click="openLeafSection('llm')"
               >
                 <KeyIcon class="h-4 w-4 shrink-0" />
-                <span>LLM &amp; API Keys</span>
+                <span>Models</span>
               </button>
               <button
                 type="button"
@@ -47,7 +47,7 @@
                 @click="openWorkspaceSection"
               >
                 <ListBulletIcon class="h-4 w-4 shrink-0" />
-                <span>Workspace</span>
+                <span>Workspaces</span>
               </button>
               <button
                 type="button"
@@ -154,18 +154,18 @@ const activeNavClass = 'nav-tab-active'
 const inactiveNavClass = 'nav-tab'
 
 const activeSectionTitle = computed(() => {
-  if (activeSection.value === 'llm') return 'LLM & API Keys'
-  if (activeSection.value === 'workspace') return 'Manage Workspaces'
-  if (activeSection.value === 'appearance') return 'Appearance Preferences'
-  if (activeSection.value === 'account') return 'Account Settings'
+  if (activeSection.value === 'llm') return 'Models'
+  if (activeSection.value === 'workspace') return 'Workspaces'
+  if (activeSection.value === 'appearance') return 'Appearance'
+  if (activeSection.value === 'account') return 'Account'
   return 'Settings'
 })
 
 const activeSectionDescription = computed(() => {
-  if (activeSection.value === 'llm') return 'Configure model providers, search credentials, and LLM preferences.'
-  if (activeSection.value === 'workspace') return 'Browse, create, configure, activate, or delete your workspaces.'
-  if (activeSection.value === 'appearance') return 'Customize application theme presets, typography sizing, and code block fonts.'
-  if (activeSection.value === 'account') return 'Manage your user profile configuration and application connection logs.'
+  if (activeSection.value === 'llm') return 'Choose providers and models. Advanced generation controls stay collapsed by default.'
+  if (activeSection.value === 'workspace') return 'Create, select, and maintain local workspaces.'
+  if (activeSection.value === 'appearance') return 'Choose the theme and typography used throughout Inquira.'
+  if (activeSection.value === 'account') return 'Review local profile and application information.'
   return 'Customize application settings.'
 })
 

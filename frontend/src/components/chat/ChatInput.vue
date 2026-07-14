@@ -4,7 +4,7 @@
     <div class="relative">
       <div
         ref="inputCardRef"
-        class="relative flex flex-col rounded-2xl border transition-all duration-150"
+        class="group/composer relative flex flex-col rounded-2xl border transition-all duration-150"
         @dragenter.prevent="handleAttachmentDragEnter"
         @dragover.prevent="handleAttachmentDragOver"
         @dragleave.prevent="handleAttachmentDragLeave"
@@ -73,10 +73,10 @@
           >
             <PlusIcon class="w-5 h-5" />
           </button>
-          <template v-if="appStore.activeTurnId">
+          <template v-if="appStore.activeTurnId && hasTurnNavigation">
             <button
               type="button"
-              class="btn-icon"
+              class="btn-icon opacity-60 transition-opacity group-focus-within/composer:opacity-100 group-hover/composer:opacity-100"
               title="Previous turn"
               aria-label="Previous turn"
               data-tooltip="Previous turn"
@@ -87,7 +87,7 @@
             </button>
             <button
               type="button"
-              class="btn-icon"
+              class="btn-icon opacity-60 transition-opacity group-focus-within/composer:opacity-100 group-hover/composer:opacity-100"
               title="Next turn"
               aria-label="Next turn"
               data-tooltip="Next turn"
@@ -111,6 +111,7 @@
               :search-debounce-ms="250"
               :max-options-without-search="10"
               @model-changed="handleModelChange"
+              @manage-models="appStore.openSettings('llm')"
             />
           </div>
 
@@ -177,18 +178,13 @@
       />
     </div>
 
-    <!-- Requirements Notice -->
-    <div v-if="!appStore.canAnalyze" class="rounded-xl p-4 border" style="background-color: color-mix(in srgb, var(--color-error) 5%, transparent); border-color: color-mix(in srgb, var(--color-error) 20%, transparent);">
-      <div class="flex items-start gap-3">
-        <ExclamationTriangleIcon class="h-5 w-5 shrink-0 mt-0.5" style="color: var(--color-error);" />
-        <div>
-          <h4 class="text-sm font-semibold mb-1" style="color: var(--color-error);">Setup Required</h4>
-          <ul class="space-y-1 text-sm list-disc list-inside" style="color: var(--color-text-muted);">
-            <li v-for="requirement in missingSetupRequirements" :key="requirement">{{ requirement }}</li>
-          </ul>
-        </div>
-      </div>
-    </div>
+    <InlineNotice
+      v-if="!appStore.canAnalyze"
+      :title="setupNotice.title"
+      :message="setupNotice.message"
+      :action-label="setupNotice.actionLabel"
+      @action="setupNotice.action()"
+    />
   </div>
 </template>
 
@@ -207,12 +203,12 @@ import ModelSelector from '../ui/ModelSelector.vue'
 import ColumnSuggest from './ColumnSuggest.vue'
 import ChatAttachmentTray from './ChatAttachmentTray.vue'
 import ChatComposerActions from './ChatComposerActions.vue'
+import InlineNotice from '../ui/InlineNotice.vue'
 import { useChatAttachments } from '../../composables/useChatAttachments'
 import { useChatAutocomplete } from '../../composables/useChatAutocomplete'
 import { useVoiceInput } from '../../composables/useVoiceInput'
 import {
   PlusIcon,
-  ExclamationTriangleIcon,
   PhotoIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -243,6 +239,26 @@ const missingSetupRequirements = computed(() => {
     requirements.push(`Enter your ${provider} API key in Settings`)
   }
   return requirements.length ? requirements : ['Finish model setup in Settings']
+})
+const hasTurnNavigation = computed(() => Boolean(
+  appStore.activeTurnRelations?.previous_turn || appStore.activeTurnRelations?.next_turn,
+))
+const setupNotice = computed(() => {
+  if (!appStore.hasWorkspace) {
+    return {
+      title: 'Select a workspace to start',
+      message: 'Your conversations and artifacts are stored per workspace.',
+      actionLabel: 'Choose',
+      action: () => appStore.openSettings('workspace'),
+    }
+  }
+  const provider = String(appStore.llmProvider || 'model provider').trim()
+  return {
+    title: `Configure ${provider}`,
+    message: missingSetupRequirements.value[0] || 'Add provider access to start an analysis.',
+    actionLabel: 'Open Settings',
+    action: () => appStore.openSettings('llm'),
+  }
 })
 const activeTokenRange = ref({ start: 0, end: 0, token: '' })
 const suggestionsOpenUp = ref(false)

@@ -1,11 +1,7 @@
 <template>
   <div class="flex h-full w-full min-h-0 min-w-0 flex-col" style="background-color: var(--color-workspace-surface);">
-    <div
-      ref="headerRef"
-      class="workspace-toolbar-shell flex-shrink-0 h-12 px-3 flex items-center"
-      style="background-color: var(--color-workspace-surface);"
-    >
-      <div class="workspace-toolbar-zone workspace-toolbar-zone-left">
+    <AppToolbar ref="headerRef" aria-label="Results pane toolbar">
+      <template #start>
         <HeaderDropdown
           v-if="useCompactPaneSwitcher"
           v-model="selectedDataPane"
@@ -14,50 +10,17 @@
           aria-label="Select data pane"
           max-width-class="w-[150px]"
         />
-        <div v-else class="inline-flex items-center gap-1">
-          <button
-            @click="appStore.setDataPane('table')"
-            class="data-pane-tab"
-            :class="appStore.dataPane === 'table' ? 'data-pane-tab-active' : ''"
-            :aria-pressed="appStore.dataPane === 'table'"
-            title="Table"
-            aria-label="Table"
-          >
-            <TableCellsIcon class="w-4 h-4" />
-            <span class="text-xs font-medium">Table</span>
-          </button>
-          <button
-            @click="appStore.setDataPane('figure')"
-            class="data-pane-tab"
-            :class="appStore.dataPane === 'figure' ? 'data-pane-tab-active' : ''"
-            :aria-pressed="appStore.dataPane === 'figure'"
-            title="Chart"
-            aria-label="Chart"
-          >
-            <ChartBarIcon class="w-4 h-4" />
-            <span class="text-xs font-medium">Chart</span>
-          </button>
-          <button
-            @click="appStore.setDataPane('output')"
-            class="data-pane-tab"
-            :class="appStore.dataPane === 'output' ? 'data-pane-tab-active' : ''"
-            :aria-pressed="appStore.dataPane === 'output'"
-            title="Output"
-            aria-label="Output"
-          >
-            <CommandLineIcon class="w-4 h-4" />
-            <span class="text-xs font-medium">Output</span>
-          </button>
-        </div>
-      </div>
+        <SegmentedControl v-else v-model="selectedDataPane" :options="dataPaneOptions" aria-label="Result panes" />
+      </template>
 
       <!-- Teleport Target: centered selector slot -->
-      <div id="workspace-right-pane-toolbar-center" class="workspace-toolbar-zone workspace-toolbar-zone-center"></div>
+      <div id="workspace-right-pane-toolbar-center" class="min-w-0"></div>
 
       <!-- Teleport Target: right controls slot -->
-      <div id="workspace-right-pane-toolbar-right" class="workspace-toolbar-zone workspace-toolbar-zone-right"></div>
-    </div>
+      <template #end><div id="workspace-right-pane-toolbar-right" class="min-w-0"></div></template>
+    </AppToolbar>
 
+    <p class="sr-only" aria-live="polite">{{ resultAnnouncement }}</p>
     <div class="min-h-0 flex-1 p-3 sm:p-4 pb-0" style="background-color: var(--color-workspace-surface);">
       <div v-if="appStore.dataPane === 'table'" class="h-full">
         <TableTab />
@@ -73,9 +36,11 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, onMounted, onUnmounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
+import AppToolbar from '../ui/AppToolbar.vue'
+import SegmentedControl from '../ui/SegmentedControl.vue'
 import {
   TableCellsIcon,
   ChartBarIcon,
@@ -85,105 +50,67 @@ import {
 const appStore = useAppStore()
 const headerRef = ref(null)
 const useCompactPaneSwitcher = ref(false)
+const isMounted = ref(false)
+const newResultPanes = ref(new Set())
+const resultAnnouncement = ref('')
 let switcherResizeObserver = null
 const COMPACT_SWITCHER_THRESHOLD_PX = 660
 const TableTab = defineAsyncComponent(() => import('../analysis/TableTab.vue'))
 const FigureTab = defineAsyncComponent(() => import('../analysis/FigureTab.vue'))
 const OutputTab = defineAsyncComponent(() => import('../analysis/OutputTab.vue'))
 
-const dataPaneOptions = [
-  { value: 'table', label: 'Table' },
-  { value: 'figure', label: 'Chart' },
-  { value: 'output', label: 'Output' }
-]
+const dataPaneOptions = computed(() => [
+  { value: 'table', label: 'Table', icon: TableCellsIcon, indicator: newResultPanes.value.has('table') },
+  { value: 'figure', label: 'Chart', icon: ChartBarIcon, indicator: newResultPanes.value.has('figure') },
+  { value: 'output', label: 'Output', icon: CommandLineIcon, indicator: newResultPanes.value.has('output') }
+])
 
 const selectedDataPane = computed({
   get: () => appStore.dataPane,
-  set: (pane) => appStore.setDataPane(pane)
+  set: (pane) => {
+    newResultPanes.value.delete(pane)
+    newResultPanes.value = new Set(newResultPanes.value)
+    appStore.setDataPane(pane)
+  }
+})
+
+function markResultAvailable(pane, label) {
+  if (!isMounted.value || appStore.dataPane === pane) return
+  newResultPanes.value = new Set([...newResultPanes.value, pane])
+  resultAnnouncement.value = `${label} available`
+}
+
+watch(() => appStore.tableCount, (next, previous) => {
+  if (Number(next) > Number(previous || 0)) markResultAvailable('table', 'New table')
+})
+watch(() => appStore.figureCount, (next, previous) => {
+  if (Number(next) > Number(previous || 0)) markResultAvailable('figure', 'New chart')
+})
+watch(() => appStore.terminalEntries.length, (next, previous) => {
+  if (Number(next) > Number(previous || 0)) markResultAvailable('output', 'New output')
 })
 
 function updatePaneSwitcherMode() {
-  const width = Number(headerRef.value?.clientWidth || 0)
+  const width = Number(headerRef.value?.$el?.clientWidth || headerRef.value?.clientWidth || 0)
   useCompactPaneSwitcher.value = width > 0 && width < COMPACT_SWITCHER_THRESHOLD_PX
 }
 
 onMounted(() => {
+  isMounted.value = true
   updatePaneSwitcherMode()
-  if ('ResizeObserver' in window && headerRef.value) {
+  const element = headerRef.value?.$el || headerRef.value
+  if ('ResizeObserver' in window && element) {
     switcherResizeObserver = new ResizeObserver(() => updatePaneSwitcherMode())
-    switcherResizeObserver.observe(headerRef.value)
+    switcherResizeObserver.observe(element)
   }
 })
 
 onUnmounted(() => {
-  if (switcherResizeObserver && headerRef.value) {
-    try { switcherResizeObserver.unobserve(headerRef.value) } catch (_error) {}
+  isMounted.value = false
+  const element = headerRef.value?.$el || headerRef.value
+  if (switcherResizeObserver && element) {
+    try { switcherResizeObserver.unobserve(element) } catch (_error) {}
   }
   switcherResizeObserver = null
 })
 </script>
-
-<style scoped>
-.workspace-toolbar-shell {
-  gap: 0.5rem;
-}
-
-.workspace-toolbar-zone {
-  min-width: 0;
-  height: 100%;
-  display: flex;
-  align-items: center;
-}
-
-.workspace-toolbar-zone-left {
-  justify-content: flex-start;
-  flex: 0 0 auto;
-  padding-right: 0.25rem;
-}
-
-.workspace-toolbar-zone-center {
-  justify-content: flex-start;
-  flex: 1 1 12rem;
-}
-
-.workspace-toolbar-zone-right {
-  justify-content: flex-end;
-  flex: 0 1 auto;
-}
-
-.data-pane-tab {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.375rem;
-  border-radius: 0;
-  color: var(--color-text-muted);
-  height: 2rem;
-  padding: 0 0.625rem;
-  position: relative;
-  transition: color 150ms ease;
-}
-
-.data-pane-tab::after {
-  background: transparent;
-  bottom: -0.5rem;
-  content: '';
-  height: 2px;
-  left: 0.5rem;
-  position: absolute;
-  right: 0.5rem;
-  transition: background-color 150ms ease;
-}
-
-.data-pane-tab:hover {
-  color: var(--color-text-main);
-}
-
-.data-pane-tab-active {
-  color: var(--color-text-main);
-}
-
-.data-pane-tab-active::after {
-  background: var(--color-accent);
-}
-</style>

@@ -10,7 +10,7 @@ test('figure toolbar uses flexible selector width and icon-only actions', () => 
   assert.equal(source.includes('to="#workspace-right-pane-toolbar-center"'), true)
   assert.equal(source.includes('v-if="orderedFigures && orderedFigures.length > 0"'), true)
   assert.equal(source.includes('class="flex min-w-[10rem] max-w-full flex-1 items-center"'), true)
-  assert.equal(source.includes(`:title="isDeletingArtifact ? 'Deleting chart' : 'Delete chart'"`), true)
+  assert.equal(source.includes("label: 'Delete chart'"), true)
   assert.equal(source.includes(`:title="isDownloading ? 'Exporting chart' : 'Export chart'"`), true)
   assert.equal(source.includes('ChevronDownIcon'), false)
   assert.equal(source.includes('class="btn-icon h-8 w-8 shrink-0 border"'), true)

@@ -13,7 +13,7 @@ test('status bar renders provider token placeholders from pinia and formats pric
   assert.equal(source.includes('tokenUsageHoverLabel'), true)
   assert.equal(source.includes('formatUsageCompact'), true)
   assert.equal(source.includes('formatUsageTooltip'), true)
-  assert.equal(formatter.includes("return `In ${formatTokenCount(usage.input_tokens)} | Out ${formatTokenCount(usage.output_tokens)} | Cost ${formatUsd(usage.price_usd)}`"), true)
+  assert.equal(formatter.includes("return `${formatTokenCount(usage.input_tokens)} in · ${formatTokenCount(usage.output_tokens)} out · ${formatUsd(usage.price_usd)}`"), true)
   assert.equal(formatter.includes('Input tokens:'), true)
   assert.equal(formatter.includes('Cached input tokens:'), true)
   assert.equal(formatter.includes('Output tokens:'), true)

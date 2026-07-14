@@ -59,7 +59,7 @@ export function formatUsd(value) {
 
 export function formatUsageCompact(value) {
   const usage = normalizeUsage(value) || emptyUsage()
-  return `In ${formatTokenCount(usage.input_tokens)} | Out ${formatTokenCount(usage.output_tokens)} | Cost ${formatUsd(usage.price_usd)}`
+  return `${formatTokenCount(usage.input_tokens)} in · ${formatTokenCount(usage.output_tokens)} out · ${formatUsd(usage.price_usd)}`
 }
 
 export function formatUsageTooltip(value, summary = null) {
@@ -77,4 +77,3 @@ export function formatUsageTooltip(value, summary = null) {
   if (Number.isFinite(turnsWithUsage)) lines.push(`Turns with usage: ${turnsWithUsage}`)
   return lines.join('\n')
 }
-

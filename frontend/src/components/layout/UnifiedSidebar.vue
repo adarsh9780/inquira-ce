@@ -46,45 +46,6 @@
           </span>
         </button>
 
-        <button
-          type="button"
-          class="sidebar-nav-row justify-start px-2.5"
-          :class="[
-            appStore.activeTab === 'schema-editor' ? 'sidebar-nav-row-active' : '',
-          ]"
-          :title="shortcutTooltip('schema', appStore.isSidebarCollapsed ? 'Open schema editor' : 'Schema editor')"
-          @click="openSchemaEditor"
-        >
-          <span class="sidebar-row-icon">
-            <CircleStackIcon class="h-5 w-5" :class="appStore.activeTab === 'schema-editor' ? 'text-[var(--color-accent)]' : ''" />
-          </span>
-          <span
-            class="sidebar-row-label"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[176px] opacity-100 ml-2.5'"
-          >
-            Schema
-          </span>
-        </button>
-
-        <button
-          type="button"
-          class="sidebar-nav-row justify-start px-2.5"
-          :class="[
-            appStore.activeTab === 'conversation-tree' ? 'sidebar-nav-row-active' : '',
-          ]"
-          :title="shortcutTooltip('conversation-tree', appStore.isSidebarCollapsed ? 'Open conversation tree' : 'Conversation tree')"
-          @click="openConversationTree"
-        >
-          <span class="sidebar-row-icon">
-            <ShareIcon class="h-5 w-5" :class="appStore.activeTab === 'conversation-tree' ? 'text-[var(--color-accent)]' : ''" />
-          </span>
-          <span
-            class="sidebar-row-label"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[176px] opacity-100 ml-2.5'"
-          >
-            Conversation Tree
-          </span>
-        </button>
       </SidebarPrimaryNav>
 
       <!-- ─── Workspaces and conversations ─── -->
@@ -187,6 +148,41 @@
           </div>
         </div>
       </SidebarWorkspaceConversations>
+
+      <div class="shrink-0 px-0.5 pb-1">
+        <DisclosureSection v-if="!appStore.isSidebarCollapsed" v-model:open="workspaceToolsOpen" label="Workspace tools">
+          <div class="space-y-0.5">
+            <button
+              type="button"
+              class="sidebar-nav-row justify-start px-2.5"
+              :class="appStore.activeTab === 'schema-editor' ? 'sidebar-nav-row-active' : ''"
+              :title="shortcutTooltip('schema', 'Schema editor')"
+              @click="openSchemaEditor"
+            >
+              <span class="sidebar-row-icon"><CircleStackIcon class="h-5 w-5" /></span>
+              <span class="sidebar-row-label ml-2.5 max-w-[176px] opacity-100">Schema</span>
+            </button>
+            <button
+              type="button"
+              class="sidebar-nav-row justify-start px-2.5"
+              :class="appStore.activeTab === 'conversation-tree' ? 'sidebar-nav-row-active' : ''"
+              :title="shortcutTooltip('conversation-tree', 'Conversation tree')"
+              @click="openConversationTree"
+            >
+              <span class="sidebar-row-icon"><ShareIcon class="h-5 w-5" /></span>
+              <span class="sidebar-row-label ml-2.5 max-w-[176px] opacity-100">Conversation tree</span>
+            </button>
+          </div>
+        </DisclosureSection>
+        <div v-else class="space-y-0.5">
+          <button type="button" class="sidebar-nav-row justify-start px-2.5" title="Schema editor" @click="openSchemaEditor">
+            <span class="sidebar-row-icon"><CircleStackIcon class="h-5 w-5" /></span>
+          </button>
+          <button type="button" class="sidebar-nav-row justify-start px-2.5" title="Conversation tree" @click="openConversationTree">
+            <span class="sidebar-row-icon"><ShareIcon class="h-5 w-5" /></span>
+          </button>
+        </div>
+      </div>
 
       <!-- ─── Footer Navigation ─── -->
       <SidebarFooter>
@@ -342,6 +338,7 @@ import SidebarConversationRow from './sidebar/SidebarConversationRow.vue'
 import SidebarFooter from './sidebar/SidebarFooter.vue'
 import SidebarPrimaryNav from './sidebar/SidebarPrimaryNav.vue'
 import SidebarWorkspaceConversations from './sidebar/SidebarWorkspaceConversations.vue'
+import DisclosureSection from '../ui/DisclosureSection.vue'
 import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
 import { sidebarConversationPageSize, useSidebarConversations } from '../../composables/useSidebarConversations'
@@ -371,6 +368,7 @@ const profileMenuOpen      = ref(false)
 const profileMenuRef       = ref(null)
 const profileMenuButtonRef = ref(null)
 const profileMenuPosition  = ref({ left: 0, top: 0 })
+const workspaceToolsOpen = ref(false)
 const sidebarConversationsByWorkspace = ref({})
 const loadingConversationsByWorkspace = ref({})
 const visibleConversationCountByWorkspace = ref({})

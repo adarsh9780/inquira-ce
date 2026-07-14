@@ -24,10 +24,9 @@ test('FigureTab renders artifact load errors inside the centered empty state ins
   const figureTabPath = resolve(process.cwd(), 'src/components/analysis/FigureTab.vue')
   const source = readFileSync(figureTabPath, 'utf-8')
 
-  assert.equal(source.includes("v-if=\"artifactListError\""), true)
-  assert.equal(source.includes("{{ artifactListError }}"), true)
-  assert.equal(source.includes("class=\"mt-3 rounded-md px-4 py-3 text-sm\""), true)
-  assert.equal(source.includes("background-color: var(--color-danger-bg); color: var(--color-danger);"), true)
+  assert.equal(source.includes('<AppEmptyState'), true)
+  assert.equal(source.includes(":title=\"artifactListError ? 'Charts unavailable' : 'No saved charts'\""), true)
+  assert.equal(source.includes(":description=\"artifactListError || 'Run code that creates a Plotly figure.'\""), true)
   assert.equal(source.includes("v-else-if=\"artifactListError\""), false)
 })
 

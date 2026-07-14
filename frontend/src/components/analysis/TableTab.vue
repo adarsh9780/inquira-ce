@@ -52,24 +52,6 @@
           />
         </div>
 
-        <!-- Delete selected table -->
-        <button
-          @click="openDeleteDialog"
-          type="button"
-          :disabled="!canDeleteSelectedArtifact || isDeletingArtifact"
-          class="btn-icon h-8 w-8 shrink-0 border"
-          style="border-color: var(--color-border); color: var(--color-text-muted);"
-          :class="(!canDeleteSelectedArtifact || isDeletingArtifact) ? 'opacity-50 cursor-not-allowed' : ''"
-          :title="isDeletingArtifact ? 'Deleting table' : 'Delete table'"
-          :aria-label="isDeletingArtifact ? 'Deleting table' : 'Delete table'"
-        >
-          <div
-            v-if="isDeletingArtifact"
-            class="h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-error)]"
-          ></div>
-          <TrashIcon v-else class="h-4 w-4" />
-        </button>
-
         <!-- CSV download -->
         <button
           @click="downloadCsv"
@@ -82,6 +64,17 @@
         >
           <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4" />
           <div v-else class="h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-text-main)]"></div>
+        </button>
+        <button
+          ref="tableActionsButtonRef"
+          type="button"
+          class="btn-icon h-8 w-8 shrink-0 border"
+          style="border-color: var(--color-border); color: var(--color-text-muted);"
+          title="Table actions"
+          aria-label="Table actions"
+          @click="toggleTableActions"
+        >
+          <EllipsisHorizontalIcon class="h-4 w-4" />
         </button>
       </TableToolbar>
     </Teleport>
@@ -214,6 +207,16 @@
     @close="closeDeleteDialog"
     @confirm="deleteSelectedArtifact"
   />
+  <FloatingActionMenu
+    :is-open="tableActionsOpen"
+    :position="tableActionsPosition"
+    :items="tableActionItems"
+    width-class="w-44"
+    :width="176"
+    :height="56"
+    @select="handleTableAction"
+    @close="tableActionsOpen = false"
+  />
 </template>
 
 <script setup>
@@ -228,6 +231,7 @@ import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import TableEmptyState from './table/TableEmptyState.vue'
 import TableGridShell from './table/TableGridShell.vue'
 import TableToolbar from './table/TableToolbar.vue'
+import FloatingActionMenu from '../ui/FloatingActionMenu.vue'
 import { toast } from '../../composables/useToast'
 import { persistExportFile } from '../../utils/exportFile'
 import { useTableArtifacts } from '../../composables/useTableArtifacts'
@@ -235,9 +239,9 @@ import { useTableArtifacts } from '../../composables/useTableArtifacts'
 ModuleRegistry.registerModules([AllCommunityModule])
 import {
   ArrowDownTrayIcon,
+  EllipsisHorizontalIcon,
   FunnelIcon,
-  TableCellsIcon,
-  TrashIcon
+  TableCellsIcon
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
@@ -247,6 +251,9 @@ const pageSize = 100
 const isDownloading = ref(false)
 const isDeletingArtifact = ref(false)
 const isDeleteDialogOpen = ref(false)
+const tableActionsOpen = ref(false)
+const tableActionsButtonRef = ref(null)
+const tableActionsPosition = ref({ x: 0, y: 0 })
 const isPageLoading = ref(false)
 const isLoadingArtifacts = ref(false)
 
@@ -275,6 +282,19 @@ let selectedArtifactLoadToken = 0
 let currentDatasourceToken = 0
 let tableSearchDebounceTimer = null
 const pendingRestorePageByArtifact = new Map()
+const tableActionItems = computed(() => [
+  { id: 'delete', label: 'Delete table', destructive: true, disabled: !canDeleteSelectedArtifact.value || isDeletingArtifact.value },
+])
+
+function toggleTableActions() {
+  const rect = tableActionsButtonRef.value?.getBoundingClientRect?.()
+  if (rect) tableActionsPosition.value = { x: rect.right - 176, y: rect.bottom + 8 }
+  tableActionsOpen.value = !tableActionsOpen.value
+}
+
+function handleTableAction(action) {
+  if (action === 'delete') openDeleteDialog()
+}
 
 onMounted(() => {
   isMounted.value = true

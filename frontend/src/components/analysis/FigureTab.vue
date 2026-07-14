@@ -34,25 +34,6 @@
         </div>
 
         <div class="flex min-w-0 items-center justify-end gap-2">
-          <!-- Delete Figure -->
-          <button
-            @click="openDeleteDialog"
-            type="button"
-            :disabled="!canDeleteSelectedFigure || isDeletingArtifact"
-            class="btn-icon h-8 w-8 shrink-0 border"
-            style="border-color: var(--color-border); color: var(--color-text-muted);"
-            :class="(!canDeleteSelectedFigure || isDeletingArtifact) ? 'opacity-50 cursor-not-allowed' : ''"
-            :title="isDeletingArtifact ? 'Deleting chart' : 'Delete chart'"
-            :aria-label="isDeletingArtifact ? 'Deleting chart' : 'Delete chart'"
-          >
-            <div
-              v-if="isDeletingArtifact"
-              class="h-4 w-4 animate-spin rounded-full border-2"
-              style="border-color: var(--color-border); border-top-color: var(--color-danger);"
-            ></div>
-            <TrashIcon v-else class="h-4 w-4" />
-          </button>
-
           <button
             ref="exportMenuButtonRef"
             type="button"
@@ -85,29 +66,11 @@
       ></div>
       
       <!-- Empty State -->
-      <div
-        v-else
-        class="absolute inset-0 flex items-center justify-center"
-        style="background-color: var(--color-base);"
-      >
-        <div class="max-w-xl px-6 text-center">
-          <ChartBarIcon class="h-12 w-12 mx-auto mb-3" style="color: var(--color-border);" />
-          <p class="text-sm font-medium" style="color: var(--color-text-main);">No saved charts</p>
-          <p
-            v-if="artifactListError"
-            class="mt-3 rounded-md px-4 py-3 text-sm"
-            style="background-color: var(--color-danger-bg); color: var(--color-danger);"
-          >
-            {{ artifactListError }}
-          </p>
-          <p
-            v-else
-            class="text-xs mt-1"
-            style="color: var(--color-text-muted);"
-          >
-            Run code that creates a Plotly figure.
-          </p>
-        </div>
+      <div v-else class="absolute inset-0" style="background-color: var(--color-base);">
+        <AppEmptyState
+          :title="artifactListError ? 'Charts unavailable' : 'No saved charts'"
+          :description="artifactListError || 'Run code that creates a Plotly figure.'"
+        ><template #icon><ChartBarIcon class="h-7 w-7" /></template></AppEmptyState>
       </div>
     </div>
   </div>
@@ -128,7 +91,7 @@
     marker-attr="data-figure-export-menu"
     width-class="w-48"
     :width="192"
-    :height="96"
+    :height="136"
     @select="handleExportMenuSelect"
     @close="exportMenuOpen = false"
   />
@@ -141,6 +104,7 @@ import Plotly from 'plotly.js-dist-min'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import FloatingActionMenu from '../ui/FloatingActionMenu.vue'
+import AppEmptyState from '../ui/AppEmptyState.vue'
 import apiService from '../../services/apiService'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import { persistExportFile } from '../../utils/exportFile'
@@ -149,7 +113,6 @@ import { toast } from '../../composables/useToast'
 import { 
   ArrowDownTrayIcon,
   ChartBarIcon,
-  TrashIcon
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
@@ -173,10 +136,11 @@ let listAbortController = null
 let figureAbortController = null
 const DEFAULT_PLOTLY_THEME_MODE = PLOTLY_THEME_MODE.SOFT
 
-const exportMenuItems = [
+const exportMenuItems = computed(() => [
   { id: 'png', label: 'PNG image (.png)' },
   { id: 'html', label: 'HTML file (.html)' },
-]
+  { id: 'delete', label: 'Delete chart', dividerBefore: true, destructive: true, disabled: !canDeleteSelectedFigure.value || isDeletingArtifact.value },
+])
 
 const persistedFigureArtifacts = computed(() => (
   Array.isArray(workspaceFigureArtifacts.value) ? workspaceFigureArtifacts.value : []
@@ -251,6 +215,7 @@ function toggleExportMenu() {
 function handleExportMenuSelect(action) {
   if (action === 'png') void downloadPng()
   if (action === 'html') void downloadHtml()
+  if (action === 'delete') openDeleteDialog()
 }
 
 onMounted(async () => {

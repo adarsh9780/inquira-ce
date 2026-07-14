@@ -2,35 +2,19 @@
   <div class="flex h-full min-w-0 rounded-xl overflow-hidden" style="background-color: var(--color-base);">
     <div class="flex-1 min-w-0 flex flex-col">
       <div class="chat-scroll-shell flex-1 min-h-0 overflow-y-auto" style="background-color: var(--color-base);" data-chat-scroll-container>
-        <div v-if="!appStore.hasWorkspace" class="flex items-center justify-center h-full px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-2 sm:pb-3 lg:pb-4">
-          <div class="text-center max-w-md">
-            <div
-              class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg sm:mb-6 sm:h-20 sm:w-20"
-              style="background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 20%, var(--color-base)) 0%, color-mix(in srgb, var(--color-chart-accent) 18%, var(--color-base)) 100%);"
-            >
-              <ChatBubbleLeftRightIcon class="h-8 w-8 sm:h-10 sm:w-10" style="color: var(--color-accent-text);" />
-            </div>
-            <h3 class="text-xl sm:text-2xl font-bold mb-2 sm:mb-3" style="color: var(--color-text-main);">Create a Workspace First</h3>
-            <p class="text-sm sm:text-base leading-relaxed" style="color: var(--color-text-muted);">
-              Open the workspace dropdown in the header and create your first workspace before starting analysis.
-            </p>
-          </div>
-        </div>
+        <AppEmptyState
+          v-if="!appStore.hasWorkspace"
+          title="Select a workspace"
+          description="Create or select a workspace before starting an analysis."
+          action-label="Open workspace settings"
+          @action="appStore.openSettings('workspace')"
+        ><template #icon><ChatBubbleLeftRightIcon class="h-6 w-6" /></template></AppEmptyState>
 
-        <div v-else-if="appStore.chatHistory.length === 0" class="flex items-center justify-center h-full px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-2 sm:pb-3 lg:pb-4">
-          <div class="text-center max-w-md">
-            <div
-              class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg sm:mb-6 sm:h-20 sm:w-20"
-              style="background: linear-gradient(135deg, color-mix(in srgb, var(--color-chart-accent) 20%, var(--color-base)) 0%, color-mix(in srgb, var(--color-accent) 16%, var(--color-base)) 100%);"
-            >
-              <ChatBubbleLeftRightIcon class="h-8 w-8 sm:h-10 sm:w-10" style="color: var(--color-chart-accent);" />
-            </div>
-            <h3 class="text-xl sm:text-2xl font-bold mb-2 sm:mb-3" style="color: var(--color-text-main);">Start Your Analysis</h3>
-            <p class="text-sm sm:text-base leading-relaxed" style="color: var(--color-text-muted);">
-              Select a workspace, configure your model provider in Settings, then ask a question to generate code and insights.
-            </p>
-          </div>
-        </div>
+        <AppEmptyState
+          v-else-if="appStore.chatHistory.length === 0"
+          title="Ask about your data"
+          description="Use the composer below to generate an analysis, table, or chart."
+        ><template #icon><ChatBubbleLeftRightIcon class="h-6 w-6" /></template></AppEmptyState>
 
         <div v-else class="px-2 sm:px-2 pt-2 pb-1 space-y-2">
           <ChatHistory />
@@ -45,6 +29,7 @@
 import { onMounted, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import ChatHistory from './ChatHistory.vue'
+import AppEmptyState from '../ui/AppEmptyState.vue'
 import { ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
