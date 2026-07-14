@@ -1,11 +1,8 @@
 <template>
-  <section class="border-t border-[var(--color-border)] pt-4">
-    <div class="flex items-start justify-between gap-4">
-      <div>
-        <h4 class="section-label">Models &amp; privacy</h4>
-        <p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ effectiveSummary }}</p>
-      </div>
-      <button type="button" class="text-xs font-semibold text-[var(--color-accent)] hover:underline" @click="isEditing = !isEditing">{{ isEditing ? 'Done' : 'Edit settings' }}</button>
+  <section>
+    <div>
+      <h4 class="section-label">Models &amp; privacy</h4>
+      <p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ effectiveSummary }}</p>
     </div>
 
     <div class="mt-3 flex items-center gap-2 text-[11px] text-[var(--color-text-muted)]">
@@ -16,10 +13,10 @@
       <button v-if="config && !config.readiness?.credential_ready" type="button" class="font-semibold text-[var(--color-accent)] hover:underline" @click="appStore.openSettings('connections')">Manage connection</button>
     </div>
 
-    <div v-if="isEditing" class="mt-4 space-y-5 border-t border-[var(--color-border)] pt-4">
+    <div class="mt-4 space-y-5 border-t border-[var(--color-border)] pt-4">
       <label class="flex items-center justify-between gap-4">
         <span><span class="block text-sm font-medium text-[var(--color-text-main)]">Use application defaults</span><span class="mt-0.5 block text-xs text-[var(--color-text-muted)]">Inherit the secondary defaults stored under Connections.</span></span>
-        <input v-model="useDefaults" type="checkbox" class="h-4 w-4 accent-[var(--color-accent)]" @change="handleDefaultsChange" />
+        <input v-model="useDefaults" type="checkbox" class="h-4 w-4 accent-[var(--color-accent)]" />
       </label>
 
       <div v-if="!useDefaults" class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -44,7 +41,7 @@
         <span><span class="block text-sm font-medium text-[var(--color-text-main)]">Allow bounded data samples in model prompts</span><span class="mt-1 block text-xs leading-relaxed text-[var(--color-text-muted)]">Off keeps row previews local. This permission applies only to this workspace.</span></span>
       </label>
 
-      <details class="border-t border-[var(--color-border)] pt-4">
+      <details v-if="!useDefaults" class="border-t border-[var(--color-border)] pt-4">
         <summary class="cursor-pointer text-xs font-semibold text-[var(--color-text-sub)]">Advanced generation controls</summary>
         <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
           <label><span class="input-label">Temperature</span><input v-model.number="form.temperature" type="number" min="0" max="2" step="0.1" class="input-base input-outlined" placeholder="Default" /></label>
@@ -54,8 +51,8 @@
       </details>
 
       <div class="flex items-center justify-between gap-3 border-t border-[var(--color-border)] pt-4">
-        <p class="text-xs" :class="errorMessage ? 'text-[var(--color-danger)]' : 'text-[var(--color-text-muted)]'">{{ errorMessage || saveStateLabel }}</p>
-        <button type="button" class="btn-primary px-4 py-2 text-xs" :disabled="isSaving" @click="save">{{ isSaving ? 'Saving…' : 'Save AI settings' }}</button>
+        <p class="text-xs" :class="errorMessage ? 'text-[var(--color-danger)]' : isDirty ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'">{{ errorMessage || (isDirty ? 'Unsaved changes' : saveStateLabel) }}</p>
+        <button type="button" class="btn-primary px-4 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50" :disabled="isSaving || !isDirty" @click="save">{{ isSaving ? 'Saving…' : 'Save AI settings' }}</button>
       </div>
     </div>
   </section>
@@ -69,12 +66,12 @@ import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 
 const props = defineProps({ workspaceId: { type: String, required: true } })
 const appStore = useAppStore()
-const isEditing = ref(false)
 const isSaving = ref(false)
 const errorMessage = ref('')
 const saveStateLabel = ref('Changes apply to this workspace only.')
 const providerCatalog = ref(null)
 const localConfig = ref(null)
+const initialPayloadSignature = ref('')
 const form = reactive({ provider: '', mainModel: '', liteModel: '', allowDataSamples: false, temperature: null, maxTokens: null, topP: null })
 
 const config = computed(() => localConfig.value)
@@ -90,6 +87,7 @@ const effectiveSummary = computed(() => {
   return `${effective.provider} · ${effective.main_model || 'Main model required'} · ${effective.lite_model || 'Lite model required'}`
 })
 const credentialLabel = computed(() => config.value?.readiness?.credential_ready ? 'Using application credential' : 'Application credential required')
+const isDirty = computed(() => Boolean(config.value) && payloadSignature(buildPayload()) !== initialPayloadSignature.value)
 
 watch(config, hydrate, { immediate: true })
 watch(() => appStore.workspaceAIConfig, (value) => {
@@ -97,6 +95,8 @@ watch(() => appStore.workspaceAIConfig, (value) => {
 })
 watch(() => props.workspaceId, async (workspaceId) => {
   localConfig.value = null
+  initialPayloadSignature.value = ''
+  saveStateLabel.value = 'Changes apply to this workspace only.'
   if (workspaceId) localConfig.value = await appStore.fetchWorkspaceAIConfig(workspaceId)
 }, { immediate: true })
 
@@ -112,6 +112,8 @@ function hydrate(value) {
   form.temperature = overrides.temperature
   form.maxTokens = overrides.max_tokens
   form.topP = overrides.top_p
+  initialPayloadSignature.value = payloadSignature(buildPayload())
+  errorMessage.value = ''
   if (form.provider) loadProviderModels(form.provider)
 }
 
@@ -119,25 +121,29 @@ async function loadProviderModels(provider) {
   try { providerCatalog.value = await apiService.v1GetPreferences(provider) } catch (_error) { providerCatalog.value = null }
 }
 
-async function handleDefaultsChange() {
-  if (!useDefaults.value) return
-  isSaving.value = true
-  try { localConfig.value = await appStore.resetWorkspaceAIConfig(props.workspaceId); saveStateLabel.value = 'Using application defaults.' } catch (error) { errorMessage.value = error?.message || 'Could not reset AI settings.' } finally { isSaving.value = false }
+function buildPayload() {
+  return {
+    llm_provider_override: useDefaults.value ? null : form.provider,
+    main_model_override: useDefaults.value ? null : form.mainModel,
+    lite_model_override: useDefaults.value ? null : form.liteModel,
+    llm_temperature_override: useDefaults.value ? null : (form.temperature === '' ? null : form.temperature),
+    llm_max_tokens_override: useDefaults.value ? null : (form.maxTokens === '' ? null : form.maxTokens),
+    llm_top_p_override: useDefaults.value ? null : (form.topP === '' ? null : form.topP),
+    allow_llm_data_samples: Boolean(form.allowDataSamples),
+  }
+}
+
+function payloadSignature(payload) {
+  return JSON.stringify(payload)
 }
 
 async function save() {
   isSaving.value = true
   errorMessage.value = ''
   try {
-    localConfig.value = await appStore.saveWorkspaceAIConfig({
-      llm_provider_override: useDefaults.value ? null : form.provider,
-      main_model_override: useDefaults.value ? null : form.mainModel,
-      lite_model_override: useDefaults.value ? null : form.liteModel,
-      llm_temperature_override: useDefaults.value ? null : (form.temperature === '' ? null : form.temperature),
-      llm_max_tokens_override: useDefaults.value ? null : (form.maxTokens === '' ? null : form.maxTokens),
-      llm_top_p_override: useDefaults.value ? null : (form.topP === '' ? null : form.topP),
-      allow_llm_data_samples: Boolean(form.allowDataSamples),
-    }, props.workspaceId)
+    const savedConfig = await appStore.saveWorkspaceAIConfig(buildPayload(), props.workspaceId)
+    localConfig.value = savedConfig
+    hydrate(savedConfig)
     saveStateLabel.value = 'Saved.'
   } catch (error) { errorMessage.value = error?.message || 'Could not save AI settings.' } finally { isSaving.value = false }
 }
