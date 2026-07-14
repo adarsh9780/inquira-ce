@@ -143,6 +143,51 @@ def test_extract_token_usage_reads_ollama_usage_shape() -> None:
 
 
 @pytest.mark.asyncio
+async def test_structured_chain_accumulates_wrapped_raw_usage_once(monkeypatch) -> None:
+    parsed = SimpleNamespace(value="parsed")
+    raw = {
+        "usage": {
+            "prompt_tokens": 120,
+            "completion_tokens": 34,
+            "total_tokens": 154,
+        }
+    }
+    accumulated: list[dict[str, object]] = []
+
+    class _FakePrompt:
+        def __or__(self, other):
+            return other
+
+    class _FakeModel:
+        def with_structured_output(self, _schema, **_kwargs):
+            return self
+
+    async def fake_ainvoke(_chain, _payload):
+        return {"raw": raw, "parsed": parsed}
+
+    monkeypatch.setattr(nodes_module, "_ainvoke_structured_chain", fake_ainvoke)
+    monkeypatch.setattr(nodes_module, "_accumulate_llm_usage", accumulated.append)
+
+    result = await nodes_module._ainvoke_provider_structured_chain(
+        _FakePrompt(),
+        _FakeModel(),
+        SimpleNamespace,
+        {"question": "test"},
+    )
+
+    assert result is parsed
+    assert accumulated == [
+        {
+            "input_tokens": 120,
+            "output_tokens": 34,
+            "cached_tokens": 0,
+            "total_tokens": 154,
+            "price_usd": 0.0,
+        }
+    ]
+
+
+@pytest.mark.asyncio
 async def test_analysis_enrich_context_node_produces_structured_pending_tools(monkeypatch) -> None:
     class _FakePrompt:
         def __or__(self, _other):

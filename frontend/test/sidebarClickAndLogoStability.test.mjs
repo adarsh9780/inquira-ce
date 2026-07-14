@@ -17,7 +17,7 @@ test('collapsed sidebar expands only on explicit click and not on hover', () => 
   assert.equal(sidebarSource.includes('visibleConversationsForSidebar(workspace)'), true)
   assert.equal(sidebarSource.includes('title="Settings"'), true)
   assert.equal(sidebarSource.includes('<ChevronDoubleLeftIcon'), true)
-  assert.equal(sidebarSource.includes('<ChevronDoubleRightIcon'), false)
+  assert.equal(sidebarSource.includes('<ChevronDoubleRightIcon'), true)
 })
 
 test('sidebar branding keeps a stable fixed top row while the shell owns width animation', () => {

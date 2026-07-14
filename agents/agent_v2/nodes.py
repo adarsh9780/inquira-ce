@@ -1758,13 +1758,13 @@ async def _ainvoke_provider_structured_chain(
             chain = _bind_structured_chain(prompt, model, schema, method)
             result = await _ainvoke_structured_chain(chain, payload)
             if isinstance(result, dict):
-                _accumulate_llm_usage(_extract_token_usage(result))
                 raw = result.get("raw")
-                if raw is not None:
-                    _accumulate_llm_usage(_extract_token_usage(raw))
+                usage_source = raw if raw is not None else result
+                _accumulate_llm_usage(_extract_token_usage(usage_source))
                 parsed = result.get("parsed")
                 if parsed is not None:
                     return parsed
+                return result
             _accumulate_llm_usage(_extract_token_usage(result))
             return result
         except Exception as exc:

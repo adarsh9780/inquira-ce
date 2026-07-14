@@ -23,15 +23,6 @@
           </span>
         </div>
       </button>
-      <button
-        v-if="!appStore.isSidebarCollapsed"
-        type="button"
-        class="sidebar-icon-button"
-        title="Collapse sidebar"
-        @click="handleBrandClick"
-      >
-        <ChevronDoubleLeftIcon class="h-4 w-4" />
-      </button>
     </div>
 
     <!-- ─── Main Scroll Area ─── -->
@@ -201,6 +192,26 @@
       <SidebarFooter>
         <div class="mx-1 mb-2 h-px bg-[var(--color-border)] opacity-70" />
         <div class="flex flex-col space-y-0.5">
+          <!-- Sidebar collapse / expand -->
+          <button
+            type="button"
+            class="sidebar-nav-row justify-start px-2.5"
+            :title="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+            :aria-label="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+            @click="handleBrandClick"
+          >
+            <span class="sidebar-row-icon">
+              <ChevronDoubleRightIcon v-if="appStore.isSidebarCollapsed" class="h-5 w-5" />
+              <ChevronDoubleLeftIcon v-else class="h-5 w-5" />
+            </span>
+            <span
+              class="sidebar-row-label"
+              :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[176px] opacity-100 ml-2.5'"
+            >
+              Collapse sidebar
+            </span>
+          </button>
+
           <!-- Settings -->
           <button
             type="button"
@@ -341,6 +352,7 @@ import {
   ShareIcon,
   Cog6ToothIcon,
   ChevronDoubleLeftIcon,
+  ChevronDoubleRightIcon,
   PencilSquareIcon,
 } from '@heroicons/vue/24/outline'
 
