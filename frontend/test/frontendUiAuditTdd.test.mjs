@@ -99,7 +99,6 @@ test('large components are split into workflow components and composables', () =
     'WorkspaceListPanel',
     'WorkspaceContextSection',
     'WorkspaceDatasetSection',
-    'WorkspaceRuntimeReadiness',
   ]) {
     assert.equal(workspaceTab.includes(componentName), true)
   }

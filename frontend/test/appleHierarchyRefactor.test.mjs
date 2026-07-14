@@ -33,7 +33,7 @@ test('composer uses inline setup guidance and progressive model management', () 
 
   assert.match(composer, /<InlineNotice/)
   assert.match(composer, /hasTurnNavigation/)
-  assert.match(composer, /@manage-models="appStore\.openSettings\('workspace'\)"/)
+  assert.match(composer, /@manage-models="appStore\.openSettings\('workspace-ai'\)"/)
   assert.match(selector, /Workspace model settings…/)
 })
 

@@ -46,7 +46,7 @@ test('settings puts workspace models with workspace data and isolates credential
   assert.ok(workspace.indexOf('<WorkspaceAIConfigSection') < workspace.indexOf('<WorkspaceDatasetSection>'))
   assert.match(connections, /API Credentials/)
   assert.match(connections, /<details/)
-  assert.match(chatInput, /@manage-models="appStore\.openSettings\('workspace'\)"/)
+  assert.match(chatInput, /@manage-models="appStore\.openSettings\('workspace-ai'\)"/)
 })
 
 test('first-run surfaces follow workspace data connection configuration readiness order', () => {

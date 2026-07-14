@@ -36,10 +36,10 @@ const readinessItems = computed(() => {
   const hasConnection = !['no_workspace', 'no_data', 'data_processing', 'model_connection_required'].includes(state)
   const configured = state === 'ready'
   const steps = [
-    { key: 'workspace', label: 'Workspace', description: hasWorkspace ? 'An active workspace is selected.' : 'Create a place for your data and conversations.', complete: hasWorkspace, actionLabel: 'Create workspace', action: () => appStore.openSettings('workspace') },
-    { key: 'data', label: 'Data', description: hasData ? 'Workspace data is prepared.' : 'Add a dataset to analyze.', complete: hasData, actionLabel: 'Add data', action: () => appStore.openSettings('workspace') },
+    { key: 'workspace', label: 'Workspace', description: hasWorkspace ? 'An active workspace is selected.' : 'Create a place for your data and conversations.', complete: hasWorkspace, actionLabel: 'Create workspace', action: () => appStore.openSettings('workspace-general') },
+    { key: 'data', label: 'Data', description: hasData ? 'Workspace data is prepared.' : 'Add a dataset to analyze.', complete: hasData, actionLabel: 'Add data', action: () => appStore.openSettings('workspace-data') },
     { key: 'connection', label: 'Model connection', description: hasConnection ? 'The effective provider is connected.' : 'Connect a provider once for all workspaces.', complete: hasConnection, actionLabel: 'Connect model', action: () => appStore.openSettings('connections') },
-    { key: 'configuration', label: 'Workspace AI', description: configured ? 'Models and privacy are configured.' : 'Review workspace models and data-sharing permission.', complete: configured, actionLabel: 'Review', action: () => appStore.openSettings('workspace') },
+    { key: 'configuration', label: 'Workspace AI', description: configured ? 'Models and privacy are configured.' : 'Review workspace models and data-sharing permission.', complete: configured, actionLabel: 'Review', action: () => appStore.openSettings('workspace-ai') },
   ]
   const firstIncomplete = steps.findIndex((step) => !step.complete)
   return steps.map((step, index) => ({ ...step, index: index + 1, current: index === firstIncomplete }))

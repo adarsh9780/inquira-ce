@@ -88,13 +88,44 @@
               <button type="button" class="btn-primary px-3 py-1.5 text-xs" @click="saveRename">Save</button>
             </template>
             <template v-else>
+              <span v-if="isWorkspaceActive" class="inline-flex items-center gap-1.5 text-[10px] text-[var(--color-text-muted)]">
+                <span class="h-1.5 w-1.5 rounded-full" :class="runtimeStatusTone === 'danger' ? 'bg-[var(--color-danger)]' : runtimeStatusTone === 'success' ? 'bg-[var(--color-success)]' : 'bg-[var(--color-warning)]'"></span>
+                {{ runtimeStatusLabel }}
+              </span>
               <button v-if="!isWorkspaceActive" type="button" class="btn-primary px-3 py-1.5 text-xs" @click="activateSelectedWorkspace">Activate</button>
-              <button v-if="isWorkspaceActive" type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="startRename">Rename</button>
+              <details class="relative">
+                <summary class="btn-icon h-8 w-8 list-none" aria-label="Workspace actions" title="Workspace actions">•••</summary>
+                <div class="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-[var(--color-border)] bg-[var(--color-base)] p-1 shadow-lg">
+                  <button v-if="isWorkspaceActive" type="button" class="nav-tab w-full text-left" @click="startRename">Rename workspace</button>
+                  <button v-if="isWorkspaceActive" type="button" class="nav-tab w-full text-left" :disabled="isRuntimeActionInProgress" @click="retryWorkspaceRuntime">Retry runtime</button>
+                  <button v-if="isWorkspaceActive" type="button" class="nav-tab w-full text-left" :disabled="isRuntimeActionInProgress" @click="hardResetWorkspaceRuntime">Reset runtime</button>
+                  <button type="button" class="nav-tab w-full text-left text-[var(--color-danger)]" @click="requestDeleteWorkspace(activeWorkspace.id)">Delete workspace</button>
+                </div>
+              </details>
             </template>
           </div>
         </header>
 
-        <div v-if="activeWorkspace" class="min-h-0 flex-1 space-y-4 overflow-y-auto scrollbar-thin">
+        <nav v-if="activeWorkspace" class="flex shrink-0 gap-5 border-b border-[var(--color-border)]" aria-label="Workspace settings sections" role="tablist">
+          <button
+            v-for="section in workspaceSections"
+            :key="section.id"
+            type="button"
+            class="relative -mb-px border-b-2 px-0.5 pb-2 text-xs font-medium transition-colors"
+            :class="activeWorkspaceSection === section.id ? 'border-[var(--color-accent)] text-[var(--color-text-main)]' : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
+            :aria-selected="activeWorkspaceSection === section.id"
+            :tabindex="activeWorkspaceSection === section.id ? 0 : -1"
+            role="tab"
+            @click="activeWorkspaceSection = section.id"
+            @keydown.left.prevent="moveWorkspaceSection(-1, $event)"
+            @keydown.right.prevent="moveWorkspaceSection(1, $event)"
+          >
+            {{ section.label }}
+          </button>
+        </nav>
+
+        <div v-if="activeWorkspace" class="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
+          <div v-show="activeWorkspaceSection === 'general'" class="space-y-4" role="tabpanel" aria-label="General workspace settings">
           <WorkspaceContextSection>
             <div class="flex items-center justify-between gap-3">
               <h4 class="section-label">Workspace Context</h4>
@@ -115,10 +146,23 @@
               <p v-else class="text-xs text-[var(--color-text-muted)]">No workspace context added yet.</p>
             </div>
           </WorkspaceContextSection>
+            <div class="border-t border-[var(--color-border)] pt-4">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <h4 class="section-label">Runtime</h4>
+                  <p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ runtimeStatusMessage || runtimeStatusLabel }}</p>
+                </div>
+                <span class="text-[10px] text-[var(--color-text-muted)]">Maintenance is under •••</span>
+              </div>
+            </div>
+          </div>
 
-          <WorkspaceAIConfigSection v-if="activeWorkspace?.id" :workspace-id="activeWorkspace.id" />
+          <div v-show="activeWorkspaceSection === 'ai'" role="tabpanel" aria-label="Workspace AI settings">
+            <WorkspaceAIConfigSection v-if="activeWorkspace?.id" :workspace-id="activeWorkspace.id" />
+          </div>
 
-          <WorkspaceDatasetSection>
+          <div v-show="activeWorkspaceSection === 'data'" role="tabpanel" aria-label="Workspace data settings">
+            <WorkspaceDatasetSection>
             <div class="flex items-center justify-between gap-3">
               <h4 class="section-label">Linked Datasets</h4>
               <button v-if="isWorkspaceActive" type="button" class="text-lg font-semibold leading-none text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] disabled:cursor-not-allowed disabled:opacity-50" aria-label="Add dataset" title="Add dataset" :disabled="isDatasetIngesting || isDeletingDataset" @click="openDatasetPicker">+</button>
@@ -162,9 +206,8 @@
             <div v-else-if="!isWorkspaceActive" class="rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-base-soft)]/20 py-6 text-center">
               <p class="text-xs text-[var(--color-text-muted)]">Activate this workspace to add datasets.</p>
             </div>
-          </WorkspaceDatasetSection>
-
-          <WorkspaceRuntimeReadiness />
+            </WorkspaceDatasetSection>
+          </div>
         </div>
 
         <div v-else class="flex flex-1 flex-col items-center justify-center rounded-lg bg-[var(--color-base-soft)] px-5 py-8 text-center">
@@ -227,7 +270,6 @@ import ConfirmationModal from '../ConfirmationModal.vue'
 import WorkspaceContextSection from './workspace/WorkspaceContextSection.vue'
 import WorkspaceDatasetSection from './workspace/WorkspaceDatasetSection.vue'
 import WorkspaceListPanel from './workspace/WorkspaceListPanel.vue'
-import WorkspaceRuntimeReadiness from './workspace/WorkspaceRuntimeReadiness.vue'
 import { useWorkspaceDatasets } from '../../../composables/useWorkspaceDatasets'
 
 const props = defineProps({
@@ -239,12 +281,32 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  initialSection: {
+    type: String,
+    default: 'general',
+  },
 })
 
 const emit = defineEmits(['select-workspace', 'activate-workspace', 'workspace-operation-change', 'workspace-created'])
 
 const appStore = useAppStore()
 useWorkspaceDatasets()
+const workspaceSections = [
+  { id: 'general', label: 'General' },
+  { id: 'data', label: 'Data' },
+  { id: 'ai', label: 'AI' },
+]
+const activeWorkspaceSection = ref('general')
+
+function moveWorkspaceSection(direction, event) {
+  const currentIndex = workspaceSections.findIndex((section) => section.id === activeWorkspaceSection.value)
+  const nextIndex = (currentIndex + direction + workspaceSections.length) % workspaceSections.length
+  activeWorkspaceSection.value = workspaceSections[nextIndex].id
+  nextTick(() => {
+    const tabs = event?.currentTarget?.parentElement?.querySelectorAll?.('[role="tab"]') || []
+    tabs[nextIndex]?.focus?.()
+  })
+}
 
 const workspaceSummaries = ref({})
 const workspaceDetail = ref(null)
@@ -434,6 +496,14 @@ const schemaRegenerateDialogMessage = computed(() => {
   const filename = String(pendingSchemaRegenerateDataset.value?.filename || '').trim()
   return `Regenerated schema may differ from the current version because it is generated by the LLM. Continue regenerating "${filename || 'this dataset'}"?`
 })
+watch(
+  () => props.initialSection,
+  (section) => {
+    const normalized = String(section || '').trim().toLowerCase()
+    activeWorkspaceSection.value = workspaceSections.some((item) => item.id === normalized) ? normalized : 'general'
+  },
+  { immediate: true },
+)
 watch(
   () => props.workspaces,
   async () => { await hydrateWorkspaceCards() },

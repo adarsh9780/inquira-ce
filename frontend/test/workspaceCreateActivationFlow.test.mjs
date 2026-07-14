@@ -40,7 +40,7 @@ test('existing workspace summary supports inspect-first activation and active-on
   assert.equal(workspace.includes("emit('select-workspace', id)"), true)
   assert.equal(workspace.includes("emit('activate-workspace', id)"), true)
   assert.equal(workspace.includes('v-if="isWorkspaceActive && !isEditingContext"'), true)
-  assert.equal(workspace.includes('v-if="isWorkspaceActive" type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="startRename"'), true)
+  assert.equal(workspace.includes('v-if="isWorkspaceActive" type="button" class="nav-tab w-full text-left" @click="startRename"'), true)
   assert.equal(workspace.includes('function startContextEdit()'), true)
   assert.equal(settings.includes('@select-workspace="selectWorkspace"'), true)
   assert.equal(settings.includes('@activate-workspace="activateWorkspace"'), true)

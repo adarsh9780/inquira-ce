@@ -166,7 +166,9 @@ export const useAppStore = defineStore('app', () => {
     const n = String(tab || '').trim().toLowerCase()
     if      (n === 'setup' || n === 'readiness')   settingsInitialTab.value = 'setup'
     else if (n === 'api' || n === 'llm' || n === 'connections') settingsInitialTab.value = 'connections'
-    else if (n === 'workspace' || n === 'data')     settingsInitialTab.value = 'workspace'
+    else if (n === 'models' || n === 'workspace-ai') settingsInitialTab.value = 'workspace-ai'
+    else if (n === 'data' || n === 'workspace-data') settingsInitialTab.value = 'workspace-data'
+    else if (n === 'workspace' || n === 'workspace-general') settingsInitialTab.value = 'workspace-general'
     else if (n === 'account')                       settingsInitialTab.value = 'account'
     else if (n === 'appearance' || n === 'theme')   settingsInitialTab.value = 'appearance'
     else if (n === 'terms'  || n === 'legal')       settingsInitialTab.value = 'terms'

@@ -61,7 +61,7 @@ test('selected summary exposes only activation until the workspace is active', (
   assert.equal(workspace.includes('@click="startContextEdit"'), true)
   assert.equal(workspace.includes('v-if="isWorkspaceActive && !isEditingContext"'), true)
   assert.equal(workspace.includes('@click="startRename"'), true)
-  assert.equal(workspace.includes('v-if="isWorkspaceActive" type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="startRename"'), true)
+  assert.equal(workspace.includes('v-if="isWorkspaceActive" type="button" class="nav-tab w-full text-left" @click="startRename"'), true)
   assert.equal(workspace.includes('@click="openWorkspaceEditor"'), false)
 })
 

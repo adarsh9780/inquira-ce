@@ -7,7 +7,7 @@
           title="Create your first workspace"
           description="A workspace keeps your data, conversations, and AI preferences together."
           action-label="Create workspace"
-          @action="appStore.openSettings('workspace')"
+          @action="appStore.openSettings('workspace-general')"
         ><template #icon><ChatBubbleLeftRightIcon class="h-6 w-6" /></template></AppEmptyState>
 
         <AppEmptyState
@@ -31,7 +31,7 @@
           title="Review workspace AI"
           description="Choose workspace models and confirm its data-sharing permission."
           action-label="Review configuration"
-          @action="appStore.openSettings('workspace')"
+          @action="appStore.openSettings('workspace-ai')"
         ><template #icon><SparklesIcon class="h-6 w-6" /></template></AppEmptyState>
 
         <AppEmptyState

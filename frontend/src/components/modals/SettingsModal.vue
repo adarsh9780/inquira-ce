@@ -95,6 +95,7 @@
               <section :class="panelClass('workspace')" :aria-hidden="currentPanel !== 'workspace'" :inert="currentPanel !== 'workspace'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
                 <WorkspaceTab
                   :active-workspace-id="activeWorkspaceId"
+                  :initial-section="workspaceInitialSection"
                   :workspaces="workspaceItems"
                   @workspace-operation-change="setActiveWorkspaceOperation"
                   @select-workspace="selectWorkspace"
@@ -157,6 +158,7 @@ const llmConfig = useLLMConfig()
 
 const activeSection = ref('setup')
 const activeWorkspaceId = ref('')
+const workspaceInitialSection = ref('general')
 const currentPanel = ref('setup')
 const panelDirection = ref('forward')
 const activeWorkspaceOperation = ref('')
@@ -228,7 +230,7 @@ watch(
 function normalizeTab(tab) {
   const candidate = String(tab || '').toLowerCase()
   if (candidate === 'api' || candidate === 'llm') return 'connections'
-  if (candidate === 'data') return 'workspace'
+  if (candidate === 'data' || candidate === 'models' || candidate.startsWith('workspace-')) return 'workspace'
   if (candidate === 'setup' || candidate === 'connections' || candidate === 'workspace' || candidate === 'appearance' || candidate === 'account') {
     return candidate
   }
@@ -236,6 +238,12 @@ function normalizeTab(tab) {
 }
 
 function initializePanelState(tab) {
+  const candidate = String(tab || '').trim().toLowerCase()
+  workspaceInitialSection.value = candidate === 'data' || candidate === 'workspace-data'
+    ? 'data'
+    : candidate === 'models' || candidate === 'workspace-ai'
+      ? 'ai'
+      : 'general'
   const normalized = normalizeTab(tab)
   if (normalized === 'workspace') {
     activeSection.value = 'workspace'

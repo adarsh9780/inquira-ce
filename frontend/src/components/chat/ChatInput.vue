@@ -111,7 +111,7 @@
               :search-debounce-ms="250"
               :max-options-without-search="10"
               @model-changed="handleModelChange"
-              @manage-models="appStore.openSettings('workspace')"
+              @manage-models="appStore.openSettings('workspace-ai')"
             />
           </div>
 
@@ -262,10 +262,10 @@ const setupNotice = computed(() => {
     }
   }
   if (appStore.workspaceReadiness.state === 'no_data') {
-    return { title: 'Add data to begin', message: missingSetupRequirements.value[0], actionLabel: 'Add data', action: () => appStore.openSettings('workspace') }
+    return { title: 'Add data to begin', message: missingSetupRequirements.value[0], actionLabel: 'Add data', action: () => appStore.openSettings('workspace-data') }
   }
   if (appStore.workspaceReadiness.state === 'workspace_configuration_required') {
-    return { title: 'Review workspace AI', message: missingSetupRequirements.value[0], actionLabel: 'Review', action: () => appStore.openSettings('workspace') }
+    return { title: 'Review workspace AI', message: missingSetupRequirements.value[0], actionLabel: 'Review', action: () => appStore.openSettings('workspace-ai') }
   }
   const provider = String(appStore.llmProvider || 'model provider').trim()
   return {
