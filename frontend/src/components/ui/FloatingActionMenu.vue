@@ -1,47 +1,49 @@
 <template>
   <Teleport to="body">
-    <div
-      v-if="isOpen"
-      ref="menuRef"
-      class="floating-action-menu layer-dropdown fixed overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-panel-elevated)] py-1 shadow-lg focus:outline-none"
-      :class="widthClass"
-      :style="menuStyle"
-      tabindex="-1"
-      role="menu"
-      data-floating-action-menu
-      v-bind="markerAttributes"
-      @click.stop
-      @keydown="handleMenuKeydown"
-    >
+    <Transition name="motion-popover" @before-enter="prepareMenuEnter">
       <div
-        v-if="header"
-        class="px-3 py-2 text-[12px] font-medium text-[var(--color-text-muted)]"
-        data-floating-action-menu-header
+        v-if="isOpen"
+        ref="menuRef"
+        class="floating-action-menu motion-popover-surface layer-dropdown fixed overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-panel-elevated)] py-1 shadow-lg focus:outline-none"
+        :class="widthClass"
+        :style="menuStyle"
+        tabindex="-1"
+        role="menu"
+        data-floating-action-menu
+        v-bind="markerAttributes"
+        @click.stop
+        @keydown="handleMenuKeydown"
       >
-        {{ header }}
-      </div>
-      <template v-for="item in normalizedItems" :key="item.id">
         <div
-          v-if="item.dividerBefore"
-          class="my-1 h-px bg-[var(--color-border)] opacity-70"
-          data-floating-action-menu-divider
-        />
-        <button
-          :ref="(element) => setItemRef(element, item.id)"
-          type="button"
-          role="menuitem"
-          class="w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-          :class="item.destructive
-            ? 'text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)]'
-            : 'text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)]'"
-          :data-action-id="item.id"
-          :disabled="item.disabled"
-          @click.stop="handleSelect(item)"
+          v-if="header"
+          class="px-3 py-2 text-[12px] font-medium text-[var(--color-text-muted)]"
+          data-floating-action-menu-header
         >
-          {{ item.label }}
-        </button>
-      </template>
-    </div>
+          {{ header }}
+        </div>
+        <template v-for="item in normalizedItems" :key="item.id">
+          <div
+            v-if="item.dividerBefore"
+            class="my-1 h-px bg-[var(--color-border)] opacity-70"
+            data-floating-action-menu-divider
+          />
+          <button
+            :ref="(element) => setItemRef(element, item.id)"
+            type="button"
+            role="menuitem"
+            class="w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            :class="item.destructive
+              ? 'text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)]'
+              : 'text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)]'"
+            :data-action-id="item.id"
+            :disabled="item.disabled"
+            @click.stop="handleSelect(item)"
+          >
+            {{ item.label }}
+          </button>
+        </template>
+      </div>
+    </Transition>
   </Teleport>
 </template>
 
@@ -126,9 +128,9 @@ function resolveRawPosition() {
   }
 }
 
-function updateMenuPosition() {
+function updateMenuPosition(element = menuRef.value) {
   const gap = Number(props.clampPadding || 8)
-  const rect = menuRef.value?.getBoundingClientRect?.()
+  const rect = element?.getBoundingClientRect?.()
   const width = Number(rect?.width || props.width || 176)
   const height = Number(rect?.height || props.height || 96)
   const viewportWidth = typeof window === 'undefined' ? width + gap * 2 : window.innerWidth
@@ -138,6 +140,12 @@ function updateMenuPosition() {
     x: Math.max(gap, Math.min(raw.x || gap, viewportWidth - width - gap)),
     y: Math.max(gap, Math.min(raw.y || gap, viewportHeight - height - gap)),
   }
+}
+
+function prepareMenuEnter(element) {
+  updateMenuPosition(element)
+  element.style.left = `${clampedPosition.value.x}px`
+  element.style.top = `${clampedPosition.value.y}px`
 }
 
 function handleSelect(item) {

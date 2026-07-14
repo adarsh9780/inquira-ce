@@ -41,14 +41,21 @@
         <span><span class="block text-sm font-medium text-[var(--color-text-main)]">Allow bounded data samples in model prompts</span><span class="mt-1 block text-xs leading-relaxed text-[var(--color-text-muted)]">Off keeps row previews local. This permission applies only to this workspace.</span></span>
       </label>
 
-      <details v-if="!useDefaults" class="border-t border-[var(--color-border)] pt-3">
-        <summary class="cursor-pointer text-xs font-semibold text-[var(--color-text-sub)]">Advanced generation controls</summary>
+      <section v-if="!useDefaults" class="border-t border-[var(--color-border)] pt-3">
+        <button type="button" class="flex w-full items-center justify-between text-left text-xs font-semibold text-[var(--color-text-sub)]" :aria-expanded="advancedOpen" @click="advancedOpen = !advancedOpen">
+          <span>Advanced generation controls</span>
+          <span class="inline-block transition-transform" :class="advancedOpen ? 'rotate-90' : ''" aria-hidden="true">›</span>
+        </button>
+        <div class="motion-disclosure" :class="advancedOpen ? 'motion-disclosure-open' : ''" :aria-hidden="!advancedOpen">
+        <div class="motion-disclosure-content">
         <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
           <label><span class="input-label">Temperature</span><input v-model.number="form.temperature" type="number" min="0" max="2" step="0.1" class="input-base input-outlined" placeholder="Default" /></label>
           <label><span class="input-label">Max tokens</span><input v-model.number="form.maxTokens" type="number" min="1" max="131072" class="input-base input-outlined" placeholder="Default" /></label>
           <label><span class="input-label">Top P</span><input v-model.number="form.topP" type="number" min="0" max="1" step="0.05" class="input-base input-outlined" placeholder="Default" /></label>
         </div>
-      </details>
+        </div>
+        </div>
+      </section>
 
       <div class="flex items-center justify-between gap-3 border-t border-[var(--color-border)] pt-3">
         <p class="text-xs" :class="errorMessage ? 'text-[var(--color-danger)]' : isDirty ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'">{{ errorMessage || (isDirty ? 'Unsaved changes' : saveStateLabel) }}</p>
@@ -66,6 +73,7 @@ import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 
 const props = defineProps({ workspaceId: { type: String, required: true } })
 const appStore = useAppStore()
+const advancedOpen = ref(false)
 const isSaving = ref(false)
 const errorMessage = ref('')
 const saveStateLabel = ref('Changes apply to this workspace only.')

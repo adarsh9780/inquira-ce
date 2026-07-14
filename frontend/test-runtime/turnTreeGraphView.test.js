@@ -120,7 +120,9 @@ describe('TurnTreeGraphView', () => {
 
     await header.trigger('click')
     expect(header.attributes('aria-expanded')).toBe('false')
-    expect(wrapper.get('[data-turn-tree-graph="conversation-1"]').attributes('style')).toContain('display: none')
+    const disclosure = wrapper.get('.motion-disclosure')
+    expect(disclosure.attributes('aria-hidden')).toBe('true')
+    expect(disclosure.classes()).not.toContain('motion-disclosure-open')
   })
 
   it('shows contiguous visible turn numbers when persisted sequence numbers have gaps', () => {

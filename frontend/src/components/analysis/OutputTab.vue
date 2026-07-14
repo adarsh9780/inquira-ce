@@ -61,7 +61,9 @@
             />
           </button>
 
-          <div v-if="isExpanded(event.id)" class="px-3 pb-3">
+          <div class="motion-disclosure" :class="isExpanded(event.id) ? 'motion-disclosure-open' : ''" :aria-hidden="!isExpanded(event.id)">
+          <div class="motion-disclosure-content">
+          <div class="px-3 pb-3">
             <template v-if="event.type === 'log'">
               <pre
                 v-if="event.stdout"
@@ -178,6 +180,8 @@
                 style="color: var(--color-text-main); background-color: color-mix(in srgb, var(--color-base) 90%, var(--color-surface));"
               >{{ event.displayValue }}</pre>
             </template>
+          </div>
+          </div>
           </div>
         </article>
       </div>

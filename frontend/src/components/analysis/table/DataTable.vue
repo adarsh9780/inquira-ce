@@ -156,10 +156,11 @@
   </div>
 
   <Teleport to="body">
+    <Transition name="motion-popover">
     <form
       v-if="filterMenu.columnId"
       ref="filterMenuElement"
-      class="inquira-table-filter-menu"
+      class="inquira-table-filter-menu motion-popover-surface"
       :style="{ left: `${filterMenu.x}px`, top: `${filterMenu.y}px` }"
       role="dialog"
       :aria-label="`Filter ${filterMenu.columnId}`"
@@ -242,6 +243,7 @@
         </button>
       </div>
     </form>
+    </Transition>
   </Teleport>
 </template>
 

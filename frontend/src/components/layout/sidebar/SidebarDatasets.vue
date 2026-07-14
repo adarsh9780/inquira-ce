@@ -26,9 +26,9 @@
       </button>
     </div>
 
-    <Transition name="sidebar-list">
+    <div class="motion-disclosure" :class="isExpanded && appStore.hasWorkspace ? 'motion-disclosure-open' : ''" :aria-hidden="!(isExpanded && appStore.hasWorkspace)">
+      <div class="motion-disclosure-content">
       <div
-        v-show="isExpanded && appStore.hasWorkspace"
         class="flex flex-col mt-1 space-y-0.5 pl-4 pb-2"
         @dragenter.prevent="handleDropDragEnter"
         @dragover.prevent="handleDropDragOver"
@@ -80,7 +80,8 @@
           </div>
         </button>
       </div>
-    </Transition>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -314,16 +315,3 @@ onUnmounted(() => {
   window.removeEventListener('dataset-switched', handleDatasetSwitched)
 })
 </script>
-
-<style scoped>
-.sidebar-list-enter-active,
-.sidebar-list-leave-active {
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-
-.sidebar-list-enter-from,
-.sidebar-list-leave-to {
-  opacity: 0;
-  transform: translateY(-4px);
-}
-</style>

@@ -103,19 +103,19 @@
                   <span aria-hidden="true">•••</span>
                 </button>
 
-                <transition name="fade">
+                <Transition name="motion-fade">
                   <span v-if="verifySuccessMessage" class="success-message">
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                     {{ verifySuccessMessage }}
                   </span>
-                </transition>
+                </Transition>
               </div>
 
-              <transition name="fade">
+              <Transition name="motion-fade">
                 <p v-if="verifyError" class="error-message-text">{{ verifyError }}</p>
-              </transition>
+              </Transition>
 
               <p v-if="providerApiKeyPortal" class="portal-link-text">
                 Need an API key?
@@ -135,16 +135,27 @@
           </div>
         </div>
 
-        <details class="mt-6 border-t border-[var(--color-border)] pt-4">
-          <summary class="cursor-pointer list-none rounded-md py-2 text-sm font-semibold text-[var(--color-text-main)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-border)]">
+        <section class="mt-6 border-t border-[var(--color-border)] pt-4">
+          <button
+            type="button"
+            class="w-full cursor-pointer rounded-md py-2 text-left text-sm font-semibold text-[var(--color-text-main)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-border)]"
+            :aria-expanded="applicationDefaultsOpen"
+            @click="applicationDefaultsOpen = !applicationDefaultsOpen"
+          >
             <span class="flex items-center justify-between gap-4">
               <span>
                 <span class="block">Application model defaults</span>
                 <span class="mt-1 block text-xs font-normal text-[var(--color-text-muted)]">Fallback values for workspaces that choose to inherit defaults.</span>
               </span>
-              <span class="text-xs font-normal text-[var(--color-text-muted)]">Optional</span>
+              <span class="inline-flex items-center gap-2 text-xs font-normal text-[var(--color-text-muted)]">
+                Optional
+                <span class="inline-block transition-transform" :class="applicationDefaultsOpen ? 'rotate-90' : ''" aria-hidden="true">›</span>
+              </span>
             </span>
-          </summary>
+          </button>
+
+          <div class="motion-disclosure" :class="applicationDefaultsOpen ? 'motion-disclosure-open' : ''" :aria-hidden="!applicationDefaultsOpen">
+          <div class="motion-disclosure-content">
 
         <!-- 3. Model Configuration Dashboard -->
         <div class="settings-card glass-panel mt-3">
@@ -251,10 +262,8 @@
             <span class="trigger-label">Advanced settings</span>
           </button>
 
-          <div
-            class="advanced-content-container"
-            :style="{ maxHeight: showAdvanced ? '800px' : '0px', opacity: showAdvanced ? 1 : 0 }"
-          >
+          <div class="advanced-content-container motion-disclosure" :class="showAdvanced ? 'motion-disclosure-open' : ''" :aria-hidden="!showAdvanced">
+            <div class="motion-disclosure-content">
             <div class="advanced-grid">
               <!-- Warning Warning warning! Slow request warning -->
               <div class="advanced-field-box">
@@ -389,6 +398,7 @@
                 Reset to defaults
               </button>
             </div>
+            </div>
           </div>
         </div>
 
@@ -406,7 +416,9 @@
               <span v-else>Save application defaults</span>
             </button>
           </div>
-        </details>
+          </div>
+          </div>
+        </section>
       </div>
     </div>
   </section>
@@ -486,6 +498,7 @@ const {
 } = llm
 
 const showKey = ref(false)
+const applicationDefaultsOpen = ref(false)
 const showAdvanced = ref(false)
 const deleteLoading = ref(false)
 const credentialMenuButton = ref(null)

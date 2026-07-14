@@ -12,7 +12,7 @@ test('chat slash command suggestions are constrained to beginning of input', () 
   assert.equal(source.includes('token.startsWith(\'/\')'), true)
   assert.equal(source.includes('suggestionsOpenUp'), true)
   assert.equal(source.includes('updateSuggestionPlacement()'), true)
-  assert.equal(source.includes(":class=\"suggestionsOpenUp ? 'bottom-full mb-2' : 'top-full mt-1'\""), true)
+  assert.equal(source.includes(":class=\"suggestionsOpenUp ? 'motion-popover-from-bottom bottom-full mb-2' : 'top-full mt-1'\""), true)
 })
 
 test('chat column autocomplete uses DuckDB quoted identifiers for special column names', () => {
@@ -34,7 +34,7 @@ test('column suggestion UI highlights escaped/special column references', () => 
 
   assert.equal(source.includes('item.displayText || `${item.table_name}.${item.column_name}`'), true)
   assert.equal(source.includes("item?.isSpecial ? 'color: var(--color-info);'"), true)
-  assert.equal(source.includes(":class=\"openUp ? 'bottom-full mb-2' : 'top-full mt-1'\""), true)
+  assert.equal(source.includes(":class=\"openUp ? 'motion-popover-from-bottom bottom-full mb-2' : 'top-full mt-1'\""), true)
 })
 
 test('chat caret keyup handler ignores suggestion navigation keys to preserve arrow selection', () => {

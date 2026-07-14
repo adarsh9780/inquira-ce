@@ -1,8 +1,8 @@
 <template>
   <div
     v-if="items.length > 0"
-    class="absolute left-0 right-0 z-[70] max-h-56 w-full overflow-y-auto rounded-xl border shadow-lg suggestions-glass"
-    :class="openUp ? 'bottom-full mb-2' : 'top-full mt-1'"
+    class="motion-popover-surface absolute left-0 right-0 z-[70] max-h-56 w-full overflow-y-auto rounded-xl border shadow-lg suggestions-glass"
+    :class="openUp ? 'motion-popover-from-bottom bottom-full mb-2' : 'top-full mt-1'"
     style="border-color: var(--color-border);"
   >
     <ul class="py-1">

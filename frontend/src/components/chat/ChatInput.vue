@@ -47,16 +47,18 @@
         @remove="removePendingAttachment"
       />
 
-      <div
-        v-if="isAttachmentDragActive"
-        class="pointer-events-none absolute inset-3 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed"
-        style="border-color: var(--color-border-hover); background-color: color-mix(in srgb, var(--color-base) 80%, transparent);"
-      >
-        <div class="text-center">
-          <PhotoIcon class="mx-auto h-6 w-6" style="color: var(--color-text-main);" />
-          <p class="mt-2 text-sm font-medium" style="color: var(--color-text-main);">Drop images to attach</p>
+      <Transition name="motion-fade">
+        <div
+          v-if="isAttachmentDragActive"
+          class="pointer-events-none absolute inset-3 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed"
+          style="border-color: var(--color-border-hover); background-color: color-mix(in srgb, var(--color-base) 80%, transparent);"
+        >
+          <div class="text-center">
+            <PhotoIcon class="mx-auto h-6 w-6" style="color: var(--color-text-main);" />
+            <p class="mt-2 text-sm font-medium" style="color: var(--color-text-main);">Drop images to attach</p>
+          </div>
         </div>
-      </div>
+      </Transition>
 
       <!-- Bottom Action Row -->
       <ChatComposerActions>
@@ -143,12 +145,13 @@
       </ChatComposerActions>
       </div>
 
-      <div
-        v-if="showCommandSuggestions"
-        class="absolute left-0 right-0 z-[70] overflow-hidden rounded-xl border shadow-lg suggestions-glass"
-        :class="suggestionsOpenUp ? 'bottom-full mb-2' : 'top-full mt-1'"
-        style="border-color: var(--color-border);"
-      >
+      <Transition name="motion-popover">
+        <div
+          v-if="showCommandSuggestions"
+          class="motion-popover-surface absolute left-0 right-0 z-[70] overflow-hidden rounded-xl border shadow-lg suggestions-glass"
+          :class="suggestionsOpenUp ? 'motion-popover-from-bottom bottom-full mb-2' : 'top-full mt-1'"
+          style="border-color: var(--color-border);"
+        >
         <ul class="py-1">
           <li v-for="(item, index) in commandSuggestions" :key="item.name">
             <button
@@ -167,15 +170,18 @@
             </button>
           </li>
         </ul>
-      </div>
+        </div>
+      </Transition>
 
-      <ColumnSuggest
-        v-if="showColumnSuggestions"
-        :items="columnSuggestions"
-        :selected-index="selectedColumnIndex"
-        :open-up="suggestionsOpenUp"
-        @select="acceptColumnSuggestion"
-      />
+      <Transition name="motion-popover">
+        <ColumnSuggest
+          v-if="showColumnSuggestions"
+          :items="columnSuggestions"
+          :selected-index="selectedColumnIndex"
+          :open-up="suggestionsOpenUp"
+          @select="acceptColumnSuggestion"
+        />
+      </Transition>
     </div>
 
     <InlineNotice

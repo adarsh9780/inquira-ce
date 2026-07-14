@@ -20,6 +20,8 @@ export function updateFloatingDropdownPosition(triggerRef, {
     maxHeight: `${Math.round(Math.min(maxHeight, openUpward ? spaceAbove : spaceBelow))}px`,
     backgroundColor: surface,
     border: `1px solid ${border}`,
+    '--motion-popover-origin': openUpward ? 'bottom center' : 'top center',
+    '--motion-popover-y': openUpward ? 'var(--motion-distance-popover)' : 'calc(var(--motion-distance-popover) * -1)',
   }
 
   if (openUpward) {

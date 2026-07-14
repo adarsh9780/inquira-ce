@@ -22,8 +22,9 @@
             {{ turnCountLabel(conversation) }} · {{ conversationUsageLabel(conversation) }}
           </span>
         </button>
+        <div class="motion-disclosure" :class="isExpanded(conversation.id) ? 'motion-disclosure-open' : ''" :aria-hidden="!isExpanded(conversation.id)">
+        <div class="motion-disclosure-content">
         <div
-          v-show="isExpanded(conversation.id)"
           :id="`conversation-graph-${conversation.id}`"
           :ref="(element) => setCanvasRef(conversation.id, element)"
           class="relative overflow-hidden bg-[var(--color-surface)]"
@@ -134,6 +135,8 @@
             <button type="button" class="graph-control" aria-label="Zoom out" title="Zoom out" @click="zoomBy(conversation.id, 1 / 1.2)">−</button>
             <button type="button" class="graph-control px-2" aria-label="Reset graph view" title="Fit graph to view" @click="fitToView(conversation.id)">Fit</button>
           </div>
+        </div>
+        </div>
         </div>
       </section>
     </div>

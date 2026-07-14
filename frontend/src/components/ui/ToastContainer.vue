@@ -1,5 +1,5 @@
 <template>
-  <div class="layer-toast fixed right-4 bottom-4 flex max-h-[calc(100vh-5rem)] flex-col items-end gap-2 overflow-hidden">
+  <TransitionGroup name="motion-toast" tag="div" class="layer-toast fixed right-4 bottom-4 flex max-h-[calc(100vh-5rem)] flex-col items-end gap-2 overflow-hidden">
     <ToastNotification
       v-for="toast in toasts"
       :key="toast.id"
@@ -10,7 +10,7 @@
       :duration="toast.duration"
       @close="removeToast(toast.id)"
     />
-  </div>
+  </TransitionGroup>
 </template>
 
 <script setup>

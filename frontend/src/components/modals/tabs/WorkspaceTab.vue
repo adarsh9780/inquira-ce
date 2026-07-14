@@ -93,15 +93,17 @@
                 {{ runtimeStatusLabel }}
               </span>
               <button v-if="!isWorkspaceActive" type="button" class="btn-primary px-3 py-1.5 text-xs" @click="activateSelectedWorkspace">Activate</button>
-              <details class="relative">
-                <summary class="btn-icon h-8 w-8 list-none" aria-label="Workspace actions" title="Workspace actions">•••</summary>
-                <div class="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-[var(--color-border)] bg-[var(--color-base)] p-1 shadow-lg">
-                  <button v-if="isWorkspaceActive" type="button" class="nav-tab w-full text-left" @click="startRename">Rename workspace</button>
-                  <button v-if="isWorkspaceActive" type="button" class="nav-tab w-full text-left" :disabled="isRuntimeActionInProgress" @click="retryWorkspaceRuntime">Retry runtime</button>
-                  <button v-if="isWorkspaceActive" type="button" class="nav-tab w-full text-left" :disabled="isRuntimeActionInProgress" @click="hardResetWorkspaceRuntime">Reset runtime</button>
-                  <button type="button" class="nav-tab w-full text-left text-[var(--color-danger)]" @click="requestDeleteWorkspace(activeWorkspace.id)">Delete workspace</button>
-                </div>
-              </details>
+              <div ref="workspaceActionsRef" class="relative">
+                <button type="button" class="btn-icon h-8 w-8" aria-label="Workspace actions" title="Workspace actions" :aria-expanded="workspaceActionsOpen" @click.stop="workspaceActionsOpen = !workspaceActionsOpen">•••</button>
+                <Transition name="motion-popover">
+                  <div v-if="workspaceActionsOpen" class="motion-popover-surface absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-[var(--color-border)] bg-[var(--color-base)] p-1 shadow-lg">
+                    <button v-if="isWorkspaceActive" type="button" class="nav-tab w-full text-left" @click="runWorkspaceAction(startRename)">Rename workspace</button>
+                    <button v-if="isWorkspaceActive" type="button" class="nav-tab w-full text-left" :disabled="isRuntimeActionInProgress" @click="runWorkspaceAction(retryWorkspaceRuntime)">Retry runtime</button>
+                    <button v-if="isWorkspaceActive" type="button" class="nav-tab w-full text-left" :disabled="isRuntimeActionInProgress" @click="runWorkspaceAction(hardResetWorkspaceRuntime)">Reset runtime</button>
+                    <button type="button" class="nav-tab w-full text-left text-[var(--color-danger)]" @click="runWorkspaceAction(requestDeleteWorkspace, activeWorkspace.id)">Delete workspace</button>
+                  </div>
+                </Transition>
+              </div>
             </template>
           </div>
         </header>
@@ -297,6 +299,19 @@ const workspaceSections = [
   { id: 'ai', label: 'AI' },
 ]
 const activeWorkspaceSection = ref('general')
+const workspaceActionsOpen = ref(false)
+const workspaceActionsRef = ref(null)
+
+function runWorkspaceAction(action, ...args) {
+  workspaceActionsOpen.value = false
+  return action?.(...args)
+}
+
+function handleWorkspaceActionsPointerDown(event) {
+  if (!workspaceActionsOpen.value) return
+  if (workspaceActionsRef.value?.contains(event.target)) return
+  workspaceActionsOpen.value = false
+}
 
 function moveWorkspaceSection(direction, event) {
   const currentIndex = workspaceSections.findIndex((section) => section.id === activeWorkspaceSection.value)
@@ -535,6 +550,7 @@ onMounted(async () => {
   unsubscribeRuntimeError = settingsWebSocket.subscribeError(handleRuntimeSocketError)
   unsubscribeRuntimeComplete = settingsWebSocket.subscribeComplete(handleRuntimeSocketComplete)
   window.addEventListener('dataset-switched', handleExternalDatasetRefresh)
+  document.addEventListener('pointerdown', handleWorkspaceActionsPointerDown)
   if (isE2EMode) {
     window.addEventListener('inquira:e2e-select-data-path', handleE2eDatasetSelection)
   }
@@ -557,6 +573,7 @@ onUnmounted(() => {
     unsubscribeRuntimeComplete = null
   }
   window.removeEventListener('dataset-switched', handleExternalDatasetRefresh)
+  document.removeEventListener('pointerdown', handleWorkspaceActionsPointerDown)
   if (isE2EMode) {
     window.removeEventListener('inquira:e2e-select-data-path', handleE2eDatasetSelection)
   }

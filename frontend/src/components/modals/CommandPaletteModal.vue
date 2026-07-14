@@ -1,4 +1,10 @@
 <template>
+  <Transition
+    enter-active-class="dialog-fade-enter-active dialog-pop-enter-active"
+    enter-from-class="dialog-fade-enter-from dialog-pop-enter-from"
+    leave-active-class="dialog-fade-leave-active dialog-pop-leave-active"
+    leave-to-class="dialog-fade-leave-to dialog-pop-leave-to"
+  >
   <div
     v-if="isOpen"
     class="fixed inset-0 z-[95] flex items-start justify-center px-4 pt-[9vh]"
@@ -124,6 +130,7 @@
       </div>
     </div>
   </div>
+  </Transition>
 </template>
 
 <script setup>

@@ -28,7 +28,7 @@ test('sidebar profile menu routes terms, account, and appearance through setting
   assert.equal(source.includes('ref="profileMenuButtonRef"'), true)
   assert.equal(source.includes('function openProfileSection(tab) {'), true)
   assert.equal(source.includes('profileInitials'), true)
-  assert.equal(source.includes('class="sidebar-profile-menu layer-dropdown fixed w-48 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-lg"'), true)
+  assert.equal(source.includes('class="sidebar-profile-menu motion-popover-surface motion-popover-from-bottom layer-dropdown fixed w-48 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-lg"'), true)
   assert.equal(source.includes('profileMenuStyle'), true)
   assert.equal(source.includes("@click=\"openProfileSection('terms')\""), false)
   assert.equal(source.includes('@click="openTermsModal"'), true)

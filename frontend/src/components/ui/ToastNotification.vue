@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="isVisible"
-    class="max-w-sm w-full animate-toast-in"
+    class="max-w-sm w-full"
   >
     <div
       class="relative overflow-hidden flex items-start gap-3 rounded-lg border p-4"
@@ -159,21 +159,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateX(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.animate-toast-in {
-  animation: toast-in 0.2s ease-out forwards;
-}
-
 @keyframes toast-progress {
   from {
     transform: scaleX(1);

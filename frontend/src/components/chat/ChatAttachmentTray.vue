@@ -1,10 +1,12 @@
 <template>
-  <div v-if="attachments.length" class="px-4 pb-2">
-    <div class="flex flex-wrap gap-2">
+  <div class="motion-disclosure" :class="attachments.length ? 'motion-disclosure-open' : ''" :aria-hidden="!attachments.length">
+  <div class="motion-disclosure-content">
+  <div class="px-4 pb-2">
+    <TransitionGroup name="motion-popover" tag="div" class="flex flex-wrap gap-2">
       <div
         v-for="attachment in attachments"
         :key="attachment.attachment_id"
-        class="group/attachment flex items-center gap-2 rounded-xl border px-2 py-2"
+        class="motion-popover-surface group/attachment flex items-center gap-2 rounded-xl border px-2 py-2"
         style="border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-surface) 75%, transparent);"
       >
         <img
@@ -25,7 +27,9 @@
           <XMarkIcon class="h-4 w-4" />
         </button>
       </div>
-    </div>
+    </TransitionGroup>
+  </div>
+  </div>
   </div>
 </template>
 

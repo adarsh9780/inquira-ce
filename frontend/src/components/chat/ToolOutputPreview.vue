@@ -28,7 +28,9 @@
       </button>
     </div>
 
-    <div v-if="expanded" class="tool-output-body">
+    <div class="motion-disclosure" :class="expanded ? 'motion-disclosure-open' : ''" :aria-hidden="!expanded">
+    <div class="motion-disclosure-content">
+    <div class="tool-output-body">
       <div v-if="isCodePreview" class="tool-output-code">
         <pre><code :class="`language-${preview.language || 'text'}`" v-html="highlightedCode"></code></pre>
       </div>
@@ -54,15 +56,21 @@
         <div v-if="preview.summary?.length" class="tool-output-json-summary">
           <p v-for="item in preview.summary" :key="item">{{ item }}</p>
         </div>
-        <details class="tool-output-json-raw">
-          <summary>Raw output</summary>
+        <div class="tool-output-json-raw">
+          <button type="button" :aria-expanded="rawOutputOpen" @click="rawOutputOpen = !rawOutputOpen">Raw output</button>
+          <div class="motion-disclosure" :class="rawOutputOpen ? 'motion-disclosure-open' : ''" :aria-hidden="!rawOutputOpen">
+          <div class="motion-disclosure-content">
           <pre>{{ preview.text }}</pre>
-        </details>
+          </div>
+          </div>
+        </div>
       </div>
 
       <pre v-else class="tool-output-logs">{{ preview.text }}</pre>
 
       <p v-if="preview.truncated" class="tool-output-truncated">Preview truncated. Copy full output for details.</p>
+    </div>
+    </div>
     </div>
   </div>
 </template>
@@ -96,6 +104,7 @@ const md = new MarkdownIt({
 
 const preview = computed(() => buildToolOutputPreview(props.activity))
 const expanded = ref(!props.collapsed)
+const rawOutputOpen = ref(false)
 
 watch(
   () => props.collapsed,
@@ -357,7 +366,7 @@ async function copyFullOutput() {
   word-break: break-word;
 }
 
-.tool-output-json-raw summary {
+.tool-output-json-raw button {
   cursor: pointer;
   color: var(--color-text-muted);
   font-size: 0.75rem;

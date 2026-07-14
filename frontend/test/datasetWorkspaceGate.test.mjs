@@ -8,7 +8,8 @@ test('sidebar datasets are gated when no workspace exists', () => {
   const source = readFileSync(componentPath, 'utf-8')
 
   assert.equal(source.includes("if (!appStore.hasWorkspace) return"), true)
-  assert.equal(source.includes('v-show="isExpanded && appStore.hasWorkspace"'), true)
+  assert.equal(source.includes(":class=\"isExpanded && appStore.hasWorkspace ? 'motion-disclosure-open' : ''\""), true)
+  assert.equal(source.includes(':aria-hidden="!(isExpanded && appStore.hasWorkspace)"'), true)
 })
 
 test('app store clears stale dataset state when workspace list is empty', () => {

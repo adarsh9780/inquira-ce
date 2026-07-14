@@ -1,4 +1,4 @@
-export const dropdownSurfaceClass = 'layer-modal-dropdown fixed overflow-auto rounded-md py-1 shadow-md focus:outline-none'
+export const dropdownSurfaceClass = 'motion-popover-surface layer-modal-dropdown fixed overflow-auto rounded-md py-1 shadow-md focus:outline-none'
 
 export const dropdownSearchRowClass = 'sticky top-0 z-10 px-2 pb-1 pt-1'
 

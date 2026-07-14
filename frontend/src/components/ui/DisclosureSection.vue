@@ -9,7 +9,9 @@
       <ChevronRightIcon class="h-3.5 w-3.5 transition-transform" :class="open ? 'rotate-90' : ''" aria-hidden="true" />
       <span>{{ label }}</span>
     </button>
-    <div v-show="open"><slot /></div>
+    <div class="motion-disclosure" :class="open ? 'motion-disclosure-open' : ''" :aria-hidden="!open">
+      <div class="motion-disclosure-content"><slot /></div>
+    </div>
   </section>
 </template>
 
@@ -21,4 +23,3 @@ defineProps({
 })
 const emit = defineEmits(['update:open'])
 </script>
-

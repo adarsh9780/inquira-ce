@@ -1,4 +1,10 @@
 <template>
+  <Transition
+    enter-active-class="dialog-fade-enter-active dialog-pop-enter-active"
+    enter-from-class="dialog-fade-enter-from dialog-pop-enter-from"
+    leave-active-class="dialog-fade-leave-active dialog-pop-leave-active"
+    leave-to-class="dialog-fade-leave-to dialog-pop-leave-to"
+  >
   <div v-if="isOpen" class="fixed inset-0 z-[90] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="keyboard-shortcuts-title">
     <div class="modal-overlay" @click="$emit('close')"></div>
     <div class="modal-card relative flex w-full max-w-lg flex-col overflow-hidden" @click.stop>
@@ -26,6 +32,7 @@
       </div>
     </div>
   </div>
+  </Transition>
 </template>
 
 <script setup>

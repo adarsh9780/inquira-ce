@@ -11,6 +11,12 @@
     @close="closeContextMenu"
   />
 
+  <Transition
+    enter-active-class="dialog-fade-enter-active dialog-pop-enter-active"
+    enter-from-class="dialog-fade-enter-from dialog-pop-enter-from"
+    leave-active-class="dialog-fade-leave-active dialog-pop-leave-active"
+    leave-to-class="dialog-fade-leave-to dialog-pop-leave-to"
+  >
   <div v-if="detailModalOpen" class="fixed inset-0 z-[86] flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="modal-overlay" @click="closeDetailModal"></div>
     <div class="modal-card relative flex w-full max-w-2xl flex-col overflow-hidden" @click.stop>
@@ -60,6 +66,7 @@
       </div>
     </div>
   </div>
+  </Transition>
 </template>
 
 <script setup>

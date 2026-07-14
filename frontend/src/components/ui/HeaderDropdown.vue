@@ -13,14 +13,7 @@
         </ListboxButton>
 
         <Portal>
-          <transition
-            enter-active-class="transition duration-100 ease-out"
-            enter-from-class="opacity-0 scale-95 -translate-y-1"
-            enter-to-class="opacity-100 scale-100 translate-y-0"
-            leave-active-class="transition duration-75 ease-in"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
-          >
+          <Transition name="motion-popover" @before-enter="prepareFloatingPosition">
             <ListboxOptions
               v-if="open"
               ref="optionsRef"
@@ -116,7 +109,7 @@
                 </div>
               </template>
             </ListboxOptions>
-          </transition>
+          </Transition>
         </Portal>
       </div>
     </Listbox>
@@ -313,9 +306,23 @@ function handleChange(value) {
   emit('update:modelValue', value)
 }
 
-function updateFloatingPosition() {
+function applyInlineStyle(element, style) {
+  if (!element?.style || !style) return
+  Object.entries(style).forEach(([property, value]) => {
+    if (property.startsWith('--')) element.style.setProperty(property, value)
+    else element.style[property] = value
+  })
+}
+
+function updateFloatingPosition(element = null) {
   const nextStyle = updateFloatingDropdownPosition(triggerRef)
-  if (nextStyle) floatingOptionsStyle.value = nextStyle
+  if (!nextStyle) return
+  floatingOptionsStyle.value = nextStyle
+  applyInlineStyle(element, nextStyle)
+}
+
+function prepareFloatingPosition(element) {
+  updateFloatingPosition(element)
 }
 
 function bindPositionListeners() {

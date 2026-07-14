@@ -6,12 +6,13 @@
     >
       <span class="font-medium text-[var(--color-text-muted)]">Workspace:</span>
       <span class="max-w-[180px] truncate text-[var(--color-text-main)] font-semibold">{{ activeWorkspaceName || 'Select Workspace' }}</span>
-      <svg class="w-4 h-4 text-[var(--color-text-muted)]" :class="{ 'rotate-180': isOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg class="w-4 h-4 text-[var(--color-text-muted)] transition-transform" :class="{ 'rotate-180': isOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
       </svg>
     </button>
 
-    <div v-if="isOpen" class="absolute top-full left-0 mt-1 w-80 rounded-lg border z-50 overflow-hidden workspace-dropdown-menu">
+    <Transition name="motion-popover">
+    <div v-if="isOpen" class="motion-popover-surface absolute top-full left-0 mt-1 w-80 rounded-lg border z-50 overflow-hidden workspace-dropdown-menu">
       <div class="p-2 border-b flex justify-between items-center" style="border-color: var(--color-border);">
         <span class="text-xs text-[var(--color-text-muted)] font-medium">Workspaces</span>
         <button class="text-xs px-2 py-1 rounded bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)] font-medium transition-colors" @click="openWorkspaceSettings">New</button>
@@ -49,6 +50,7 @@
         </div>
       </div>
     </div>
+    </Transition>
   </div>
 
   <FloatingActionMenu

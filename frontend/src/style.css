@@ -129,8 +129,14 @@
   --motion-duration-standard: 200ms;
   --motion-duration-slow: 300ms;
   --motion-duration-slower: 500ms;
+  --motion-duration-popover-enter: 180ms;
+  --motion-duration-popover-leave: 140ms;
+  --motion-duration-dialog-enter: 220ms;
+  --motion-duration-dialog-leave: 170ms;
   --motion-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --motion-distance-popover: 0.25rem;
+  --motion-scale-popover: 0.985;
   --blur-backdrop-subtle: 2px;
   --blur-backdrop-modal: 4px;
   --blur-backdrop-strong: 8px;
@@ -657,27 +663,118 @@ body {
       box-shadow var(--motion-duration-standard) var(--motion-ease-standard);
   }
 
-  /* Dialog transitions */
-  .dialog-fade-enter-active,
-  .dialog-fade-leave-active {
-    transition: opacity var(--motion-duration-standard) var(--motion-ease-standard);
+  /* Dialog transitions. Animate the surfaces, never the fixed positioning root. */
+  .dialog-fade-enter-active .modal-overlay,
+  .dialog-pop-enter-active .modal-card {
+    transition-duration: var(--motion-duration-dialog-enter);
   }
 
-  .dialog-fade-enter-from,
-  .dialog-fade-leave-to {
+  .dialog-fade-leave-active .modal-overlay,
+  .dialog-pop-leave-active .modal-card {
+    pointer-events: none;
+    transition-duration: var(--motion-duration-dialog-leave);
+  }
+
+  .dialog-fade-enter-from .modal-overlay,
+  .dialog-fade-leave-to .modal-overlay,
+  .dialog-pop-enter-from .modal-card,
+  .dialog-pop-leave-to .modal-card {
     opacity: 0;
   }
 
-  .dialog-pop-enter-active,
-  .dialog-pop-leave-active {
-    transition: opacity var(--motion-duration-standard) var(--motion-ease-standard),
-      transform var(--motion-duration-standard) var(--motion-ease-emphasized);
+  .dialog-pop-enter-from .modal-card,
+  .dialog-pop-leave-to .modal-card {
+    transform: translate3d(0, 0.5rem, 0) scale(0.985);
   }
 
-  .dialog-pop-enter-from,
-  .dialog-pop-leave-to {
+  /* Anchored overlays: dropdowns, menus, autocomplete, and compact panels. */
+  .motion-popover-surface {
+    --motion-popover-origin: top center;
+    --motion-popover-y: calc(var(--motion-distance-popover) * -1);
+    backface-visibility: hidden;
+    transform-origin: var(--motion-popover-origin);
+  }
+
+  .motion-popover-from-bottom {
+    --motion-popover-origin: bottom center;
+    --motion-popover-y: var(--motion-distance-popover);
+  }
+
+  .motion-popover-enter-active,
+  .motion-popover-leave-active {
+    transition-property: opacity, transform;
+    transition-timing-function: var(--motion-ease-standard);
+    will-change: opacity, transform;
+  }
+
+  .motion-popover-enter-active {
+    transition-duration: var(--motion-duration-popover-enter);
+  }
+
+  .motion-popover-leave-active {
+    pointer-events: none;
+    transition-duration: var(--motion-duration-popover-leave);
+  }
+
+  .motion-popover-enter-from,
+  .motion-popover-leave-to {
     opacity: 0;
-    transform: translateY(10px) scale(0.98);
+    transform: translate3d(0, var(--motion-popover-y), 0) scale(var(--motion-scale-popover));
+  }
+
+  .motion-fade-enter-active,
+  .motion-fade-leave-active {
+    transition: opacity var(--motion-duration-fast) var(--motion-ease-standard);
+  }
+
+  .motion-fade-enter-from,
+  .motion-fade-leave-to {
+    opacity: 0;
+  }
+
+  /* Grid-based disclosure motion avoids measuring height in JavaScript. */
+  .motion-disclosure {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      grid-template-rows var(--motion-duration-standard) var(--motion-ease-emphasized),
+      opacity var(--motion-duration-fast) var(--motion-ease-standard),
+      visibility 0s linear var(--motion-duration-standard);
+  }
+
+  .motion-disclosure-open {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    visibility: visible;
+    transition:
+      grid-template-rows var(--motion-duration-standard) var(--motion-ease-emphasized),
+      opacity var(--motion-duration-fast) var(--motion-ease-standard),
+      visibility 0s linear 0s;
+  }
+
+  .motion-disclosure-content {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .motion-toast-enter-active,
+  .motion-toast-leave-active,
+  .motion-toast-move {
+    transition:
+      opacity var(--motion-duration-standard) var(--motion-ease-standard),
+      transform var(--motion-duration-standard) var(--motion-ease-standard);
+  }
+
+  .motion-toast-leave-active {
+    pointer-events: none;
+  }
+
+  .motion-toast-enter-from,
+  .motion-toast-leave-to {
+    opacity: 0;
+    transform: translate3d(0.75rem, 0, 0) scale(0.985);
   }
 
   .motion-fast {

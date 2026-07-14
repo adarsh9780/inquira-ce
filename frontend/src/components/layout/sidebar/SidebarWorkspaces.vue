@@ -49,9 +49,9 @@
             </div>
           </ListboxButton>
 
-          <transition name="workspace-dropdown">
+          <Transition name="motion-popover">
             <ListboxOptions
-              class="absolute z-30 mt-2 max-h-72 w-full overflow-auto rounded-xl border p-1 shadow-xl focus:outline-none"
+              class="motion-popover-surface absolute z-30 mt-2 max-h-72 w-full overflow-auto rounded-xl border p-1 shadow-xl focus:outline-none"
               style="border-color: color-mix(in srgb, var(--color-border) 82%, transparent); background-color: var(--color-base);"
             >
               <ListboxOption
@@ -86,7 +86,7 @@
                 </li>
               </ListboxOption>
             </ListboxOptions>
-          </transition>
+          </Transition>
         </div>
       </Listbox>
     </div>
@@ -199,16 +199,3 @@ onMounted(async () => {
   }
 })
 </script>
-
-<style scoped>
-.workspace-dropdown-enter-active,
-.workspace-dropdown-leave-active {
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-
-.workspace-dropdown-enter-from,
-.workspace-dropdown-leave-to {
-  opacity: 0;
-  transform: translateY(-6px);
-}
-</style>

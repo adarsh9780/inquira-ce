@@ -45,7 +45,8 @@ test('settings puts workspace models with workspace data and isolates credential
   assert.match(workspace, /<WorkspaceDatasetSection>/)
   assert.ok(workspace.indexOf('<WorkspaceAIConfigSection') < workspace.indexOf('<WorkspaceDatasetSection>'))
   assert.match(connections, /API Credentials/)
-  assert.match(connections, /<details/)
+  assert.match(connections, /:aria-expanded="applicationDefaultsOpen"/)
+  assert.match(connections, /motion-disclosure-open/)
   assert.match(chatInput, /@manage-models="appStore\.openSettings\('workspace-ai'\)"/)
 })
 

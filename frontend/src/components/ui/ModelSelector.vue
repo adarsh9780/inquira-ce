@@ -15,14 +15,7 @@
           <ChevronDownIcon class="h-3.5 w-3.5 shrink-0 transition-transform group-data-[open]:rotate-180" style="color: var(--color-text-muted);" />
         </ListboxButton>
 
-        <transition
-          enter-active-class="transition duration-100 ease-out"
-          enter-from-class="opacity-0 scale-95 translate-y-1"
-          enter-to-class="opacity-100 scale-100 translate-y-0"
-          leave-active-class="transition duration-75 ease-in"
-          leave-from-class="opacity-100"
-          leave-to-class="opacity-0"
-        >
+        <Transition name="motion-popover">
           <ListboxOptions
             :class="modelDropdownSurfaceClass"
             style="background-color: var(--color-workspace-surface); border: 1px solid var(--color-border);"
@@ -74,7 +67,7 @@
               </button>
             </div>
           </ListboxOptions>
-        </transition>
+        </Transition>
       </div>
     </Listbox>
   </div>
@@ -156,7 +149,7 @@ const backendModels = ref([])
 const backendLoadingLocal = ref(false)
 let backendSearchTimer = null
 let backendSearchToken = 0
-const modelDropdownSurfaceClass = `${dropdownSurfaceClass.replace('fixed', 'absolute')} z-50 bottom-full mb-2 right-0 w-72 max-w-[calc(100vw-1rem)] max-h-72 rounded-lg text-xs overflow-y-auto overflow-x-hidden`
+const modelDropdownSurfaceClass = `${dropdownSurfaceClass.replace('fixed', 'absolute')} motion-popover-from-bottom z-50 bottom-full mb-2 right-0 w-72 max-w-[calc(100vw-1rem)] max-h-72 rounded-lg text-xs overflow-y-auto overflow-x-hidden`
 
 const fallbackModels = [
   'google/gemini-3-flash-preview',

@@ -10,7 +10,7 @@ test('profile menu renders from the sidebar bottom nav above collapsed rail clip
 
   assert.equal(source.includes('ref="profileMenuButtonRef"'), true)
   assert.equal(source.includes('<Teleport to="body">'), true)
-  assert.equal(source.includes('class="sidebar-profile-menu layer-dropdown fixed w-48 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-lg"'), true)
+  assert.equal(source.includes('class="sidebar-profile-menu motion-popover-surface motion-popover-from-bottom layer-dropdown fixed w-48 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-lg"'), true)
   assert.equal(source.includes(':style="profileMenuStyle"'), true)
   assert.equal(source.includes('function updateProfileMenuPosition() {'), true)
   assert.equal(source.includes('sidebar-initials-avatar'), true)

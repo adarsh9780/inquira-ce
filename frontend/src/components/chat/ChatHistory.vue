@@ -116,14 +116,16 @@
             <div v-html="renderMarkdown(message.explanation)"></div>
           </div>
 
-          <details v-if="shouldRenderCodeDetails(message)" class="mt-2 view-code-details">
-            <summary class="view-code-toggle">
+          <div v-if="shouldRenderCodeDetails(message)" class="mt-2 view-code-details" :class="isCodeDetailsOpen(message.id) ? 'view-code-details-open' : ''">
+            <button type="button" class="view-code-toggle" :aria-expanded="isCodeDetailsOpen(message.id)" @click="toggleCodeDetails(message.id)">
               <span class="inline-flex items-center gap-1.5">
                 <CodeBracketIcon class="h-4 w-4" title="View code details" />
                 <span>View code</span>
                 <span class="view-code-caret" aria-hidden="true">↓</span>
               </span>
-            </summary>
+            </button>
+            <div class="motion-disclosure" :class="isCodeDetailsOpen(message.id) ? 'motion-disclosure-open' : ''" :aria-hidden="!isCodeDetailsOpen(message.id)">
+            <div class="motion-disclosure-content">
             <div class="view-code-panel">
               <div v-if="tableUsageSummary(message)" class="mb-3">
                 <span class="view-code-meta-badge">{{ tableUsageSummary(message) }}</span>
@@ -150,7 +152,9 @@
                 <pre class="chat-code-scroll"><code class="language-python" v-html="renderCodeSnapshot(message.codeSnapshot)"></code></pre>
               </div>
             </div>
-          </details>
+            </div>
+            </div>
+          </div>
 
         </div>
         <div v-if="message.explanation" class="flex items-center justify-end mt-1 px-4">
@@ -195,7 +199,8 @@
       </div>
     </div>
 
-    <div v-if="showScrollToBottomButton" class="sticky bottom-3 z-20 flex justify-end pr-2 pointer-events-none">
+    <Transition name="motion-popover">
+    <div v-if="showScrollToBottomButton" class="motion-popover-surface motion-popover-from-bottom sticky bottom-3 z-20 flex justify-end pr-2 pointer-events-none">
       <button
         type="button"
         class="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors"
@@ -208,6 +213,7 @@
         <span>Latest</span>
       </button>
     </div>
+    </Transition>
 
     <!-- Sentinel for auto-scroll -->
     <div ref="end" />
@@ -254,11 +260,23 @@ const chatContainer = ref(null)
 const scrollHost = ref(null)
 const end = ref(null)
 const pendingInterventionIds = ref(new Set())
+const expandedCodeMessageIds = ref(new Set())
 const SHOW_EPHEMERAL_TRACE = true
 const showScrollToBottomButton = ref(false)
 let shouldAutoScroll = true
 let mutationObserver = null
 let lastScrollTop = 0
+
+function isCodeDetailsOpen(messageId) {
+  return expandedCodeMessageIds.value.has(messageId)
+}
+
+function toggleCodeDetails(messageId) {
+  const next = new Set(expandedCodeMessageIds.value)
+  if (next.has(messageId)) next.delete(messageId)
+  else next.add(messageId)
+  expandedCodeMessageIds.value = next
+}
 
 function mapTurnToMessage(turn) {
   if (!turn || typeof turn !== 'object') return null
@@ -1157,7 +1175,7 @@ watch(() => appStore.activeConversationIsLoading, (isLoading, wasLoading) => {
   transition: transform 130ms ease;
 }
 
-.view-code-details[open] .view-code-caret {
+.view-code-details-open .view-code-caret {
   transform: rotate(180deg);
 }
 

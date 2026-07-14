@@ -275,12 +275,13 @@
       @close="isTermsOpen = false"
     />
     <Teleport to="body">
-      <div
-        v-if="profileMenuOpen"
-        ref="profileMenuRef"
-        class="sidebar-profile-menu layer-dropdown fixed w-48 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-lg"
-        :style="profileMenuStyle"
-      >
+      <Transition name="motion-popover">
+        <div
+          v-if="profileMenuOpen"
+          ref="profileMenuRef"
+          class="sidebar-profile-menu motion-popover-surface motion-popover-from-bottom layer-dropdown fixed w-48 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-lg"
+          :style="profileMenuStyle"
+        >
         <button
           type="button"
           class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
@@ -311,7 +312,8 @@
         >
           Terms &amp; Conditions
         </button>
-      </div>
+        </div>
+      </Transition>
     </Teleport>
     <SidebarConversationActionsMenu
       :is-open="Boolean(conversationMenuId)"
@@ -575,11 +577,14 @@ function updateProfileMenuPosition() {
 }
 
 async function toggleProfileMenu() {
-  profileMenuOpen.value = !profileMenuOpen.value
   if (profileMenuOpen.value) {
-    await nextTick()
-    updateProfileMenuPosition()
+    profileMenuOpen.value = false
+    return
   }
+  updateProfileMenuPosition()
+  profileMenuOpen.value = true
+  await nextTick()
+  updateProfileMenuPosition()
 }
 
 function closeProfileMenu() {

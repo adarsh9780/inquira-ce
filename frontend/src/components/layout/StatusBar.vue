@@ -35,9 +35,10 @@
           <ChevronUpDownIcon class="h-3.5 w-3.5 shrink-0 text-[var(--color-text-muted)]" />
         </button>
 
+        <Transition name="motion-popover">
         <div
           v-if="workspaceSwitcherOpen"
-          class="layer-modal-dropdown absolute left-0 bottom-full mb-2 w-72 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-[var(--shadow-lifted)]"
+          class="motion-popover-surface motion-popover-from-bottom layer-modal-dropdown absolute left-0 bottom-full mb-2 w-72 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-[var(--shadow-lifted)]"
         >
           <div class="border-b border-[var(--color-border)] px-3 py-2">
             <p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">Workspaces</p>
@@ -64,6 +65,7 @@
             </button>
           </template>
         </div>
+        </Transition>
       </div>
 
       <template v-if="appStore.isEditorFocused">
@@ -176,9 +178,10 @@
           </span>
         </button>
 
+        <Transition name="motion-popover">
         <div
           v-if="notificationsPanelOpen"
-          class="layer-modal-dropdown absolute right-0 bottom-full mb-2 w-[24rem] overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-[var(--shadow-lifted)]"
+          class="motion-popover-surface motion-popover-from-bottom layer-modal-dropdown absolute right-0 bottom-full mb-2 w-[24rem] overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-[var(--shadow-lifted)]"
         >
           <div class="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
             <div>
@@ -233,6 +236,7 @@
             </div>
           </div>
         </div>
+        </Transition>
       </div>
 
       <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
