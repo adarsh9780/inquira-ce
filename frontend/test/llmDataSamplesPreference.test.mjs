@@ -3,16 +3,14 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('LLM settings expose opt-in data samples preference', () => {
-  const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/LLMSettingsTab.vue')
+test('workspace AI settings expose an explicit per-workspace data samples preference', () => {
+  const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceAIConfigSection.vue')
   const tabSource = readFileSync(tabPath, 'utf-8')
 
-  assert.equal(tabSource.includes('v-model="allowLlmDataSamples"'), true)
-  assert.equal(tabSource.includes('saveDataSamplesPreference'), true)
-  assert.equal(tabSource.includes('dataSamplesMessage'), true)
-  assert.equal(tabSource.includes('Allow bounded data samples in LLM prompts'), true)
-  assert.equal(tabSource.includes('analyst-style markdown explanations instead of generic summaries'), true)
-  assert.equal(tabSource.includes('enables insight-first result explanations'), false)
+  assert.equal(tabSource.includes('v-model="form.allowDataSamples"'), true)
+  assert.equal(tabSource.includes('allow_llm_data_samples: Boolean(form.allowDataSamples)'), true)
+  assert.equal(tabSource.includes('Allow bounded data samples in model prompts'), true)
+  assert.equal(tabSource.includes('This permission applies only to this workspace.'), true)
 })
 
 test('app store syncs LLM data samples preference with backend preferences', () => {

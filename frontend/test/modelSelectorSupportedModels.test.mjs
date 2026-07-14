@@ -27,17 +27,17 @@ test('model selector accepts injected model options prop', () => {
   assert.equal(source.includes('class="min-w-0 flex-1 truncate text-left"'), true)
 })
 
-test('chat input model dropdown updates only main model in pinia store', () => {
+test('chat input model dropdown uses and updates the effective workspace model', () => {
   const path = resolve(process.cwd(), 'src/components/chat/ChatInput.vue')
   const source = readFileSync(path, 'utf-8')
 
-  assert.equal(source.includes(':selected-model="appStore.selectedModel"'), true)
+  assert.equal(source.includes(':selected-model="effectiveWorkspaceModel"'), true)
   assert.equal(source.includes(':max-options-without-search="10"'), true)
   assert.equal(source.includes(':backend-search="searchProviderModels"'), true)
-  assert.equal(source.includes(':provider="appStore.llmProvider"'), true)
+  assert.equal(source.includes(':provider="effectiveWorkspaceProvider"'), true)
   assert.equal(source.includes(':search-loading="appStore.providerModelSearchLoading"'), true)
   assert.equal(source.includes('style="max-width: clamp(7rem, 30vw, 22rem);"'), true)
-  assert.equal(source.includes('appStore.setSelectedModel(model)'), true)
+  assert.equal(source.includes('main_model_override: model'), true)
 })
 
 test('app store reads available models from v1 preferences payload', () => {

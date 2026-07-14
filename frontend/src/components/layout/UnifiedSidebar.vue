@@ -213,7 +213,7 @@
             type="button"
             class="sidebar-nav-row justify-start px-2.5"
             title="Settings"
-            @click="appStore.openSettings('llm')"
+            @click="appStore.openSettings('setup')"
           >
             <span class="sidebar-row-icon">
               <Cog6ToothIcon class="h-5 w-5" />

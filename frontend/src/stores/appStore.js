@@ -86,6 +86,9 @@ export const useAppStore = defineStore('app', () => {
   const activeConversationUsage = ref(null)
   const conversationUsageById = ref({})
   const workspaces = ref([])
+  const activeWorkspaceSummary = ref(null)
+  const workspaceAIConfig = ref(null)
+  const workspaceAIConfigLoading = ref(false)
   const workspaceDeletionJobs = ref([])
   const activeWorkspaceId = ref('')
   const conversations = ref([])
@@ -157,16 +160,17 @@ export const useAppStore = defineStore('app', () => {
 
   // Settings trigger
   const isSettingsOpen = ref(false)
-  const settingsInitialTab = ref('llm')
+  const settingsInitialTab = ref('setup')
 
   function openSettings(tab = 'llm') {
     const n = String(tab || '').trim().toLowerCase()
-    if      (n === 'api'    || n === 'llm')        settingsInitialTab.value = 'llm'
+    if      (n === 'setup' || n === 'readiness')   settingsInitialTab.value = 'setup'
+    else if (n === 'api'    || n === 'llm')        settingsInitialTab.value = 'llm'
     else if (n === 'workspace' || n === 'data')     settingsInitialTab.value = 'workspace'
     else if (n === 'account')                       settingsInitialTab.value = 'account'
     else if (n === 'appearance' || n === 'theme')   settingsInitialTab.value = 'appearance'
     else if (n === 'terms'  || n === 'legal')       settingsInitialTab.value = 'terms'
-    else                                            settingsInitialTab.value = 'llm'
+    else                                            settingsInitialTab.value = 'setup'
 
     isSettingsOpen.value = true
   }
@@ -180,11 +184,20 @@ export const useAppStore = defineStore('app', () => {
     return workspaces.value.some((ws) => ws.id === activeId)
   })
   const canAnalyze = computed(() => {
-    const hasProviderAccess = providerRequiresApiKey.value
-      ? selectedProviderApiKeyPresent.value
-      : true
+    const hasProviderAccess = workspaceAIConfig.value?.readiness
+      ? Boolean(workspaceAIConfig.value.readiness.credential_ready)
+      : (providerRequiresApiKey.value ? selectedProviderApiKeyPresent.value : true)
     if (!hasProviderAccess) return false
-    return hasWorkspace.value
+    return workspaceReadiness.value.ready
+  })
+  const workspaceReadiness = computed(() => {
+    if (!hasWorkspace.value) return { state: 'no_workspace', ready: false }
+    const tableCount = Number(activeWorkspaceSummary.value?.table_count || 0)
+    if (tableCount < 1 && !hasDataFile.value) return { state: 'no_data', ready: false }
+    const aiReadiness = workspaceAIConfig.value?.readiness
+    if (aiReadiness && !aiReadiness.credential_ready) return { state: 'model_connection_required', ready: false }
+    if (aiReadiness && (!aiReadiness.model_ready || !aiReadiness.configuration_reviewed)) return { state: 'workspace_configuration_required', ready: false }
+    return { state: 'ready', ready: true }
   })
   const activeWorkspaceRuntimeStatus = computed(() => getWorkspaceRuntimeStatus())
   const activeConversationIsLoading = computed(() => isConversationRunning(activeConversationId.value))
@@ -886,6 +899,9 @@ export const useAppStore = defineStore('app', () => {
     activeConversationUsage.value = null
     conversationUsageById.value = {}
     workspaces.value = []
+    activeWorkspaceSummary.value = null
+    workspaceAIConfig.value = null
+    workspaceAIConfigLoading.value = false
     workspaceDeletionJobs.value = []
     activeWorkspaceId.value = ''
     conversations.value = []
@@ -2423,6 +2439,64 @@ export const useAppStore = defineStore('app', () => {
       saveLocalConfig()
     }
 
+    if (activeWorkspaceId.value) {
+      await Promise.all([
+        fetchActiveWorkspaceSummary(activeWorkspaceId.value),
+        fetchWorkspaceAIConfig(activeWorkspaceId.value),
+      ])
+    } else {
+      activeWorkspaceSummary.value = null
+      workspaceAIConfig.value = null
+    }
+
+  }
+
+  async function fetchActiveWorkspaceSummary(workspaceId = activeWorkspaceId.value) {
+    const target = String(workspaceId || '').trim()
+    if (!target) {
+      activeWorkspaceSummary.value = null
+      return null
+    }
+    try {
+      const summary = await apiService.v1GetWorkspaceSummary(target)
+      if (target === activeWorkspaceId.value) activeWorkspaceSummary.value = summary
+      return summary
+    } catch (_error) {
+      if (target === activeWorkspaceId.value) activeWorkspaceSummary.value = null
+      return null
+    }
+  }
+
+  async function fetchWorkspaceAIConfig(workspaceId = activeWorkspaceId.value) {
+    const target = String(workspaceId || '').trim()
+    if (!target) {
+      workspaceAIConfig.value = null
+      return null
+    }
+    workspaceAIConfigLoading.value = true
+    try {
+      const config = await apiService.v1GetWorkspaceAIConfig(target)
+      if (target === activeWorkspaceId.value) workspaceAIConfig.value = config
+      return config
+    } finally {
+      workspaceAIConfigLoading.value = false
+    }
+  }
+
+  async function saveWorkspaceAIConfig(payload, workspaceId = activeWorkspaceId.value) {
+    const target = String(workspaceId || '').trim()
+    if (!target) throw new Error('Select a workspace before updating AI settings.')
+    const config = await apiService.v1UpdateWorkspaceAIConfig(target, payload)
+    if (target === activeWorkspaceId.value) workspaceAIConfig.value = config
+    return config
+  }
+
+  async function resetWorkspaceAIConfig(workspaceId = activeWorkspaceId.value) {
+    const target = String(workspaceId || '').trim()
+    if (!target) throw new Error('Select a workspace before resetting AI settings.')
+    const config = await apiService.v1ResetWorkspaceAIConfig(target)
+    if (target === activeWorkspaceId.value) workspaceAIConfig.value = config
+    return config
   }
 
   async function createWorkspace(name, schemaContext = '') {
@@ -2447,7 +2521,13 @@ export const useAppStore = defineStore('app', () => {
     chatHistory.value = []
     turnsNextCursor.value = null
     clearLiveTokenUsage()
+    activeWorkspaceSummary.value = null
+    workspaceAIConfig.value = null
     saveLocalConfig()
+    await Promise.all([
+      fetchActiveWorkspaceSummary(workspaceId),
+      fetchWorkspaceAIConfig(workspaceId),
+    ])
   }
 
   async function renameWorkspace(workspaceId, name, schemaContext = undefined) {
@@ -2565,6 +2645,8 @@ export const useAppStore = defineStore('app', () => {
               source: 'dataset-ingestion',
             })
             await fetchColumnCatalog({ force: true }).catch(() => {})
+            await fetchActiveWorkspaceSummary(workspaceId)
+            await fetchWorkspaceAIConfig(workspaceId).catch(() => {})
 
             const failedCount = Number(job?.failed_count || 0)
             const finalMessage = failedCount > 0
@@ -3785,6 +3867,9 @@ export const useAppStore = defineStore('app', () => {
     activeConversationUsage,
     conversationUsageById,
     workspaces,
+    activeWorkspaceSummary,
+    workspaceAIConfig,
+    workspaceAIConfigLoading,
     workspaceDeletionJobs,
     activeWorkspaceId,
     conversations,
@@ -3855,6 +3940,7 @@ export const useAppStore = defineStore('app', () => {
     hasSchemaFile,
     canAnalyze,
     hasWorkspace,
+    workspaceReadiness,
     activeWorkspaceRuntimeStatus,
 
     // Actions
@@ -3945,6 +4031,10 @@ export const useAppStore = defineStore('app', () => {
     markTurnFinal,
     rerunSelectedFinalTurn,
     fetchWorkspaces,
+    fetchActiveWorkspaceSummary,
+    fetchWorkspaceAIConfig,
+    saveWorkspaceAIConfig,
+    resetWorkspaceAIConfig,
     fetchColumnCatalog,
     fetchWorkspaceDeletionJobs,
     trackWorkspaceDeletionJob,

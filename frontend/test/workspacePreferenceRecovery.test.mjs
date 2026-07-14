@@ -3,14 +3,14 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('app store requires active workspace and API key for chat analysis', () => {
+test('app store requires a ready workspace and effective provider access for chat analysis', () => {
   const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
   const source = readFileSync(storePath, 'utf-8')
 
   assert.equal(source.includes('const canAnalyze = computed(() => {'), true)
-  assert.equal(source.includes('const hasProviderAccess = providerRequiresApiKey.value'), true)
+  assert.equal(source.includes('const hasProviderAccess = workspaceAIConfig.value?.readiness'), true)
   assert.equal(source.includes('if (!hasProviderAccess) return false'), true)
-  assert.equal(source.includes('return hasWorkspace.value'), true)
+  assert.equal(source.includes('return workspaceReadiness.value.ready'), true)
 })
 
 test('user preferences recover from stale active workspace ids', () => {

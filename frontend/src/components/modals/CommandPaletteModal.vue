@@ -183,13 +183,13 @@ const commandActions = computed(() => [
     type: 'action',
     id: 'open-settings',
     title: 'Open Settings',
-    subtitle: 'LLM, workspace, account, appearance, and preferences.',
+    subtitle: 'Review readiness, models, workspaces, appearance, and account preferences.',
     keywords: 'settings preferences api llm account appearance theme workspace',
     statusLabel: shortcutText('settings'),
     icon: Cog6ToothIcon,
     run: () => {
       emit('close')
-      appStore.openSettings('llm')
+      appStore.openSettings('setup')
     },
   },
   {

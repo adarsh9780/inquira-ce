@@ -544,7 +544,7 @@ function handleGlobalShortcuts(event) {
 
   if (matchShortcut(event, 'settings')) {
     event.preventDefault()
-    appStore.openSettings('llm')
+    appStore.openSettings('setup')
     return
   }
 

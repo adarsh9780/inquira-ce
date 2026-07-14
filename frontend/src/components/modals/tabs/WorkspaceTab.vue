@@ -159,6 +159,8 @@
             </div>
           </WorkspaceDatasetSection>
 
+          <WorkspaceAIConfigSection v-if="activeWorkspace?.id" :workspace-id="activeWorkspace.id" />
+
           <WorkspaceRuntimeReadiness />
         </div>
 
@@ -209,6 +211,7 @@ import { previewService } from '../../../services/previewService'
 import { settingsWebSocket } from '../../../services/websocketService'
 import { useAppStore } from '../../../stores/appStore'
 import { toast } from '../../../composables/useToast'
+import WorkspaceAIConfigSection from './WorkspaceAIConfigSection.vue'
 import { extractApiErrorMessage } from '../../../utils/apiError'
 import {
   datasetImportLabel,

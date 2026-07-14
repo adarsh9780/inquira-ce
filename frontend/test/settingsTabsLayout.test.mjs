@@ -8,6 +8,7 @@ test('settings modal keeps left nav static and routes workspace panels on the ri
   const source = readFileSync(path, 'utf-8')
 
   assert.equal(source.includes('<span>Models</span>'), true)
+  assert.equal(source.includes('<span>Setup</span>'), true)
   assert.equal(source.includes('<span>Workspaces</span>'), true)
   assert.equal(source.includes('Appearance'), true)
   assert.equal(source.includes('Account'), true)
@@ -24,5 +25,5 @@ test('settings modal keeps left nav static and routes workspace panels on the ri
   assert.equal(source.includes('<AccountTab />'), true)
   assert.equal(source.includes('activeTab ==='), false)
   assert.equal(source.includes("if (candidate === 'api') return 'llm'"), true)
-  assert.equal(source.includes("if (candidate === 'llm' || candidate === 'workspace' || candidate === 'appearance' || candidate === 'account')"), true)
+  assert.equal(source.includes("candidate === 'setup' || candidate === 'llm'"), true)
 })

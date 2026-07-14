@@ -18,6 +18,9 @@ export const v1Api = {
     }),
     activate: (workspaceId) => axios.put(`/api/v1/workspaces/${workspaceId}/activate`),
     summary: (workspaceId) => axios.get(`/api/v1/workspaces/${workspaceId}/summary`),
+    aiConfig: (workspaceId) => axios.get(`/api/v1/workspaces/${workspaceId}/ai-config`),
+    updateAiConfig: (workspaceId, payload) => axios.put(`/api/v1/workspaces/${workspaceId}/ai-config`, payload),
+    resetAiConfig: (workspaceId) => axios.delete(`/api/v1/workspaces/${workspaceId}/ai-config/overrides`),
     rename: (workspaceId, name, schemaContext = undefined) => {
       const payload = {}
       if (name !== null && name !== undefined) payload.name = name

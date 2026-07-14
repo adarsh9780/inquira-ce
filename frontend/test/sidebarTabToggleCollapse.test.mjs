@@ -34,7 +34,7 @@ test('sidebar uses settings and profile actions in the footer', () => {
   const sidebarPath = resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue')
   const sidebarSource = readFileSync(sidebarPath, 'utf-8')
 
-  assert.equal(sidebarSource.includes("@click=\"appStore.openSettings('llm')\""), true)
+  assert.equal(sidebarSource.includes("@click=\"appStore.openSettings('setup')\""), true)
   assert.equal(sidebarSource.includes("@click.stop=\"openSettings('workspace', 1)\""), false)
   assert.equal(sidebarSource.includes('title="Settings"'), true)
   assert.equal(sidebarSource.includes('title="Profile Settings"'), true)

@@ -795,6 +795,18 @@ export const apiService = {
     return v1Api.workspaces.summary(workspaceId)
   },
 
+  async v1GetWorkspaceAIConfig(workspaceId) {
+    return v1Api.workspaces.aiConfig(workspaceId)
+  },
+
+  async v1UpdateWorkspaceAIConfig(workspaceId, payload) {
+    return v1Api.workspaces.updateAiConfig(workspaceId, payload)
+  },
+
+  async v1ResetWorkspaceAIConfig(workspaceId) {
+    return v1Api.workspaces.resetAiConfig(workspaceId)
+  },
+
   async v1RenameWorkspace(workspaceId, name, schemaContext = undefined) {
     return v1Api.workspaces.rename(workspaceId, name, schemaContext)
   },

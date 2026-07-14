@@ -18,8 +18,8 @@ test('settings modal is viewport bounded and exposes dialog keyboard semantics',
 test('inactive settings panels are removed from keyboard and accessibility navigation', () => {
   const source = read('src/components/modals/SettingsModal.vue')
 
-  assert.equal((source.match(/:inert="currentPanel !==/g) || []).length, 4)
-  assert.equal((source.match(/:aria-hidden="currentPanel !==/g) || []).length, 4)
+  assert.equal((source.match(/:inert="currentPanel !==/g) || []).length, 5)
+  assert.equal((source.match(/:aria-hidden="currentPanel !==/g) || []).length, 5)
   assert.match(source, /filter\(\(element\) => !element\.closest\('\[inert\]'\)\)/)
 })
 
@@ -60,8 +60,8 @@ test('composer setup guidance is provider-aware and icon controls are labelled',
 
   assert.doesNotMatch(source, /Enter your OpenRouter API key/)
   assert.match(source, /missingSetupRequirements/)
-  assert.match(source, /appStore\.providerRequiresApiKey/)
-  assert.match(source, /appStore\.selectedProviderApiKeyPresent/)
+  assert.match(source, /appStore\.workspaceReadiness\.state/)
+  assert.match(source, /model_connection_required/)
   assert.match(source, /aria-label="Attach images"/)
   assert.match(source, /:aria-label="actionButtonTitle"/)
 })
@@ -76,4 +76,3 @@ test('global UI honors reduced motion and startup states are announced', () => {
   assert.match(app, /role="alert"/)
   assert.match(app, /:aria-hidden="blockingOverlayActive \? 'false' : 'true'"/)
 })
-

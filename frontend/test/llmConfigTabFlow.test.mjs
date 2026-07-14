@@ -63,19 +63,19 @@ test('useLLMConfig composable exposes provider-aware save flow and advanced fiel
   assert.equal(source.includes('await loadPreferences(selectedProvider, true)'), true)
 })
 
-test('LLM settings tab uses provider cards, searchable model selects, and advanced controls', () => {
+test('LLM settings tab uses a compact provider connection, searchable model selects, and advanced controls', () => {
   const source = read('src/components/modals/tabs/LLMSettingsTab.vue')
 
-  assert.equal(source.includes("handleProviderSelect('openai')"), true)
-  assert.equal(source.includes("handleProviderSelect('openrouter')"), true)
-  assert.equal(source.includes("handleProviderSelect('ollama')"), true)
+  assert.equal(source.includes('@update:model-value="handleProviderSelect"'), true)
   assert.equal(source.includes('Provider'), true)
   assert.equal(source.includes('OpenAI'), true)
   assert.equal(source.includes('OpenRouter'), true)
   assert.equal(source.includes('Ollama (local)'), true)
 
   assert.equal(source.includes('Verify &amp; save key'), true)
-  assert.equal(source.includes('Delete saved key'), true)
+  assert.equal(source.includes('Delete saved credential'), true)
+  assert.equal(source.includes('<FloatingActionMenu'), true)
+  assert.equal(source.includes('<ConfirmationModal'), true)
   assert.equal(source.includes('Refresh model list'), true)
   assert.equal(source.includes('Show all models'), true)
   assert.equal(source.includes('Save configuration'), true)

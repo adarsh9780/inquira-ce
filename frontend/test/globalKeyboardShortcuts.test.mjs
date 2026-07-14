@@ -23,7 +23,7 @@ test('app registers global shortcuts for command palette, sidebar, settings, and
   assert.equal(appSource.includes("matchShortcut(event, 'layout-cycle')"), false)
   assert.equal(appSource.includes("appStore.setActiveTab('conversation-tree')"), true)
   assert.equal(appSource.includes("appStore.setActiveTab('schema-editor')"), true)
-  assert.equal(appSource.includes("appStore.openSettings('llm')"), true)
+  assert.equal(appSource.includes("appStore.openSettings('setup')"), true)
   assert.equal(appSource.includes('appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)'), true)
   assert.equal(appSource.includes('appStore.openKeyboardShortcuts()'), false)
   assert.equal(appSource.includes('<KeyboardShortcutsModal'), true)

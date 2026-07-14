@@ -15,6 +15,6 @@ test('chat input uses longer auto-cancel timeout for free models', () => {
   assert.equal(source.includes("normalized.includes('/free')"), true)
   assert.equal(source.includes('const warningAfterMs = resolveSlowRequestWarningTimeoutMs(appStore.slowRequestWarningSeconds)'), true)
   assert.equal(source.includes('}, warningAfterMs)'), true)
-  assert.equal(source.includes('const cancelAfterMs = resolveAnalyzeCancelTimeoutMs(appStore.selectedModel)'), true)
+  assert.equal(source.includes('const cancelAfterMs = resolveAnalyzeCancelTimeoutMs(effectiveWorkspaceModel.value)'), true)
   assert.equal(source.includes('}, cancelAfterMs)'), true)
 })

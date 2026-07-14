@@ -35,6 +35,14 @@
             <div class="space-y-0.5">
               <button
                 type="button"
+                :class="activeSection === 'setup' ? activeNavClass : inactiveNavClass"
+                @click="openLeafSection('setup')"
+              >
+                <CheckCircleIcon class="h-4 w-4 shrink-0" />
+                <span>Setup</span>
+              </button>
+              <button
+                type="button"
                 :class="activeSection === 'llm' ? activeNavClass : inactiveNavClass"
                 @click="openLeafSection('llm')"
               >
@@ -76,6 +84,10 @@
             </header>
 
             <div class="relative flex-1 overflow-hidden">
+              <section :class="panelClass('setup')" :aria-hidden="currentPanel !== 'setup'" :inert="currentPanel !== 'setup'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
+                <SetupTab />
+              </section>
+
               <section :class="panelClass('llm')" :aria-hidden="currentPanel !== 'llm'" :inert="currentPanel !== 'llm'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
                 <LLMSettingsTab @close-request="closeModal" />
               </section>
@@ -118,7 +130,9 @@ import LLMSettingsTab from './tabs/LLMSettingsTab.vue'
 import WorkspaceTab from './tabs/WorkspaceTab.vue'
 import AppearanceTab from './tabs/AppearanceTab.vue'
 import AccountTab from './tabs/AccountTab.vue'
+import SetupTab from './tabs/SetupTab.vue'
 import {
+  CheckCircleIcon,
   ListBulletIcon,
   KeyIcon,
   PaintBrushIcon,
@@ -132,7 +146,7 @@ const props = defineProps({
   },
   initialTab: {
     type: String,
-    default: 'llm',
+    default: 'setup',
   },
 })
 
@@ -141,9 +155,9 @@ const emit = defineEmits(['update:modelValue'])
 const appStore = useAppStore()
 const llmConfig = useLLMConfig()
 
-const activeSection = ref('llm')
+const activeSection = ref('setup')
 const activeWorkspaceId = ref('')
-const currentPanel = ref('llm')
+const currentPanel = ref('setup')
 const panelDirection = ref('forward')
 const activeWorkspaceOperation = ref('')
 const activeWorkspaceOperationMessage = ref('')
@@ -154,6 +168,7 @@ const activeNavClass = 'nav-tab-active'
 const inactiveNavClass = 'nav-tab'
 
 const activeSectionTitle = computed(() => {
+  if (activeSection.value === 'setup') return 'Setup'
   if (activeSection.value === 'llm') return 'Models'
   if (activeSection.value === 'workspace') return 'Workspaces'
   if (activeSection.value === 'appearance') return 'Appearance'
@@ -162,6 +177,7 @@ const activeSectionTitle = computed(() => {
 })
 
 const activeSectionDescription = computed(() => {
+  if (activeSection.value === 'setup') return 'See what is ready and complete the next required step.'
   if (activeSection.value === 'llm') return 'Choose providers and models. Advanced generation controls stay collapsed by default.'
   if (activeSection.value === 'workspace') return 'Create, select, and maintain local workspaces.'
   if (activeSection.value === 'appearance') return 'Choose the theme and typography used throughout Inquira.'
@@ -213,10 +229,10 @@ function normalizeTab(tab) {
   const candidate = String(tab || '').toLowerCase()
   if (candidate === 'api') return 'llm'
   if (candidate === 'data') return 'workspace'
-  if (candidate === 'llm' || candidate === 'workspace' || candidate === 'appearance' || candidate === 'account') {
+  if (candidate === 'setup' || candidate === 'llm' || candidate === 'workspace' || candidate === 'appearance' || candidate === 'account') {
     return candidate
   }
-  return 'llm'
+  return 'setup'
 }
 
 function initializePanelState(tab) {
@@ -283,6 +299,7 @@ function handleWorkspaceCreated(payload) {
   if (!workspaceId) return
   activeWorkspaceId.value = workspaceId
   activeSection.value = 'workspace'
+  emit('update:modelValue', false)
 }
 
 function closeModal() {

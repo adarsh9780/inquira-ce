@@ -103,9 +103,9 @@
         <div class="composer-model-actions flex min-w-0 flex-1 items-center justify-end gap-2 sm:min-w-[12rem] sm:gap-3">
           <div class="min-w-0 flex-1" style="max-width: clamp(7rem, 30vw, 22rem);">
             <ModelSelector
-              :selected-model="appStore.selectedModel"
-              :model-options="appStore.availableModels"
-              :provider="appStore.llmProvider"
+              :selected-model="effectiveWorkspaceModel"
+              :model-options="workspaceModelOptions"
+              :provider="effectiveWorkspaceProvider"
               :backend-search="searchProviderModels"
               :search-loading="appStore.providerModelSearchLoading"
               :search-debounce-ms="250"
@@ -216,6 +216,16 @@ import {
 import { ArrowUpIcon, MicrophoneIcon, StopIcon } from '@heroicons/vue/24/solid'
 
 const appStore = useAppStore()
+const effectiveWorkspaceProvider = computed(() => appStore.workspaceAIConfig?.effective?.provider || appStore.llmProvider)
+const effectiveWorkspaceModel = computed(() => appStore.workspaceAIConfig?.effective?.main_model || appStore.selectedModel)
+const workspaceModelOptions = computed(() => {
+  const configured = appStore.workspaceAIConfig?.defaults?.provider === effectiveWorkspaceProvider.value
+    ? appStore.availableModels
+    : []
+  const values = Array.isArray(configured) ? [...configured] : []
+  if (effectiveWorkspaceModel.value && !values.includes(effectiveWorkspaceModel.value)) values.unshift(effectiveWorkspaceModel.value)
+  return values
+})
 const { formatAttachmentSize } = useChatAttachments()
 useChatAutocomplete()
 useVoiceInput()
@@ -234,10 +244,9 @@ const questionHistoryDraft = ref('')
 const missingSetupRequirements = computed(() => {
   const requirements = []
   if (!appStore.hasWorkspace) requirements.push('Create or select a workspace from the sidebar')
-  if (appStore.providerRequiresApiKey && !appStore.selectedProviderApiKeyPresent) {
-    const provider = String(appStore.llmProvider || 'model provider').trim()
-    requirements.push(`Enter your ${provider} API key in Settings`)
-  }
+  if (appStore.workspaceReadiness.state === 'no_data') requirements.push('Add a dataset to this workspace')
+  if (appStore.workspaceReadiness.state === 'model_connection_required') requirements.push('Connect the effective model provider in Settings')
+  if (appStore.workspaceReadiness.state === 'workspace_configuration_required') requirements.push('Review workspace AI settings')
   return requirements.length ? requirements : ['Finish model setup in Settings']
 })
 const hasTurnNavigation = computed(() => Boolean(
@@ -251,6 +260,12 @@ const setupNotice = computed(() => {
       actionLabel: 'Choose',
       action: () => appStore.openSettings('workspace'),
     }
+  }
+  if (appStore.workspaceReadiness.state === 'no_data') {
+    return { title: 'Add data to begin', message: missingSetupRequirements.value[0], actionLabel: 'Add data', action: () => appStore.openSettings('workspace') }
+  }
+  if (appStore.workspaceReadiness.state === 'workspace_configuration_required') {
+    return { title: 'Review workspace AI', message: missingSetupRequirements.value[0], actionLabel: 'Review', action: () => appStore.openSettings('workspace') }
   }
   const provider = String(appStore.llmProvider || 'model provider').trim()
   return {
@@ -498,12 +513,24 @@ async function handleAttachmentDrop(event) {
   }
 }
 
-function handleModelChange(model) {
-  appStore.setSelectedModel(model)
+async function handleModelChange(model) {
+  const config = appStore.workspaceAIConfig
+  if (!config || !appStore.activeWorkspaceId) return
+  const overrides = config.overrides || {}
+  await appStore.saveWorkspaceAIConfig({
+    llm_provider_override: overrides.provider,
+    main_model_override: model,
+    lite_model_override: overrides.lite_model,
+    llm_temperature_override: overrides.temperature,
+    llm_max_tokens_override: overrides.max_tokens,
+    llm_top_p_override: overrides.top_p,
+    allow_llm_data_samples: Boolean(overrides.allow_llm_data_samples),
+  })
 }
 
 async function searchProviderModels(query, limit = 25) {
-  const models = await appStore.searchProviderModels(query, limit)
+  const response = await apiService.v1SearchProviderModels(effectiveWorkspaceProvider.value, query, limit)
+  const models = response?.models
   return Array.isArray(models) ? models : []
 }
 
@@ -1349,7 +1376,7 @@ async function handleSubmit() {
       toast.warning('Request Taking Longer', 'Your query is taking longer than expected.')
     }, warningAfterMs)
 
-    const cancelAfterMs = resolveAnalyzeCancelTimeoutMs(appStore.selectedModel)
+    const cancelAfterMs = resolveAnalyzeCancelTimeoutMs(effectiveWorkspaceModel.value)
     cancelTimer = setTimeout(() => {
       toast.error('Request Cancelled', 'Your query took too long and was cancelled.')
       abortController.abort()
@@ -1363,7 +1390,7 @@ async function handleSubmit() {
         conversation_id: requestConversationId,
         question: questionText,
         current_code: appStore.pythonFileContent || '',
-        model: appStore.selectedModel,
+        model: effectiveWorkspaceModel.value,
         context: appStore.schemaContext.trim() || null,
         use_selected_turn_context: Boolean(selectedParentTurnId),
         selected_parent_turn_id: selectedParentTurnId || null,

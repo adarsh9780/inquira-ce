@@ -4,63 +4,22 @@
 
 
       <div class="llm-settings-container">
-        <!-- 1. Visual Provider Selection Grid -->
-        <div class="space-y-2">
-          <label class="input-label uppercase tracking-wider text-[var(--color-text-muted)] font-semibold">Select Provider</label>
-          <div class="provider-grid">
-            <button
-              type="button"
-              class="provider-card"
-              :class="{ active: provider === 'openai' }"
-              @click="handleProviderSelect('openai')"
-            >
-              <div class="provider-card-icon">
-                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H7" />
-                </svg>
-              </div>
-              <div class="provider-card-content">
-                <div class="provider-card-title">OpenAI</div>
-                <div class="provider-card-desc">Industry-standard flagship models (GPT-4o, o1)</div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              class="provider-card"
-              :class="{ active: provider === 'openrouter' }"
-              @click="handleProviderSelect('openrouter')"
-            >
-              <div class="provider-card-icon">
-                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M12 2v7M12 15v7M2 12h7M15 12h7" />
-                </svg>
-              </div>
-              <div class="provider-card-content">
-                <div class="provider-card-title">OpenRouter</div>
-                <div class="provider-card-desc">Unified hub for Claude, Gemini, Llama, etc.</div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              class="provider-card"
-              :class="{ active: provider === 'ollama' }"
-              @click="handleProviderSelect('ollama')"
-            >
-              <div class="provider-card-icon">
-                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <path d="M4 12a8 8 0 0 1 16 0v4a8 8 0 0 1-16 0z" />
-                  <circle cx="9" cy="12" r="1" />
-                  <circle cx="15" cy="12" r="1" />
-                </svg>
-              </div>
-              <div class="provider-card-content">
-                <div class="provider-card-title">Ollama (local)</div>
-                <div class="provider-card-desc">Run open-source models offline on your machine</div>
-              </div>
-            </button>
+        <!-- 1. Provider connection -->
+        <div class="flex items-end justify-between gap-5 border-b border-[var(--color-border)] pb-5">
+          <div class="min-w-0 flex-1">
+            <label class="input-label">Provider</label>
+            <HeaderDropdown
+              :model-value="provider"
+              :options="providerOptions"
+              max-width-class="w-full"
+              aria-label="Application model provider"
+              @update:model-value="handleProviderSelect"
+            />
+            <p class="mt-1.5 text-xs text-[var(--color-text-muted)]">Credentials are stored once and can be used by every workspace.</p>
+          </div>
+          <div class="status-badge mb-0.5 shrink-0" :class="statusBadgeClass">
+            <span class="status-dot"></span>
+            <span>{{ statusBadgeText }}</span>
           </div>
         </div>
 
@@ -70,10 +29,6 @@
             <h3 class="settings-card-title">
               {{ provider === 'ollama' ? 'Connection Settings' : 'API Credentials' }}
             </h3>
-            <div class="status-badge" :class="statusBadgeClass">
-              <span class="status-dot"></span>
-              <span>{{ statusBadgeText }}</span>
-            </div>
           </div>
 
           <div class="settings-card-body">
@@ -137,16 +92,15 @@
 
                 <button
                   v-if="selectedProviderApiKeyPresent"
+                  ref="credentialMenuButton"
                   type="button"
-                  class="action-btn danger-action"
+                  class="btn-icon h-9 w-9 border border-[var(--color-border)]"
                   :disabled="verifyLoading || saveLoading || deleteLoading"
-                  @click="handleDeleteSavedKey"
+                  title="Credential actions"
+                  aria-label="Credential actions"
+                  @click="openCredentialMenu"
                 >
-                  <span v-if="deleteLoading" class="inline-flex items-center gap-2">
-                    <span class="loading-spinner"></span>
-                    Removing...
-                  </span>
-                  <span v-else>Delete saved key</span>
+                  <span aria-hidden="true">•••</span>
                 </button>
 
                 <transition name="fade">
@@ -274,53 +228,7 @@
           </div>
         </div>
 
-        <!-- 4. Privacy Settings Card -->
-        <div class="settings-card glass-panel">
-          <div class="settings-card-header">
-            <h3 class="settings-card-title">Data Privacy &amp; Context</h3>
-          </div>
-
-          <div class="settings-card-body">
-            <div class="privacy-container" :class="{ 'active-privacy': allowLlmDataSamples }">
-              <label class="privacy-main-label">
-                <div class="privacy-checkbox-wrapper">
-                  <input
-                    v-model="allowLlmDataSamples"
-                    type="checkbox"
-                    :disabled="dataSamplesSaving"
-                    class="toggle-checkbox-hidden"
-                  />
-                  <div class="custom-checkbox" :class="{ checked: allowLlmDataSamples }">
-                    <svg v-if="allowLlmDataSamples" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  </div>
-                </div>
-                <div class="privacy-info-block">
-                  <span class="privacy-title-text">
-                    Allow bounded data samples in LLM prompts
-                  </span>
-                  <span class="privacy-desc-text">
-                    Off keeps row previews local. On allows small table samples and result previews to be sent to your selected LLM provider, so the agent can write more concrete, analyst-style markdown explanations instead of generic summaries.
-                  </span>
-                </div>
-              </label>
-
-              <transition name="fade">
-                <div
-                  v-if="dataSamplesMessage"
-                  class="privacy-status-msg"
-                  :class="dataSamplesMessageType === 'error' ? 'status-danger' : 'status-success'"
-                >
-                  <span class="status-msg-dot"></span>
-                  <span>{{ dataSamplesMessage }}</span>
-                </div>
-              </transition>
-            </div>
-          </div>
-        </div>
-
-        <!-- 5. Advanced Settings Accordion -->
+        <!-- 4. Advanced application defaults -->
         <div class="advanced-settings-wrapper">
           <button
             type="button"
@@ -498,11 +406,31 @@
       </button>
     </div>
   </section>
+  <FloatingActionMenu
+    :is-open="credentialMenuOpen"
+    :position="credentialMenuPosition"
+    :items="credentialMenuItems"
+    marker-attr="data-credential-actions-menu"
+    :height="56"
+    @select="handleCredentialMenuSelect"
+    @close="credentialMenuOpen = false"
+  />
+  <ConfirmationModal
+    :is-open="deleteCredentialDialogOpen"
+    title="Delete saved credential"
+    :message="`Remove the saved ${providerDisplayName} credential? Workspaces using this provider will stop working until another key is saved.`"
+    confirm-text="Delete credential"
+    cancel-text="Cancel"
+    @close="deleteCredentialDialogOpen = false"
+    @confirm="confirmDeleteCredential"
+  />
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import HeaderDropdown from '../../ui/HeaderDropdown.vue'
+import FloatingActionMenu from '../../ui/FloatingActionMenu.vue'
+import ConfirmationModal from '../ConfirmationModal.vue'
 import { apiService } from '../../../services/apiService'
 import { useLLMConfig } from '../../../composables/useLLMConfig'
 import { useAppStore } from '../../../stores/appStore'
@@ -540,7 +468,6 @@ const {
   llmFrequencyPenalty,
   llmPresencePenalty,
   slowRequestWarningSeconds,
-  allowLlmDataSamples,
   loadPreferences,
   setProvider,
   setApiKey,
@@ -548,7 +475,6 @@ const {
   deleteKey,
   refreshModels,
   saveConfig,
-  saveDataSamplesPreference,
   getModelMeta,
   setMainModel,
   clearTransientMessages,
@@ -558,11 +484,11 @@ const {
 const showKey = ref(false)
 const showAdvanced = ref(false)
 const deleteLoading = ref(false)
-const dataSamplesSaving = ref(false)
-const dataSamplesMessage = ref('')
-const dataSamplesMessageType = ref('')
-const preferencesLoaded = ref(false)
-const suppressDataSamplesSave = ref(false)
+const credentialMenuButton = ref(null)
+const credentialMenuOpen = ref(false)
+const credentialMenuPosition = ref({ x: 0, y: 0 })
+const deleteCredentialDialogOpen = ref(false)
+const credentialMenuItems = computed(() => [{ id: 'delete', label: 'Delete saved credential', destructive: true }])
 
 const providerOptions = [
   { value: 'openai', label: 'OpenAI' },
@@ -610,7 +536,6 @@ const advancedFields = computed(() => {
 
 onMounted(async () => {
   await loadPreferences(null, false)
-  preferencesLoaded.value = true
 })
 
 watch(
@@ -618,36 +543,11 @@ watch(
   async (newUserId, oldUserId) => {
     if (!newUserId || newUserId === oldUserId) return
     showKey.value = false
-    preferencesLoaded.value = false
     resetForAuthBoundary()
     try {
       await loadPreferences(null, false)
-      preferencesLoaded.value = true
     } catch (_error) {
       toast.error('Provider Error', 'Could not load provider configuration.')
-    }
-  },
-)
-
-watch(
-  () => allowLlmDataSamples.value,
-  async (nextValue, previousValue) => {
-    if (suppressDataSamplesSave.value || !preferencesLoaded.value || nextValue === previousValue) return
-    dataSamplesSaving.value = true
-    dataSamplesMessage.value = ''
-    dataSamplesMessageType.value = ''
-    try {
-      await saveDataSamplesPreference()
-      dataSamplesMessage.value = 'Preference saved'
-      dataSamplesMessageType.value = 'success'
-    } catch (_error) {
-      suppressDataSamplesSave.value = true
-      allowLlmDataSamples.value = previousValue
-      suppressDataSamplesSave.value = false
-      dataSamplesMessage.value = 'Could not save this preference'
-      dataSamplesMessageType.value = 'error'
-    } finally {
-      dataSamplesSaving.value = false
     }
   },
 )
@@ -727,6 +627,21 @@ async function handleDeleteSavedKey() {
   }
 }
 
+function openCredentialMenu() {
+  const rect = credentialMenuButton.value?.getBoundingClientRect?.()
+  credentialMenuPosition.value = { x: Number(rect?.right || 0) - 176, y: Number(rect?.bottom || 0) + 6 }
+  credentialMenuOpen.value = true
+}
+
+function handleCredentialMenuSelect(action) {
+  if (action === 'delete') deleteCredentialDialogOpen.value = true
+}
+
+async function confirmDeleteCredential() {
+  deleteCredentialDialogOpen.value = false
+  await handleDeleteSavedKey()
+}
+
 function openProviderApiKeyPortal() {
   const url = String(providerApiKeyPortal.value || '').trim()
   if (!url) return
@@ -758,5 +673,3 @@ async function saveConfiguration() {
   toast.success('Configuration saved', 'Configuration saved')
 }
 </script>
-
-

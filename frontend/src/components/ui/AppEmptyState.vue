@@ -6,6 +6,7 @@
     <button v-if="actionLabel" type="button" class="btn-secondary mt-4 px-3 py-1.5 text-xs" @click="emit('action')">
       {{ actionLabel }}
     </button>
+    <slot />
   </div>
 </template>
 
@@ -17,4 +18,3 @@ defineProps({
 })
 const emit = defineEmits(['action'])
 </script>
-
