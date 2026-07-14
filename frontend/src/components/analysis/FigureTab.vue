@@ -325,6 +325,15 @@ watch(() => appStore.dataPane, (pane) => {
   }
 })
 
+watch(
+  () => [appStore.uiTheme, appStore.plotlyThemeMode],
+  async () => {
+    if (!selectedFigure.value || appStore.dataPane !== 'figure') return
+    await nextTick()
+    await renderPlot()
+  },
+)
+
 async function loadActiveTurnFigureArtifacts() {
   const conversationId = String(appStore.activeConversationId || '').trim()
   const turnId = String(appStore.activeTurnId || '').trim()

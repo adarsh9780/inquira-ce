@@ -132,3 +132,55 @@ test('single bar trace collapses continuous bar coloring into one UI accent colo
   assert.equal(themed.data[0].marker.cmax, undefined)
   assert.equal(themed.layout.coloraxis, undefined)
 })
+
+test('plotly theme reads analytics colors and elevated legend surface from the active UI theme', () => {
+  const darkTokens = {
+    '--color-base': '#101923',
+    '--color-surface': '#16212C',
+    '--color-panel-elevated': '#1B2835',
+    '--color-border': '#273543',
+    '--color-border-hover': '#3B4D60',
+    '--color-text-main': '#E7EDF5',
+    '--color-text-muted': '#97A6B8',
+    '--color-accent': '#D98958',
+    '--color-chart-grid': '#243341',
+    '--color-chart-zero': '#3B4F62',
+    '--color-chart-series-1': '#78A9E6',
+    '--color-chart-series-2': '#E09963',
+    '--color-chart-sequential-1': '#13243A',
+    '--color-chart-sequential-2': '#275F93',
+    '--color-chart-sequential-3': '#4F91CB',
+    '--color-chart-sequential-4': '#9CCAF2',
+    '--color-chart-diverging-low': '#78A9E6',
+    '--color-chart-diverging-mid': '#1B2835',
+    '--color-chart-diverging-high': '#E09963',
+  }
+  const previousWindow = globalThis.window
+  const previousDocument = globalThis.document
+  const previousGetComputedStyle = globalThis.getComputedStyle
+  globalThis.window = {}
+  globalThis.document = { documentElement: {} }
+  globalThis.getComputedStyle = () => ({
+    getPropertyValue: (tokenName) => darkTokens[tokenName] || '',
+  })
+
+  try {
+    const themed = applyPlotlyTheme(
+      { data: [{ type: 'scatter', x: [1, 2], y: [2, 4] }], layout: {} },
+      { mode: PLOTLY_THEME_MODE.SOFT },
+    )
+
+    assert.equal(themed.layout.paper_bgcolor, '#101923')
+    assert.equal(themed.layout.plot_bgcolor, '#16212C')
+    assert.equal(themed.layout.legend.bgcolor, '#1B2835')
+    assert.equal(themed.layout.xaxis.gridcolor, '#243341')
+    assert.equal(themed.layout.xaxis.zerolinecolor, '#3B4F62')
+    assert.equal(themed.layout.colorway[0], '#78A9E6')
+    assert.equal(themed.layout.colorway[1], '#E09963')
+    assert.equal(themed.layout.colorscale.diverging[1][1], '#1B2835')
+  } finally {
+    globalThis.window = previousWindow
+    globalThis.document = previousDocument
+    globalThis.getComputedStyle = previousGetComputedStyle
+  }
+})

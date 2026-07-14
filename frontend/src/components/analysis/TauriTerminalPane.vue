@@ -71,6 +71,27 @@ function readThemeFont(tokenName, fallback) {
   return value || fallback
 }
 
+function getTerminalVisualTheme() {
+  return {
+    background: readThemeColor('--color-base', 'var(--color-base)'),
+    foreground: readThemeColor('--color-text-main', 'var(--color-text-main)'),
+    cursor: readThemeColor('--color-accent', 'var(--color-accent)'),
+    selectionBackground: readThemeColor(
+      '--color-info-bg',
+      'color-mix(in srgb, var(--color-info) 18%, transparent)',
+    ),
+  }
+}
+
+function syncTerminalTheme() {
+  if (!terminal) return
+  terminal.options.theme = getTerminalVisualTheme()
+  terminal.options.fontFamily = readThemeFont(
+    '--font-mono',
+    '"JetBrainsMono Nerd Font", "JetBrains Mono", monospace',
+  )
+}
+
 function normalizeErrorMessage(error, fallback) {
   if (!error) return fallback
   if (typeof error === 'string') return error
@@ -161,22 +182,13 @@ onMounted(async () => {
   if (!tauriTerminalService.isTauriRuntime()) return
   if (!terminalHostRef.value) return
 
-  const terminalBackground = readThemeColor('--color-base', 'var(--color-base)')
-  const terminalForeground = readThemeColor('--color-text-main', 'var(--color-text-main)')
-  const terminalCursor = readThemeColor('--color-accent', 'var(--color-accent)')
-  const terminalSelection = readThemeColor('--color-info-bg', 'color-mix(in srgb, var(--color-info) 18%, transparent)')
   const terminalFontFamily = readThemeFont('--font-mono', '"JetBrainsMono Nerd Font", "JetBrains Mono", monospace')
 
   terminal = new Terminal({
     cursorBlink: true,
     fontFamily: terminalFontFamily,
     fontSize: 13,
-    theme: {
-      background: terminalBackground,
-      foreground: terminalForeground,
-      cursor: terminalCursor,
-      selectionBackground: terminalSelection,
-    },
+    theme: getTerminalVisualTheme(),
     allowProposedApi: false,
     convertEol: true,
     scrollback: 10000,
@@ -209,6 +221,14 @@ watch(
   async () => {
     if (!terminal) return
     await startSession()
+  },
+)
+
+watch(
+  () => [appStore.uiTheme, appStore.uiCodeFont],
+  async () => {
+    await nextTick()
+    syncTerminalTheme()
   },
 )
 

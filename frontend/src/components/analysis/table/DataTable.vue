@@ -524,7 +524,7 @@ async function copyCellOnShortcut(event, value) {
   padding: 0;
   border-right: 1px solid var(--color-border);
   border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-data-grid-header);
   color: var(--color-text-main);
   font-size: 12px;
   font-weight: 650;
@@ -550,11 +550,11 @@ async function copyCellOnShortcut(event, value) {
 }
 
 .inquira-data-grid tbody tr:nth-child(even) td {
-  background: var(--color-surface);
+  background: var(--color-data-grid-row-alt);
 }
 
 .inquira-data-grid tbody tr:hover td {
-  background: var(--color-base-muted);
+  background: var(--color-data-grid-row-hover);
 }
 
 .inquira-data-grid td:focus-visible {
@@ -686,7 +686,7 @@ async function copyCellOnShortcut(event, value) {
   justify-content: flex-end;
   gap: 16px;
   border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-data-grid-footer);
   padding: 0 8px 0 12px;
   color: var(--color-text-muted);
   font-size: 12px;

@@ -1,11 +1,41 @@
+const DEFAULT_COLORWAY = Object.freeze([
+  '#D47948', // brand orange
+  '#3B82F6', // brand blue
+  '#0EA5E9', // sky
+  '#22C55E', // success green
+  '#F59E0B', // warning amber
+  '#EF4444', // danger red
+  '#14B8A6', // teal
+  '#6366F1', // indigo
+])
+
+const DEFAULT_SEQUENTIAL_SCALE = Object.freeze([
+  '#FFF7ED',
+  '#FED7AA',
+  '#E7A06A',
+  '#D47948',
+])
+
+const DEFAULT_DIVERGING_SCALE = Object.freeze([
+  '#3B82F6',
+  '#FFFFFF',
+  '#D47948',
+])
+
 const DEFAULT_UI_COLORS = Object.freeze({
   base: '#FFFFFF',
   surface: '#FFFFFF',
+  panelElevated: '#FFFFFF',
   border: '#E4E4E7',
   borderHover: '#D4D4D8',
   textMain: '#18181B',
   textMuted: '#52525B',
   accent: '#D47948',
+  chartGrid: '#E4E4E7',
+  chartZero: '#D4D4D8',
+  colorway: DEFAULT_COLORWAY,
+  sequentialScale: DEFAULT_SEQUENTIAL_SCALE,
+  divergingScale: DEFAULT_DIVERGING_SCALE,
 })
 
 let UI_COLORS = { ...DEFAULT_UI_COLORS }
@@ -20,11 +50,25 @@ function refreshUiColors() {
   UI_COLORS = {
     base: readUiColor('--color-base', DEFAULT_UI_COLORS.base),
     surface: readUiColor('--color-surface', DEFAULT_UI_COLORS.surface),
+    panelElevated: readUiColor('--color-panel-elevated', DEFAULT_UI_COLORS.panelElevated),
     border: readUiColor('--color-border', DEFAULT_UI_COLORS.border),
     borderHover: readUiColor('--color-border-hover', DEFAULT_UI_COLORS.borderHover),
     textMain: readUiColor('--color-text-main', DEFAULT_UI_COLORS.textMain),
     textMuted: readUiColor('--color-text-muted', DEFAULT_UI_COLORS.textMuted),
     accent: readUiColor('--color-accent', DEFAULT_UI_COLORS.accent),
+    chartGrid: readUiColor('--color-chart-grid', DEFAULT_UI_COLORS.chartGrid),
+    chartZero: readUiColor('--color-chart-zero', DEFAULT_UI_COLORS.chartZero),
+    colorway: DEFAULT_COLORWAY.map((fallback, index) => (
+      readUiColor(`--color-chart-series-${index + 1}`, fallback)
+    )),
+    sequentialScale: DEFAULT_SEQUENTIAL_SCALE.map((fallback, index) => (
+      readUiColor(`--color-chart-sequential-${index + 1}`, fallback)
+    )),
+    divergingScale: [
+      readUiColor('--color-chart-diverging-low', DEFAULT_DIVERGING_SCALE[0]),
+      readUiColor('--color-chart-diverging-mid', DEFAULT_DIVERGING_SCALE[1]),
+      readUiColor('--color-chart-diverging-high', DEFAULT_DIVERGING_SCALE[2]),
+    ],
   }
 }
 
@@ -34,33 +78,9 @@ const FONT_FAMILY = (
     : ''
 ) || 'sans-serif'
 
-const COLORWAY = Object.freeze([
-  '#D47948', // brand orange
-  '#3B82F6', // brand blue
-  '#0EA5E9', // sky
-  '#22C55E', // success green
-  '#F59E0B', // warning amber
-  '#EF4444', // danger red
-  '#14B8A6', // teal
-  '#6366F1', // indigo
-])
-
 const CARTESIAN_AXIS_KEY = /^(x|y)axis(\d+)?$/i
 const COLOR_AXIS_KEY = /^coloraxis(\d+)?$/i
 const BAR_LIKE_TRACE_TYPES = new Set(['bar', 'histogram', 'funnel', 'waterfall'])
-const BRAND_COLOR_SCALE = Object.freeze({
-  sequential: Object.freeze([
-    [0, '#FFF7ED'],
-    [0.35, '#FED7AA'],
-    [0.68, '#E7A06A'],
-    [1, '#D47948'],
-  ]),
-  diverging: Object.freeze([
-    [0, '#3B82F6'],
-    [0.5, '#FFFFFF'],
-    [1, '#D47948'],
-  ]),
-})
 
 const CARTESIAN_TRACE_TYPES = new Set([
   '',
@@ -196,7 +216,7 @@ function applyBarTraceTemplate(data) {
     const traceType = getTraceType(trace, 'scatter')
     if (!BAR_LIKE_TRACE_TYPES.has(traceType)) return trace
 
-    const color = COLORWAY[index % COLORWAY.length]
+    const color = UI_COLORS.colorway[index % UI_COLORS.colorway.length]
     const marker = isPlainObject(trace.marker) ? trace.marker : {}
     const hasPerItemColor = Array.isArray(marker.color) || Array.isArray(trace.color)
     const hasColorAxis = typeof marker.coloraxis === 'string' || typeof trace.coloraxis === 'string'
@@ -236,9 +256,9 @@ function stripUnusedColorAxis(layout, data) {
 
 function getSoftAxisPatch() {
   return {
-    linecolor: UI_COLORS.borderHover,
-    gridcolor: UI_COLORS.border,
-    zerolinecolor: UI_COLORS.borderHover,
+    linecolor: UI_COLORS.chartZero,
+    gridcolor: UI_COLORS.chartGrid,
+    zerolinecolor: UI_COLORS.chartZero,
     tickcolor: UI_COLORS.textMuted,
     tickfont: {
       color: UI_COLORS.textMuted,
@@ -325,7 +345,7 @@ function applyHardTraceDefaults(data) {
   return data.map((trace, index) => {
     if (!isPlainObject(trace)) return trace
     const traceType = getTraceType(trace, 'scatter')
-    const color = COLORWAY[index % COLORWAY.length]
+    const color = UI_COLORS.colorway[index % UI_COLORS.colorway.length]
 
     if (traceType === 'bar' || traceType === 'histogram' || traceType === 'funnel' || traceType === 'waterfall') {
       return {
@@ -430,11 +450,25 @@ export function applyPlotlyTheme(figure, options = {}) {
   const softLayoutPatch = {
     paper_bgcolor: UI_COLORS.base,
     plot_bgcolor: UI_COLORS.surface,
-    colorway: [...COLORWAY],
+    colorway: [...UI_COLORS.colorway],
     colorscale: {
-      sequential: cloneArray(BRAND_COLOR_SCALE.sequential),
-      sequentialminus: cloneArray(BRAND_COLOR_SCALE.sequential),
-      diverging: cloneArray(BRAND_COLOR_SCALE.diverging),
+      sequential: [
+        [0, UI_COLORS.sequentialScale[0]],
+        [0.35, UI_COLORS.sequentialScale[1]],
+        [0.68, UI_COLORS.sequentialScale[2]],
+        [1, UI_COLORS.sequentialScale[3]],
+      ],
+      sequentialminus: [
+        [0, UI_COLORS.sequentialScale[0]],
+        [0.35, UI_COLORS.sequentialScale[1]],
+        [0.68, UI_COLORS.sequentialScale[2]],
+        [1, UI_COLORS.sequentialScale[3]],
+      ],
+      diverging: [
+        [0, UI_COLORS.divergingScale[0]],
+        [0.5, UI_COLORS.divergingScale[1]],
+        [1, UI_COLORS.divergingScale[2]],
+      ],
     },
     font: {
       color: UI_COLORS.textMain,
@@ -445,7 +479,7 @@ export function applyPlotlyTheme(figure, options = {}) {
       },
     },
     legend: {
-      bgcolor: 'rgba(255, 255, 255, 0.88)',
+      bgcolor: UI_COLORS.panelElevated,
       bordercolor: UI_COLORS.border,
       borderwidth: 1,
       font: {

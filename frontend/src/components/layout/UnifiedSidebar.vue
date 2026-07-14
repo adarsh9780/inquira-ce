@@ -1,6 +1,7 @@
 <template>
   <div
     class="relative z-40 flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden sidebar-root"
+    :class="{ 'sidebar-root-collapsed': appStore.isSidebarCollapsed }"
   >
     <!-- ─── Brand / Collapse Toggle ─── -->
     <div
@@ -149,7 +150,7 @@
         </div>
       </SidebarWorkspaceConversations>
 
-      <div class="shrink-0 px-0.5 pb-1">
+      <div class="sidebar-tools shrink-0 px-0.5 pb-1">
         <DisclosureSection v-if="!appStore.isSidebarCollapsed" v-model:open="workspaceToolsOpen" label="Workspace tools">
           <div class="space-y-0.5">
             <button
@@ -906,6 +907,16 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
   background: color-mix(in srgb, var(--color-text-main) 5%, transparent);
 }
 
+.sidebar-root-collapsed .sidebar-brand-row {
+  padding-inline: 0.5rem;
+}
+
+.sidebar-root-collapsed .sidebar-brand-button {
+  height: var(--size-sidebar-row-height);
+  width: var(--size-sidebar-rail-control);
+  justify-content: center;
+}
+
 .sidebar-icon-button {
   display: inline-flex;
   height: 1.875rem;
@@ -956,6 +967,17 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
   color: var(--color-text-main);
 }
 
+.sidebar-root-collapsed .sidebar-nav-row,
+.sidebar-root-collapsed .sidebar-workspace-row {
+  width: var(--size-sidebar-rail-control);
+  justify-content: center;
+  padding-inline: 0 !important;
+}
+
+.sidebar-root-collapsed .sidebar-tools {
+  padding-inline: 0;
+}
+
 .sidebar-row-icon {
   display: inline-flex;
   height: calc(var(--size-sidebar-inline-icon) + 0.5rem);
@@ -979,11 +1001,11 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
   display: inline-flex;
   font-size: 0.625rem;
   font-weight: 800;
-  height: calc(var(--size-sidebar-inline-icon) + 0.375rem);
+  height: var(--size-sidebar-rail-glyph);
   justify-content: center;
   letter-spacing: 0.02em;
   line-height: 1;
-  width: calc(var(--size-sidebar-inline-icon) + 0.375rem);
+  width: var(--size-sidebar-rail-glyph);
 }
 
 .sidebar-row-label {
@@ -1025,8 +1047,8 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
 
 .sidebar-initials-avatar {
   display: inline-flex;
-  height: 1.5rem;
-  width: 1.5rem;
+  height: var(--size-sidebar-rail-glyph);
+  width: var(--size-sidebar-rail-glyph);
   align-items: center;
   justify-content: center;
   border-radius: 999px;

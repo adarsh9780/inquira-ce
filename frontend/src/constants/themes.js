@@ -8,8 +8,8 @@ export const THEME_OPTIONS = [
   {
     id: 'midnight',
     label: 'Bluehour',
-    description: 'High-contrast graphite dark theme with warm copper actions and clear data accents.',
-    preview: ['#101821', '#182431', '#D18455']
+    description: 'Low-glare navy workspace with crisp tables, balanced contrast, and distinct chart colors.',
+    preview: ['#101923', '#16212C', '#78A9E6']
   }
 ]
 
