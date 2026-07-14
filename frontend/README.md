@@ -249,7 +249,7 @@ The default analysis uses your backend-declared table name from `/settings/view`
 │   Frontend      │◄──►│   Backend       │◄──►│   LLM Service   │
 │                 │    │                 │    │                 │
 │ • CodeMirror    │    │ • Data Processing│    │ • Code Generation│
-│ • AG Grid/Table │    │ • File Upload    │    │ • Query Optimization│
+│ • TanStack Table│    │ • File Upload    │    │ • Query Optimization│
 │ • Plotly Charts │    │ • Code Execution │    │ • Error Handling │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                               │
@@ -270,7 +270,7 @@ The default analysis uses your backend-declared table name from `/settings/view`
 - **Framework**: Vue.js 3 (Composition API)
 - **Styling**: Tailwind CSS
 - **Code Editor**: CodeMirror 6
-- **Data Grid**: AG Grid (Table tab); simple sticky table for Preview tab
+- **Data Grid**: TanStack Table with an Inquira-owned renderer and query adapter
 - **Charts**: Plotly.js
 - **Icons**: Heroicons
 - **Build Tool**: Vite
@@ -627,7 +627,7 @@ copies of the Software...
 
 ## Architecture
 
-- **Frontend**: Vue.js 3 + Tailwind CSS + Monaco Editor + AG Grid + Plotly
+- **Frontend**: Vue.js 3 + Tailwind CSS + CodeMirror + TanStack Table + Plotly
 - **Backend**: FastAPI + Python 3.12+
 - **Data Processing**: Pandas + DuckDB
 - **LLM**: Google Gemini API
@@ -823,4 +823,4 @@ This project is licensed under the MIT License.
 - Code editor improvements: `Tab`/`Shift+Tab` indent/outdent (4 spaces).
 - Default code template unified: uses backend table name from `/settings/view` and includes sample, schema (DESCRIBE), row count, and pandas `describe()` summary.
 - Plotly charts reliably fill available space on first render (responsive + resize observer).
-- AG Grid theming migrated to the Theming API (Quartz) and legacy CSS removed in affected views.
+- The Table pane uses a native Inquira renderer backed by TanStack Table.

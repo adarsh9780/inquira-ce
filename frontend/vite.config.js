@@ -14,7 +14,7 @@ const frontendVersion = String(frontendPackage.version || '0.0.0').trim() || '0.
 const manualChunkGroups = {
   'vue-vendor': ['node_modules/vue/', 'node_modules/@vue/devtools-api/'],
   'pinia-store': ['node_modules/pinia/'],
-  'ui-components': ['node_modules/ag-grid-community/', 'node_modules/ag-grid-vue3/'],
+  'table-engine': ['node_modules/@tanstack/table-core/', 'node_modules/@tanstack/vue-table/'],
   'ui-icons': ['node_modules/@heroicons/vue/'],
   'ui-headless': ['node_modules/@headlessui/vue/'],
   'plotly-charts': ['node_modules/plotly.js-dist-min/'],

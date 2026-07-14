@@ -80,43 +80,18 @@
     </Teleport>
 
     <TableGridShell>
-      <!-- Grid: infinite model -->
-      <ag-grid-vue
-        v-if="selectedArtifactId && hasRenderableRows && useInfiniteModel"
-        :key="`infinite-${selectedArtifactId}`"
-        class="ag-theme-quartz absolute inset-0"
-        :columnDefs="columnDefs"
-        :defaultColDef="defaultColDef"
-        :enableClipboard="true"
-        :pagination="true"
-        :paginationPageSize="pageSize"
-        :cacheBlockSize="pageSize"
-        rowModelType="infinite"
-        :suppressMenuHide="true"
-        :animateRows="false"
-        @grid-pre-destroy="onGridPreDestroy"
-        @grid-ready="onGridReady"
-        @pagination-changed="onPaginationChanged"
-      ></ag-grid-vue>
-
-      <!-- Grid: client-side fallback -->
-      <ag-grid-vue
-        v-else-if="selectedArtifactId && hasRenderableRows"
-        :key="`client-${selectedArtifactId}`"
-        class="ag-theme-quartz absolute inset-0"
-        :columnDefs="columnDefs"
-        :rowData="clientRows"
-        :quickFilterText="tableSearch"
-        :defaultColDef="defaultColDef"
-        :enableClipboard="true"
-        :pagination="true"
-        :paginationPageSize="pageSize"
-        :suppressMenuHide="true"
-        :animateRows="false"
-        @grid-pre-destroy="onGridPreDestroy"
-        @grid-ready="onGridReady"
-        @pagination-changed="onPaginationChanged"
-      ></ag-grid-vue>
+      <DataTable
+        v-if="selectedArtifactId && hasRenderableRows"
+        :key="`${useServerModel ? 'server' : 'client'}-${selectedArtifactId}`"
+        :rows="visibleTableRows"
+        :columns="tableColumns"
+        :row-count="rowCount"
+        :query="tableQuery"
+        :manual="useServerModel"
+        :global-filter="tableSearch"
+        :loading="isPageLoading"
+        @update:query="handleTableQueryChange"
+      />
 
       <!-- Empty state: user hasn't selected a table yet but artifacts exist -->
       <div
@@ -223,11 +198,9 @@
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import apiService from '../../services/apiService'
-import { AgGridVue } from 'ag-grid-vue3'
-import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
-import 'ag-grid-community/styles/ag-theme-quartz.css'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
+import DataTable from './table/DataTable.vue'
 import TableEmptyState from './table/TableEmptyState.vue'
 import TableGridShell from './table/TableGridShell.vue'
 import TableToolbar from './table/TableToolbar.vue'
@@ -235,8 +208,12 @@ import FloatingActionMenu from '../ui/FloatingActionMenu.vue'
 import { toast } from '../../composables/useToast'
 import { persistExportFile } from '../../utils/exportFile'
 import { useTableArtifacts } from '../../composables/useTableArtifacts'
-
-ModuleRegistry.registerModules([AllCommunityModule])
+import {
+  createTableQuery,
+  DEFAULT_TABLE_PAGE_SIZE,
+  toBackendFilterModel,
+  toBackendSortModel,
+} from './table/tableQuery'
 import {
   ArrowDownTrayIcon,
   EllipsisHorizontalIcon,
@@ -247,7 +224,7 @@ import {
 const appStore = useAppStore()
 useTableArtifacts()
 
-const pageSize = 100
+const pageSize = DEFAULT_TABLE_PAGE_SIZE
 const isDownloading = ref(false)
 const isDeletingArtifact = ref(false)
 const isDeleteDialogOpen = ref(false)
@@ -272,14 +249,14 @@ const windowStart = ref(0)
 const windowEnd = ref(0)
 const useClientFallback = ref(false)
 const tableSearch = ref('')
+const tableQuery = ref(createTableQuery({ pageSize }))
 const tableError = ref('')
 const artifactListError = ref('')
 const pendingControllers = new Set()
-let gridApi = null
 let listAbortController = null
 let serializedRequestQueue = Promise.resolve()
 let selectedArtifactLoadToken = 0
-let currentDatasourceToken = 0
+let currentPageRequestToken = 0
 let tableSearchDebounceTimer = null
 const pendingRestorePageByArtifact = new Map()
 const tableActionItems = computed(() => [
@@ -307,7 +284,6 @@ onUnmounted(() => {
     clearTimeout(tableSearchDebounceTimer)
     tableSearchDebounceTimer = null
   }
-  gridApi = null
 })
 
 const allArtifacts = computed(() => (Array.isArray(workspaceArtifacts.value) ? workspaceArtifacts.value : []))
@@ -633,10 +609,15 @@ watch(tableSearch, () => {
     tableSearchDebounceTimer = null
     pendingRestorePageByArtifact.delete(artifactId)
     appStore.setTablePageOffset(appStore.activeWorkspaceId, artifactId, 0)
-    if (!useInfiniteModel.value || !isGridAlive()) return
-    void attachInfiniteDatasource(artifactId).then(() => {
-      gridApi?.paginationGoToPage?.(0)
+    tableQuery.value = createTableQuery({
+      ...tableQuery.value,
+      pageIndex: 0,
     })
+    if (!useServerModel.value) {
+      updateTableViewport()
+      return
+    }
+    void loadServerPage(artifactId, tableQuery.value)
   }, 200)
 })
 
@@ -660,24 +641,28 @@ const deleteDialogMessage = computed(() => {
   return `Delete table "${artifactLabel}"? This cannot be undone.`
 })
 
-const useInfiniteModel = computed(() => {
+const useServerModel = computed(() => {
   return !!selectedArtifactId.value && !useClientFallback.value
 })
 
 const rowCount = computed(() => {
-  if (useInfiniteModel.value) return Number(rowCountValue.value || 0)
+  if (useServerModel.value) return Number(rowCountValue.value || 0)
   return Number(clientRows.value.length || 0)
 })
 
 const downloadRows = computed(() => {
-  if (useInfiniteModel.value) return Array.isArray(serverRows.value) ? serverRows.value : []
+  if (useServerModel.value) return Array.isArray(serverRows.value) ? serverRows.value : []
   return Array.isArray(clientRows.value) ? clientRows.value : []
 })
 
 const hasRenderableRows = computed(() => {
-  if (useInfiniteModel.value) return rowCount.value > 0
-  return clientRows.value.length > 0
+  if (useServerModel.value) return rowCount.value > 0 || serverColumns.value.length > 0
+  return clientRows.value.length > 0 || serverColumns.value.length > 0
 })
+
+const visibleTableRows = computed(() => (
+  useServerModel.value ? serverRows.value : clientRows.value
+))
 
 const tableStatusMessage = computed(() => {
   if (isDeletingArtifact.value) return 'Deleting table...'
@@ -691,40 +676,14 @@ const tableStatusClass = computed(() => {
   return 'text-[var(--color-text-main)]'
 })
 
-const columnDefs = computed(() => {
+const tableColumns = computed(() => {
   if (serverColumns.value.length > 0) {
-    return serverColumns.value.map((name) => ({
-      headerName: String(name),
-      field: String(name),
-      cellRenderer: getCellRenderer(null),
-      tooltipField: String(name),
-      valueGetter: (params) => params.data?.[String(name)],
-      cellRendererParams: { truncate: 120 },
-      cellStyle: { whiteSpace: 'nowrap' }
-    }))
+    return serverColumns.value.map((name) => String(name))
   }
   const sourceRows = downloadRows.value
   if (!sourceRows || sourceRows.length === 0) return []
-  return generateColumnDefs(sourceRows)
+  return Object.keys(sourceRows[0] || {})
 })
-
-const defaultColDef = {
-  sortable: true,
-  filter: true,
-  resizable: true,
-  minWidth: 120
-}
-
-// ---------------------------------------------------------------------------
-// Grid lifecycle
-// ---------------------------------------------------------------------------
-function isGridAlive() {
-  if (!gridApi) return false
-  if (typeof gridApi.isDestroyed === 'function') {
-    return !gridApi.isDestroyed()
-  }
-  return true
-}
 
 function cancelPendingRequests() {
   for (const controller of pendingControllers) {
@@ -734,7 +693,7 @@ function cancelPendingRequests() {
 }
 
 function resetTableState() {
-  currentDatasourceToken += 1
+  currentPageRequestToken += 1
   cancelPendingRequests()
   clientRows.value = []
   serverRows.value = []
@@ -745,28 +704,10 @@ function resetTableState() {
   appStore.clearTableViewport()
   tableError.value = ''
   useClientFallback.value = false
-  if (isGridAlive()) {
-    gridApi.setGridOption?.('datasource', null)
-  }
+  tableQuery.value = createTableQuery({ pageSize })
 }
 
-function onGridReady(params) {
-  gridApi = params.api
-  if (useInfiniteModel.value) {
-    void attachInfiniteDatasource().then(() => {
-      restoreArtifactPage(selectedArtifactId.value)
-    })
-  }
-}
-
-function onGridPreDestroy() {
-  currentDatasourceToken += 1
-  cancelPendingRequests()
-  gridApi = null
-}
-
-function onPaginationChanged() {
-  if (!isGridAlive()) return
+function updateTableViewport() {
   const total = rowCount.value
   if (total <= 0) {
     windowStart.value = 0
@@ -774,41 +715,41 @@ function onPaginationChanged() {
     appStore.clearTableViewport()
     return
   }
-  const page = Math.max(0, Number(gridApi.paginationGetCurrentPage?.() || 0))
+  const page = Math.max(0, Number(tableQuery.value.pageIndex || 0))
   const aid = selectedArtifactId.value
   if (aid) {
-    const pendingPage = pendingRestorePageByArtifact.get(aid)
-    if (Number.isInteger(pendingPage) && pendingPage > 0) {
-      // Ignore the transient page-0 event fired while grid is reinitializing.
-      if (page === 0) return
-      if (page === pendingPage) {
-        pendingRestorePageByArtifact.delete(aid)
-      }
-    }
+    pendingRestorePageByArtifact.delete(aid)
     appStore.setTablePageOffset(appStore.activeWorkspaceId, aid, page)
   }
   const start = page * pageSize + 1
-  const end = Math.min(total, start + pageSize - 1)
+  const visibleLength = useServerModel.value ? serverRows.value.length : pageSize
+  const end = Math.min(total, start + Math.max(0, visibleLength) - 1)
   windowStart.value = start
   windowEnd.value = end
   appStore.setTableViewport(start, end, total)
 }
 
-function restoreArtifactPage(artifactId) {
-  if (!artifactId || !isGridAlive()) return
-  if (String(tableSearch.value || '').trim()) return
+function restoredArtifactPage(artifactId) {
+  if (!artifactId || String(tableSearch.value || '').trim()) return 0
   const rememberedPage = pendingRestorePageByArtifact.get(artifactId)
     ?? appStore.getTablePageOffset(appStore.activeWorkspaceId, artifactId)
-  if (!Number.isInteger(rememberedPage) || rememberedPage <= 0) return
-  const total = Number(rowCountValue.value || 0)
-  if (total <= 0) return
-  const maxPage = Math.max(0, Math.ceil(total / pageSize) - 1)
-  const targetPage = Math.min(rememberedPage, maxPage)
-  if (targetPage > 0) {
-    gridApi.paginationGoToPage?.(targetPage)
-  } else {
-    pendingRestorePageByArtifact.delete(artifactId)
+  if (!Number.isInteger(rememberedPage) || rememberedPage <= 0) return 0
+  const knownTotal = Number(selectedArtifactMeta.value?.row_count || 0)
+  if (knownTotal <= 0) return rememberedPage
+  return Math.min(rememberedPage, Math.max(0, Math.ceil(knownTotal / pageSize) - 1))
+}
+
+function handleTableQueryChange(nextQuery) {
+  const normalizedQuery = createTableQuery(nextQuery)
+  tableQuery.value = normalizedQuery
+  const artifactId = String(selectedArtifactId.value || '').trim()
+  if (!artifactId) return
+  appStore.setTablePageOffset(appStore.activeWorkspaceId, artifactId, normalizedQuery.pageIndex)
+  if (useServerModel.value) {
+    void loadServerPage(artifactId, normalizedQuery)
+    return
   }
+  updateTableViewport()
 }
 
 function columnsChanged(nextColumns) {
@@ -827,67 +768,79 @@ async function prepareArtifact(artifactId) {
   if (!artifactId || !appStore.activeWorkspaceId || !appStore.activeConversationId || !appStore.activeTurnId) return
   tableError.value = ''
   useClientFallback.value = false
-
-  try {
-    const workspaceId = appStore.activeWorkspaceId
-    const conversationId = appStore.activeConversationId
-    const turnId = appStore.activeTurnId
-    await enqueueSerializedRequest(async () => {
-      if (workspaceId !== appStore.activeWorkspaceId) throw createAbortError()
-      if (conversationId !== appStore.activeConversationId) throw createAbortError()
-      if (turnId !== appStore.activeTurnId) throw createAbortError()
-      // Always use server infinite model for persisted artifacts
-      clientRows.value = []
-      await loadInitialServerPage(artifactId)
-    })
-    if (tableError.value) return
-    await attachInfiniteDatasource(artifactId)
-    restoreArtifactPage(artifactId)
-  } catch (error) {
-    if (isAbortError(error)) return
-    tableError.value = error?.message || 'Failed to load selected table.'
-  }
+  clientRows.value = []
+  const pageIndex = restoredArtifactPage(artifactId)
+  tableQuery.value = createTableQuery({ pageIndex, pageSize })
+  await loadServerPage(artifactId, tableQuery.value)
 }
 
-async function loadInitialServerPage(artifactId) {
+async function loadServerPage(artifactId, query = tableQuery.value) {
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
   const conversationId = String(appStore.activeConversationId || '').trim()
   const turnId = String(appStore.activeTurnId || '').trim()
-  if (!artifactId || !conversationId || !turnId) return
+  const normalizedArtifactId = String(artifactId || '').trim()
+  if (!workspaceId || !normalizedArtifactId || !conversationId || !turnId) return
+
+  cancelPendingRequests()
+  const requestToken = ++currentPageRequestToken
   isPageLoading.value = true
+  tableError.value = ''
   const controller = new AbortController()
   pendingControllers.add(controller)
   try {
-    const payload = await apiService.getTurnDataframeArtifactRows(
-      conversationId,
-      turnId,
-      artifactId,
-      0,
-      pageSize,
-      {
-        signal: controller.signal,
-        searchText: String(tableSearch.value || '').trim(),
-      },
-    )
+    const pageIndex = Math.max(0, Number(query?.pageIndex || 0))
+    const requestLimit = Math.max(1, Math.min(pageSize, Number(query?.pageSize || pageSize)))
+    const startRow = pageIndex * requestLimit
+    const payload = await enqueueSerializedRequest(async () => {
+      if (workspaceId !== String(appStore.activeWorkspaceId || '').trim()) throw createAbortError()
+      if (conversationId !== String(appStore.activeConversationId || '').trim()) throw createAbortError()
+      if (turnId !== String(appStore.activeTurnId || '').trim()) throw createAbortError()
+      if (normalizedArtifactId !== String(selectedArtifactId.value || '').trim()) throw createAbortError()
+      return apiService.getTurnDataframeArtifactRows(
+        conversationId,
+        turnId,
+        normalizedArtifactId,
+        startRow,
+        requestLimit,
+        {
+          signal: controller.signal,
+          sortModel: toBackendSortModel(query),
+          filterModel: toBackendFilterModel(query),
+          searchText: String(tableSearch.value || '').trim(),
+        },
+      )
+    })
+    if (requestToken !== currentPageRequestToken) return
     const rows = Array.isArray(payload?.rows) ? payload.rows : []
-    serverRows.value = rows
     const nextColumns = Array.isArray(payload?.columns)
       ? payload.columns.map((c) => String(c))
       : (rows[0] ? Object.keys(rows[0]) : [])
     if (columnsChanged(nextColumns)) {
       serverColumns.value = nextColumns
     }
-    rowCountValue.value = Number(payload?.row_count || rows.length || 0)
-    clientRows.value = rows
-    windowStart.value = rows.length > 0 ? 1 : 0
-    windowEnd.value = rows.length > 0 ? Math.min(pageSize, rowCountValue.value || rows.length) : 0
-    appStore.setTableViewport(windowStart.value, windowEnd.value, rowCountValue.value)
+    const nextRowCount = Number(payload?.row_count ?? rows.length ?? 0)
+    const maxPage = Math.max(0, Math.ceil(nextRowCount / requestLimit) - 1)
+    if (pageIndex > maxPage) {
+      const clampedQuery = createTableQuery({ ...query, pageIndex: maxPage })
+      tableQuery.value = clampedQuery
+      appStore.setTablePageOffset(workspaceId, normalizedArtifactId, maxPage)
+      pendingControllers.delete(controller)
+      if (requestToken === currentPageRequestToken) isPageLoading.value = false
+      await loadServerPage(normalizedArtifactId, clampedQuery)
+      return
+    }
+    serverRows.value = rows
+    rowCountValue.value = nextRowCount
+    tableQuery.value = createTableQuery(query)
+    updateTableViewport()
   } catch (error) {
     if (isAbortError(error)) return
     if (isArtifactMissingError(error)) {
-      clearMissingSelectedArtifact(artifactId)
+      clearMissingSelectedArtifact(normalizedArtifactId)
       return
     }
-    console.error('Failed to load initial dataframe page:', error)
+    if (requestToken !== currentPageRequestToken) return
+    console.error('Failed to load dataframe page:', error)
     tableError.value = error?.message || 'Failed to load table data.'
     serverRows.value = []
     serverColumns.value = []
@@ -898,145 +851,9 @@ async function loadInitialServerPage(artifactId) {
     appStore.clearTableViewport()
   } finally {
     pendingControllers.delete(controller)
-    isPageLoading.value = false
-  }
-}
-
-async function attachInfiniteDatasource(artifactId) {
-  const aid = artifactId || selectedArtifactId.value
-  const conversationId = String(appStore.activeConversationId || '').trim()
-  const turnId = String(appStore.activeTurnId || '').trim()
-  if (!aid || !conversationId || !turnId) return
-  cancelPendingRequests()
-  currentDatasourceToken += 1
-  if (!isGridAlive()) return
-  const datasourceTag = currentDatasourceToken
-
-  const datasource = {
-    rowCount: null,
-    getRows: async (params) => {
-      isPageLoading.value = true
-      const controller = new AbortController()
-      pendingControllers.add(controller)
-      try {
-        const payload = await enqueueSerializedRequest(async () => {
-          const startRow = Number(params.startRow || 0)
-          const endRow = Number(params.endRow || (startRow + pageSize))
-          const requestLimit = Math.max(1, Math.min(pageSize, endRow - startRow))
-          const sortModel = Array.isArray(params?.sortModel) ? params.sortModel : []
-          const filterModel = (
-            params?.filterModel &&
-            typeof params.filterModel === 'object' &&
-            !Array.isArray(params.filterModel)
-          ) ? params.filterModel : {}
-          return apiService.getTurnDataframeArtifactRows(
-            conversationId,
-            turnId,
-            aid,
-            startRow,
-            requestLimit,
-            {
-              signal: controller.signal,
-              sortModel,
-              filterModel,
-              searchText: String(tableSearch.value || '').trim(),
-            },
-          )
-        })
-        if (!isGridAlive() || datasourceTag !== currentDatasourceToken) return
-        const startRow = Number(params.startRow || 0)
-        const rows = Array.isArray(payload?.rows) ? payload.rows : []
-        serverRows.value = rows
-        if (Array.isArray(payload?.columns) && payload.columns.length > 0) {
-          const nextColumns = payload.columns.map((c) => String(c))
-          if (columnsChanged(nextColumns)) {
-            serverColumns.value = nextColumns
-          }
-        } else if (rows[0]) {
-          const nextColumns = Object.keys(rows[0])
-          if (columnsChanged(nextColumns)) {
-            serverColumns.value = nextColumns
-          }
-        }
-        rowCountValue.value = Number(payload?.row_count || rowCountValue.value || 0)
-        const knownLastRow = Number.isFinite(rowCountValue.value) ? rowCountValue.value : undefined
-        params.successCallback(rows, knownLastRow)
-        windowStart.value = rows.length > 0 ? startRow + 1 : 0
-        windowEnd.value = rows.length > 0 ? startRow + rows.length : 0
-        appStore.setTableViewport(windowStart.value, windowEnd.value, rowCountValue.value)
-      } catch (error) {
-        if (isAbortError(error)) return
-        if (isArtifactMissingError(error)) {
-          clearMissingSelectedArtifact(aid)
-          params.successCallback([], 0)
-          return
-        }
-        console.error('Failed to load dataframe page:', error)
-        if (!isGridAlive() || datasourceTag !== currentDatasourceToken) return
-        tableError.value = error?.message || 'Failed to load paginated table data.'
-        // Fail once and stop AG Grid retries that can flood the backend.
-        if (typeof gridApi?.setGridOption === 'function') {
-          gridApi.setGridOption('datasource', null)
-        } else if (typeof gridApi?.setDatasource === 'function') {
-          gridApi.setDatasource(null)
-        }
-        params.successCallback([], Number(rowCountValue.value || 0))
-      } finally {
-        pendingControllers.delete(controller)
-        if (datasourceTag === currentDatasourceToken) {
-          isPageLoading.value = false
-        }
-      }
+    if (requestToken === currentPageRequestToken) {
+      isPageLoading.value = false
     }
-  }
-
-  if (!isGridAlive()) return
-  if (typeof gridApi.setGridOption === 'function') {
-    gridApi.setGridOption('datasource', datasource)
-  } else if (typeof gridApi.setDatasource === 'function') {
-    gridApi.setDatasource(datasource)
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Column / cell helpers
-// ---------------------------------------------------------------------------
-function generateColumnDefs(data) {
-  if (!data || data.length === 0) return []
-  const firstRow = data[0]
-  return Object.keys(firstRow).map((key) => {
-    const sampleValue = firstRow[key]
-    return {
-      headerName: key,
-      field: key,
-      cellRenderer: getCellRenderer(sampleValue),
-      tooltipField: key,
-      valueGetter: (params) => params.data?.[key],
-      cellRendererParams: { truncate: 120 },
-      cellStyle: { whiteSpace: 'nowrap' }
-    }
-  })
-}
-
-function getCellRenderer(value) {
-  const truncateLen = 120
-  if (typeof value === 'number') {
-    return (params) => {
-      const v = params.value
-      if (v == null) return '<span class="text-[var(--color-text-muted)] italic">null</span>'
-      const s = typeof v === 'number' ? v.toLocaleString() : String(v)
-      const display = s.length > truncateLen ? s.slice(0, truncateLen) + '…' : s
-      const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      return `<span title="${esc(s)}">${esc(display)}</span>`
-    }
-  }
-  return (params) => {
-    const v = params.value
-    if (v == null) return '<span class="text-[var(--color-text-muted)] italic">null</span>'
-    const s = String(v)
-    const display = s.length > truncateLen ? s.slice(0, truncateLen) + '…' : s
-    const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    return `<span title="${esc(s)}">${esc(display)}</span>`
   }
 }
 
@@ -1135,92 +952,6 @@ async function deleteSelectedArtifact() {
 </script>
 
 <style>
-.ag-theme-quartz {
-  --ag-background-color: var(--color-base);
-  --ag-header-background-color: var(--color-surface);
-  --ag-header-height: 34px;
-  --ag-row-height: 30px;
-  --ag-grid-size: 4px;
-  --ag-cell-horizontal-padding: 8px;
-  --ag-header-cell-horizontal-padding: 8px;
-  --ag-odd-row-background-color: var(--color-base);
-  --ag-even-row-background-color: var(--color-surface);
-  --ag-row-hover-color: var(--color-base-muted);
-  --ag-selected-row-background-color: var(--color-accent-soft);
-  --ag-border-color: var(--color-border);
-  --ag-header-foreground-color: var(--color-text-main);
-  --ag-foreground-color: var(--color-text-main);
-  --ag-secondary-foreground-color: var(--color-text-muted);
-  --ag-input-focus-border-color: var(--color-accent);
-  --ag-range-selection-border-color: var(--color-border-hover);
-  --ag-cell-horizontal-border: solid var(--color-border);
-  --ag-header-column-separator-color: var(--color-border);
-  --ag-header-column-separator-display: block;
-  --ag-icon-color: var(--color-text-sub);
-  --ag-active-color: var(--color-accent);
-}
-
-.ag-theme-quartz .ag-header {
-  border-bottom: 1px solid var(--color-border);
-  font-family: var(--font-ui);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.3;
-  color: var(--color-text-main);
-}
-
-.ag-theme-quartz .ag-cell,
-.ag-theme-quartz .ag-header-cell {
-  border-right: 1px solid var(--color-border);
-}
-
-.ag-theme-quartz .ag-cell {
-  font-family: var(--font-ui);
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 1.5;
-  color: var(--color-text-main);
-}
-
-.ag-theme-quartz .ag-row .ag-cell:last-child,
-.ag-theme-quartz .ag-header-row .ag-header-cell:last-child {
-  border-right: none;
-}
-
-.ag-theme-quartz .ag-icon {
-  color: var(--color-text-sub);
-}
-
-.ag-theme-quartz .ag-header-cell-sorted-asc .ag-icon,
-.ag-theme-quartz .ag-header-cell-sorted-desc .ag-icon,
-.ag-theme-quartz .ag-header-cell-filtered .ag-icon {
-  color: var(--color-accent);
-}
-
-.ag-theme-quartz .ag-root-wrapper,
-.ag-theme-quartz .ag-root,
-.ag-theme-quartz .ag-center-cols-viewport,
-.ag-theme-quartz .ag-center-cols-container,
-.ag-theme-quartz .ag-body-viewport,
-.ag-theme-quartz .ag-body {
-  background-color: var(--color-base);
-}
-
-.ag-theme-quartz .ag-paging-panel {
-  background-color: var(--color-surface);
-  border-top: 1px solid var(--color-border);
-  color: var(--color-text-main);
-  font-family: var(--font-ui);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.3;
-}
-
-.ag-theme-quartz .ag-paging-button[aria-current='page'] {
-  color: var(--color-accent);
-  font-weight: 500;
-}
-
 .table-pane-surface {
   background-color: var(--color-base);
 }
