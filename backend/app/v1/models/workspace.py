@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..db.base import AppDataBase
@@ -60,6 +60,14 @@ class Workspace(AppDataBase):
     is_active: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     duckdb_path: Mapped[str] = mapped_column(String(512), nullable=False)
     schema_context: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    llm_provider_override: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    main_model_override: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    lite_model_override: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    llm_temperature_override: Mapped[float | None] = mapped_column(Float, nullable=True)
+    llm_max_tokens_override: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    llm_top_p_override: Mapped[float | None] = mapped_column(Float, nullable=True)
+    allow_llm_data_samples: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    ai_config_reviewed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

@@ -39,6 +39,7 @@ from ..services.turn_artifact_read_service import TurnArtifactReadService
 from ..services.turn_artifact_storage_service import TurnArtifactStorageService
 from ..services.turn_bundle_service import TurnBundleService
 from ..services.workspace_maintenance_service import WorkspaceMaintenanceService
+from ..services.workspace_ai_config_service import WorkspaceAIConfigService
 from ..services.dataset_service import DatasetService
 from .deps import ensure_appdata_principal, get_current_user
 from ...core.prompt_library import get_prompt
@@ -2185,16 +2186,20 @@ async def regenerate_workspace_dataset_schema(
     )
 
     prefs = await PreferencesRepository.get_or_create(session, current_user.id)
+    workspace_ai = await WorkspaceAIConfigService.resolve(
+        session, current_user.id, workspace_id, workspace=workspace
+    )
+    effective_ai = workspace_ai["effective"]
     context = (
         payload.context if payload.context is not None else prefs.schema_context
     ) or "General data analysis"
     model = (
         payload.model
-        or getattr(prefs, "selected_lite_model", "")
-        or getattr(prefs, "selected_model", "")
+        or effective_ai.get("lite_model")
+        or effective_ai.get("main_model")
         or "google/gemini-2.5-flash-lite"
     ).strip()
-    provider = normalize_llm_provider(getattr(prefs, "llm_provider", "openrouter"))
+    provider = normalize_llm_provider(effective_ai.get("provider") or "openrouter")
     allow_sample_values = bool(prefs.allow_schema_sample_values)
 
     try:

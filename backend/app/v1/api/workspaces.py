@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db.session import get_appdata_db_session
 from ..schemas.workspace import (
     WorkspaceCreateRequest,
+    WorkspaceAIConfigResponse,
+    WorkspaceAIConfigUpdateRequest,
     WorkspaceDatabaseClearResponse,
     WorkspaceDeletionJobListResponse,
     WorkspaceDeletionJobResponse,
@@ -18,6 +20,7 @@ from ..schemas.workspace import (
 )
 from ..services.workspace_deletion_service import WorkspaceDeletionService
 from ..services.workspace_service import WorkspaceService
+from ..services.workspace_ai_config_service import WorkspaceAIConfigService
 from .deps import (
     ensure_appdata_principal,
     get_current_user,
@@ -30,6 +33,37 @@ router = APIRouter(
     tags=["V1 Workspaces"],
     dependencies=[Depends(ensure_appdata_principal)],
 )
+
+
+@router.get("/{workspace_id}/ai-config", response_model=WorkspaceAIConfigResponse)
+async def get_workspace_ai_config(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    resolved = await WorkspaceAIConfigService.resolve(session, current_user.id, workspace_id)
+    return WorkspaceAIConfigResponse(**WorkspaceAIConfigService.public_response(workspace_id, resolved))
+
+
+@router.put("/{workspace_id}/ai-config", response_model=WorkspaceAIConfigResponse)
+async def update_workspace_ai_config(
+    workspace_id: str,
+    payload: WorkspaceAIConfigUpdateRequest,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    resolved = await WorkspaceAIConfigService.update(session, current_user.id, workspace_id, payload)
+    return WorkspaceAIConfigResponse(**WorkspaceAIConfigService.public_response(workspace_id, resolved))
+
+
+@router.delete("/{workspace_id}/ai-config/overrides", response_model=WorkspaceAIConfigResponse)
+async def reset_workspace_ai_config(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    resolved = await WorkspaceAIConfigService.reset_overrides(session, current_user.id, workspace_id)
+    return WorkspaceAIConfigResponse(**WorkspaceAIConfigService.public_response(workspace_id, resolved))
 
 
 @router.get("", response_model=WorkspaceListResponse)

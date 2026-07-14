@@ -273,6 +273,48 @@ class ChatService:
         }
 
     @staticmethod
+    async def _resolve_workspace_llm_preferences(
+        session: AsyncSession,
+        user_id: str,
+        workspace_id: str,
+    ) -> dict[str, Any]:
+        """Apply workspace overrides without changing the stable global resolver contract."""
+        resolved = await ChatService._resolve_llm_preferences(session, user_id)
+        if not hasattr(session, "execute"):
+            return resolved
+        workspace = await WorkspaceRepository.get_by_id(session, workspace_id, user_id)
+        if workspace is None:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        provider_override = str(getattr(workspace, "llm_provider_override", "") or "").strip()
+        if provider_override:
+            provider = normalize_llm_provider(provider_override)
+            resolved["provider"] = provider
+            resolved["requires_api_key"] = provider_requires_api_key(provider)
+            if provider == "openrouter":
+                resolved["base_url"] = load_llm_runtime_config().base_url
+            elif provider == "ollama":
+                resolved["base_url"] = "http://localhost:11434/v1"
+            else:
+                resolved["base_url"] = provider_default_base_url(provider)
+
+        field_map = {
+            "main_model_override": "selected_main_model",
+            "lite_model_override": "selected_lite_model",
+            "llm_temperature_override": "temperature",
+            "llm_max_tokens_override": "max_tokens",
+            "llm_top_p_override": "top_p",
+        }
+        for workspace_field, resolved_field in field_map.items():
+            value = getattr(workspace, workspace_field, None)
+            if value is not None and value != "":
+                resolved[resolved_field] = value
+        if getattr(workspace, "main_model_override", None):
+            resolved["selected_coding_model"] = resolved["selected_main_model"]
+        resolved["allow_llm_data_samples"] = bool(getattr(workspace, "allow_llm_data_samples", False))
+        return resolved
+
+    @staticmethod
     def _normalize_known_columns(raw: Any, max_items: int = 50) -> list[dict[str, str]]:
         if not isinstance(raw, list):
             return []
@@ -1427,7 +1469,7 @@ class ChatService:
         try:
             normalized_attachments = ChatService._normalize_chat_attachments(attachments)
             thread_id = f"{user.id}:{workspace_id}:{conversation_id}"
-            llm_prefs = await ChatService._resolve_llm_preferences(session, str(user.id))
+            llm_prefs = await ChatService._resolve_workspace_llm_preferences(session, str(user.id), workspace_id)
             resolved_api_key = (api_key or "").strip() or (
                 SecretStorageService.get_api_key(user.id, provider=llm_prefs["provider"]) or ""
             )
@@ -1875,7 +1917,7 @@ class ChatService:
         try:
             normalized_attachments = ChatService._normalize_chat_attachments(attachments)
             thread_id = f"{user.id}:{workspace_id}:{resolved_conversation_id}"
-            llm_prefs = await ChatService._resolve_llm_preferences(session, str(user.id))
+            llm_prefs = await ChatService._resolve_workspace_llm_preferences(session, str(user.id), workspace_id)
             resolved_api_key = (api_key or "").strip() or (
                 SecretStorageService.get_api_key(user.id, provider=llm_prefs["provider"]) or ""
             )

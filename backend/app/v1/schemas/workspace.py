@@ -51,6 +51,28 @@ class WorkspaceSummaryResponse(BaseModel):
     conversation_count: int
 
 
+class WorkspaceAIConfigUpdateRequest(BaseModel):
+    """Editable workspace AI overrides. API credentials remain application scoped."""
+
+    llm_provider_override: str | None = Field(default=None, max_length=32)
+    main_model_override: str | None = Field(default=None, max_length=120)
+    lite_model_override: str | None = Field(default=None, max_length=120)
+    llm_temperature_override: float | None = Field(default=None, ge=0.0, le=2.0)
+    llm_max_tokens_override: int | None = Field(default=None, ge=1, le=131072)
+    llm_top_p_override: float | None = Field(default=None, ge=0.0, le=1.0)
+    allow_llm_data_samples: bool
+
+
+class WorkspaceAIConfigResponse(BaseModel):
+    """Global defaults, explicit overrides, resolved values, and readiness."""
+
+    workspace_id: str
+    defaults: dict
+    overrides: dict
+    effective: dict
+    readiness: dict
+
+
 class WorkspaceDeletionJobResponse(BaseModel):
     """Workspace deletion job status payload."""
 
