@@ -15,5 +15,6 @@ test('status bar no longer exposes alternate layout view controls', () => {
   assert.equal(source.includes(':aria-keyshortcuts="workspaceLayoutAriaShortcut"'), false)
   assert.equal(source.includes('aria-live="polite"'), false)
   assert.equal(source.includes('class="status-layout-preset"'), false)
-  assert.equal(source.includes('text-[11px] font-medium text-[var(--color-text-muted)] select-none'), true)
+  assert.equal(source.includes('status-bar h-7'), true)
+  assert.equal(source.includes('text-[11px] font-normal text-[var(--color-text-muted)] select-none'), true)
 })

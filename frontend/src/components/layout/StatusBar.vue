@@ -1,11 +1,11 @@
 <template>
-  <div class="h-7 w-full bg-[var(--color-surface)] border-t border-[var(--color-border)] flex items-center justify-between px-3 text-[11px] font-medium text-[var(--color-text-muted)] select-none z-50 shrink-0">
+  <div class="status-bar h-7 w-full bg-[var(--color-surface)] border-t border-[var(--color-border)] flex items-center justify-between px-3 text-[11px] font-normal text-[var(--color-text-muted)] select-none z-50 shrink-0">
 
     <!-- Left Section: Token usage, runtime status, and editor position -->
     <div class="flex items-center gap-3 h-full">
       <div
         v-if="authStore.isAuthenticated"
-        class="flex items-center gap-1 h-full px-1 text-[11px] text-[var(--color-text-muted)]"
+        class="flex items-center gap-1 h-full px-1 tabular-nums text-[var(--color-text-muted)]"
         :title="tokenUsageHoverLabel"
       >
         <span class="truncate">{{ tokenUsageSummaryLabel }}</span>
@@ -29,7 +29,7 @@
           <span class="truncate font-medium text-[var(--color-text-main)]">
             {{ activeWorkspaceName }}
           </span>
-          <span class="hidden text-[11px] font-semibold sm:inline" :class="workspaceRuntimeStatusMeta.textClass">
+          <span class="hidden font-medium sm:inline" :class="workspaceRuntimeStatusMeta.textClass">
             {{ workspaceRuntimeStatusMeta.label }}
           </span>
           <ChevronUpDownIcon class="h-3.5 w-3.5 shrink-0 text-[var(--color-text-muted)]" />
@@ -68,7 +68,7 @@
 
       <template v-if="appStore.isEditorFocused">
         <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
-        <div class="flex items-center text-[11px] text-[var(--color-text-muted)] tracking-tight gap-1 px-1">
+        <div class="flex items-center tabular-nums text-[var(--color-text-muted)] tracking-tight gap-1 px-1">
           <span>Ln {{ appStore.editorLine }},</span>
           <span>Col {{ appStore.editorCol }}</span>
         </div>
@@ -88,7 +88,7 @@
       <template v-else>
         <div
           v-if="primaryBackgroundOperation"
-          class="flex max-w-[360px] items-center gap-1.5 rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-text-muted)]"
+          class="flex max-w-[360px] items-center gap-1.5 rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 font-medium tabular-nums text-[var(--color-text-muted)]"
           :title="primaryBackgroundOperationTitle"
           data-background-operation-status
         >
@@ -105,11 +105,11 @@
           <span class="truncate">{{ primaryBackgroundOperationLabel }}</span>
           <span v-if="backgroundOperationCountLabel" class="shrink-0 text-[var(--color-text-sub)]">{{ backgroundOperationCountLabel }}</span>
         </div>
-        <div v-if="appStore.activeWorkspaceId && paneArtifactCountLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium"
+        <div v-if="appStore.activeWorkspaceId && paneArtifactCountLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded font-medium tabular-nums"
              :class="artifactCountClass">
           <span>{{ paneArtifactCountLabel }}</span>
         </div>
-        <div v-if="appStore.activeWorkspaceId && tableViewportLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium" :class="artifactCountClass">
+        <div v-if="appStore.activeWorkspaceId && tableViewportLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded font-medium tabular-nums" :class="artifactCountClass">
           <span>{{ tableViewportLabel }}</span>
         </div>
         <div

@@ -32,13 +32,15 @@ test('primary navigation and settings use the compact shell metrics', () => {
   assert.match(settings, /w-\[176px\]/)
 })
 
-test('brand mark is a crisp static vector at sidebar scale', () => {
+test('brand mark is a crisp animated vector at sidebar scale', () => {
   const sourceMark = read('src/assets/favicon.svg')
   const publicMark = read('public/favicon.svg')
 
   for (const mark of [sourceMark, publicMark]) {
     assert.match(mark, /viewBox="0 0 32 32"/)
-    assert.doesNotMatch(mark, /<filter|feGaussianBlur|<animate/)
+    assert.doesNotMatch(mark, /<filter|feGaussianBlur/)
+    assert.match(mark, /shape-rendering="geometricPrecision"/)
+    assert.match(mark, /<animateTransform[^>]+type="rotate"[^>]+dur="16s"/)
     assert.match(mark, /stroke-linecap="round"/)
   }
   assert.equal(sourceMark, publicMark)

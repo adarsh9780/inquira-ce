@@ -32,7 +32,8 @@ test('desktop favicon follows the blue-orange Inquira brand mark', () => {
     assert.equal(source.includes('stop-color="#C96A2E"'), true)
     assert.equal(source.includes('viewBox="0 0 32 32"'), true)
     assert.equal(source.includes('feGaussianBlur'), false)
-    assert.equal(source.includes('<animate'), false)
+    assert.equal(source.includes('<animateTransform'), true)
+    assert.equal(source.includes('dur="16s"'), true)
     assert.equal(source.includes('fill="#8b5cf6"'), false)
     assert.equal(source.includes('fill="#6366f1"'), false)
   }
