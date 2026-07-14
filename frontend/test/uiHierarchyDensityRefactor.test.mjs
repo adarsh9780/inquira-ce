@@ -32,7 +32,7 @@ test('chat keeps composer pinned as footer and improves assistant readability', 
   const leftPaneSource = readFileSync(resolve(process.cwd(), 'src/components/layout/WorkspaceLeftPane.vue'), 'utf-8')
   const chatHistorySource = readFileSync(resolve(process.cwd(), 'src/components/chat/ChatHistory.vue'), 'utf-8')
 
-  assert.equal(leftPaneSource.includes('class="workspace-left-content min-h-0 flex-1 flex flex-col p-3 sm:p-4 pb-0"'), true)
+  assert.equal(leftPaneSource.includes('class="workspace-left-content min-h-0 flex-1 flex flex-col p-2.5 sm:p-3 pb-0"'), true)
   assert.equal(leftPaneSource.includes(':style="leftPaneBodyStyle"'), false)
   assert.equal(chatHistorySource.includes('class="chat-markdown-content final-response-body max-w-none"'), true)
   assert.equal(chatHistorySource.includes('class="ephemeral-trace-list"'), true)

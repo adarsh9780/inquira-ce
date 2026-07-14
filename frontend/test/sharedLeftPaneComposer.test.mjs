@@ -21,7 +21,7 @@ test('workspace left pane hosts a shared chat composer below both code and chat 
   assert.equal(source.includes('rounded-xl border p-1'), false)
   assert.equal(source.includes('workspace-left-content-chat-only'), false)
   assert.equal(source.includes('workspaceLayoutMode'), false)
-  assert.equal(source.includes("class=\"flex-shrink-0 pt-2 sm:pt-3\""), true)
+  assert.equal(source.includes("class=\"flex-shrink-0 pt-2\""), true)
   assert.equal(source.includes("v-show=\"appStore.workspacePane === 'code'\""), true)
   assert.equal(source.includes("v-show=\"appStore.workspacePane === 'chat'\""), true)
   assert.equal(source.includes("v-show=\"appStore.workspacePane === 'ctree'\""), false)

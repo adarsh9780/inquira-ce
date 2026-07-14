@@ -1048,14 +1048,14 @@ watch(() => appStore.activeConversationIsLoading, (isLoading, wasLoading) => {
 
 :deep(.chat-markdown-content) {
   font-size: 14px;
-  line-height: 1.7;
+  line-height: 1.6;
   color: var(--color-text-main);
   font-weight: 400;
 }
 
 :deep(.final-response-body) {
   font-size: 14px;
-  line-height: 1.7;
+  line-height: 1.6;
   font-weight: 400;
 }
 
@@ -1063,8 +1063,8 @@ watch(() => appStore.activeConversationIsLoading, (isLoading, wasLoading) => {
   position: relative;
   border: 1px solid color-mix(in srgb, var(--color-accent) 14%, var(--color-border));
   background-color: var(--color-chat-user-bubble);
-  box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--color-text-main) 6%, transparent);
-  border-radius: 1.25rem !important;
+  box-shadow: 0 2px 10px -4px color-mix(in srgb, var(--color-text-main) 6%, transparent);
+  border-radius: 0.875rem !important;
 }
 
 

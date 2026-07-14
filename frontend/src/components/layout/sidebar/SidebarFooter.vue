@@ -1,5 +1,5 @@
 <template>
-  <nav class="mt-auto pb-4 pt-2">
+  <nav class="mt-auto pb-2 pt-1.5">
     <slot />
   </nav>
 </template>

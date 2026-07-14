@@ -21,7 +21,7 @@
     </AppToolbar>
 
     <p class="sr-only" aria-live="polite">{{ resultAnnouncement }}</p>
-    <div class="min-h-0 flex-1 p-3 sm:p-4 pb-0" style="background-color: var(--color-workspace-surface);">
+    <div class="min-h-0 flex-1 p-2.5 sm:p-3 pb-0" style="background-color: var(--color-workspace-surface);">
       <div v-if="appStore.dataPane === 'table'" class="h-full">
         <TableTab />
       </div>

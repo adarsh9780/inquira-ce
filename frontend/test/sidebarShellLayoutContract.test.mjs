@@ -11,16 +11,16 @@ test('app shell owns sidebar rail sizing while UnifiedSidebar fills the provided
   assert.equal(appSource.includes("'app-nav-pane-collapsed': appStore.isSidebarCollapsed"), true)
   assert.equal(appSource.includes('app-nav-pane-hidden'), false)
   assert.equal(appSource.includes('.app-nav-pane {'), true)
-  assert.equal(appSource.includes('width: 260px;'), true)
+  assert.equal(appSource.includes('width: 244px;'), true)
   assert.equal(appSource.includes('.app-nav-pane-collapsed {'), true)
-  assert.equal(appSource.includes('width: 64px;'), true)
+  assert.equal(appSource.includes('width: 52px;'), true)
 
   assert.equal(
     sidebarSource.includes('class="relative z-40 flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden sidebar-root"'),
     true,
   )
-  assert.equal(sidebarSource.includes("'w-[260px]'"), false)
-  assert.equal(sidebarSource.includes("'w-[64px]'"), false)
+  assert.equal(sidebarSource.includes("'w-[244px]'"), false)
+  assert.equal(sidebarSource.includes("'w-[52px]'"), false)
   assert.equal(sidebarSource.includes('transition-[width]'), false)
 })
 

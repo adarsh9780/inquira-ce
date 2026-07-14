@@ -1,6 +1,6 @@
 <template>
   <section class="scrollbar-hidden h-full overflow-y-auto">
-    <div class="grid h-full min-h-0 grid-cols-[240px_1fr] gap-6">
+    <div class="grid h-full min-h-0 grid-cols-[210px_1fr] gap-4">
       <WorkspaceListPanel>
         <header class="mb-3 flex items-center justify-between">
           <h3 class="section-label">Workspaces</h3>
@@ -9,7 +9,7 @@
           </button>
         </header>
 
-        <div class="flex-1 space-y-2 overflow-y-auto pr-1 scrollbar-thin">
+        <div class="flex-1 space-y-1.5 overflow-y-auto pr-1 scrollbar-thin">
           <div
             v-if="isInlineCreating"
             class="rounded-lg bg-[var(--color-accent-soft)] px-3 py-2.5 ring-1 ring-[var(--color-accent-border)]"
@@ -30,7 +30,7 @@
           <div
             v-for="workspace in workspaceCards"
             :key="workspace.id"
-            class="group relative flex w-full cursor-pointer flex-col rounded-lg px-3 py-2.5 text-left transition-all"
+            class="group relative flex w-full cursor-pointer flex-col rounded-lg px-2.5 py-2 text-left transition-all"
             :class="workspace.id === activeWorkspaceId
               ? 'bg-[var(--color-accent-soft)] ring-1 ring-[var(--color-accent-border)]'
               : 'bg-[var(--color-base-soft)] hover:bg-[var(--color-base-muted)]'"
@@ -62,7 +62,7 @@
       </WorkspaceListPanel>
 
       <div
-        class="flex h-full min-w-0 flex-col space-y-4"
+        class="flex h-full min-w-0 flex-col space-y-3"
         @dragenter.prevent="handleDropDragEnter"
         @dragover.prevent="handleDropDragOver"
         @dragleave.prevent="handleDropDragLeave"
@@ -106,12 +106,12 @@
           </div>
         </header>
 
-        <nav v-if="activeWorkspace" class="flex shrink-0 gap-5 border-b border-[var(--color-border)]" aria-label="Workspace settings sections" role="tablist">
+        <nav v-if="activeWorkspace" class="flex shrink-0 gap-4 border-b border-[var(--color-border)]" aria-label="Workspace settings sections" role="tablist">
           <button
             v-for="section in workspaceSections"
             :key="section.id"
             type="button"
-            class="relative -mb-px border-b-2 px-0.5 pb-2 text-xs font-medium transition-colors"
+            class="relative -mb-px border-b-2 px-0.5 pb-1.5 text-xs font-medium transition-colors"
             :class="activeWorkspaceSection === section.id ? 'border-[var(--color-accent)] text-[var(--color-text-main)]' : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
             :aria-selected="activeWorkspaceSection === section.id"
             :tabindex="activeWorkspaceSection === section.id ? 0 : -1"
@@ -125,7 +125,7 @@
         </nav>
 
         <div v-if="activeWorkspace" class="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
-          <div v-show="activeWorkspaceSection === 'general'" class="space-y-4" role="tabpanel" aria-label="General workspace settings">
+          <div v-show="activeWorkspaceSection === 'general'" class="space-y-3" role="tabpanel" aria-label="General workspace settings">
           <WorkspaceContextSection>
             <div class="flex items-center justify-between gap-3">
               <h4 class="section-label">Workspace Context</h4>
@@ -171,7 +171,7 @@
             <button
               v-if="isWorkspaceActive"
               type="button"
-              class="w-full rounded-xl border border-dashed px-5 py-4 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-70"
+              class="w-full rounded-lg border border-dashed px-4 py-3 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-70"
               :class="isDropActive ? 'border-[var(--color-accent-border)] bg-[var(--color-accent-soft)]' : 'border-[var(--color-border)] bg-[var(--color-base-soft)]/30 hover:bg-[var(--color-base-soft)]/70'"
               :disabled="isDatasetIngesting || isDeletingDataset"
               data-testid="workspace-import-datasets-dropzone"

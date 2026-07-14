@@ -4,7 +4,7 @@
     <div class="relative">
       <div
         ref="inputCardRef"
-        class="group/composer relative flex flex-col rounded-2xl border transition-all duration-150"
+        class="group/composer relative flex flex-col rounded-xl border transition-all duration-150"
         @dragenter.prevent="handleAttachmentDragEnter"
         @dragover.prevent="handleAttachmentDragOver"
         @dragleave.prevent="handleAttachmentDragLeave"
@@ -35,8 +35,8 @@
         @focus="isFocused = true"
         @blur="isFocused = false"
         placeholder="How can I help you today?"
-        class="w-full px-4 pt-4 pb-2 resize-none focus:outline-none text-sm leading-relaxed bg-transparent border-none"
-        style="color: var(--color-text-main); min-height: 72px;"
+        class="w-full px-3 pt-3 pb-1.5 resize-none focus:outline-none text-[13px] leading-[1.55] bg-transparent border-none"
+        style="color: var(--color-text-main); min-height: 60px;"
         :class="{ 'opacity-60 cursor-not-allowed': !appStore.canAnalyze || appStore.activeConversationIsLoading }"
         :disabled="!appStore.canAnalyze || appStore.activeConversationIsLoading"
       />
@@ -71,7 +71,7 @@
             data-tooltip="Attach images"
             @click="openAttachmentPicker"
           >
-            <PlusIcon class="w-5 h-5" />
+            <PlusIcon class="w-4 h-4" />
           </button>
           <template v-if="appStore.activeTurnId && hasTurnNavigation">
             <button

@@ -28,8 +28,11 @@ test('desktop favicon follows the blue-orange Inquira brand mark', () => {
   const publicIconSource = readFileSync(resolve(process.cwd(), 'public/favicon.svg'), 'utf-8')
 
   for (const source of [appIconSource, publicIconSource]) {
-    assert.equal(source.includes('stop-color:#3b82f6'), true)
-    assert.equal(source.includes('stop-color:#f97316'), true)
+    assert.equal(source.includes('stop-color="#5B7FD4"'), true)
+    assert.equal(source.includes('stop-color="#C96A2E"'), true)
+    assert.equal(source.includes('viewBox="0 0 32 32"'), true)
+    assert.equal(source.includes('feGaussianBlur'), false)
+    assert.equal(source.includes('<animate'), false)
     assert.equal(source.includes('fill="#8b5cf6"'), false)
     assert.equal(source.includes('fill="#6366f1"'), false)
   }

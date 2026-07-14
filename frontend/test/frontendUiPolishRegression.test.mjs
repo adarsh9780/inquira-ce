@@ -7,7 +7,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf
 test('settings modal is viewport bounded and exposes dialog keyboard semantics', () => {
   const source = read('src/components/modals/SettingsModal.vue')
 
-  assert.match(source, /h-\[min\(680px,calc\(100dvh-2rem\)\)\]/)
+  assert.match(source, /h-\[min\(640px,calc\(100dvh-2rem\)\)\]/)
   assert.match(source, /role="dialog"/)
   assert.match(source, /aria-modal="true"/)
   assert.match(source, /@keydown="handleDialogKeydown"/)

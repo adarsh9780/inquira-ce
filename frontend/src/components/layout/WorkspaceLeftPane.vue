@@ -19,7 +19,7 @@
       <div id="workspace-left-pane-toolbar" class="min-w-0"></div></template>
     </AppToolbar>
 
-    <div class="workspace-left-content min-h-0 flex-1 flex flex-col p-3 sm:p-4 pb-0">
+    <div class="workspace-left-content min-h-0 flex-1 flex flex-col p-2.5 sm:p-3 pb-0">
       <div class="min-h-0 flex-1">
       <div v-show="appStore.workspacePane === 'code'" class="h-full">
         <CodeTab />
@@ -29,7 +29,7 @@
       </div>
       </div>
 
-      <div class="flex-shrink-0 pt-2 sm:pt-3" style="background-color: var(--color-workspace-surface);">
+      <div class="flex-shrink-0 pt-2" style="background-color: var(--color-workspace-surface);">
         <ChatInput />
       </div>
     </div>

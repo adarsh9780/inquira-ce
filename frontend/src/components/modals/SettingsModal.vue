@@ -16,7 +16,7 @@
       <div class="modal-overlay" @click="closeModal"></div>
       <div
         ref="dialogRef"
-        class="modal-card settings-modal-card relative h-[min(680px,calc(100dvh-2rem))] w-full max-w-[900px] text-[var(--color-text-main)]"
+        class="modal-card settings-modal-card relative h-[min(640px,calc(100dvh-2rem))] w-full max-w-[860px] text-[var(--color-text-main)]"
         @click.stop
       >
         <button
@@ -31,7 +31,7 @@
         </button>
 
         <div class="settings-modal-layout flex h-full">
-          <aside class="settings-modal-nav w-[190px] shrink-0 border-r border-[var(--color-border)] bg-[var(--color-base-soft)] px-3 py-4 flex flex-col justify-between select-none">
+          <aside class="settings-modal-nav w-[176px] shrink-0 border-r border-[var(--color-border)] bg-[var(--color-base-soft)] px-2.5 py-3 flex flex-col justify-between select-none">
             <div class="space-y-0.5">
               <button
                 type="button"
@@ -78,21 +78,21 @@
 
           <main class="relative flex-1 flex flex-col overflow-hidden">
             <!-- Header Zone -->
-            <header class="px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-base-soft)] shrink-0 select-none">
-              <h2 id="settings-modal-title" class="text-sm font-bold tracking-tight text-[var(--color-text-main)]">{{ activeSectionTitle }}</h2>
+            <header class="px-5 py-3 border-b border-[var(--color-border)] bg-[var(--color-base-soft)] shrink-0 select-none">
+              <h2 id="settings-modal-title" class="text-[13px] font-semibold tracking-tight text-[var(--color-text-main)]">{{ activeSectionTitle }}</h2>
               <p class="text-[11px] text-[var(--color-text-muted)] mt-0.5 leading-snug">{{ activeSectionDescription }}</p>
             </header>
 
             <div class="relative flex-1 overflow-hidden">
-              <section :class="panelClass('setup')" :aria-hidden="currentPanel !== 'setup'" :inert="currentPanel !== 'setup'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
+              <section :class="panelClass('setup')" :aria-hidden="currentPanel !== 'setup'" :inert="currentPanel !== 'setup'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
                 <SetupTab />
               </section>
 
-              <section :class="panelClass('connections')" :aria-hidden="currentPanel !== 'connections'" :inert="currentPanel !== 'connections'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
+              <section :class="panelClass('connections')" :aria-hidden="currentPanel !== 'connections'" :inert="currentPanel !== 'connections'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
                 <LLMSettingsTab @close-request="closeModal" />
               </section>
 
-              <section :class="panelClass('workspace')" :aria-hidden="currentPanel !== 'workspace'" :inert="currentPanel !== 'workspace'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
+              <section :class="panelClass('workspace')" :aria-hidden="currentPanel !== 'workspace'" :inert="currentPanel !== 'workspace'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
                 <WorkspaceTab
                   :active-workspace-id="activeWorkspaceId"
                   :initial-section="workspaceInitialSection"
@@ -104,13 +104,13 @@
                 />
               </section>
 
-              <section :class="panelClass('appearance')" :aria-hidden="currentPanel !== 'appearance'" :inert="currentPanel !== 'appearance'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
+              <section :class="panelClass('appearance')" :aria-hidden="currentPanel !== 'appearance'" :inert="currentPanel !== 'appearance'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
                 <AppearanceTab />
               </section>
 
 
 
-              <section :class="panelClass('account')" :aria-hidden="currentPanel !== 'account'" :inert="currentPanel !== 'account'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
+              <section :class="panelClass('account')" :aria-hidden="currentPanel !== 'account'" :inert="currentPanel !== 'account'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
                 <AccountTab />
               </section>
             </div>

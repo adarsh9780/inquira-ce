@@ -4,21 +4,21 @@
   >
     <!-- ─── Brand / Collapse Toggle ─── -->
     <div
-      class="sidebar-brand-row justify-between px-4"
+      class="sidebar-brand-row justify-between px-3"
     >
       <button
         class="sidebar-brand-button justify-start"
         :title="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         @click="handleBrandClick"
       >
-        <div class="flex h-7 w-7 shrink-0 items-center justify-center">
-          <img :src="logo" alt="Inquira" class="h-full w-full rounded-md" />
+        <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+          <img :src="logo" alt="Inquira" class="block h-full w-full" />
         </div>
         <div
           class="flex items-center overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
           :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[160px] opacity-100 ml-2.5'"
         >
-          <span class="text-[13px] font-semibold text-[var(--color-text-main)]">
+          <span class="text-[13px] font-semibold tracking-[-0.01em] text-[var(--color-text-main)]">
             Inquira
           </span>
         </div>
@@ -36,7 +36,7 @@
           @click="createConversation()"
         >
           <span class="sidebar-row-icon">
-            <PencilSquareIcon class="h-5 w-5" />
+            <PencilSquareIcon class="h-4 w-4" />
           </span>
           <span
             class="sidebar-row-label"
@@ -159,7 +159,7 @@
               :title="shortcutTooltip('schema', 'Schema editor')"
               @click="openSchemaEditor"
             >
-              <span class="sidebar-row-icon"><CircleStackIcon class="h-5 w-5" /></span>
+              <span class="sidebar-row-icon"><CircleStackIcon class="h-4 w-4" /></span>
               <span class="sidebar-row-label ml-2.5 max-w-[176px] opacity-100">Schema</span>
             </button>
             <button
@@ -169,17 +169,17 @@
               :title="shortcutTooltip('conversation-tree', 'Conversation tree')"
               @click="openConversationTree"
             >
-              <span class="sidebar-row-icon"><ShareIcon class="h-5 w-5" /></span>
+              <span class="sidebar-row-icon"><ShareIcon class="h-4 w-4" /></span>
               <span class="sidebar-row-label ml-2.5 max-w-[176px] opacity-100">Conversation tree</span>
             </button>
           </div>
         </DisclosureSection>
         <div v-else class="space-y-0.5">
           <button type="button" class="sidebar-nav-row justify-start px-2.5" title="Schema editor" @click="openSchemaEditor">
-            <span class="sidebar-row-icon"><CircleStackIcon class="h-5 w-5" /></span>
+            <span class="sidebar-row-icon"><CircleStackIcon class="h-4 w-4" /></span>
           </button>
           <button type="button" class="sidebar-nav-row justify-start px-2.5" title="Conversation tree" @click="openConversationTree">
-            <span class="sidebar-row-icon"><ShareIcon class="h-5 w-5" /></span>
+            <span class="sidebar-row-icon"><ShareIcon class="h-4 w-4" /></span>
           </button>
         </div>
       </div>
@@ -197,8 +197,8 @@
             @click="handleBrandClick"
           >
             <span class="sidebar-row-icon">
-              <ChevronDoubleRightIcon v-if="appStore.isSidebarCollapsed" class="h-5 w-5" />
-              <ChevronDoubleLeftIcon v-else class="h-5 w-5" />
+              <ChevronDoubleRightIcon v-if="appStore.isSidebarCollapsed" class="h-4 w-4" />
+              <ChevronDoubleLeftIcon v-else class="h-4 w-4" />
             </span>
             <span
               class="sidebar-row-label"
@@ -216,7 +216,7 @@
             @click="appStore.openSettings('setup')"
           >
             <span class="sidebar-row-icon">
-              <Cog6ToothIcon class="h-5 w-5" />
+              <Cog6ToothIcon class="h-4 w-4" />
             </span>
             <span
               class="sidebar-row-label"
@@ -885,7 +885,7 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
 
 .sidebar-brand-row {
   display: flex;
-  height: 3.5rem;
+  height: 3rem;
   flex-shrink: 0;
   align-items: center;
   border-bottom: 1px solid var(--color-border);
@@ -928,7 +928,7 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
 .sidebar-nav-row,
 .sidebar-workspace-row {
   display: flex;
-  height: 2.25rem;
+  height: var(--size-sidebar-row-height);
   width: 100%;
   align-items: center;
   border-radius: 0.5rem;
@@ -991,9 +991,9 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  line-height: 1.25rem;
+  font-size: var(--text-ui);
+  font-weight: 500;
+  line-height: var(--line-height-ui);
   transition:
     max-width var(--motion-duration-slow) var(--motion-ease-emphasized),
     opacity var(--motion-duration-standard) var(--motion-ease-standard),
@@ -1001,8 +1001,8 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
 }
 
 .sidebar-section-label {
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: var(--text-caption);
+  font-weight: 600;
   line-height: 1rem;
   color: color-mix(in srgb, var(--color-text-muted) 78%, var(--color-base) 22%);
   letter-spacing: 0.02em;

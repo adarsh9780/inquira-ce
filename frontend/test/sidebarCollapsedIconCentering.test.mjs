@@ -7,7 +7,7 @@ test('collapsed sidebar relies on app-shell width and visually hidden label copy
   const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
-  assert.equal(appSource.includes('width: 64px;'), true)
+  assert.equal(appSource.includes('width: 52px;'), true)
   assert.equal(sidebarSource.includes("max-w-0 opacity-0 ml-0"), true)
   assert.equal(sidebarSource.includes("'max-w-[176px] opacity-100 ml-2.5'"), true)
 })
@@ -21,7 +21,8 @@ test('collapsed sidebar rows keep a stable fixed-size icon rail', () => {
   assert.ok(sidebarSource.includes('.sidebar-row-icon'))
   assert.ok(sidebarSource.includes('height: calc(var(--size-sidebar-inline-icon) + 0.5rem);'))
   assert.ok(sidebarSource.includes('width: calc(var(--size-sidebar-inline-icon) + 0.5rem);'))
-  assert.ok(sidebarSource.includes('height: 2.25rem;'))
+  assert.ok(sidebarSource.includes('height: var(--size-sidebar-row-height);'))
+  assert.ok(styleSource.includes('--size-sidebar-row-height: 2.125rem;'))
   assert.ok(sidebarSource.includes('.sidebar-row-icon :deep(svg)'))
   assert.ok(sidebarSource.includes('workspaceInitials(workspace.name)'))
   assert.ok(sidebarSource.includes('.sidebar-workspace-initials'))

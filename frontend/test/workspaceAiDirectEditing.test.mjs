@@ -9,7 +9,7 @@ test('workspace AI tab is directly editable without a nested edit mode', () => {
   assert.doesNotMatch(source, /Edit settings/)
   assert.doesNotMatch(source, /isEditing/)
   assert.doesNotMatch(source, /handleDefaultsChange/)
-  assert.match(source, /<div class="mt-4 space-y-5 border-t/)
+  assert.match(source, /<div class="mt-3 space-y-4 border-t/)
   assert.match(source, /v-model="useDefaults"/)
 })
 
