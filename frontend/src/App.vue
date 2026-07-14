@@ -5,6 +5,8 @@
     <div
       v-show="!startupFailure && !desktopStartup.ready"
       class="fixed inset-0 flex items-center justify-center bg-[var(--color-base)]"
+      role="status"
+      aria-live="polite"
     >
       <div class="w-full max-w-md px-6 text-center">
         <!-- Logo -->
@@ -43,6 +45,7 @@
     <div
       v-show="startupFailure"
       class="fixed inset-0 flex items-center justify-center bg-[var(--color-base)]"
+      role="alert"
     >
       <div class="w-full max-w-md px-6 text-center">
         <!-- Logo -->
@@ -105,6 +108,9 @@
       <div
         data-testid="startup-overlay"
         :data-active="blockingOverlayActive ? 'true' : 'false'"
+        :aria-hidden="blockingOverlayActive ? 'false' : 'true'"
+        role="status"
+        aria-live="polite"
         class="layer-blocking fixed inset-0 flex items-center justify-center bg-[var(--color-base)] transition-opacity duration-300"
         :class="blockingOverlayActive ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
       >
@@ -131,7 +137,7 @@
 
           <!-- Spinner + elapsed only; keep a single status message above -->
           <div class="mt-8 flex items-center justify-center gap-3">
-            <div class="relative h-8 w-8 shrink-0">
+            <div class="relative h-8 w-8 shrink-0" aria-hidden="true">
               <div class="absolute inset-0 rounded-full border-2 border-[var(--color-border)]"></div>
               <div class="absolute inset-0 rounded-full border-2 border-t-[var(--color-text-main)] border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
             </div>

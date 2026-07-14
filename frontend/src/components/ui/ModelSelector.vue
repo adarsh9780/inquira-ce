@@ -6,7 +6,8 @@
         <ListboxButton
           class="inline-flex w-full min-w-0 items-center justify-between gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none group"
           style="color: var(--color-text-main); border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-surface) 88%, var(--color-workspace-surface));"
-          title="Select model"
+          :title="getModelDisplayName(selectedModel)"
+          aria-label="Select model"
         >
           <span class="min-w-0 flex-1 truncate text-left" style="color: var(--color-text-main);">
             {{ getModelDisplayName(selectedModel) }}
@@ -50,6 +51,7 @@
               <li
                 :style="dropdownOptionStyle(active, { activeMix: 'var(--color-surface) 78%' })"
                 :class="[dropdownOptionClass, 'pl-3 pr-9 flex items-center justify-between']"
+                :title="model.label"
               >
                 <span :class="selected ? 'font-semibold' : 'font-normal'" class="block truncate">
                   {{ model.label }}
@@ -149,7 +151,7 @@ const backendModels = ref([])
 const backendLoadingLocal = ref(false)
 let backendSearchTimer = null
 let backendSearchToken = 0
-const modelDropdownSurfaceClass = `${dropdownSurfaceClass.replace('fixed', 'absolute')} z-50 bottom-full mb-2 right-0 min-w-[200px] rounded-lg text-xs overflow-hidden`
+const modelDropdownSurfaceClass = `${dropdownSurfaceClass.replace('fixed', 'absolute')} z-50 bottom-full mb-2 right-0 w-72 max-w-[calc(100vw-1rem)] max-h-72 rounded-lg text-xs overflow-y-auto overflow-x-hidden`
 
 const fallbackModels = [
   'google/gemini-3-flash-preview',

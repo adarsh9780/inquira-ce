@@ -7,10 +7,11 @@
       :class="widthClass"
       :style="menuStyle"
       tabindex="-1"
+      role="menu"
       data-floating-action-menu
       v-bind="markerAttributes"
       @click.stop
-      @keydown.esc.stop.prevent="emit('close')"
+      @keydown="handleMenuKeydown"
     >
       <div
         v-if="header"
@@ -26,7 +27,9 @@
           data-floating-action-menu-divider
         />
         <button
+          :ref="(element) => setItemRef(element, item.id)"
           type="button"
+          role="menuitem"
           class="w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           :class="item.destructive
             ? 'text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)]'
@@ -87,7 +90,9 @@ const props = defineProps({
 const emit = defineEmits(['select', 'close'])
 
 const menuRef = ref(null)
+const itemRefs = ref(new Map())
 const clampedPosition = ref({ x: 0, y: 0 })
+let triggerElement = null
 
 const normalizedItems = computed(() => (
   Array.isArray(props.items)
@@ -154,6 +159,35 @@ function handleViewportChange() {
   updateMenuPosition()
 }
 
+function setItemRef(element, id) {
+  if (element) itemRefs.value.set(id, element)
+  else itemRefs.value.delete(id)
+}
+
+function enabledItems() {
+  return normalizedItems.value
+    .filter((item) => !item.disabled)
+    .map((item) => itemRefs.value.get(item.id))
+    .filter(Boolean)
+}
+
+function handleMenuKeydown(event) {
+  if (event.key === 'Escape') {
+    event.stopPropagation()
+    event.preventDefault()
+    emit('close')
+    return
+  }
+  const items = enabledItems()
+  if (!items.length || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+  event.preventDefault()
+  const currentIndex = items.indexOf(document.activeElement)
+  if (event.key === 'Home') items[0].focus()
+  else if (event.key === 'End') items[items.length - 1].focus()
+  else if (event.key === 'ArrowDown') items[(currentIndex + 1 + items.length) % items.length].focus()
+  else items[(currentIndex - 1 + items.length) % items.length].focus()
+}
+
 watch(
   () => [props.isOpen, props.position?.x, props.position?.y, props.position?.left, props.position?.top, normalizedItems.value.length, props.header],
   async () => {
@@ -166,8 +200,13 @@ watch(
 )
 
 watch(() => props.isOpen, (isOpen) => {
-  if (!isOpen) return
-  void nextTick(() => menuRef.value?.focus?.())
+  if (isOpen) {
+    triggerElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    void nextTick(() => enabledItems()[0]?.focus?.())
+    return
+  }
+  triggerElement?.focus?.()
+  triggerElement = null
 })
 
 if (typeof document !== 'undefined') {

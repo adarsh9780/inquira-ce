@@ -22,8 +22,11 @@ test('onboarding copy avoids provider-specific hardcoding in LLM settings', () =
 
   assert.equal(chatInput.includes('Gemini API key'), false)
   assert.equal(chatTab.includes('Gemini API key'), false)
-  assert.equal(chatInput.includes('OpenRouter API key'), true)
-  assert.equal(chatTab.includes('OpenRouter API key'), true)
+  assert.equal(chatInput.includes('OpenRouter API key'), false)
+  assert.equal(chatTab.includes('OpenRouter API key'), false)
+  assert.equal(chatTab.includes('configure your model provider in Settings'), true)
+  assert.equal(chatInput.includes('appStore.llmProvider'), true)
+  assert.equal(chatInput.includes('missingSetupRequirements'), true)
   assert.equal(llmTab.includes('API Key (OpenRouter)'), false)
   assert.equal(llmTab.includes('{{ apiKeyLabel }}'), true)
 })

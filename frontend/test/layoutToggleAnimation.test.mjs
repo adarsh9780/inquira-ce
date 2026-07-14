@@ -16,7 +16,7 @@ test('right panel animates terminal open and close via height and opacity transi
   assert.equal(panelSource.includes('workspace-data-pane-hidden'), false)
   assert.equal(panelSource.includes('const leftPaneWidth = computed(() => appStore.leftPaneWidth)'), true)
   assert.equal(panelSource.includes('const rightPaneWidth = computed(() => 100 - appStore.leftPaneWidth)'), true)
-  assert.equal(panelSource.includes('width: `${rightPaneWidth}%`'), true)
+  assert.equal(panelSource.includes("width: isCompactLayout ? '100%' : `${rightPaneWidth}%`"), true)
 })
 
 test('sidebar keeps the current animated text-collapse and scroll layout', () => {

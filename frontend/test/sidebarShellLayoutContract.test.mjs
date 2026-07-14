@@ -34,7 +34,7 @@ test('workspace shell owns pane sizing while child panes stay fluid', () => {
     true,
   )
   assert.equal(
-    panelSource.includes(`:style="{ width: leftPaneWidth + '%', borderColor: 'var(--color-border)' }"`),
+    panelSource.includes(`width: isCompactLayout ? '100%' : leftPaneWidth + '%'`),
     true,
   )
   assert.equal(
@@ -42,7 +42,7 @@ test('workspace shell owns pane sizing while child panes stay fluid', () => {
     true,
   )
   assert.equal(
-    panelSource.includes('width: `${rightPaneWidth}%`'),
+    panelSource.includes("width: isCompactLayout ? '100%' : `${rightPaneWidth}%`"),
     true,
   )
   assert.equal(panelSource.includes('v-if="appStore.showLeftPane"'), false)

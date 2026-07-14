@@ -8,10 +8,15 @@
     <div
       v-if="modelValue"
       class="fixed inset-0 layer-modal flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-modal-title"
+      @keydown="handleDialogKeydown"
     >
       <div class="modal-overlay" @click="closeModal"></div>
       <div
-        class="modal-card relative h-[680px] w-full max-w-[900px] text-[var(--color-text-main)]"
+        ref="dialogRef"
+        class="modal-card settings-modal-card relative h-[min(680px,calc(100dvh-2rem))] w-full max-w-[900px] text-[var(--color-text-main)]"
         @click.stop
       >
         <button
@@ -25,8 +30,8 @@
           </svg>
         </button>
 
-        <div class="flex h-full">
-          <aside class="w-[190px] shrink-0 border-r border-[var(--color-border)] bg-[var(--color-base-soft)] px-3 py-4 flex flex-col justify-between select-none">
+        <div class="settings-modal-layout flex h-full">
+          <aside class="settings-modal-nav w-[190px] shrink-0 border-r border-[var(--color-border)] bg-[var(--color-base-soft)] px-3 py-4 flex flex-col justify-between select-none">
             <div class="space-y-0.5">
               <button
                 type="button"
@@ -66,16 +71,16 @@
           <main class="relative flex-1 flex flex-col overflow-hidden">
             <!-- Header Zone -->
             <header class="px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-base-soft)] shrink-0 select-none">
-              <h2 class="text-sm font-bold tracking-tight text-[var(--color-text-main)]">{{ activeSectionTitle }}</h2>
+              <h2 id="settings-modal-title" class="text-sm font-bold tracking-tight text-[var(--color-text-main)]">{{ activeSectionTitle }}</h2>
               <p class="text-[11px] text-[var(--color-text-muted)] mt-0.5 leading-snug">{{ activeSectionDescription }}</p>
             </header>
 
             <div class="relative flex-1 overflow-hidden">
-              <section :class="panelClass('llm')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
+              <section :class="panelClass('llm')" :aria-hidden="currentPanel !== 'llm'" :inert="currentPanel !== 'llm'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
                 <LLMSettingsTab @close-request="closeModal" />
               </section>
 
-              <section :class="panelClass('workspace')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
+              <section :class="panelClass('workspace')" :aria-hidden="currentPanel !== 'workspace'" :inert="currentPanel !== 'workspace'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
                 <WorkspaceTab
                   :active-workspace-id="activeWorkspaceId"
                   :workspaces="workspaceItems"
@@ -86,13 +91,13 @@
                 />
               </section>
 
-              <section :class="panelClass('appearance')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
+              <section :class="panelClass('appearance')" :aria-hidden="currentPanel !== 'appearance'" :inert="currentPanel !== 'appearance'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
                 <AppearanceTab />
               </section>
 
 
 
-              <section :class="panelClass('account')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
+              <section :class="panelClass('account')" :aria-hidden="currentPanel !== 'account'" :inert="currentPanel !== 'account'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
                 <AccountTab />
               </section>
             </div>
@@ -104,7 +109,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useLLMConfig } from '../../composables/useLLMConfig'
 import { useAppStore } from '../../stores/appStore'
 import { toast } from '../../composables/useToast'
@@ -142,6 +147,8 @@ const currentPanel = ref('llm')
 const panelDirection = ref('forward')
 const activeWorkspaceOperation = ref('')
 const activeWorkspaceOperationMessage = ref('')
+const dialogRef = ref(null)
+const previouslyFocusedElement = ref(null)
 
 const activeNavClass = 'nav-tab-active'
 const inactiveNavClass = 'nav-tab'
@@ -178,13 +185,18 @@ watch(
   () => props.modelValue,
   async (isOpen) => {
     if (isOpen) {
+      previouslyFocusedElement.value = document.activeElement instanceof HTMLElement ? document.activeElement : null
       await appStore.fetchWorkspaces()
       const initialWorkspace = String(appStore.activeWorkspaceId || '').trim() || String(workspaceItems.value[0]?.id || '').trim()
       activeWorkspaceId.value = initialWorkspace
       initializePanelState(props.initialTab)
+      await nextTick()
+      dialogRef.value?.querySelector('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')?.focus?.()
       return
     }
     llmConfig.clearSensitiveState()
+    previouslyFocusedElement.value?.focus?.()
+    previouslyFocusedElement.value = null
   },
   { immediate: true },
 )
@@ -278,6 +290,28 @@ function closeModal() {
   emit('update:modelValue', false)
 }
 
+function handleDialogKeydown(event) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    closeModal()
+    return
+  }
+  if (event.key !== 'Tab') return
+  const focusable = [...(dialogRef.value?.querySelectorAll(
+    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+  ) || [])].filter((element) => !element.closest('[inert]'))
+  if (!focusable.length) return
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
 function setActiveWorkspaceOperation(payload) {
   if (!payload || payload.locked === false) {
     activeWorkspaceOperation.value = ''
@@ -305,5 +339,27 @@ function notifyWorkspaceOperationBlocked() {
 .settings-panel-transition {
   transition: transform var(--motion-duration-slow) var(--motion-ease-emphasized),
               opacity var(--motion-duration-slow) var(--motion-ease-standard);
+}
+
+@media (max-width: 640px) {
+  .settings-modal-card {
+    height: calc(100dvh - 1rem);
+  }
+
+  .settings-modal-layout {
+    flex-direction: column;
+  }
+
+  .settings-modal-nav {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+    padding: 0.5rem 2.75rem 0.5rem 0.5rem;
+  }
+
+  .settings-modal-nav > div {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

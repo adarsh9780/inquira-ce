@@ -4,13 +4,19 @@
     <!-- Top Workspace Area (Chat/Code & Data Panes) -->
     <div 
       v-show="isWorkspaceActive"
-      class="flex w-full overflow-hidden transition-[height] motion-slow"
+      class="relative flex w-full overflow-hidden transition-[height] motion-slow"
+      :class="isCompactLayout ? 'flex-col' : ''"
       :style="{ height: workspaceVisualHeight + '%' }"
     >
+      <div v-if="isCompactLayout" class="flex h-9 shrink-0 items-center justify-center gap-1 border-b border-[var(--color-border)]">
+        <button type="button" class="compact-pane-button" :aria-pressed="compactPane === 'work'" @click="compactPane = 'work'">Work</button>
+        <button type="button" class="compact-pane-button" :aria-pressed="compactPane === 'data'" @click="compactPane = 'data'">Data</button>
+      </div>
       <!-- Left Pane (Chat / Code) -->
       <div 
         class="flex h-full min-w-0 flex-col border-r workspace-center-pane" 
-        :style="{ width: leftPaneWidth + '%', borderColor: 'var(--color-border)' }"
+        v-show="!isCompactLayout || compactPane === 'work'"
+        :style="{ width: isCompactLayout ? '100%' : leftPaneWidth + '%', height: isCompactLayout ? 'calc(100% - 2.25rem)' : '100%', borderColor: 'var(--color-border)' }"
       >
         <WorkspaceLeftPane />
       </div>
@@ -18,14 +24,23 @@
       <!-- Vertical Resizer Handle (Left/Right panes) -->
       <div 
         class="pane-resizer-x relative z-10 -mx-[1px] h-full w-[3px] cursor-col-resize bg-transparent transition-all motion-fast hover:w-1"
-        @mousedown="startResizeX"
+        v-if="!isCompactLayout"
+        role="separator"
+        aria-label="Resize work and data panes"
+        aria-orientation="vertical"
+        :aria-valuenow="Math.round(leftPaneWidth)"
+        tabindex="0"
+        @pointerdown="startResizeX"
+        @keydown="handleResizeXKeydown"
       ></div>
 
       <!-- Right Pane (Table / Figure / Output) -->
       <div 
         class="flex h-full min-w-0 flex-col overflow-hidden workspace-data-pane"
+        v-show="!isCompactLayout || compactPane === 'data'"
         :style="{
-          width: `${rightPaneWidth}%`,
+          width: isCompactLayout ? '100%' : `${rightPaneWidth}%`,
+          height: isCompactLayout ? 'calc(100% - 2.25rem)' : '100%',
           opacity: 1
         }"
       >
@@ -38,7 +53,13 @@
       v-if="isWorkspaceActive"
       class="pane-resizer-y relative z-20 -my-[1px] w-full bg-transparent transition-[height,opacity,background-color,box-shadow] motion-slow"
       :class="appStore.isTerminalOpen ? 'h-[3px] cursor-row-resize opacity-100 hover:h-1' : 'h-0 pointer-events-none opacity-0'"
-      @mousedown="appStore.isTerminalOpen && startResizeY($event)"
+      role="separator"
+      aria-label="Resize workspace and terminal panes"
+      aria-orientation="horizontal"
+      :aria-valuenow="Math.round(terminalVisualHeight)"
+      :tabindex="appStore.isTerminalOpen ? 0 : -1"
+      @pointerdown="appStore.isTerminalOpen && startResizeY($event)"
+      @keydown="handleResizeYKeydown"
     ></div>
 
     <!-- Bottom Pane (Terminal View) -->
@@ -61,6 +82,8 @@
           @click="appStore.toggleTerminal()" 
           class="btn-icon h-5 w-5 p-1"
           title="Close Terminal"
+          aria-label="Close terminal"
+          data-tooltip="Close terminal"
         >
           <XMarkIcon class="w-4 h-4" />
         </button>
@@ -92,7 +115,9 @@
       class="fixed inset-0 z-50 cursor-col-resize"
       :class="isResizingY ? 'cursor-row-resize' : 'cursor-col-resize'"
       @mousemove="onResize"
+      @pointermove="onResize"
       @mouseup="stopResize"
+      @pointerup="stopResize"
       @mouseleave="stopResize"
     ></div>
 
@@ -123,6 +148,9 @@ const workspaceVisualHeight = computed(() => 100 - terminalVisualHeight.value)
 const panelRef = ref(null)
 const isResizingX = ref(false)
 const isResizingY = ref(false)
+const isCompactLayout = ref(false)
+const compactPane = ref('work')
+let panelResizeObserver = null
 
 function startResizeX(e) {
   isResizingX.value = true
@@ -132,6 +160,22 @@ function startResizeX(e) {
 function startResizeY(e) {
   isResizingY.value = true
   document.body.style.userSelect = 'none'
+}
+
+function handleResizeXKeydown(event) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+  event.preventDefault()
+  if (event.key === 'Home') appStore.setLeftPaneWidth(20)
+  else if (event.key === 'End') appStore.setLeftPaneWidth(80)
+  else appStore.setLeftPaneWidth(Math.min(80, Math.max(20, leftPaneWidth.value + (event.key === 'ArrowRight' ? 2 : -2))))
+}
+
+function handleResizeYKeydown(event) {
+  if (!appStore.isTerminalOpen || !['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
+  event.preventDefault()
+  if (event.key === 'Home') appStore.setTerminalHeight(10)
+  else if (event.key === 'End') appStore.setTerminalHeight(80)
+  else appStore.setTerminalHeight(Math.min(80, Math.max(10, terminalVisualHeight.value + (event.key === 'ArrowUp' ? 2 : -2))))
 }
 
 function onResize(e) {
@@ -168,10 +212,20 @@ function stopResize() {
 
 onMounted(() => {
   window.addEventListener('mouseup', stopResize)
+  window.addEventListener('pointerup', stopResize)
+  if ('ResizeObserver' in window && panelRef.value) {
+    panelResizeObserver = new ResizeObserver(([entry]) => {
+      isCompactLayout.value = Number(entry?.contentRect?.width || panelRef.value?.clientWidth || 0) < 760
+    })
+    panelResizeObserver.observe(panelRef.value)
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('mouseup', stopResize)
+  window.removeEventListener('pointerup', stopResize)
+  panelResizeObserver?.disconnect?.()
+  document.body.style.userSelect = ''
 })
 </script>
 
@@ -194,8 +248,28 @@ onUnmounted(() => {
 }
 
 .pane-resizer-x:hover,
-.pane-resizer-y:hover {
+.pane-resizer-y:hover,
+.pane-resizer-x:focus-visible,
+.pane-resizer-y:focus-visible {
   background-color: var(--color-border-hover);
   box-shadow: 0 0 6px color-mix(in srgb, var(--color-text-main) 15%, transparent);
+}
+
+.pane-resizer-x,
+.pane-resizer-y {
+  touch-action: none;
+}
+
+.compact-pane-button {
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem;
+}
+
+.compact-pane-button[aria-pressed='true'] {
+  background: var(--color-selected-surface);
+  color: var(--color-text-main);
 }
 </style>

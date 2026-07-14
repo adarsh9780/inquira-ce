@@ -67,6 +67,8 @@
             type="button"
             class="btn-icon"
             title="Attach images"
+            aria-label="Attach images"
+            data-tooltip="Attach images"
             @click="openAttachmentPicker"
           >
             <PlusIcon class="w-5 h-5" />
@@ -76,6 +78,8 @@
               type="button"
               class="btn-icon"
               title="Previous turn"
+              aria-label="Previous turn"
+              data-tooltip="Previous turn"
               :disabled="!appStore.activeTurnRelations?.previous_turn"
               @click="appStore.goToPreviousTurn()"
             >
@@ -85,6 +89,8 @@
               type="button"
               class="btn-icon"
               title="Next turn"
+              aria-label="Next turn"
+              data-tooltip="Next turn"
               :disabled="!appStore.activeTurnRelations?.next_turn"
               @click="appStore.goToNextTurn()"
             >
@@ -94,8 +100,8 @@
         </div>
 
         <!-- Right: Model selector + action button -->
-        <div class="flex min-w-[12rem] flex-1 items-center justify-end gap-3">
-          <div class="min-w-[9rem] flex-1" style="max-width: clamp(9rem, 30vw, 22rem);">
+        <div class="composer-model-actions flex min-w-0 flex-1 items-center justify-end gap-2 sm:min-w-[12rem] sm:gap-3">
+          <div class="min-w-0 flex-1" style="max-width: clamp(7rem, 30vw, 22rem);">
             <ModelSelector
               :selected-model="appStore.selectedModel"
               :model-options="appStore.availableModels"
@@ -119,6 +125,8 @@
                 : 'cursor-default opacity-50'
             "
             :title="actionButtonTitle"
+            :aria-label="actionButtonTitle"
+            :data-tooltip="actionButtonTitle"
           >
             <span
               class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-text-main)] text-[var(--color-on-accent)] transition-all duration-300"
@@ -176,8 +184,7 @@
         <div>
           <h4 class="text-sm font-semibold mb-1" style="color: var(--color-error);">Setup Required</h4>
           <ul class="space-y-1 text-sm list-disc list-inside" style="color: var(--color-text-muted);">
-            <li>Create or select a workspace from the header dropdown</li>
-            <li>Enter your OpenRouter API key in Settings</li>
+            <li v-for="requirement in missingSetupRequirements" :key="requirement">{{ requirement }}</li>
           </ul>
         </div>
       </div>
@@ -228,6 +235,15 @@ const columnSuggestions = ref([])
 const selectedColumnIndex = ref(0)
 const questionHistoryIndex = ref(-1)
 const questionHistoryDraft = ref('')
+const missingSetupRequirements = computed(() => {
+  const requirements = []
+  if (!appStore.hasWorkspace) requirements.push('Create or select a workspace from the sidebar')
+  if (appStore.providerRequiresApiKey && !appStore.selectedProviderApiKeyPresent) {
+    const provider = String(appStore.llmProvider || 'model provider').trim()
+    requirements.push(`Enter your ${provider} API key in Settings`)
+  }
+  return requirements.length ? requirements : ['Finish model setup in Settings']
+})
 const activeTokenRange = ref({ start: 0, end: 0, token: '' })
 const suggestionsOpenUp = ref(false)
 const dismissedSuggestionSignature = ref('')

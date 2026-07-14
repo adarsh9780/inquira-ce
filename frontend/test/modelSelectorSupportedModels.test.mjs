@@ -36,7 +36,7 @@ test('chat input model dropdown updates only main model in pinia store', () => {
   assert.equal(source.includes(':backend-search="searchProviderModels"'), true)
   assert.equal(source.includes(':provider="appStore.llmProvider"'), true)
   assert.equal(source.includes(':search-loading="appStore.providerModelSearchLoading"'), true)
-  assert.equal(source.includes('style="max-width: clamp(9rem, 30vw, 22rem);"'), true)
+  assert.equal(source.includes('style="max-width: clamp(7rem, 30vw, 22rem);"'), true)
   assert.equal(source.includes('appStore.setSelectedModel(model)'), true)
 })
 

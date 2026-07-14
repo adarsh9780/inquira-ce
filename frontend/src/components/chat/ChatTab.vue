@@ -27,7 +27,7 @@
             </div>
             <h3 class="text-xl sm:text-2xl font-bold mb-2 sm:mb-3" style="color: var(--color-text-main);">Start Your Analysis</h3>
             <p class="text-sm sm:text-base leading-relaxed" style="color: var(--color-text-muted);">
-              Point Inquira at your local dataset path, add your OpenRouter API key in Settings, then ask a question to generate code and insights.
+              Select a workspace, configure your model provider in Settings, then ask a question to generate code and insights.
             </p>
           </div>
         </div>

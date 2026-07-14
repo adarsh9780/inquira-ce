@@ -308,6 +308,48 @@ body {
   width: 100vw;
 }
 
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  background: var(--color-text-main);
+  border-radius: var(--radius-md);
+  bottom: calc(100% + 0.4rem);
+  color: var(--color-base);
+  content: attr(data-tooltip);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  left: 50%;
+  max-width: min(20rem, calc(100vw - 1rem));
+  opacity: 0;
+  padding: 0.3rem 0.45rem;
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, 0.2rem);
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-standard), transform var(--motion-duration-fast) var(--motion-ease-standard);
+  white-space: nowrap;
+  z-index: 100;
+}
+
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-delay: 0s !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @layer components {
 
   /* Base Button - The foundation for all interactive elements */
