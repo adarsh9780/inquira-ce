@@ -78,7 +78,10 @@
             @keydown.enter.prevent="saveRename"
             @keydown.escape.prevent="cancelRename"
           />
-          <h2 v-else class="min-w-0 truncate text-sm font-bold text-[var(--color-text-main)]">Selected Workspace Summary</h2>
+          <div v-else class="min-w-0">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">Workspace settings</p>
+            <h2 class="truncate text-sm font-bold text-[var(--color-text-main)]">{{ activeWorkspace?.name || 'Select a workspace' }}</h2>
+          </div>
           <div v-if="activeWorkspace" class="flex shrink-0 flex-wrap items-center justify-end gap-2">
             <template v-if="isRenamingInline">
               <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="cancelRename">Cancel</button>
@@ -112,6 +115,8 @@
               <p v-else class="text-xs text-[var(--color-text-muted)]">No workspace context added yet.</p>
             </div>
           </WorkspaceContextSection>
+
+          <WorkspaceAIConfigSection v-if="activeWorkspace?.id" :workspace-id="activeWorkspace.id" />
 
           <WorkspaceDatasetSection>
             <div class="flex items-center justify-between gap-3">
@@ -158,8 +163,6 @@
               <p class="text-xs text-[var(--color-text-muted)]">Activate this workspace to add datasets.</p>
             </div>
           </WorkspaceDatasetSection>
-
-          <WorkspaceAIConfigSection v-if="activeWorkspace?.id" :workspace-id="activeWorkspace.id" />
 
           <WorkspaceRuntimeReadiness />
         </div>

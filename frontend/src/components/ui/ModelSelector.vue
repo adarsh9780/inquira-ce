@@ -70,7 +70,7 @@
             </li>
             <div class="sticky bottom-0 border-t border-[var(--color-border)] bg-[var(--color-workspace-surface)] p-1.5">
               <button type="button" class="w-full rounded-md px-2 py-1.5 text-left text-[11px] font-semibold text-[var(--color-text-muted)] hover:bg-[var(--color-panel-muted)] hover:text-[var(--color-text-main)]" @click.stop="emit('manage-models')">
-                Manage models…
+                Workspace model settings…
               </button>
             </div>
           </ListboxOptions>

@@ -43,19 +43,19 @@
               </button>
               <button
                 type="button"
-                :class="activeSection === 'llm' ? activeNavClass : inactiveNavClass"
-                @click="openLeafSection('llm')"
-              >
-                <KeyIcon class="h-4 w-4 shrink-0" />
-                <span>Models</span>
-              </button>
-              <button
-                type="button"
                 :class="activeSection === 'workspace' ? activeNavClass : inactiveNavClass"
                 @click="openWorkspaceSection"
               >
                 <ListBulletIcon class="h-4 w-4 shrink-0" />
                 <span>Workspaces</span>
+              </button>
+              <button
+                type="button"
+                :class="activeSection === 'connections' ? activeNavClass : inactiveNavClass"
+                @click="openLeafSection('connections')"
+              >
+                <KeyIcon class="h-4 w-4 shrink-0" />
+                <span>Connections</span>
               </button>
               <button
                 type="button"
@@ -88,7 +88,7 @@
                 <SetupTab />
               </section>
 
-              <section :class="panelClass('llm')" :aria-hidden="currentPanel !== 'llm'" :inert="currentPanel !== 'llm'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
+              <section :class="panelClass('connections')" :aria-hidden="currentPanel !== 'connections'" :inert="currentPanel !== 'connections'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
                 <LLMSettingsTab @close-request="closeModal" />
               </section>
 
@@ -169,7 +169,7 @@ const inactiveNavClass = 'nav-tab'
 
 const activeSectionTitle = computed(() => {
   if (activeSection.value === 'setup') return 'Setup'
-  if (activeSection.value === 'llm') return 'Models'
+  if (activeSection.value === 'connections') return 'Connections'
   if (activeSection.value === 'workspace') return 'Workspaces'
   if (activeSection.value === 'appearance') return 'Appearance'
   if (activeSection.value === 'account') return 'Account'
@@ -178,8 +178,8 @@ const activeSectionTitle = computed(() => {
 
 const activeSectionDescription = computed(() => {
   if (activeSection.value === 'setup') return 'See what is ready and complete the next required step.'
-  if (activeSection.value === 'llm') return 'Choose providers and models. Advanced generation controls stay collapsed by default.'
-  if (activeSection.value === 'workspace') return 'Create, select, and maintain local workspaces.'
+  if (activeSection.value === 'connections') return 'Manage provider credentials shared by every workspace.'
+  if (activeSection.value === 'workspace') return 'Manage each workspace, its data, models, privacy, and advanced controls.'
   if (activeSection.value === 'appearance') return 'Choose the theme and typography used throughout Inquira.'
   if (activeSection.value === 'account') return 'Review local profile and application information.'
   return 'Customize application settings.'
@@ -227,9 +227,9 @@ watch(
 
 function normalizeTab(tab) {
   const candidate = String(tab || '').toLowerCase()
-  if (candidate === 'api') return 'llm'
+  if (candidate === 'api' || candidate === 'llm') return 'connections'
   if (candidate === 'data') return 'workspace'
-  if (candidate === 'setup' || candidate === 'llm' || candidate === 'workspace' || candidate === 'appearance' || candidate === 'account') {
+  if (candidate === 'setup' || candidate === 'connections' || candidate === 'workspace' || candidate === 'appearance' || candidate === 'account') {
     return candidate
   }
   return 'setup'

@@ -18,7 +18,8 @@ test('workspace settings uses one active-workspace management surface', () => {
   assert.equal(settings.includes("panelClass('ws-detail')"), false)
   assert.equal(settings.includes("panelClass('ws-create')"), false)
   assert.equal(workspace.includes('workspaceSurface'), false)
-  assert.equal(workspace.includes('Selected Workspace Summary'), true)
+  assert.equal(workspace.includes('Workspace settings'), true)
+  assert.equal(workspace.includes('Selected Workspace Summary'), false)
   assert.equal(template.includes('workspace-stepper'), false)
   assert.equal(template.includes('System Pipeline Graph'), false)
   assert.equal(template.includes('Workspace runtime'), false)
@@ -80,7 +81,7 @@ test('selected summary puts actions in the header and uses context instead of du
   assert.equal(template.match(/@click="beginInlineCreate"/g)?.length, 2)
 })
 
-test('settings sidebar is flat, ordered, and starts with model settings', () => {
+test('settings sidebar keeps workspace ownership ahead of shared connections', () => {
   const settings = read('src/components/modals/SettingsModal.vue')
   const template = settings.slice(0, settings.indexOf('<script setup>'))
 
@@ -88,8 +89,9 @@ test('settings sidebar is flat, ordered, and starts with model settings', () => 
   assert.equal(template.includes('App Config'), false)
   assert.equal(template.includes('User &amp; System'), false)
   assert.equal(template.includes('Switch &amp; Create'), false)
-  assert.equal(template.indexOf('<span>Models</span>') < template.indexOf('<span>Workspaces</span>'), true)
-  assert.equal(template.indexOf('<span>Workspaces</span>') < template.indexOf('<span>Appearance</span>'), true)
+  assert.equal(template.includes('<span>Models</span>'), false)
+  assert.equal(template.indexOf('<span>Workspaces</span>') < template.indexOf('<span>Connections</span>'), true)
+  assert.equal(template.indexOf('<span>Connections</span>') < template.indexOf('<span>Appearance</span>'), true)
   assert.equal(template.indexOf('<span>Appearance</span>') < template.indexOf('<span>Account</span>'), true)
 })
 

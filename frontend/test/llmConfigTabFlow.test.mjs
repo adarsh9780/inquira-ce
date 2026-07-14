@@ -63,11 +63,11 @@ test('useLLMConfig composable exposes provider-aware save flow and advanced fiel
   assert.equal(source.includes('await loadPreferences(selectedProvider, true)'), true)
 })
 
-test('LLM settings tab uses a compact provider connection, searchable model selects, and advanced controls', () => {
+test('connections tab prioritizes credentials and buries application model defaults', () => {
   const source = read('src/components/modals/tabs/LLMSettingsTab.vue')
 
   assert.equal(source.includes('@update:model-value="handleProviderSelect"'), true)
-  assert.equal(source.includes('Provider'), true)
+  assert.equal(source.includes('Connection provider'), true)
   assert.equal(source.includes('OpenAI'), true)
   assert.equal(source.includes('OpenRouter'), true)
   assert.equal(source.includes('Ollama (local)'), true)
@@ -78,7 +78,9 @@ test('LLM settings tab uses a compact provider connection, searchable model sele
   assert.equal(source.includes('<ConfirmationModal'), true)
   assert.equal(source.includes('Refresh model list'), true)
   assert.equal(source.includes('Show all models'), true)
-  assert.equal(source.includes('Save configuration'), true)
+  assert.equal(source.includes('Application model defaults'), true)
+  assert.equal(source.includes('Fallback values for workspaces that choose to inherit defaults.'), true)
+  assert.equal(source.includes('Save application defaults'), true)
   assert.equal(source.includes('Configuration ready'), false)
   assert.equal(source.includes('Update key'), false)
   assert.equal(source.includes('@click="openPanel'), false)

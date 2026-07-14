@@ -2,10 +2,10 @@
   <section class="border-t border-[var(--color-border)] pt-4">
     <div class="flex items-start justify-between gap-4">
       <div>
-        <h4 class="section-label">AI configuration</h4>
+        <h4 class="section-label">Models &amp; privacy</h4>
         <p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ effectiveSummary }}</p>
       </div>
-      <button type="button" class="text-xs font-semibold text-[var(--color-accent)] hover:underline" @click="isEditing = !isEditing">{{ isEditing ? 'Done' : 'Customize' }}</button>
+      <button type="button" class="text-xs font-semibold text-[var(--color-accent)] hover:underline" @click="isEditing = !isEditing">{{ isEditing ? 'Done' : 'Edit settings' }}</button>
     </div>
 
     <div class="mt-3 flex items-center gap-2 text-[11px] text-[var(--color-text-muted)]">
@@ -13,11 +13,12 @@
       <span>{{ credentialLabel }}</span>
       <span aria-hidden="true">·</span>
       <span>{{ hasOverrides ? 'Workspace override' : 'Application defaults' }}</span>
+      <button v-if="config && !config.readiness?.credential_ready" type="button" class="font-semibold text-[var(--color-accent)] hover:underline" @click="appStore.openSettings('connections')">Manage connection</button>
     </div>
 
     <div v-if="isEditing" class="mt-4 space-y-5 border-t border-[var(--color-border)] pt-4">
       <label class="flex items-center justify-between gap-4">
-        <span><span class="block text-sm font-medium text-[var(--color-text-main)]">Use application defaults</span><span class="mt-0.5 block text-xs text-[var(--color-text-muted)]">Keep model choices in sync with Models settings.</span></span>
+        <span><span class="block text-sm font-medium text-[var(--color-text-main)]">Use application defaults</span><span class="mt-0.5 block text-xs text-[var(--color-text-muted)]">Inherit the secondary defaults stored under Connections.</span></span>
         <input v-model="useDefaults" type="checkbox" class="h-4 w-4 accent-[var(--color-accent)]" @change="handleDefaultsChange" />
       </label>
 

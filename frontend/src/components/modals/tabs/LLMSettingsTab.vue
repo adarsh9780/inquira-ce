@@ -1,21 +1,21 @@
 <template>
   <section class="scrollbar-hidden relative h-full overflow-y-auto">
-    <div class="scrollbar-hidden h-full overflow-y-auto pb-24">
+    <div class="scrollbar-hidden h-full overflow-y-auto pb-8">
 
 
       <div class="llm-settings-container">
         <!-- 1. Provider connection -->
         <div class="flex items-end justify-between gap-5 border-b border-[var(--color-border)] pb-5">
           <div class="min-w-0 flex-1">
-            <label class="input-label">Provider</label>
+            <label class="input-label">Connection provider</label>
             <HeaderDropdown
               :model-value="provider"
               :options="providerOptions"
               max-width-class="w-full"
-              aria-label="Application model provider"
+              aria-label="Credential provider"
               @update:model-value="handleProviderSelect"
             />
-            <p class="mt-1.5 text-xs text-[var(--color-text-muted)]">Credentials are stored once and can be used by every workspace.</p>
+            <p class="mt-1.5 text-xs text-[var(--color-text-muted)]">Choose a provider to manage its shared application credential.</p>
           </div>
           <div class="status-badge mb-0.5 shrink-0" :class="statusBadgeClass">
             <span class="status-dot"></span>
@@ -135,8 +135,19 @@
           </div>
         </div>
 
+        <details class="mt-6 border-t border-[var(--color-border)] pt-4">
+          <summary class="cursor-pointer list-none rounded-md py-2 text-sm font-semibold text-[var(--color-text-main)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-border)]">
+            <span class="flex items-center justify-between gap-4">
+              <span>
+                <span class="block">Application model defaults</span>
+                <span class="mt-1 block text-xs font-normal text-[var(--color-text-muted)]">Fallback values for workspaces that choose to inherit defaults.</span>
+              </span>
+              <span class="text-xs font-normal text-[var(--color-text-muted)]">Optional</span>
+            </span>
+          </summary>
+
         <!-- 3. Model Configuration Dashboard -->
-        <div class="settings-card glass-panel">
+        <div class="settings-card glass-panel mt-3">
           <div class="settings-card-header">
             <h3 class="settings-card-title">Model Mapping</h3>
             <button
@@ -380,30 +391,23 @@
             </div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Actions Footer -->
-    <div class="settings-footer-actions">
-      <button
-        type="button"
-        class="action-btn cancel-btn"
-        @click="emit('close-request')"
-      >
-        Cancel
-      </button>
-      <button
-        type="button"
-        class="action-btn save-btn"
-        :disabled="saveLoading"
-        @click="saveConfiguration"
-      >
-        <span v-if="saveLoading" class="inline-flex items-center gap-2">
-          <span class="loading-spinner accent-spinner"></span>
-          Saving...
-        </span>
-        <span v-else>Save configuration</span>
-      </button>
+          <div class="mt-5 flex items-center justify-end border-t border-[var(--color-border)] pt-4">
+            <button
+              type="button"
+              class="action-btn save-btn"
+              :disabled="saveLoading"
+              @click="saveConfiguration"
+            >
+              <span v-if="saveLoading" class="inline-flex items-center gap-2">
+                <span class="loading-spinner accent-spinner"></span>
+                Saving...
+              </span>
+              <span v-else>Save application defaults</span>
+            </button>
+          </div>
+        </details>
+      </div>
     </div>
   </section>
   <FloatingActionMenu

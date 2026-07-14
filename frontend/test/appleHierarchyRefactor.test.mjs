@@ -33,8 +33,8 @@ test('composer uses inline setup guidance and progressive model management', () 
 
   assert.match(composer, /<InlineNotice/)
   assert.match(composer, /hasTurnNavigation/)
-  assert.match(composer, /@manage-models="appStore\.openSettings\('llm'\)"/)
-  assert.match(selector, /Manage models…/)
+  assert.match(composer, /@manage-models="appStore\.openSettings\('workspace'\)"/)
+  assert.match(selector, /Workspace model settings…/)
 })
 
 test('rare destructive result actions live in overflow menus', () => {

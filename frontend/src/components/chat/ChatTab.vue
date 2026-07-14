@@ -23,7 +23,7 @@
           title="Connect a model"
           description="Provider credentials are saved once and used by your workspaces."
           action-label="Connect model"
-          @action="appStore.openSettings('llm')"
+          @action="appStore.openSettings('connections')"
         ><template #icon><KeyIcon class="h-6 w-6" /></template></AppEmptyState>
 
         <AppEmptyState

@@ -7,7 +7,8 @@ test('settings modal keeps left nav static and routes workspace panels on the ri
   const path = resolve(process.cwd(), 'src/components/modals/SettingsModal.vue')
   const source = readFileSync(path, 'utf-8')
 
-  assert.equal(source.includes('<span>Models</span>'), true)
+  assert.equal(source.includes('<span>Connections</span>'), true)
+  assert.equal(source.includes('<span>Models</span>'), false)
   assert.equal(source.includes('<span>Setup</span>'), true)
   assert.equal(source.includes('<span>Workspaces</span>'), true)
   assert.equal(source.includes('Appearance'), true)
@@ -24,6 +25,6 @@ test('settings modal keeps left nav static and routes workspace panels on the ri
   assert.equal(source.includes('<AppearanceTab />'), true)
   assert.equal(source.includes('<AccountTab />'), true)
   assert.equal(source.includes('activeTab ==='), false)
-  assert.equal(source.includes("if (candidate === 'api') return 'llm'"), true)
-  assert.equal(source.includes("candidate === 'setup' || candidate === 'llm'"), true)
+  assert.equal(source.includes("if (candidate === 'api' || candidate === 'llm') return 'connections'"), true)
+  assert.equal(source.includes("candidate === 'setup' || candidate === 'connections'"), true)
 })

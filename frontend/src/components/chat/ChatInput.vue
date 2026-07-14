@@ -111,7 +111,7 @@
               :search-debounce-ms="250"
               :max-options-without-search="10"
               @model-changed="handleModelChange"
-              @manage-models="appStore.openSettings('llm')"
+              @manage-models="appStore.openSettings('workspace')"
             />
           </div>
 
@@ -272,7 +272,7 @@ const setupNotice = computed(() => {
     title: `Configure ${provider}`,
     message: missingSetupRequirements.value[0] || 'Add provider access to start an analysis.',
     actionLabel: 'Open Settings',
-    action: () => appStore.openSettings('llm'),
+    action: () => appStore.openSettings('connections'),
   }
 })
 const activeTokenRange = ref({ start: 0, end: 0, token: '' })

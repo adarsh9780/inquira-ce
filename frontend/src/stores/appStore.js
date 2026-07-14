@@ -162,10 +162,10 @@ export const useAppStore = defineStore('app', () => {
   const isSettingsOpen = ref(false)
   const settingsInitialTab = ref('setup')
 
-  function openSettings(tab = 'llm') {
+  function openSettings(tab = 'setup') {
     const n = String(tab || '').trim().toLowerCase()
     if      (n === 'setup' || n === 'readiness')   settingsInitialTab.value = 'setup'
-    else if (n === 'api'    || n === 'llm')        settingsInitialTab.value = 'llm'
+    else if (n === 'api' || n === 'llm' || n === 'connections') settingsInitialTab.value = 'connections'
     else if (n === 'workspace' || n === 'data')     settingsInitialTab.value = 'workspace'
     else if (n === 'account')                       settingsInitialTab.value = 'account'
     else if (n === 'appearance' || n === 'theme')   settingsInitialTab.value = 'appearance'
