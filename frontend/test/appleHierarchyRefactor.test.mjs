@@ -60,6 +60,14 @@ test('empty states and token summary use the shared quiet hierarchy', () => {
   assert.match(usage, /in · .*out ·/)
 })
 
+test('flat model settings sections do not regain card borders on hover', () => {
+  const styles = read('src/style.css')
+  const hoverRule = styles.match(/\.llm-settings-container \.settings-card:hover \{([^}]+)\}/)?.[1] || ''
+
+  assert.match(hoverRule, /border-color: transparent;/)
+  assert.match(hoverRule, /border-top-color: var\(--color-border\);/)
+})
+
 test('result panes announce and mark new contextual output without moving focus', () => {
   const source = read('src/components/layout/WorkspaceRightPane.vue')
 

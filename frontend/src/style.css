@@ -1153,6 +1153,8 @@ p {
 }
 
 .llm-settings-container .settings-card:hover {
+  border-color: transparent;
+  border-top-color: var(--color-border);
   box-shadow: none;
   transform: none;
 }
