@@ -11,7 +11,8 @@ test('manual code execution refreshes artifact panes without reloading the turn'
 
   assert.equal(codeTabSource.includes('appStore.refreshActiveTurnArtifacts()'), true)
   assert.equal(codeTabSource.includes('appStore.loadActiveTurnRelations('), false)
-  assert.equal(codeTabSource.includes('appStore.setScalars(viewModel.scalars)'), true)
-  assert.equal(codeTabSource.includes('appStore.setSelectedTableArtifact(workspaceId, viewModel.dataframes[0]?.data?.artifact_id || \'\')'), true)
-  assert.equal(codeTabSource.includes('appStore.setSelectedFigureArtifact(workspaceId, viewModel.figures[0]?.artifact_id || \'\')'), true)
+  assert.equal(codeTabSource.includes('appStore.setScalars(scalars)'), true)
+  assert.equal(codeTabSource.includes("appStore.setSelectedTableArtifact(workspaceId, dataframes[0]?.data?.artifact_id || '')"), true)
+  assert.equal(codeTabSource.includes("appStore.setSelectedFigureArtifact(workspaceId, figures[0]?.artifact_id || '')"), true)
+  assert.equal(codeTabSource.includes('applyExecutionArtifactsToStore(orderedViewModel, effectiveRunId)'), true)
 })

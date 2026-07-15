@@ -118,6 +118,7 @@ export const useAppStore = defineStore('app', () => {
   const dataframes = ref([])
   const figures = ref([])
   const scalars = ref([])
+  const selectedResultId = ref('')
   const dataframeCount = ref(0)
   const tableRowCount = ref(0)
   const tableWindowStart = ref(0)
@@ -3008,6 +3009,7 @@ export const useAppStore = defineStore('app', () => {
 
   function setDataframes(dfs) {
     dataframes.value = Array.isArray(dfs) ? dfs : []
+    dataframeCount.value = dataframes.value.length
   }
 
   function setFigures(figs) {
@@ -3036,6 +3038,30 @@ export const useAppStore = defineStore('app', () => {
 
   function setScalars(items) {
     scalars.value = Array.isArray(items) ? items : []
+  }
+
+  function setSelectedResultId(resultId) {
+    selectedResultId.value = String(resultId || '').trim()
+  }
+
+  function removeResultArtifact(artifactId) {
+    const normalizedArtifactId = String(artifactId || '').trim()
+    if (!normalizedArtifactId) return
+    dataframes.value = dataframes.value.filter((item) => (
+      String(item?.data?.artifact_id || item?.artifact_id || '').trim() !== normalizedArtifactId
+    ))
+    figures.value = figures.value.filter((item) => (
+      String(item?.artifact_id || item?.data?.artifact_id || '').trim() !== normalizedArtifactId
+    ))
+    scalars.value = scalars.value.filter((item) => String(item?.artifact_id || '').trim() !== normalizedArtifactId)
+    activeTurnArtifacts.value = activeTurnArtifacts.value.filter(
+      (item) => String(item?.artifact_id || '').trim() !== normalizedArtifactId,
+    )
+    dataframeCount.value = dataframes.value.length
+    figureCount.value = figures.value.length
+    if (selectedResultId.value.endsWith(`:${normalizedArtifactId}`)) {
+      selectedResultId.value = ''
+    }
   }
 
   function setDataframeCount(count) {
@@ -3896,6 +3922,7 @@ export const useAppStore = defineStore('app', () => {
     dataframes,
     figures,
     scalars,
+    selectedResultId,
     dataframeCount,
     tableRowCount,
     tableWindowStart,
@@ -4058,6 +4085,8 @@ export const useAppStore = defineStore('app', () => {
     setDataframes,
     setFigures,
     setScalars,
+    setSelectedResultId,
+    removeResultArtifact,
     setDataframeCount,
     setTableViewport,
     clearTableViewport,

@@ -27,13 +27,13 @@ test('critical workflow opens current workspace settings flow before creating a 
   )
 
   assert.equal(source.includes("const workspaceSettingsButton = page.getByTitle('Workspace settings')"), true)
-  assert.equal(source.includes("const expandSidebarButton = page.getByTitle('Expand sidebar')"), true)
+  assert.equal(source.includes("const expandSidebarButton = page.getByRole('button', { name: 'Expand sidebar', exact: true })"), true)
   assert.equal(source.includes("await clickWhenReady(page, workspaceSettingsButton, { timeout: 15_000 })"), true)
+  assert.equal(source.includes("page.getByRole('dialog', { name: 'Workspaces' })"), true)
   assert.equal(source.includes("page.getByRole('button', { name: '+ New' })"), true)
   assert.equal(source.includes("page.getByPlaceholder('New workspace name')"), true)
-  assert.equal(source.includes("const addDatasetButton = page.getByRole('button', { name: 'Add dataset' })"), true)
-  assert.equal(source.includes('const activateWorkspaceButton = page.getByRole'), true)
-  assert.equal(source.includes('await activateWorkspaceButton.click({ timeout: 3_000 })'), true)
+  assert.equal(source.includes('await importDatasetFromNativePathBridge(page)'), true)
+  assert.equal(source.includes("page.getByText(datasetFileName, { exact: true }).first()).toBeAttached"), true)
   assert.equal(source.includes("page.getByRole('dialog').getByRole('button', { name: 'Create Workspace' })"), false)
   assert.equal(source.includes("page.getByRole('button', { name: 'Open sidebar' })"), false)
   assert.equal(source.includes("response.url().includes('/api/v1/preferences')"), true)
@@ -54,7 +54,7 @@ test('critical workflow mocks current async dataset ingestion flow', () => {
   assert.equal(source.includes('const datasetListRoute = /\\/api\\/v1\\/workspaces\\/[^/]+\\/datasets(?:\\?.*)?$/'), true)
   assert.equal(source.includes('state.lastSchema = buildGeneratedSchema(state.lastSchema)'), true)
   assert.equal(source.includes("new CustomEvent('inquira:e2e-select-data-path'"), true)
-  assert.equal(source.includes("await expect(page.getByText(datasetFileName, { exact: true }))"), true)
+  assert.equal(source.includes("await expect(page.getByText(datasetFileName, { exact: true }).first()).toBeAttached"), true)
 })
 
 test('critical workflow mocks conversation lifecycle around chat stream', () => {

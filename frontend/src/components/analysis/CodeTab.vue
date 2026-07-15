@@ -134,10 +134,15 @@ import { buildExecutionViewModel } from '../../utils/executionViewModel'
 import { normalizeExecutionResponse } from '../../utils/runtimeExecution'
 import { persistExportFile } from '../../utils/exportFile'
 import {
-  decideExecutionTabWithSelection,
   prioritizeByName,
   resolvePreferredArtifactNames,
 } from '../../utils/executionRouting'
+import {
+  buildUnifiedResultItems,
+  executionLogResultId,
+  preferredExecutionResultId,
+  resultPaneForKind,
+} from '../../utils/unifiedResults'
 
 import { EditorView, basicSetup } from 'codemirror'
 import { Compartment, EditorState, Prec } from '@codemirror/state'
@@ -278,24 +283,80 @@ function completionSource(context) {
   }
 }
 
-function applyExecutionArtifactsToStore(viewModel) {
-  appStore.setDataframes(viewModel.dataframes)
-  if (viewModel.dataframes.length > 0) {
-    appStore.setResultData(viewModel.dataframes[0].data)
+function stampRunResults(items, runId, createdAt) {
+  return (Array.isArray(items) ? items : []).map((item) => ({
+    ...item,
+    runId,
+    createdAt: item?.createdAt || item?.created_at || createdAt,
+  }))
+}
+
+function applyExecutionArtifactsToStore(viewModel, runId) {
+  const createdAt = new Date().toISOString()
+  const dataframes = stampRunResults(viewModel.dataframes, runId, createdAt)
+  const figures = stampRunResults(viewModel.figures, runId, createdAt)
+  const scalars = stampRunResults(viewModel.scalars, runId, createdAt)
+
+  appStore.setDataframes(dataframes)
+  if (dataframes.length > 0) {
+    appStore.setResultData(dataframes[0].data)
   }
 
-  appStore.setFigures(viewModel.figures)
-  if (viewModel.figures.length > 0) {
-    appStore.setPlotlyFigure(viewModel.figures[0].data)
+  appStore.setFigures(figures)
+  if (figures.length > 0) {
+    appStore.setPlotlyFigure(figures[0].data)
   }
 
-  appStore.setScalars(viewModel.scalars)
+  appStore.setScalars(scalars)
 
   const workspaceId = String(appStore.activeWorkspaceId || '').trim()
   if (workspaceId) {
-    appStore.setSelectedTableArtifact(workspaceId, viewModel.dataframes[0]?.data?.artifact_id || '')
-    appStore.setSelectedFigureArtifact(workspaceId, viewModel.figures[0]?.artifact_id || '')
+    appStore.setSelectedTableArtifact(workspaceId, dataframes[0]?.data?.artifact_id || '')
+    appStore.setSelectedFigureArtifact(workspaceId, figures[0]?.artifact_id || '')
   }
+
+  return { dataframes, figures, scalars }
+}
+
+function selectExecutionResult({
+  runId,
+  runEntryId,
+  normalized,
+  hasConsoleOutput,
+  hasError = false,
+  preferOutput = false,
+}) {
+  const items = buildUnifiedResultItems({
+    dataframes: appStore.dataframes,
+    figures: appStore.figures,
+    scalars: appStore.scalars,
+    terminalEntries: appStore.terminalEntries,
+    activeTurnArtifacts: appStore.activeTurnArtifacts,
+  })
+  const resultId = preferOutput
+    ? executionLogResultId(runEntryId)
+    : preferredExecutionResultId({
+        items,
+        runId,
+        resultKind: normalized?.result_kind || normalized?.result_type,
+        resultName: normalized?.result_name,
+        hasError,
+        logEntryId: runEntryId,
+        hasConsoleOutput,
+      })
+  const selected = items.find((item) => item.id === resultId)
+  if (!resultId || !selected) return ''
+
+  appStore.setSelectedResultId(resultId)
+  appStore.setDataPane(resultPaneForKind(selected.kind))
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (workspaceId && selected.kind === 'table') {
+    appStore.setSelectedTableArtifact(workspaceId, selected.artifactId)
+  }
+  if (workspaceId && selected.kind === 'chart') {
+    appStore.setSelectedFigureArtifact(workspaceId, selected.artifactId)
+  }
+  return resultId
 }
 
 async function fetchDatabasePaths() {
@@ -477,7 +538,7 @@ function createRunId() {
   return `run_${ts}_${rand}`
 }
 
-function startRunEntry(scopeLabel) {
+function startRunEntry(scopeLabel, { selectResult = false } = {}) {
   const runId = createRunId()
   const entryId = appStore.appendTerminalEntry({
     kind: 'output',
@@ -489,6 +550,10 @@ function startRunEntry(scopeLabel) {
     stderr: '',
     exitCode: 0,
   })
+  if (selectResult && entryId) {
+    appStore.setSelectedResultId(executionLogResultId(entryId))
+    appStore.setDataPane('output')
+  }
   return {
     entryId,
     runId,
@@ -534,11 +599,12 @@ async function executeSnippet(code, successLine, options = {}) {
   const outputStdout = String(normalized?.stdout || '')
   const outputStderr = String(normalized?.stderr || normalized?.error || '')
   const status = normalized?.error ? 'error' : 'success'
+  const effectiveRunId = String(normalized?.run_id || runId || '')
   const runEntryPayload = {
     kind: 'output',
     source: 'analysis',
     label: 'Run output',
-    runId: String(normalized?.run_id || runId || ''),
+    runId: effectiveRunId,
     status,
     stdout: outputStdout,
     stderr: outputStderr,
@@ -557,7 +623,13 @@ async function executeSnippet(code, successLine, options = {}) {
 
   if (normalized?.error) {
     appStore.setTerminalOutput(viewModel.output)
-    appStore.setActiveTab('output')
+    selectExecutionResult({
+      runId: effectiveRunId,
+      runEntryId,
+      normalized,
+      hasConsoleOutput: Boolean(outputStdout || outputStderr),
+      hasError: true,
+    })
     return {
       ok: false,
       execTime,
@@ -573,10 +645,16 @@ async function executeSnippet(code, successLine, options = {}) {
     dataframes: prioritizeByName(viewModel.dataframes, preferred.dataframeName),
     figures: prioritizeByName(viewModel.figures, preferred.figureName),
   }
-  const hasArtifacts = orderedViewModel.dataframes.length > 0 || orderedViewModel.figures.length > 0
+  const hasArtifacts = (
+    orderedViewModel.dataframes.length > 0
+    || orderedViewModel.figures.length > 0
+    || orderedViewModel.scalars.length > 0
+  )
   const hasConsoleOutput = Boolean(outputStdout || outputStderr)
 
-  applyExecutionArtifactsToStore(orderedViewModel)
+  if (!preserveActiveTabOnNoOutput || hasArtifacts || hasConsoleOutput) {
+    applyExecutionArtifactsToStore(orderedViewModel, effectiveRunId)
+  }
   if (
     Array.isArray(normalized?.artifacts)
     && normalized.artifacts.length > 0
@@ -585,37 +663,16 @@ async function executeSnippet(code, successLine, options = {}) {
   ) {
     appStore.refreshActiveTurnArtifacts()
   }
-  const targetTab = hasArtifacts || hasConsoleOutput
-    ? appStore.selectDataPaneForArtifacts({
-        hasFigures: orderedViewModel.figures.length > 0,
-        hasDataframes: orderedViewModel.dataframes.length > 0,
-        hasOutput: hasConsoleOutput,
-      })
-    : decideExecutionTabWithSelection({
-    resultType: normalized?.result_type,
-    resultKind: normalized?.result_kind,
-    resultName: normalized?.result_name,
-    hasError: false,
-    hasDataframes: orderedViewModel.dataframes.length > 0,
-    hasFigures: orderedViewModel.figures.length > 0,
-    selectedCode: code,
-    dataframeNames: orderedViewModel.dataframes.map((df) => String(df?.name || '')),
-    figureNames: orderedViewModel.figures.map((fig) => String(fig?.name || '')),
-  })
-  if (preferOutputPane) {
-    appStore.revealArtifactsPane({ hasOutput: true })
-  } else if (targetTab) {
-    appStore.revealArtifactsPane({
-      hasFigures: targetTab === 'figure',
-      hasDataframes: targetTab === 'table',
-      hasOutput: targetTab === 'output',
+  if (hasArtifacts || hasConsoleOutput || !preserveActiveTabOnNoOutput) {
+    selectExecutionResult({
+      runId: effectiveRunId,
+      runEntryId,
+      normalized,
+      hasConsoleOutput,
+      preferOutput: preferOutputPane,
     })
-  } else if (hasConsoleOutput) {
-    appStore.revealArtifactsPane({ hasOutput: true })
   } else if (preserveActiveTabOnNoOutput) {
     // Selection-style no-op execution (e.g. assignment only): keep current pane.
-  } else {
-    appStore.revealArtifactsPane({ hasOutput: true })
   }
   if (!preserveActiveTabOnNoOutput || hasArtifacts || hasConsoleOutput) {
     appStore.setTerminalOutput(viewModel.output)
@@ -638,7 +695,7 @@ async function runCode() {
   appStore.setCodeRunning(true)
   appStore.setActiveTab('output')
   appStore.setTerminalOutput('Running code...')
-  const runMeta = startRunEntry('Code run')
+  const runMeta = startRunEntry('Code run', { selectResult: true })
   try {
     await executeSnippet(appStore.pythonFileContent, 'Code executed successfully!', {
       runEntryId: runMeta.entryId,
@@ -655,6 +712,8 @@ async function runCode() {
       exitCode: 1,
       durationMs: Math.round(performance.now() - runMeta.startedAtMs),
     })
+    appStore.setSelectedResultId(executionLogResultId(runMeta.entryId))
+    appStore.setDataPane('output')
   } finally {
     isRunning.value = false
     appStore.setCodeRunning(false)
@@ -697,6 +756,8 @@ async function runSelectedCode() {
       exitCode: 1,
       durationMs: Math.round(performance.now() - runMeta.startedAtMs),
     })
+    appStore.setSelectedResultId(executionLogResultId(runMeta.entryId))
+    appStore.setDataPane('output')
   } finally {
     isRunning.value = false
     appStore.setCodeRunning(false)

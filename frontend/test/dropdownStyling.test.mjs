@@ -3,29 +3,25 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('table and figure headers use shared HeaderDropdown control instead of native select', () => {
+test('unified results header owns the shared HeaderDropdown instead of renderer-specific selects', () => {
   const figureTabPath = resolve(process.cwd(), 'src/components/analysis/FigureTab.vue')
   const tableTabPath = resolve(process.cwd(), 'src/components/analysis/TableTab.vue')
+  const rightPanePath = resolve(process.cwd(), 'src/components/layout/WorkspaceRightPane.vue')
   const dropdownPath = resolve(process.cwd(), 'src/components/ui/HeaderDropdown.vue')
 
   const figureTab = readFileSync(figureTabPath, 'utf-8')
   const tableTab = readFileSync(tableTabPath, 'utf-8')
+  const rightPane = readFileSync(rightPanePath, 'utf-8')
   const dropdown = readFileSync(dropdownPath, 'utf-8')
 
-  assert.equal(figureTab.includes('<HeaderDropdown'), true)
-  assert.equal(tableTab.includes('<HeaderDropdown'), true)
+  assert.equal(rightPane.includes('<HeaderDropdown'), true)
+  assert.equal(rightPane.includes('v-model="selectedResultId"'), true)
+  assert.equal(rightPane.includes('aria-label="Select result"'), true)
+  assert.equal(figureTab.includes('<HeaderDropdown'), false)
+  assert.equal(tableTab.includes('<HeaderDropdown'), false)
   assert.equal(figureTab.includes('<select'), false)
   assert.equal(tableTab.includes('<select'), false)
-  assert.equal(figureTab.includes(':fit-to-longest-label="true"'), false)
-  assert.equal(tableTab.includes(':fit-to-longest-label="true"'), false)
-  assert.equal(figureTab.includes('to="#workspace-right-pane-toolbar-center"'), true)
-  assert.equal(figureTab.includes('v-if="orderedFigures && orderedFigures.length > 0"'), true)
-  assert.equal(figureTab.includes('max-width: clamp(10rem, 32vw, 20rem);'), true)
-  assert.equal(tableTab.includes('max-width: clamp(11rem, 34vw, 20rem);'), true)
-  assert.equal(figureTab.includes('max-width-class="w-full"'), true)
-  assert.equal(tableTab.includes('max-width-class="w-full"'), true)
-  assert.equal(figureTab.includes('max-width-class="min-w-[240px]"'), false)
-  assert.equal(tableTab.includes('max-width-class="min-w-[240px]"'), false)
+  assert.equal(rightPane.includes('max-width-class="w-[clamp(11rem,28vw,20rem)]"'), true)
   assert.equal(dropdown.includes('const maxLabelChars = computed(() => {'), true)
   assert.equal(dropdown.includes('width: `${widthChars}ch`'), true)
   assert.equal(dropdown.includes("maxWidth: '100%'"), true)

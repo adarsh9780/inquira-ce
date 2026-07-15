@@ -7,14 +7,15 @@ The workspace follows progressive disclosure: frequent work stays visible, conte
 - Create a conversation.
 - Select a workspace or recent conversation.
 - Switch between Chat and Code.
-- Switch between Table, Chart, and Output.
+- Select and inspect tables, charts, scalar values, and execution logs in Results.
 - Attach a file, select a model, and submit or stop a prompt.
 - Open Settings and collapse or expand the sidebar.
 
 ## Contextual or secondary
 
 - Schema and Conversation Tree live under Workspace tools when the sidebar is expanded and remain direct icon actions when collapsed.
-- Table and Chart selectors and frequent export/search actions appear only for the active result pane.
+- The result selector stays in the Results header; export, search, and other actions appear only when they apply to the selected result.
+- Execution output related to a table, chart, or scalar remains available from the selected result without duplicating the rendered result.
 - Terminal controls appear only while the terminal is open.
 - New result indicators appear without stealing keyboard focus.
 
@@ -33,4 +34,3 @@ The workspace follows progressive disclosure: frequent work stays visible, conte
 - At narrow widths, Work and Data use a single-pane switcher rather than compressing both panes.
 - Motion respects `prefers-reduced-motion`.
 - Supported minimum content width is 640px; smaller widths use compact controls and stacked Settings navigation.
-

@@ -3,29 +3,26 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('workspace right pane supports labeled tabs and compact dropdown switcher without inline count badges', () => {
+test('workspace right pane supports one searchable result selector and lazy result renderers', () => {
   const rightPanePath = resolve(process.cwd(), 'src/components/layout/WorkspaceRightPane.vue')
   const source = readFileSync(rightPanePath, 'utf-8')
 
-  assert.equal(source.includes('v-if="useCompactPaneSwitcher"'), true)
   assert.equal(source.includes('HeaderDropdown'), true)
+  assert.equal(source.includes('v-model="selectedResultId"'), true)
+  assert.equal(source.includes(':searchable="resultOptions.length > 10"'), true)
   assert.equal(source.includes('defineAsyncComponent'), true)
   assert.equal(source.includes("defineAsyncComponent(() => import('../analysis/TableTab.vue'))"), true)
   assert.equal(source.includes("defineAsyncComponent(() => import('../analysis/FigureTab.vue'))"), true)
   assert.equal(source.includes("defineAsyncComponent(() => import('../analysis/OutputTab.vue'))"), true)
   assert.equal(source.includes("import TableTab from '../analysis/TableTab.vue'"), false)
   assert.equal(source.includes("import FigureTab from '../analysis/FigureTab.vue'"), false)
-  assert.equal(source.includes('COMPACT_SWITCHER_THRESHOLD_PX'), true)
-  assert.equal(source.includes('ResizeObserver'), true)
-  assert.equal(source.includes('<SegmentedControl'), true)
-  assert.equal(source.includes('dataPaneOptions'), true)
+  assert.equal(source.includes('<SegmentedControl'), false)
+  assert.equal(source.includes('dataPaneOptions'), false)
   assert.equal(source.includes('rounded-xl border p-1'), false)
-  assert.equal(source.includes("{ value: 'table', label: 'Table', icon: TableCellsIcon,"), true)
-  assert.equal(source.includes("{ value: 'figure', label: 'Chart', icon: ChartBarIcon,"), true)
-  assert.equal(source.includes("{ value: 'output', label: 'Output', icon: CommandLineIcon,"), true)
-  assert.equal(source.includes('appStore.dataframes.length'), false)
-  assert.equal(source.includes('appStore.figures.length'), false)
-  assert.equal(source.includes('appStore.scalars.length'), false)
+  assert.equal(source.includes('buildUnifiedResultItems'), true)
+  assert.equal(source.includes('appStore.dataframes'), true)
+  assert.equal(source.includes('appStore.figures'), true)
+  assert.equal(source.includes('appStore.scalars'), true)
 })
 
 test('status bar renders pane count from canonical table/chart counts and keeps table viewport label in parallel', () => {
@@ -44,13 +41,13 @@ test('status bar renders pane count from canonical table/chart counts and keeps 
   assert.equal(source.includes('subscribeWorkspaceArtifactUsage'), true)
 })
 
-test('figure tab header removes explicit Figure label next to dropdown', () => {
+test('figure renderer keeps contextual export actions while selection lives in Results', () => {
   const figureTabPath = resolve(process.cwd(), 'src/components/analysis/FigureTab.vue')
   const source = readFileSync(figureTabPath, 'utf-8')
 
   assert.equal(source.includes('>Figure:</label>'), false)
-  assert.equal(source.includes('id="figure-select"'), true)
-  assert.equal(source.includes('<HeaderDropdown'), true)
+  assert.equal(source.includes('id="figure-select"'), false)
+  assert.equal(source.includes('<HeaderDropdown'), false)
   assert.equal(source.includes('Chart Ready'), false)
   assert.equal(source.includes('>Fullscreen<'), false)
   assert.equal(source.includes('>PNG<'), false)

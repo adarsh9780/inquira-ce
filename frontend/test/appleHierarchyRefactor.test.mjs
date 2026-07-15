@@ -5,7 +5,7 @@ import test from 'node:test'
 
 const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
-test('workspace panes share one restrained toolbar and segmented control system', () => {
+test('workspace panes share one restrained toolbar and results use one adaptive selector', () => {
   const left = read('src/components/layout/WorkspaceLeftPane.vue')
   const right = read('src/components/layout/WorkspaceRightPane.vue')
   const styles = read('src/style.css')
@@ -13,7 +13,9 @@ test('workspace panes share one restrained toolbar and segmented control system'
   assert.match(left, /<AppToolbar/)
   assert.match(right, /<AppToolbar/)
   assert.match(left, /<SegmentedControl/)
-  assert.match(right, /<SegmentedControl/)
+  assert.match(right, /<HeaderDropdown/)
+  assert.doesNotMatch(right, /<SegmentedControl/)
+  assert.match(right, /Select result/)
   assert.match(styles, /\.app-toolbar/)
   assert.match(styles, /\.segmented-control-item-active/)
 })
@@ -72,7 +74,7 @@ test('result panes announce and mark new contextual output without moving focus'
   const source = read('src/components/layout/WorkspaceRightPane.vue')
 
   assert.match(source, /aria-live="polite"/)
-  assert.match(source, /newResultPanes/)
-  assert.match(source, /markResultAvailable/)
+  assert.match(source, /resultAnnouncement/)
+  assert.match(source, /available`/)
   assert.doesNotMatch(source, /\.focus\(/)
 })

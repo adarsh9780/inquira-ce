@@ -529,7 +529,7 @@ async function clickWhenReady(page, locator, options = {}) {
 
 async function openWorkspaceSettingsForCreation(page) {
   const workspaceSettingsButton = page.getByTitle('Workspace settings')
-  const expandSidebarButton = page.getByTitle('Expand sidebar')
+  const expandSidebarButton = page.getByRole('button', { name: 'Expand sidebar', exact: true })
   await waitForAppReady(page)
 
   const preferenceSync = page
@@ -548,7 +548,7 @@ async function openWorkspaceSettingsForCreation(page) {
   await clickWhenReady(page, workspaceSettingsButton, { timeout: 15_000 })
   await preferenceSync
   await waitForAppReady(page)
-  await expect(page.getByText('Manage Workspaces')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('dialog', { name: 'Workspaces' })).toBeVisible({ timeout: 30_000 })
 }
 
 async function createWorkspaceFromSettings(page, workspaceName) {
@@ -559,22 +559,6 @@ async function createWorkspaceFromSettings(page, workspaceName) {
   await newWorkspaceInput.fill(workspaceName)
   await newWorkspaceInput.press('Enter')
   await expect(page.getByTitle(workspaceName).first()).toBeVisible({ timeout: 30_000 })
-  const addDatasetButton = page.getByRole('button', { name: 'Add dataset' })
-  if (!(await addDatasetButton.isEnabled().catch(() => false))) {
-    const activateWorkspaceButton = page.getByRole('button', { name: 'Activate' })
-    await activateWorkspaceButton.click({ timeout: 3_000 }).catch((error) => {
-      const message = String(error?.message || '')
-      if (
-        !message.includes('element(s) not found') &&
-        !message.includes('Element is not attached') &&
-        !message.includes('element was detached') &&
-        !message.includes('Timeout')
-      ) {
-        throw error
-      }
-    })
-  }
-  await expect(addDatasetButton).toBeEnabled({ timeout: 30_000 })
 }
 
 async function importDatasetFromNativePathBridge(page) {
@@ -605,16 +589,16 @@ export async function setupCriticalWorkspace(page) {
   await createWorkspaceFromSettings(page, workspaceName)
 
   await expect(page.getByTitle(workspaceName).first()).toBeVisible({ timeout: 30_000 })
-
-  const addDatasetButton = page.getByRole('button', { name: 'Add dataset' })
-  await expect(addDatasetButton).toBeEnabled({ timeout: 30_000 })
+  await openWorkspaceSettingsForCreation(page)
 
   await importDatasetFromNativePathBridge(page)
+  await expect(page.getByText(datasetFileName, { exact: true }).first()).toBeAttached({ timeout: 60_000 })
 
-  await expect(page.getByText(datasetFileName, { exact: true })).toBeVisible({ timeout: 60_000 })
   const closeSettingsButton = page.getByLabel('Close settings')
-  await expect(closeSettingsButton).toBeEnabled({ timeout: 30_000 })
-  await clickWhenReady(page, closeSettingsButton)
+  if (await closeSettingsButton.isVisible().catch(() => false)) {
+    await expect(closeSettingsButton).toBeEnabled({ timeout: 30_000 })
+    await clickWhenReady(page, closeSettingsButton)
+  }
 
   return { workspaceName, tableName: datasetTableName }
 }

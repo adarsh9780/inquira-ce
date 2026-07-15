@@ -3,17 +3,17 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('output tab renders notebook-style dataframe preview card with middle truncation and scroll container', () => {
+test('dataframes render only through the full table renderer, not a duplicate output preview', () => {
   const outputTabPath = resolve(process.cwd(), 'src/components/analysis/OutputTab.vue')
-  const source = readFileSync(outputTabPath, 'utf-8')
+  const tableTabPath = resolve(process.cwd(), 'src/components/analysis/TableTab.vue')
+  const rightPanePath = resolve(process.cwd(), 'src/components/layout/WorkspaceRightPane.vue')
+  const output = readFileSync(outputTabPath, 'utf-8')
+  const table = readFileSync(tableTabPath, 'utf-8')
+  const rightPane = readFileSync(rightPanePath, 'utf-8')
 
-  assert.equal(source.includes("const PREVIEW_HEAD_ROWS = 8"), true)
-  assert.equal(source.includes("const PREVIEW_TAIL_ROWS = 8"), true)
-  assert.equal(source.includes("const PREVIEW_HEAD_COLUMNS = 5"), true)
-  assert.equal(source.includes("const PREVIEW_TAIL_COLUMNS = 4"), true)
-  assert.equal(source.includes('class="max-h-72 overflow-auto"'), true)
-  assert.equal(source.includes("label: '...'"), true)
-  assert.equal(source.includes("indexLabel: '...'"), true)
-  assert.equal(source.includes('No row preview captured for this dataframe yet.'), true)
-  assert.equal(source.includes('buildDataframePreview(item?.data)'), true)
+  assert.equal(output.includes('<table'), false)
+  assert.equal(output.includes('buildDataframePreview'), false)
+  assert.equal(table.includes('<DataTable'), true)
+  assert.equal(table.includes(':manual="useServerModel"'), true)
+  assert.equal(rightPane.includes("selectedResult?.kind === 'table'"), true)
 })

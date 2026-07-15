@@ -1,19 +1,5 @@
 <template>
   <div class="flex flex-col h-full">
-    <!-- Figure Header (Teleported) -->
-    <Teleport to="#workspace-right-pane-toolbar-center" v-if="isMounted && appStore.dataPane === 'figure'">
-      <div v-if="orderedFigures && orderedFigures.length > 0" class="flex min-w-[10rem] max-w-full flex-1 items-center" style="max-width: clamp(10rem, 32vw, 20rem);">
-        <HeaderDropdown
-          id="figure-select"
-          v-model="selectedArtifactId"
-          :options="figureDropdownOptions"
-          placeholder="Select chart"
-          aria-label="Select chart"
-          max-width-class="w-full"
-        />
-      </div>
-    </Teleport>
-
     <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && appStore.dataPane === 'figure'">
       <div class="flex min-w-0 items-center justify-end w-full gap-3">
         <div class="flex min-w-0 items-center space-x-3 text-sm">
@@ -101,7 +87,6 @@
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import Plotly from 'plotly.js-dist-min'
-import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import FloatingActionMenu from '../ui/FloatingActionMenu.vue'
 import AppEmptyState from '../ui/AppEmptyState.vue'
@@ -175,12 +160,6 @@ const orderedFigures = computed(() => {
   const persisted = persistedFigureArtifacts.value.map((fig) => ({ ...fig, source: 'artifact' }))
   return [...liveFigureArtifacts.value, ...persisted]
 })
-
-const figureDropdownOptions = computed(() => orderedFigures.value.map((fig, index) => ({
-  value: fig.artifact_id,
-  label: fig.display_name || fig.logical_name || `Figure ${index + 1}`,
-  key: fig.artifact_id || `${index}-figure`
-})))
 
 const selectedFigureMeta = computed(() => {
   if (!selectedArtifactId.value) return null
@@ -304,6 +283,20 @@ watch(orderedFigures, (figures) => {
     selectedArtifactId.value = orderedFigures.value[0]?.artifact_id || null
   }
 }, { immediate: true })
+
+watch(
+  () => appStore.getSelectedFigureArtifact(appStore.activeWorkspaceId),
+  (preferredArtifactId) => {
+    const normalizedArtifactId = String(preferredArtifactId || '').trim()
+    if (
+      normalizedArtifactId
+      && normalizedArtifactId !== String(selectedArtifactId.value || '').trim()
+      && orderedFigures.value.some((item) => String(item?.artifact_id || '').trim() === normalizedArtifactId)
+    ) {
+      selectedArtifactId.value = normalizedArtifactId
+    }
+  },
+)
 
 watch(selectedArtifactId, (artifactId) => {
   const normalizedWorkspaceId = String(appStore.activeWorkspaceId || '').trim()
@@ -641,6 +634,7 @@ async function deleteSelectedFigure() {
   artifactListError.value = ''
   try {
     await apiService.v1DeleteTurnArtifact(conversationId, turnId, artifactId)
+    appStore.removeResultArtifact(artifactId)
     await loadActiveTurnFigureArtifacts()
     const remainingArtifactId = workspaceFigureArtifacts.value[0]?.artifact_id || null
     selectedArtifactId.value = remainingArtifactId

@@ -7,7 +7,7 @@ function read(relativePath) {
   return readFileSync(resolve(process.cwd(), relativePath), 'utf-8')
 }
 
-test('workspace pane switchers use the current flat tab treatment instead of white chips', () => {
+test('workspace controls use flat navigation on the left and one adaptive result selector on the right', () => {
   const leftPane = read('src/components/layout/WorkspaceLeftPane.vue')
   const rightPane = read('src/components/layout/WorkspaceRightPane.vue')
   const styles = read('src/style.css')
@@ -15,7 +15,8 @@ test('workspace pane switchers use the current flat tab treatment instead of whi
   assert.equal(leftPane.includes('<SegmentedControl'), true)
   assert.equal(leftPane.includes('bg-white shadow-sm'), false)
 
-  assert.equal(rightPane.includes('<SegmentedControl'), true)
+  assert.equal(rightPane.includes('<SegmentedControl'), false)
+  assert.equal(rightPane.includes('<HeaderDropdown'), true)
   assert.equal(rightPane.includes('bg-white shadow-sm'), false)
   assert.equal(styles.includes('.segmented-control-item-active'), true)
   assert.equal(styles.includes('background: var(--color-selected-surface);'), true)

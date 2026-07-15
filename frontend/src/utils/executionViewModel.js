@@ -132,8 +132,8 @@ function buildArtifactScalars(artifacts) {
 
 export function buildExecutionViewModel(response, options = {}) {
   const opts = {
-    dataframeLine: (count) => `✅ ${count} dataframe(s) found. Available in Table tab.`,
-    figureLine: (count) => `✅ ${count} figure(s) found. Available in Chart tab.`,
+    dataframeLine: (count) => `✅ ${count} dataframe(s) found. Available in Results.`,
+    figureLine: (count) => `✅ ${count} figure(s) found. Available in Results.`,
     scalarLine: (count) => `✅ ${count} scalar(s) captured.`,
     dataframeParseErrorLine: '⚠️ Failed to parse dataframe data.',
     figureParseErrorLine: '⚠️ Failed to parse figure data.',

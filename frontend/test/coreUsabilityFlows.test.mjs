@@ -11,7 +11,9 @@ test('code tab runs manual code through execution service and surfaces output in
   assert.equal(source.includes("appStore.setActiveTab('output')"), true)
   assert.equal(source.includes("appStore.setTerminalOutput('Running code...')"), true)
   assert.equal(source.includes('const pyResponse = await executionService.executePython(code)'), true)
-  assert.equal(source.includes('applyExecutionArtifactsToStore(orderedViewModel)'), true)
+  assert.equal(source.includes('applyExecutionArtifactsToStore(orderedViewModel, effectiveRunId)'), true)
+  assert.equal(source.includes('selectExecutionResult({'), true)
+  assert.equal(source.includes('appStore.setSelectedResultId(resultId)'), true)
 })
 
 test('chat tab relies on sidebar lifecycle controls for usable analysis sessions', () => {
@@ -31,15 +33,15 @@ test('critical workflow helper sets up workspace and dataset before higher-level
   const source = readFileSync(resolve(process.cwd(), 'e2e/support/criticalWorkflow.js'), 'utf-8')
 
   assert.equal(source.includes('export async function setupCriticalWorkspace(page) {'), true)
-  assert.equal(source.includes("const addDatasetButton = page.getByRole('button', { name: 'Add dataset' })"), true)
-  assert.equal(source.includes("await expect(addDatasetButton).toBeEnabled({ timeout: 30_000 })"), true)
+  assert.equal(source.includes('await createWorkspaceFromSettings(page, workspaceName)'), true)
+  assert.equal(source.includes("page.getByRole('dialog', { name: 'Workspaces' })"), true)
   assert.equal(source.includes('await importDatasetFromNativePathBridge(page)'), true)
-  assert.equal(source.includes('await expect(page.getByText(datasetFileName, { exact: true })).toBeVisible'), true)
+  assert.equal(source.includes('await expect(page.getByText(datasetFileName, { exact: true }).first()).toBeAttached'), true)
 })
 
 test('manual code workflow uses an exact Code tab selector before editing the script', () => {
   const source = readFileSync(resolve(process.cwd(), 'e2e/manual-code-execution.spec.js'), 'utf-8')
 
-  assert.equal(source.includes("getByRole('button', { name: 'Code', exact: true })"), true)
+  assert.equal(source.includes("getByRole('tab', { name: 'Code', exact: true })"), true)
   assert.equal(source.includes("page.getByTitle('Run Code (R)').click()"), true)
 })

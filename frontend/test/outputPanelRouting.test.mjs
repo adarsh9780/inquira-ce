@@ -3,43 +3,44 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('workspace right pane routes third icon tab to output panel', () => {
-  const rightPanePath = resolve(process.cwd(), 'src/components/layout/WorkspaceRightPane.vue')
-  const source = readFileSync(rightPanePath, 'utf-8')
+test('workspace right pane uses one result selector and routes by selected result kind', () => {
+  const source = readFileSync(
+    resolve(process.cwd(), 'src/components/layout/WorkspaceRightPane.vue'),
+    'utf-8',
+  )
 
-  assert.equal(source.includes("{ value: 'output', label: 'Output', icon: CommandLineIcon,"), true)
-  assert.equal(source.includes('<SegmentedControl'), true)
-  assert.equal(source.includes('get: () => appStore.dataPane'), true)
-  assert.equal(source.includes('appStore.setDataPane(pane)'), true)
-  assert.equal(source.includes('<OutputTab />'), true)
-  assert.equal(source.includes("v-if=\"appStore.dataPane === 'table'\""), true)
-  assert.equal(source.includes("v-else-if=\"appStore.dataPane === 'figure'\""), true)
-  assert.equal(source.includes("v-show=\"appStore.dataPane === 'table'\""), false)
-  assert.equal(source.includes("v-show=\"appStore.dataPane === 'figure'\""), false)
-  assert.equal(source.includes("v-show=\"appStore.dataPane === 'output'\""), false)
+  assert.equal(source.includes('<HeaderDropdown'), true)
+  assert.equal(source.includes('v-model="selectedResultId"'), true)
+  assert.equal(source.includes('buildUnifiedResultItems'), true)
+  assert.equal(source.includes("selectedResult?.kind === 'table'"), true)
+  assert.equal(source.includes("selectedResult?.kind === 'chart'"), true)
+  assert.equal(source.includes("selectedResult?.kind === 'log' || selectedResult?.kind === 'scalar'"), true)
+  assert.equal(source.includes('<SegmentedControl'), false)
+  assert.equal(source.includes('dataPaneOptions'), false)
 })
 
-test('output panel renders timeline filters and inspector actions for logs/tables/charts', () => {
-  const outputTabPath = resolve(process.cwd(), 'src/components/analysis/OutputTab.vue')
-  const source = readFileSync(outputTabPath, 'utf-8')
+test('output renderer is limited to logs and scalars without table or chart duplication', () => {
+  const source = readFileSync(
+    resolve(process.cwd(), 'src/components/analysis/OutputTab.vue'),
+    'utf-8',
+  )
 
-  assert.equal(source.includes("entry?.kind === 'output' && entry?.source === 'analysis'"), true)
-  assert.equal(source.includes("{ value: 'all', label: 'All' }"), true)
-  assert.equal(source.includes("{ value: 'logs', label: 'Logs' }"), true)
-  assert.equal(source.includes("{ value: 'errors', label: 'Errors' }"), true)
-  assert.equal(source.includes("{ value: 'tables', label: 'Tables' }"), true)
-  assert.equal(source.includes("{ value: 'charts', label: 'Charts' }"), true)
-  assert.equal(source.includes('Open in Table tab'), true)
-  assert.equal(source.includes('Open in Chart tab'), true)
-  assert.equal(source.includes("appStore.setDataPane('table')"), true)
-  assert.equal(source.includes("appStore.setDataPane('figure')"), true)
+  assert.equal(source.includes("item.kind === 'log' || item.kind === 'scalar'"), true)
+  assert.equal(source.includes('Execution output'), true)
+  assert.equal(source.includes('Execution error'), true)
+  assert.equal(source.includes('Scalar result'), true)
+  assert.equal(source.includes('Open in Table tab'), false)
+  assert.equal(source.includes('Open in Chart tab'), false)
+  assert.equal(source.includes('<table'), false)
 })
 
-test('code execution routes runtime errors to output pane', () => {
-  const codeTabPath = resolve(process.cwd(), 'src/components/analysis/CodeTab.vue')
-  const source = readFileSync(codeTabPath, 'utf-8')
+test('manual runtime errors select their run output in the unified results pane', () => {
+  const source = readFileSync(
+    resolve(process.cwd(), 'src/components/analysis/CodeTab.vue'),
+    'utf-8',
+  )
 
-  assert.equal(source.includes("appStore.setActiveTab('output')"), true)
-  assert.equal(source.includes('const hasConsoleOutput = Boolean(outputStdout || outputStderr)'), true)
-  assert.equal(source.includes('else if (hasConsoleOutput)'), true)
+  assert.equal(source.includes('hasError: true'), true)
+  assert.equal(source.includes('appStore.setSelectedResultId(resultId)'), true)
+  assert.equal(source.includes('appStore.setDataPane(resultPaneForKind(selected.kind))'), true)
 })

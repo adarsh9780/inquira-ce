@@ -3,13 +3,12 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('figure toolbar uses flexible selector width and icon-only actions', () => {
+test('figure toolbar keeps only contextual icon actions after selection moves to Results', () => {
   const figureTabPath = resolve(process.cwd(), 'src/components/analysis/FigureTab.vue')
   const source = readFileSync(figureTabPath, 'utf-8')
 
-  assert.equal(source.includes('to="#workspace-right-pane-toolbar-center"'), true)
-  assert.equal(source.includes('v-if="orderedFigures && orderedFigures.length > 0"'), true)
-  assert.equal(source.includes('class="flex min-w-[10rem] max-w-full flex-1 items-center"'), true)
+  assert.equal(source.includes('to="#workspace-right-pane-toolbar-center"'), false)
+  assert.equal(source.includes('<HeaderDropdown'), false)
   assert.equal(source.includes("label: 'Delete chart'"), true)
   assert.equal(source.includes(`:title="isDownloading ? 'Exporting chart' : 'Export chart'"`), true)
   assert.equal(source.includes('ChevronDownIcon'), false)
@@ -17,14 +16,13 @@ test('figure toolbar uses flexible selector width and icon-only actions', () => 
   assert.equal(source.includes('style="border-color: var(--color-border); color: var(--color-text-muted);"'), true)
 })
 
-test('output toolbar keeps filter controls flexible and icon-assisted', () => {
+test('output toolbar shows compact status metadata without another result filter', () => {
   const outputTabPath = resolve(process.cwd(), 'src/components/analysis/OutputTab.vue')
   const source = readFileSync(outputTabPath, 'utf-8')
 
-  assert.equal(source.includes('class="flex min-w-0 w-full items-center justify-end gap-2"'), true)
-  assert.equal(source.includes('class="mr-auto text-xs tabular-nums"'), true)
-  assert.equal(source.includes('FunnelIcon'), true)
-  assert.equal(source.includes('class="flex min-w-[9rem] flex-1 items-center justify-end gap-2"'), true)
-  assert.equal(source.includes('max-width: min(28vw, 11rem);'), true)
-  assert.equal(source.includes('max-width-class="w-full"'), true)
+  assert.equal(source.includes('class="flex min-w-0 items-center justify-end gap-2 text-xs"'), true)
+  assert.equal(source.includes('statusLabel'), true)
+  assert.equal(source.includes('formattedTimestamp'), true)
+  assert.equal(source.includes('FunnelIcon'), false)
+  assert.equal(source.includes('<HeaderDropdown'), false)
 })

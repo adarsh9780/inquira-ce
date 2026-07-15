@@ -8,7 +8,7 @@ test('code execution appends output-style terminal entries (not command entries)
   const source = readFileSync(codeTabPath, 'utf-8')
 
   assert.equal(source.includes("kind: 'output'"), true)
-  assert.equal(source.includes('function startRunEntry(scopeLabel) {'), true)
+  assert.equal(source.includes('function startRunEntry(scopeLabel, { selectResult = false } = {}) {'), true)
   assert.equal(source.includes('runId'), true)
   assert.equal(source.includes('appStore.updateTerminalEntry'), true)
 })
