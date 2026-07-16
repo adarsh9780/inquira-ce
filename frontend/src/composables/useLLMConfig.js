@@ -1,5 +1,5 @@
 import { computed, ref, watch } from 'vue'
-import { apiService } from '../services/apiService'
+import { modelConnectionService } from '../services/modelConnectionService'
 import { extractApiErrorMessage } from '../utils/apiError'
 import { useAppStore } from '../stores/appStore'
 
@@ -278,7 +278,7 @@ function getModelMeta(providerName, modelId) {
 async function loadPreferences(providerHint = null, preserveSelection = false) {
   modelsLoading.value = true
   try {
-    const response = await apiService.v1GetPreferences(providerHint)
+    const response = await modelConnectionService.getPreferences(providerHint)
     const normalizedProvider = normalizeProvider(providerHint || response?.llm_provider)
 
     provider.value = normalizedProvider
@@ -410,7 +410,7 @@ async function verifyKey() {
 
   verifyLoading.value = true
   try {
-    const response = await apiService.v1VerifyApiKey(selectedProvider, key)
+    const response = await modelConnectionService.verifyKey(selectedProvider, key)
     if (response?.valid) {
       keyVerified.value = true
       return { ok: true, valid: true, error: '' }
@@ -451,7 +451,7 @@ async function saveKey() {
     return { ok: false, error: 'missing_key' }
   }
 
-  await apiService.v1SetApiKey({
+  await modelConnectionService.setApiKey({
     provider: selectedProvider,
     api_key: key,
     allow_llm_data_samples: Boolean(allowLlmDataSamples.value),
@@ -468,7 +468,7 @@ async function saveKey() {
 }
 
 async function saveDataSamplesPreference() {
-  const response = await apiService.v1UpdatePreferences({
+  const response = await modelConnectionService.updatePreferences({
     allow_llm_data_samples: Boolean(allowLlmDataSamples.value),
   })
   const store = getAppStore()
@@ -484,7 +484,7 @@ async function deleteKey() {
     return { ok: false, error: 'provider_has_no_key' }
   }
 
-  await apiService.v1DeleteApiKey(selectedProvider)
+  await modelConnectionService.deleteApiKey(selectedProvider)
   apiKeyPresenceByProvider.value = {
     ...apiKeyPresenceByProvider.value,
     [selectedProvider]: false,
@@ -546,7 +546,7 @@ async function refreshModels({ background = false } = {}) {
       if (key) payload.api_key = key
     }
 
-    const response = await apiService.v1RefreshProviderModels(payload)
+    const response = await modelConnectionService.refreshModels(payload)
     applyProviderModelState(selectedProvider, response, true)
 
     if (selectedMainBefore && mainModels.value.includes(selectedMainBefore)) {
@@ -616,7 +616,7 @@ async function saveConfig() {
       if (hasNewUnmaskedKey) {
         securePayload.api_key = enteredKey
       }
-      await apiService.v1SetApiKey(securePayload)
+      await modelConnectionService.setApiKey(securePayload)
     } else {
       if (!hasSavedProviderKey) {
         return {
@@ -625,7 +625,7 @@ async function saveConfig() {
           error: `Save a ${providerLabel.value} API key before updating model preferences.`,
         }
       }
-      await apiService.v1UpdatePreferences(preferencePayload)
+      await modelConnectionService.updatePreferences(preferencePayload)
     }
     const response = await loadPreferences(selectedProvider, true)
     return { ok: true, response }

@@ -447,7 +447,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 import FloatingActionMenu from '../../ui/FloatingActionMenu.vue'
 import ConfirmationModal from '../ConfirmationModal.vue'
-import { apiService } from '../../../services/apiService'
+import { modelConnectionService } from '../../../services/modelConnectionService'
 import { useLLMConfig } from '../../../composables/useLLMConfig'
 import { useAppStore } from '../../../stores/appStore'
 import { useAuthStore } from '../../../stores/authStore'
@@ -600,7 +600,7 @@ function buildModelOptions(type, selectedId) {
 async function searchProviderModels(query, limit = 25) {
   const normalizedProvider = String(provider.value || '').trim()
   if (!normalizedProvider) return []
-  const response = await apiService.v1SearchProviderModels(normalizedProvider, query, limit)
+  const response = await modelConnectionService.searchModels(normalizedProvider, query, limit)
   return Array.isArray(response?.models) ? response.models : []
 }
 

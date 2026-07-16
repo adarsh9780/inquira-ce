@@ -7,6 +7,7 @@ prepare-uv:
 
 test:
 	go test ./...
+	cd frontend && npm run test:runtime
 	cd frontend && npm run build
 
 build: prepare-uv
