@@ -1,6 +1,6 @@
 <template>
   <div class="min-w-0" data-run-table>
-    <div class="max-h-72 overflow-auto border-y" style="border-color: var(--color-border);">
+    <div class="max-h-[28rem] overflow-auto border-y" style="border-color: var(--color-border);">
       <table class="w-full min-w-max border-collapse text-left text-xs">
         <thead class="sticky top-0 z-10" style="background-color: var(--color-panel-muted); color: var(--color-text-sub);">
           <tr>

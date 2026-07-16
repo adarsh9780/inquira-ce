@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import ast
 import inspect
 import json
 import re
@@ -65,6 +66,8 @@ else:
 
 _inquira_payload
 """
+
+_JUPYTER_RESULT_MODE_MARKER = "# inquira-result-mode: jupyter"
 
 _EXPORTS_PROBE_CODE = """
 _inquira_get_active_exports()
@@ -795,6 +798,19 @@ class WorkspaceKernelManager:
     ) -> dict[str, Any]:
         parsed = await self._execute_request(session, code)
         identifier_ref = self._extract_identifier_reference(code)
+        jupyter_result_mode = _JUPYTER_RESULT_MODE_MARKER in str(code or "")
+        allow_generic_fallback = not jupyter_result_mode
+        preferred_probe_ref = identifier_ref
+        if (
+            not preferred_probe_ref
+            and jupyter_result_mode
+            and parsed.result is not None
+            and self._has_final_expression(code)
+        ):
+            # IPython updates `_` only after a displayed expression. This lets
+            # dataframe-returning calls such as df.head() become structured
+            # tables without ever searching unrelated globals from older runs.
+            preferred_probe_ref = "_"
 
         should_probe_fallback = (
             parsed.error is None
@@ -806,10 +822,10 @@ class WorkspaceKernelManager:
 
         if should_probe_fallback:
             preferred_probe_applied = False
-            if identifier_ref:
+            if preferred_probe_ref:
                 preferred_probe = await self._execute_request(
                     session,
-                    _build_identifier_result_probe_code(identifier_ref),
+                    _build_identifier_result_probe_code(preferred_probe_ref),
                 )
                 if (
                     preferred_probe.result is not None
@@ -827,7 +843,7 @@ class WorkspaceKernelManager:
                     parsed.result_type = preferred_probe.result_type
                     preferred_probe_applied = True
 
-            if not preferred_probe_applied:
+            if not preferred_probe_applied and allow_generic_fallback:
                 probe = await self._execute_request(session, _FALLBACK_RESULT_PROBE_CODE)
                 if (
                     probe.result is not None
@@ -1080,7 +1096,24 @@ class WorkspaceKernelManager:
             return None
         if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", trimmed):
             return trimmed
+        try:
+            parsed = ast.parse(trimmed)
+        except (SyntaxError, ValueError, TypeError):
+            return None
+        if not parsed.body:
+            return None
+        final_statement = parsed.body[-1]
+        if isinstance(final_statement, ast.Expr) and isinstance(final_statement.value, ast.Name):
+            return final_statement.value.id
         return None
+
+    @staticmethod
+    def _has_final_expression(code: str) -> bool:
+        try:
+            parsed = ast.parse(str(code or "").strip())
+        except (SyntaxError, ValueError, TypeError):
+            return False
+        return bool(parsed.body and isinstance(parsed.body[-1], ast.Expr))
 
     @staticmethod
     def _normalize_result_kind(result_type: str | None) -> str:

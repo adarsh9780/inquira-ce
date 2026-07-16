@@ -3548,6 +3548,18 @@ export const useAppStore = defineStore('app', () => {
     terminalEntriesTrimmedCount.value = 0
   }
 
+  function removeTerminalEntry(entryId) {
+    const targetId = String(entryId || '').trim()
+    if (!targetId) return false
+    const previousLength = terminalEntries.value.length
+    terminalEntries.value = terminalEntries.value.filter(
+      (entry) => String(entry?.id || '').trim() !== targetId,
+    )
+    if (terminalEntries.value.length === previousLength) return false
+    if (selectedResultId.value === `log:${targetId}`) selectedResultId.value = ''
+    return true
+  }
+
   function setActiveTab(tab) {
     const normalized = String(tab || '').trim().toLowerCase()
     if (normalized === 'code') {
@@ -4275,6 +4287,7 @@ export const useAppStore = defineStore('app', () => {
     clearWorkspaceRuntimeStatus,
     appendTerminalEntry,
     updateTerminalEntry,
+    removeTerminalEntry,
     clearTerminalEntries,
     setActiveTab,
     setWorkspacePane,

@@ -233,6 +233,102 @@ async def test_execute_on_session_uses_fallback_probe_when_primary_has_no_result
 
 
 @pytest.mark.asyncio
+async def test_execute_on_session_jupyter_assignment_does_not_probe_stale_kernel_variables():
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    session = _session("ws-1", "/tmp/a.duckdb")
+    calls: list[str] = []
+
+    async def fake_execute_request(current_session, code):
+        _ = current_session
+        calls.append(code)
+        return ParsedExecutionOutput()
+
+    manager._execute_request = fake_execute_request  # type: ignore[method-assign]
+
+    code = (
+        "# inquira-result-mode: jupyter\n"
+        "set_active_run('run-1')\n"
+        "top_batsmen_df = conn.sql(query).df()\n"
+    )
+    payload = await manager._execute_on_session(session, code)
+
+    assert calls == [code]
+    assert payload["success"] is True
+    assert payload["result"] is None
+    assert payload["result_kind"] == "none"
+
+
+@pytest.mark.asyncio
+async def test_execute_on_session_jupyter_cell_probes_only_its_final_identifier():
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    session = _session("ws-1", "/tmp/a.duckdb")
+    calls: list[str] = []
+
+    async def fake_execute_request(current_session, code):
+        _ = current_session
+        calls.append(code)
+        parsed = ParsedExecutionOutput()
+        if len(calls) == 1:
+            return parsed
+        assert "_inquira_identifier = 'top_batsmen_df'" in code
+        parsed.result = {"columns": ["a"], "data": [{"a": 1}]}
+        parsed.result_type = "DataFrame"
+        return parsed
+
+    manager._execute_request = fake_execute_request  # type: ignore[method-assign]
+
+    code = (
+        "# inquira-result-mode: jupyter\n"
+        "set_active_run('run-1')\n"
+        "top_batsmen_df = conn.sql(query).df()\n"
+        "top_batsmen_df\n"
+    )
+    payload = await manager._execute_on_session(session, code)
+
+    assert len(calls) == 2
+    assert payload["result_type"] == "DataFrame"
+    assert payload["result_kind"] == "dataframe"
+    assert payload["result_name"] == "top_batsmen_df"
+    assert payload["result"] == {"columns": ["a"], "data": [{"a": 1}]}
+
+
+@pytest.mark.asyncio
+async def test_execute_on_session_jupyter_expression_uses_current_display_value_only():
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    session = _session("ws-1", "/tmp/a.duckdb")
+    calls: list[str] = []
+
+    async def fake_execute_request(current_session, code):
+        _ = current_session
+        calls.append(code)
+        parsed = ParsedExecutionOutput()
+        if len(calls) == 1:
+            parsed.result = "   a\n0  1"
+            parsed.result_type = "scalar"
+            return parsed
+        assert "_inquira_identifier = '_'" in code
+        parsed.result = {"columns": ["a"], "data": [{"a": 1}]}
+        parsed.result_type = "DataFrame"
+        return parsed
+
+    manager._execute_request = fake_execute_request  # type: ignore[method-assign]
+
+    code = (
+        "# inquira-result-mode: jupyter\n"
+        "set_active_run('run-1')\n"
+        "top_batsmen_df = conn.sql(query).df()\n"
+        "top_batsmen_df.head()\n"
+    )
+    payload = await manager._execute_on_session(session, code)
+
+    assert len(calls) == 2
+    assert payload["result_type"] == "DataFrame"
+    assert payload["result_kind"] == "dataframe"
+    assert payload["result_name"] is None
+    assert payload["result"] == {"columns": ["a"], "data": [{"a": 1}]}
+
+
+@pytest.mark.asyncio
 async def test_execute_on_session_prefers_identifier_probe_for_selected_variable():
     manager = WorkspaceKernelManager(idle_minutes=30)
     session = _session("ws-1", "/tmp/a.duckdb")

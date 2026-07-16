@@ -78,6 +78,49 @@ async def test_execute_workspace_code_passes_workspace_context(monkeypatch, tmp_
 
 
 @pytest.mark.asyncio
+async def test_execute_workspace_code_marks_manual_jupyter_result_mode(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws-jupyter-result"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+    captured = {}
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_execute_code(code, **kwargs):
+        captured["code"] = code
+        _ = kwargs
+        return {
+            "success": True,
+            "stdout": "",
+            "stderr": "",
+            "error": None,
+            "result": None,
+            "result_type": None,
+            "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
+        }
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "execute_code", fake_execute_code)
+
+    response = await runtime_api.execute_workspace_code(
+        workspace_id="ws-jupyter-result",
+        payload=runtime_api.ExecuteRequest(
+            code="top_batsmen_df = conn.sql(query).df()",
+            result_mode="jupyter",
+        ),
+        session=object(),
+        current_user=SimpleNamespace(id="user-1"),
+    )
+
+    assert response.success is True
+    assert captured["code"].startswith("# inquira-result-mode: jupyter\n")
+    assert captured["code"].rstrip().endswith("top_batsmen_df = conn.sql(query).df()")
+
+
+@pytest.mark.asyncio
 async def test_execute_workspace_code_defaults_artifact_dir_for_turn_rerun(monkeypatch, tmp_path):
     workspace_dir = tmp_path / "ws-turn-rerun"
     workspace_dir.mkdir(parents=True, exist_ok=True)

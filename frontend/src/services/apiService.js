@@ -450,7 +450,8 @@ export const apiService = {
       throw new Error('Create/select a workspace before running code.')
     }
     const persistToTurn = options?.persistToTurn !== false
-    console.debug('🚀 [API] Executing code...', { timeout, persistToTurn })
+    const resultMode = options?.resultMode === 'jupyter' ? 'jupyter' : 'auto'
+    console.debug('🚀 [API] Executing code...', { timeout, persistToTurn, resultMode })
     const response = await authorizedFetch(
       `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${activeWorkspaceId}/execute`,
       {
@@ -460,6 +461,7 @@ export const apiService = {
         body: JSON.stringify({
           code,
           timeout,
+          result_mode: resultMode,
           ...(persistToTurn ? {
             conversation_id: appStore.activeConversationId || null,
             turn_id: appStore.activeTurnId || null,

@@ -14,6 +14,6 @@ test('analysis panels use short action-oriented empty states', () => {
   assert.equal(figureSource.includes('No saved charts'), true)
   assert.equal(figureSource.includes('Ask AI for a chart, or promote one from Runs.'), true)
   assert.equal(outputSource.includes('No manual runs yet'), true)
-  assert.equal(outputSource.includes('Run code from the editor to see its code, text, tables, and charts together here.'), true)
+  assert.equal(outputSource.includes('Run code from the editor to see its output here.'), true)
   assert.equal(treeSource.includes('Ask a question in Chat to build this tree.'), true)
 })

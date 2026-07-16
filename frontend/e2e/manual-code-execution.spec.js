@@ -12,7 +12,9 @@ test('manual code edit runs and shows result output', async ({ page }) => {
     mockChatStream: false,
   })
 
+  let executionRequest = null
   await page.route('**/api/v1/workspaces/*/execute', async (route) => {
+    executionRequest = route.request().postDataJSON()
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -29,7 +31,11 @@ test('manual code edit runs and shows result output', async ({ page }) => {
         result_name: '',
         run_id: 'pw-manual-run',
         artifacts: [],
-        variables: {},
+        variables: {
+          figures: {
+            stale_fig: { data: [{ type: 'bar', y: [1] }], layout: { title: 'stale-chart' } },
+          },
+        },
       }),
     })
   })
@@ -58,6 +64,12 @@ test('manual code edit runs and shows result output', async ({ page }) => {
     await expect(categoryButton.locator('[data-header-dropdown-icon]')).toHaveCount(1)
     await expect(page.locator('[data-runs-feed] [data-user-run]')).toHaveCount(1)
     await expect(page.locator('[data-runs-feed] [data-execution-code]')).toContainText('top_customer = conn.sql')
+    await expect(page.locator('[data-runs-feed] [data-run-chart]')).toHaveCount(0)
+    expect(executionRequest?.result_mode).toBe('jupyter')
+
+    await page.getByRole('button', { name: 'Delete run' }).click()
+    await expect(page.locator('[data-runs-feed] [data-user-run]')).toHaveCount(0)
+    await expect(page.getByText('No manual runs yet')).toBeVisible()
   } finally {
     await cleanup()
   }
@@ -120,11 +132,65 @@ test('manual dataframe run stays in one block and can be promoted to Tables', as
     await expect(page.getByText('rows=2', { exact: true })).toBeVisible()
     await expect(page.locator('[data-runs-feed] [data-execution-code]')).toContainText('result = conn.sql')
     await expect(page.locator('[data-inquira-data-grid]')).toHaveCount(0)
-    await page.getByRole('button', { name: /current table/i }).click()
+    await page.getByRole('button', { name: /open in tables/i }).click()
     await expect(categoryButton).toContainText('Tables')
     await expect(page.getByRole('grid', { name: 'Table data' })).toBeVisible({ timeout: 30_000 })
     await expect(page.getByRole('button', { name: 'Select table' })).toContainText('User revision')
     await expect(page.locator('[data-inquira-data-grid]')).toHaveCount(1)
+  } finally {
+    await cleanup()
+  }
+})
+
+test('large manual output can open in a focused full-output view', async ({ page }) => {
+  const { cleanup } = await installCriticalWorkflowMocks(page, {
+    mockPreferences: true,
+    mockSchemaRegenerate: false,
+    mockChatStream: false,
+  })
+  const largeOutput = `${'x'.repeat(4_500)}END`
+
+  await page.route('**/api/v1/workspaces/*/execute', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        stdout: largeOutput,
+        stderr: '',
+        has_stdout: true,
+        has_stderr: false,
+        error: '',
+        result: null,
+        result_type: 'none',
+        result_kind: 'none',
+        result_name: '',
+        run_id: 'pw-large-run',
+        artifacts: [],
+        variables: {},
+      }),
+    })
+  })
+
+  try {
+    await setupCriticalWorkspace(page)
+    await page.getByRole('tab', { name: 'Code', exact: true }).click()
+
+    const editor = page.locator('.cm-content').first()
+    await expect(editor).toBeVisible({ timeout: 30_000 })
+    await editor.click()
+    await page.keyboard.press(selectAllShortcut())
+    await page.keyboard.type("print('large output')")
+    await page.getByTitle('Run Code (R)').click()
+
+    const stdout = page.locator('[data-runs-feed] [data-execution-stdout]')
+    await expect(stdout).toBeVisible({ timeout: 30_000 })
+    await expect(stdout).not.toContainText('END')
+    await page.getByRole('button', { name: 'Open full output' }).first().click()
+    await expect(page.getByText('Full output', { exact: true })).toBeVisible()
+    await expect(stdout).toContainText('END')
+    await page.getByRole('button', { name: 'All runs' }).click()
+    await expect(page.getByRole('button', { name: 'Open full output' }).first()).toBeVisible()
   } finally {
     await cleanup()
   }

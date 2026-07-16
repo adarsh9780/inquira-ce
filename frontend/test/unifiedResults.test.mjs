@@ -30,6 +30,7 @@ test('buildUserRunItems keeps one manual run with text, table, and chart outputs
 
   assert.equal(items.length, 1)
   assert.equal(items[0].id, 'execution:mixed-run')
+  assert.equal(items[0].entryId, 'mixed-run')
   assert.equal(items[0].code.includes('print("rows=2")'), true)
   assert.equal(items[0].stdout, 'rows=2')
   assert.equal(items[0].tableOutputs[0].name, 'result')

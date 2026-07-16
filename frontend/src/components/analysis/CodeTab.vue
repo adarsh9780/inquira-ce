@@ -131,12 +131,8 @@ import apiService from '../../services/apiService'
 import executionService from '../../services/executionService'
 import { toast } from '../../composables/useToast'
 import { buildExecutionViewModel } from '../../utils/executionViewModel'
-import { normalizeExecutionResponse } from '../../utils/runtimeExecution'
+import { latestExpressionVariables, normalizeExecutionResponse } from '../../utils/runtimeExecution'
 import { persistExportFile } from '../../utils/exportFile'
-import {
-  prioritizeByName,
-  resolvePreferredArtifactNames,
-} from '../../utils/executionRouting'
 import { executionLogResultId } from '../../utils/unifiedResults'
 
 import { EditorView, basicSetup } from 'codemirror'
@@ -517,6 +513,10 @@ async function executeSnippet(code, successLine, options = {}) {
   const viewModel = buildExecutionViewModel(
     {
       ...normalized,
+      // A notebook cell displays only its final expression. Kernel variables and
+      // exports remain available to later code but are not repeated as outputs.
+      variables: latestExpressionVariables(normalized),
+      artifacts: [],
       execution_time: execTime,
     },
     {
@@ -572,18 +572,12 @@ async function executeSnippet(code, successLine, options = {}) {
     }
   }
 
-  const preferred = resolvePreferredArtifactNames(viewModel, normalized)
-  const orderedViewModel = {
-    ...viewModel,
-    dataframes: prioritizeByName(viewModel.dataframes, preferred.dataframeName),
-    figures: prioritizeByName(viewModel.figures, preferred.figureName),
-  }
   const hasConsoleOutput = Boolean(outputStdout || outputStderr)
 
   const createdAt = new Date().toISOString()
-  const tableOutputs = stampRunResults(orderedViewModel.dataframes, effectiveRunId, createdAt)
-  const chartOutputs = stampRunResults(orderedViewModel.figures, effectiveRunId, createdAt)
-  const scalarOutputs = stampRunResults(orderedViewModel.scalars, effectiveRunId, createdAt)
+  const tableOutputs = stampRunResults(viewModel.dataframes.slice(0, 1), effectiveRunId, createdAt)
+  const chartOutputs = stampRunResults(viewModel.figures.slice(0, 1), effectiveRunId, createdAt)
+  const scalarOutputs = stampRunResults(viewModel.scalars.slice(0, 1), effectiveRunId, createdAt)
   if (effectiveRunEntryId) {
     appStore.updateTerminalEntry(effectiveRunEntryId, {
       hasTableOutput: tableOutputs.length > 0,
@@ -599,8 +593,8 @@ async function executeSnippet(code, successLine, options = {}) {
   return {
     ok: true,
     execTime,
-    hasDataframes: orderedViewModel.dataframes.length > 0,
-    hasFigures: orderedViewModel.figures.length > 0,
+    hasDataframes: tableOutputs.length > 0,
+    hasFigures: chartOutputs.length > 0,
     hasConsoleOutput: Boolean(outputStdout || outputStderr),
   }
 }

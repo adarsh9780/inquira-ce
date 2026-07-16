@@ -164,3 +164,17 @@ export function normalizeExecutionResponse(raw) {
 
   return response
 }
+
+export function latestExpressionVariables(normalized) {
+  const source = isObject(normalized?.variables) ? normalized.variables : {}
+  const resultOnly = (bucket) => {
+    if (!isObject(bucket) || !Object.prototype.hasOwnProperty.call(bucket, 'result')) return {}
+    return { result: bucket.result }
+  }
+
+  return {
+    dataframes: resultOnly(source.dataframes),
+    figures: resultOnly(source.figures),
+    scalars: resultOnly(source.scalars),
+  }
+}

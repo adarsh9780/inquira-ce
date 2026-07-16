@@ -492,6 +492,14 @@ export type ExecuteRequestConversationId = string | null;
  */
 export type ExecuteRequestTurnId = string | null;
 
+export type ExecuteRequestResultMode =
+  (typeof ExecuteRequestResultMode)[keyof typeof ExecuteRequestResultMode];
+
+export const ExecuteRequestResultMode = {
+  auto: 'auto',
+  jupyter: 'jupyter',
+} as const;
+
 /**
  * Internal server-owned turn artifact directory
  */
@@ -512,6 +520,8 @@ export interface ExecuteRequest {
   conversation_id?: ExecuteRequestConversationId;
   /** Owning turn to overwrite in-place */
   turn_id?: ExecuteRequestTurnId;
+  /** Display-result policy. Jupyter mode does not probe unrelated kernel variables. */
+  result_mode?: ExecuteRequestResultMode;
   /** Internal server-owned turn artifact directory */
   artifact_dir?: ExecuteRequestArtifactDir;
 }

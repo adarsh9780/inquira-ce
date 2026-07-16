@@ -20,4 +20,7 @@ test('app store caps and trims terminal entries to bound memory usage', () => {
   assert.equal(source.includes('function updateTerminalEntry(entryId, patch = {}) {'), true)
   assert.equal(source.includes('runId: String(entry.runId || \'\')'), true)
   assert.equal(source.includes('status: normalizeTerminalEntryStatus('), true)
+  assert.equal(source.includes('function removeTerminalEntry(entryId) {'), true)
+  assert.equal(source.includes('terminalEntries.value = terminalEntries.value.filter('), true)
+  assert.equal(source.includes('removeTerminalEntry,'), true)
 })

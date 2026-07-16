@@ -28,7 +28,7 @@ class ExecutionService {
                 code,
                 60,
                 appStore.activeWorkspaceId || null,
-                { persistToTurn: false },
+                { persistToTurn: false, resultMode: 'jupyter' },
             )
             return mapExecutionServiceResponse(response)
         } catch (err) {

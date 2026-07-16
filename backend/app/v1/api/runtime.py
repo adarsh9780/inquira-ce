@@ -10,7 +10,7 @@ import re
 import shlex
 import uuid
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -135,6 +135,10 @@ class ExecuteRequest(BaseModel):
     run_id: str | None = Field(default=None, description="Optional stable run id for artifact export")
     conversation_id: str | None = Field(default=None, description="Owning conversation to update in-place")
     turn_id: str | None = Field(default=None, description="Owning turn to overwrite in-place")
+    result_mode: Literal["auto", "jupyter"] = Field(
+        default="auto",
+        description="Display-result policy. Jupyter mode does not probe unrelated kernel variables.",
+    )
     artifact_dir: str | None = Field(
         default=None,
         description="Internal server-owned turn artifact directory",
@@ -899,6 +903,8 @@ async def _execute_workspace_code_impl(
         turn_id=payload.turn_id,
         artifact_dir=payload.artifact_dir,
     )
+    if payload.result_mode == "jupyter":
+        wrapped_code = f"# inquira-result-mode: jupyter\n{wrapped_code}"
     result = await execute_code(
         code=wrapped_code,
         timeout=payload.timeout,

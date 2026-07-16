@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { normalizeExecutionResponse } from '../src/utils/runtimeExecution.js'
+import { latestExpressionVariables, normalizeExecutionResponse } from '../src/utils/runtimeExecution.js'
 
 test('normalizes stdout/stderr into legacy output field', () => {
   const normalized = normalizeExecutionResponse({
@@ -142,4 +142,22 @@ test('preserves honest output truncation metadata', () => {
   })
 
   assert.equal(normalized.output_truncated, true)
+})
+
+test('manual notebook output keeps only the current cell final result', () => {
+  const normalized = normalizeExecutionResponse({
+    success: true,
+    result: 42,
+    variables: {
+      dataframes: { stale_df: { columns: ['a'], data: [[1]] } },
+      figures: { stale_fig: { data: [{ type: 'bar', y: [1] }], layout: {} } },
+      scalars: { stale_value: 'from an earlier run' },
+    },
+  })
+
+  assert.deepEqual(latestExpressionVariables(normalized), {
+    dataframes: {},
+    figures: {},
+    scalars: { result: 42 },
+  })
 })

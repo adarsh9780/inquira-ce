@@ -7356,6 +7356,16 @@
             "title": "Turn Id",
             "description": "Owning turn to overwrite in-place"
           },
+          "result_mode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "jupyter"
+            ],
+            "title": "Result Mode",
+            "description": "Display-result policy. Jupyter mode does not probe unrelated kernel variables.",
+            "default": "auto"
+          },
           "artifact_dir": {
             "anyOf": [
               {

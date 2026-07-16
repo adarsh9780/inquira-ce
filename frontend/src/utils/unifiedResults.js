@@ -132,6 +132,7 @@ export function buildUserRunItems({
       const stderr = String(entry?.stderr || '')
       return {
         id: `execution:${clean(entry?.id) || entryIndex + 1}`,
+        entryId: clean(entry?.id),
         runId,
         label: clean(entry?.label) || 'Code run',
         status: clean(entry?.status) || (stderr.trim() ? 'error' : 'success'),
