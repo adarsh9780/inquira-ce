@@ -14,5 +14,6 @@ test('chat artifact handling uses chart-first pane priority and sorts artifacts 
   assert.equal(source.includes('if (figureArtifacts.length > 0) {'), true)
   assert.equal(source.includes('applyConversationResultState(requestConversationId, finalStatePatch, { hasFigures: true })'), true)
   assert.equal(source.includes('applyConversationResultState(requestConversationId, finalStatePatch, { hasDataframes: true })'), true)
-  assert.equal(source.includes('applyConversationResultState(requestConversationId, finalStatePatch, { hasOutput: true })'), true)
+  assert.equal(source.includes('applyConversationResultState(requestConversationId, finalStatePatch, { hasOutput: true })'), false)
+  assert.equal(source.includes("origin: 'ai'"), true)
 })

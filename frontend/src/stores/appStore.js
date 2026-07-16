@@ -118,6 +118,8 @@ export const useAppStore = defineStore('app', () => {
   const dataframes = ref([])
   const figures = ref([])
   const scalars = ref([])
+  const promotedUserDataframes = ref([])
+  const promotedUserFigures = ref([])
   const selectedResultId = ref('')
   const dataframeCount = ref(0)
   const tableRowCount = ref(0)
@@ -917,6 +919,8 @@ export const useAppStore = defineStore('app', () => {
     plotlyFigure.value = null
     dataframes.value = []
     figures.value = []
+    promotedUserDataframes.value = []
+    promotedUserFigures.value = []
     dataframeCount.value = 0
     figureCount.value = 0
     tableRowCount.value = 0
@@ -3040,6 +3044,107 @@ export const useAppStore = defineStore('app', () => {
     scalars.value = Array.isArray(items) ? items : []
   }
 
+  function currentResultScopeKey() {
+    const conversationId = String(activeConversationId.value || '').trim()
+    if (conversationId) return `conversation:${conversationId}`
+    const workspaceId = String(activeWorkspaceId.value || '').trim()
+    return workspaceId ? `workspace:${workspaceId}` : 'workspace:unscoped'
+  }
+
+  function promotedArtifactId(prefix, runId, outputId) {
+    const safe = `${runId || 'run'}-${outputId || 'output'}`
+      .replace(/[^a-zA-Z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+    return `${prefix}-${safe || Date.now().toString(36)}`
+  }
+
+  function promoteUserRunTable(output, options = {}) {
+    if (!output || typeof output !== 'object') return ''
+    const runId = String(options?.runId || output?.runId || output?.run_id || '').trim()
+    const outputId = String(options?.outputId || output?.id || options?.index || '1').trim()
+    const artifactId = promotedArtifactId('user-table', runId, outputId)
+    const existing = promotedUserDataframes.value.find((item) => (
+      String(item?.data?.artifact_id || item?.artifact_id || '').trim() === artifactId
+    ))
+    const workspaceId = String(activeWorkspaceId.value || '').trim()
+    if (existing) {
+      if (workspaceId) setSelectedTableArtifact(workspaceId, artifactId)
+      setResultData(existing.data)
+      setDataPane('table')
+      return artifactId
+    }
+
+    const rawData = output?.data && typeof output.data === 'object' ? output.data : output
+    const logicalName = String(
+      rawData?.logical_name || output?.logical_name || output?.name || `user_table_${promotedUserDataframes.value.length + 1}`,
+    ).trim()
+    const displayName = `User revision · ${String(rawData?.display_name || output?.display_name || logicalName).trim()}`
+    const supersedesArtifactId = workspaceId ? getSelectedTableArtifact(workspaceId) : ''
+    const promoted = {
+      ...output,
+      name: logicalName,
+      origin: 'user',
+      promoted: true,
+      scopeKey: currentResultScopeKey(),
+      sourceRunId: runId,
+      supersedes_artifact_id: supersedesArtifactId || undefined,
+      data: {
+        ...rawData,
+        artifact_id: artifactId,
+        logical_name: logicalName,
+        display_name: displayName,
+      },
+    }
+    promotedUserDataframes.value = [promoted, ...promotedUserDataframes.value]
+    if (workspaceId) setSelectedTableArtifact(workspaceId, artifactId)
+    setResultData(promoted.data)
+    setDataPane('table')
+    syncActiveConversationState()
+    return artifactId
+  }
+
+  function promoteUserRunFigure(output, options = {}) {
+    if (!output || typeof output !== 'object') return ''
+    const runId = String(options?.runId || output?.runId || output?.run_id || '').trim()
+    const outputId = String(options?.outputId || output?.id || options?.index || '1').trim()
+    const artifactId = promotedArtifactId('user-chart', runId, outputId)
+    const existing = promotedUserFigures.value.find((item) => (
+      String(item?.artifact_id || item?.data?.artifact_id || '').trim() === artifactId
+    ))
+    const workspaceId = String(activeWorkspaceId.value || '').trim()
+    if (existing) {
+      if (workspaceId) setSelectedFigureArtifact(workspaceId, artifactId)
+      setPlotlyFigure(existing.data)
+      setDataPane('figure')
+      return artifactId
+    }
+
+    const rawFigure = normalizePlotlyFigure(output?.data ?? output)
+    if (!rawFigure) return ''
+    const logicalName = String(output?.logical_name || output?.name || `user_chart_${promotedUserFigures.value.length + 1}`).trim()
+    const displayName = `User revision · ${String(output?.display_name || logicalName).trim()}`
+    const supersedesArtifactId = workspaceId ? getSelectedFigureArtifact(workspaceId) : ''
+    const promoted = {
+      ...output,
+      name: logicalName,
+      artifact_id: artifactId,
+      logical_name: logicalName,
+      display_name: displayName,
+      origin: 'user',
+      promoted: true,
+      scopeKey: currentResultScopeKey(),
+      sourceRunId: runId,
+      supersedes_artifact_id: supersedesArtifactId || undefined,
+      data: rawFigure,
+    }
+    promotedUserFigures.value = [promoted, ...promotedUserFigures.value]
+    if (workspaceId) setSelectedFigureArtifact(workspaceId, artifactId)
+    setPlotlyFigure(promoted.data)
+    setDataPane('figure')
+    syncActiveConversationState()
+    return artifactId
+  }
+
   function setSelectedResultId(resultId) {
     selectedResultId.value = String(resultId || '').trim()
   }
@@ -3286,12 +3391,21 @@ export const useAppStore = defineStore('app', () => {
           + String(item?.display_value ?? item?.value ?? '').length
         ), 0)
       : 0
+    const structuredChars = [...(Array.isArray(entry.tableOutputs) ? entry.tableOutputs : []), ...(Array.isArray(entry.chartOutputs) ? entry.chartOutputs : [])]
+      .reduce((sum, item) => {
+        try {
+          return sum + JSON.stringify(item).length
+        } catch (_error) {
+          return sum + String(item?.name || '').length
+        }
+      }, 0)
     return (
       String(entry.command || '').length +
       String(entry.stdout || '').length +
       String(entry.stderr || '').length +
       String(entry.label || '').length +
       scalarChars +
+      structuredChars +
       32
     )
   }
@@ -3324,6 +3438,10 @@ export const useAppStore = defineStore('app', () => {
       id: String(entry.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
       kind,
       source: String(entry.source || (kind === 'output' ? 'analysis' : 'terminal')),
+      origin: ['user', 'ai', 'system'].includes(String(entry.origin || '').trim().toLowerCase())
+        ? String(entry.origin).trim().toLowerCase()
+        : (kind === 'command' ? 'system' : ''),
+      conversationId: String(entry.conversationId || ''),
       label: String(entry.label || (kind === 'output' ? 'Python output' : '')),
       command: String(entry.command || ''),
       stdout,
@@ -3332,6 +3450,12 @@ export const useAppStore = defineStore('app', () => {
       runId: String(entry.runId || ''),
       scalarOutputs: Array.isArray(entry.scalarOutputs)
         ? entry.scalarOutputs.map((item) => ({ ...(item || {}) }))
+        : [],
+      tableOutputs: Array.isArray(entry.tableOutputs)
+        ? entry.tableOutputs.map((item) => ({ ...(item || {}) }))
+        : [],
+      chartOutputs: Array.isArray(entry.chartOutputs)
+        ? entry.chartOutputs.map((item) => ({ ...(item || {}) }))
         : [],
       hasTableOutput: Boolean(entry.hasTableOutput),
       hasChartOutput: Boolean(entry.hasChartOutput),
@@ -3372,6 +3496,14 @@ export const useAppStore = defineStore('app', () => {
       source: patch.source !== undefined
         ? String(patch.source || (kind === 'output' ? 'analysis' : 'terminal'))
         : String(current.source || (kind === 'output' ? 'analysis' : 'terminal')),
+      origin: patch.origin !== undefined
+        ? (['user', 'ai', 'system'].includes(String(patch.origin || '').trim().toLowerCase())
+            ? String(patch.origin).trim().toLowerCase()
+            : '')
+        : String(current.origin || ''),
+      conversationId: patch.conversationId !== undefined
+        ? String(patch.conversationId || '')
+        : String(current.conversationId || ''),
       label: patch.label !== undefined
         ? String(patch.label || (kind === 'output' ? 'Run output' : ''))
         : String(current.label || (kind === 'output' ? 'Run output' : '')),
@@ -3385,6 +3517,12 @@ export const useAppStore = defineStore('app', () => {
       scalarOutputs: patch.scalarOutputs !== undefined
         ? (Array.isArray(patch.scalarOutputs) ? patch.scalarOutputs.map((item) => ({ ...(item || {}) })) : [])
         : (Array.isArray(current.scalarOutputs) ? current.scalarOutputs : []),
+      tableOutputs: patch.tableOutputs !== undefined
+        ? (Array.isArray(patch.tableOutputs) ? patch.tableOutputs.map((item) => ({ ...(item || {}) })) : [])
+        : (Array.isArray(current.tableOutputs) ? current.tableOutputs : []),
+      chartOutputs: patch.chartOutputs !== undefined
+        ? (Array.isArray(patch.chartOutputs) ? patch.chartOutputs.map((item) => ({ ...(item || {}) })) : [])
+        : (Array.isArray(current.chartOutputs) ? current.chartOutputs : []),
       hasTableOutput: patch.hasTableOutput !== undefined
         ? Boolean(patch.hasTableOutput)
         : Boolean(current.hasTableOutput),
@@ -3700,6 +3838,8 @@ export const useAppStore = defineStore('app', () => {
     codeEditorSource.value = 'agent'
     resultData.value = null
     plotlyFigure.value = null
+    promotedUserDataframes.value = []
+    promotedUserFigures.value = []
     terminalOutput.value = ''
     terminalEntries.value = []
     terminalEntriesTrimmedCount.value = 0
@@ -3946,6 +4086,8 @@ export const useAppStore = defineStore('app', () => {
     dataframes,
     figures,
     scalars,
+    promotedUserDataframes,
+    promotedUserFigures,
     selectedResultId,
     dataframeCount,
     tableRowCount,
@@ -4109,6 +4251,8 @@ export const useAppStore = defineStore('app', () => {
     setDataframes,
     setFigures,
     setScalars,
+    promoteUserRunTable,
+    promoteUserRunFigure,
     setSelectedResultId,
     removeResultArtifact,
     setDataframeCount,

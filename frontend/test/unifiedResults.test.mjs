@@ -2,36 +2,28 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
-  buildOtherExecutionItems,
+  buildUserRunItems,
   buildUnifiedResultItems,
   executionLogResultId,
   preferredExecutionResultId,
   resultPaneForKind,
 } from '../src/utils/unifiedResults.js'
 
-test('buildOtherExecutionItems keeps code with non-visual output and excludes visual-only runs', () => {
-  const items = buildOtherExecutionItems({
+test('buildUserRunItems keeps one manual run with text, table, and chart outputs', () => {
+  const items = buildUserRunItems({
     terminalEntries: [
-      {
-        id: 'table-only',
-        kind: 'output',
-        source: 'analysis',
-        label: 'Code run',
-        command: 'result = query.df()\nresult',
-        runId: 'run-table',
-        status: 'success',
-        hasTableOutput: true,
-      },
       {
         id: 'mixed-run',
         kind: 'output',
         source: 'analysis',
+        origin: 'user',
         label: 'Code run',
-        command: 'result = query.df()\nprint("rows=2")\nresult',
+        command: 'result = query.df()\nfig = chart(result)\nprint("rows=2")',
         runId: 'run-mixed',
         status: 'success',
         stdout: 'rows=2',
-        hasTableOutput: true,
+        tableOutputs: [{ name: 'result', data: [{ id: 1 }, { id: 2 }] }],
+        chartOutputs: [{ name: 'figure', data: { data: [{ type: 'bar', y: [1, 2] }], layout: {} } }],
       },
     ],
   })
@@ -40,21 +32,23 @@ test('buildOtherExecutionItems keeps code with non-visual output and excludes vi
   assert.equal(items[0].id, 'execution:mixed-run')
   assert.equal(items[0].code.includes('print("rows=2")'), true)
   assert.equal(items[0].stdout, 'rows=2')
+  assert.equal(items[0].tableOutputs[0].name, 'result')
+  assert.equal(items[0].chartOutputs[0].name, 'figure')
 })
 
-test('buildOtherExecutionItems retains scalar output on its originating execution', () => {
-  const items = buildOtherExecutionItems({
+test('buildUserRunItems retains scalar output on its originating execution', () => {
+  const items = buildUserRunItems({
     terminalEntries: [{
       id: 'scalar-run',
       kind: 'output',
       source: 'analysis',
+      origin: 'user',
       label: 'Selection run',
       command: 'total = 42\ntotal',
       runId: 'run-scalar',
       status: 'success',
       scalarOutputs: [{ name: 'total', value: 42, runId: 'run-scalar', result_type: 'int' }],
     }],
-    scalars: [{ name: 'total', value: 42, runId: 'run-scalar', result_type: 'int' }],
   })
 
   assert.equal(items.length, 1)
@@ -64,22 +58,20 @@ test('buildOtherExecutionItems retains scalar output on its originating executio
   assert.equal(items[0].scalarOutputs[0].type, 'int')
 })
 
-test('buildOtherExecutionItems restores persisted scalar artifacts with turn code', () => {
-  const items = buildOtherExecutionItems({
-    activeTurnArtifacts: [{
-      artifact_id: 'scalar-artifact',
-      kind: 'scalar',
-      display_name: 'conversion_rate',
-      payload: { value: 0.42, type: 'float' },
-      created_at: '2026-07-16T08:00:00Z',
+test('buildUserRunItems excludes AI execution logs from the manual Runs feed', () => {
+  const items = buildUserRunItems({
+    terminalEntries: [{
+      id: 'ai-run',
+      kind: 'output',
+      source: 'analysis',
+      origin: 'ai',
+      label: 'Run output',
+      command: 'conversion_rate = converted / total',
+      stdout: '0.42',
     }],
-    fallbackCode: 'conversion_rate = converted / total\nconversion_rate',
   })
 
-  assert.equal(items.length, 1)
-  assert.equal(items[0].code.includes('conversion_rate ='), true)
-  assert.equal(items[0].scalarOutputs[0].name, 'conversion_rate')
-  assert.equal(items[0].scalarOutputs[0].value, 0.42)
+  assert.equal(items.length, 0)
 })
 
 test('buildUnifiedResultItems normalizes one manual run without duplicating artifacts', () => {

@@ -26,7 +26,7 @@ test('FigureTab renders artifact load errors inside the centered empty state ins
 
   assert.equal(source.includes('<AppEmptyState'), true)
   assert.equal(source.includes(":title=\"artifactListError ? 'Charts unavailable' : 'No saved charts'\""), true)
-  assert.equal(source.includes(":description=\"artifactListError || 'Run code that creates a Plotly figure.'\""), true)
+  assert.equal(source.includes(":description=\"artifactListError || 'Ask AI for a chart, or promote one from Runs.'\""), true)
   assert.equal(source.includes("v-else-if=\"artifactListError\""), false)
 })
 

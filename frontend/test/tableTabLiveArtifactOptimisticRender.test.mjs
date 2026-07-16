@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('TableTab exposes manual run dataframe artifacts before turn catalog refresh', () => {
+test('TableTab exposes promoted user revisions alongside AI artifacts', () => {
   const source = readFileSync(
     resolve(process.cwd(), 'src/components/analysis/TableTab.vue'),
     'utf-8',
@@ -14,6 +14,7 @@ test('TableTab exposes manual run dataframe artifacts before turn catalog refres
   assert.equal(source.includes('return [...liveDataframeArtifacts.value, ...persistedArtifacts]'), true)
   assert.equal(source.includes("const preferredArtifactId = workspaceId ? appStore.getSelectedTableArtifact(workspaceId) : ''"), true)
   assert.equal(source.includes("const liveArtifact = liveDataframeArtifacts.value.find("), true)
-  assert.equal(source.includes("source: 'live'"), true)
+  assert.equal(source.includes('appStore.promotedUserDataframes'), true)
+  assert.equal(source.includes("item?.promoted ? 'revision' : 'live'"), true)
   assert.equal(source.includes('apiService.v1ListTurnArtifacts('), true)
 })

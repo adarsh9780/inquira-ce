@@ -19,7 +19,7 @@ test('results uses an icon category dropdown with contextual artifact dropdowns'
   assert.equal(rightPane.includes('aria-label="Select result category"'), true)
   assert.equal(rightPane.includes("{ value: 'table', label: 'Tables', icon: TableCellsIcon }"), true)
   assert.equal(rightPane.includes("{ value: 'chart', label: 'Charts', icon: ChartBarIcon }"), true)
-  assert.equal(rightPane.includes("{ value: 'other', label: 'Other', icon: CommandLineIcon }"), true)
+  assert.equal(rightPane.includes("{ value: 'runs', label: 'Runs', icon: PlayCircleIcon }"), true)
   assert.equal(figureTab.includes('<HeaderDropdown'), true)
   assert.equal(tableTab.includes('<HeaderDropdown'), true)
   assert.equal(figureTab.includes('<select'), false)

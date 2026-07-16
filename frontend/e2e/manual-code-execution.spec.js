@@ -54,16 +54,16 @@ test('manual code edit runs and shows result output', async ({ page }) => {
     await page.getByTitle('Run Code (R)').click()
     await expect(page.getByText('top_customer=Carla')).toBeVisible({ timeout: 30_000 })
     const categoryButton = page.getByRole('button', { name: 'Select result category' })
-    await expect(categoryButton).toContainText('Other')
+    await expect(categoryButton).toContainText('Runs')
     await expect(categoryButton.locator('[data-header-dropdown-icon]')).toHaveCount(1)
-    await expect(page.locator('[data-other-output-feed] [data-execution-output]')).toHaveCount(1)
-    await expect(page.locator('[data-other-output-feed] [data-execution-code]')).toContainText('top_customer = conn.sql')
+    await expect(page.locator('[data-runs-feed] [data-user-run]')).toHaveCount(1)
+    await expect(page.locator('[data-runs-feed] [data-execution-code]')).toContainText('top_customer = conn.sql')
   } finally {
     await cleanup()
   }
 })
 
-test('manual dataframe run separates its table from other code output', async ({ page }) => {
+test('manual dataframe run stays in one block and can be promoted to Tables', async ({ page }) => {
   const { cleanup } = await installCriticalWorkflowMocks(page, {
     mockPreferences: true,
     mockSchemaRegenerate: false,
@@ -111,21 +111,20 @@ test('manual dataframe run separates its table from other code output', async ({
 
     await page.getByTitle('Run Code (R)').click()
 
-    await expect(page.getByRole('grid', { name: 'Table data' })).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByText('Carla', { exact: true })).toBeVisible()
     const categoryButton = page.getByRole('button', { name: 'Select result category' })
-    await expect(categoryButton).toContainText('Tables')
+    await expect(categoryButton).toContainText('Runs')
     await expect(categoryButton.locator('[data-header-dropdown-icon]')).toHaveCount(1)
-    await expect(page.getByRole('button', { name: 'Select table' })).toContainText('result')
-    await expect(page.locator('[data-inquira-data-grid]')).toHaveCount(1)
-    await expect(page.getByText('Open in Table tab')).toHaveCount(0)
-    await expect(page.getByRole('button', { name: /Execution log/ })).toHaveCount(0)
-
-    await categoryButton.click()
-    await page.getByRole('option', { name: 'Other', exact: true }).click()
+    await expect(page.locator('[data-runs-feed] [data-user-run]')).toHaveCount(1)
+    await expect(page.locator('[data-runs-feed] [data-run-table]')).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('[data-runs-feed]').getByText('Carla', { exact: true })).toBeVisible()
     await expect(page.getByText('rows=2', { exact: true })).toBeVisible()
-    await expect(page.locator('[data-other-output-feed] [data-execution-code]')).toContainText('result = conn.sql')
+    await expect(page.locator('[data-runs-feed] [data-execution-code]')).toContainText('result = conn.sql')
     await expect(page.locator('[data-inquira-data-grid]')).toHaveCount(0)
+    await page.getByRole('button', { name: /current table/i }).click()
+    await expect(categoryButton).toContainText('Tables')
+    await expect(page.getByRole('grid', { name: 'Table data' })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('button', { name: 'Select table' })).toContainText('User revision')
+    await expect(page.locator('[data-inquira-data-grid]')).toHaveCount(1)
   } finally {
     await cleanup()
   }

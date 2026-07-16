@@ -22,7 +22,7 @@ test('workspace right pane supports one three-option category selector and lazy 
   assert.equal(source.includes('rounded-xl border p-1'), false)
   assert.equal(source.includes("{ value: 'table', label: 'Tables', icon: TableCellsIcon }"), true)
   assert.equal(source.includes("{ value: 'chart', label: 'Charts', icon: ChartBarIcon }"), true)
-  assert.equal(source.includes("{ value: 'other', label: 'Other', icon: CommandLineIcon }"), true)
+  assert.equal(source.includes("{ value: 'runs', label: 'Runs', icon: PlayCircleIcon }"), true)
 })
 
 test('status bar renders pane count from canonical table/chart counts and keeps table viewport label in parallel', () => {

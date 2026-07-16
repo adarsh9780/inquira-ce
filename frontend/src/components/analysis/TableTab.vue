@@ -158,7 +158,7 @@
       <TableEmptyState
         v-else
         title="No saved tables"
-        subtitle="Run code that creates a dataframe."
+        subtitle="Ask AI for a table, or promote one from Runs."
       >
         <template #icon>
           <TableCellsIcon class="h-12 w-12 mx-auto mb-3" style="color: var(--color-border);" />
@@ -325,7 +325,7 @@ function normalizeLiveDataframeArtifact(item, index) {
     row_count: Number(data?.row_count || rows.length || 0),
     schema: columns.map((name) => ({ name })),
     preview_rows: rows,
-    source: 'live',
+    source: item?.promoted ? 'revision' : 'live',
   }
 }
 
@@ -335,7 +335,12 @@ const liveDataframeArtifacts = computed(() => {
       .map((artifact) => String(artifact?.artifact_id || '').trim())
       .filter(Boolean),
   )
-  return (Array.isArray(appStore.dataframes) ? appStore.dataframes : [])
+  const conversationId = String(appStore.activeConversationId || '').trim()
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  const scopeKey = conversationId ? `conversation:${conversationId}` : `workspace:${workspaceId || 'unscoped'}`
+  const userRevisions = (Array.isArray(appStore.promotedUserDataframes) ? appStore.promotedUserDataframes : [])
+    .filter((item) => String(item?.scopeKey || '') === scopeKey)
+  return [...userRevisions, ...(Array.isArray(appStore.dataframes) ? appStore.dataframes : [])]
     .map((item, index) => normalizeLiveDataframeArtifact(item, index))
     .filter((artifact) => artifact.artifact_id && !persistedIds.has(artifact.artifact_id))
 })

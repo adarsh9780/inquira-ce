@@ -68,7 +68,7 @@
       <div v-else class="absolute inset-0" style="background-color: var(--color-base);">
         <AppEmptyState
           :title="artifactListError ? 'Charts unavailable' : 'No saved charts'"
-          :description="artifactListError || 'Run code that creates a Plotly figure.'"
+          :description="artifactListError || 'Ask AI for a chart, or promote one from Runs.'"
         ><template #icon><ChartBarIcon class="h-7 w-7" /></template></AppEmptyState>
       </div>
     </div>
@@ -151,7 +151,12 @@ const liveFigureArtifacts = computed(() => {
       .map((fig) => String(fig?.artifact_id || '').trim())
       .filter(Boolean),
   )
-  return (Array.isArray(appStore.figures) ? appStore.figures : [])
+  const conversationId = String(appStore.activeConversationId || '').trim()
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  const scopeKey = conversationId ? `conversation:${conversationId}` : `workspace:${workspaceId || 'unscoped'}`
+  const userRevisions = (Array.isArray(appStore.promotedUserFigures) ? appStore.promotedUserFigures : [])
+    .filter((item) => String(item?.scopeKey || '') === scopeKey)
+  return [...userRevisions, ...(Array.isArray(appStore.figures) ? appStore.figures : [])]
     .map((fig, index) => {
       const figurePayload = normalizePlotlyFigure(fig?.data ?? fig)
       if (!figurePayload) return null
@@ -164,7 +169,7 @@ const liveFigureArtifacts = computed(() => {
         logical_name: logicalName,
         display_name: String(fig?.display_name || logicalName).trim(),
         data: figurePayload,
-        source: 'live',
+        source: fig?.promoted ? 'revision' : 'live',
       }
     })
     .filter(Boolean)

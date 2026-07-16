@@ -24,7 +24,12 @@ class ExecutionService {
     async executePython(code) {
         try {
             const appStore = useAppStore()
-            const response = await apiService.executeCode(code, 60, appStore.activeWorkspaceId || null)
+            const response = await apiService.executeCode(
+                code,
+                60,
+                appStore.activeWorkspaceId || null,
+                { persistToTurn: false },
+            )
             return mapExecutionServiceResponse(response)
         } catch (err) {
             return {

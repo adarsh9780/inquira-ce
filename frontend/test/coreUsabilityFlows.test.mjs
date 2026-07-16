@@ -11,9 +11,11 @@ test('code tab runs manual code through execution service and surfaces output in
   assert.equal(source.includes("appStore.setActiveTab('output')"), true)
   assert.equal(source.includes("appStore.setTerminalOutput('Running code...')"), true)
   assert.equal(source.includes('const pyResponse = await executionService.executePython(code)'), true)
-  assert.equal(source.includes('applyExecutionArtifactsToStore(orderedViewModel, effectiveRunId)'), true)
-  assert.equal(source.includes('selectExecutionResult({'), true)
-  assert.equal(source.includes('appStore.setSelectedResultId(resultId)'), true)
+  assert.equal(source.includes('tableOutputs = stampRunResults(orderedViewModel.dataframes'), true)
+  assert.equal(source.includes('chartOutputs = stampRunResults(orderedViewModel.figures'), true)
+  assert.equal(source.includes("origin: 'user'"), true)
+  assert.equal(source.includes("appStore.setDataPane('output')"), true)
+  assert.equal(source.includes('applyExecutionArtifactsToStore'), false)
 })
 
 test('chat tab relies on sidebar lifecycle controls for usable analysis sessions', () => {

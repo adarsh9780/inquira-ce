@@ -443,13 +443,14 @@ export const apiService = {
   },
 
   // Code execution (server-side)
-  async executeCode(code, timeout = 60, workspaceId = null) {
+  async executeCode(code, timeout = 60, workspaceId = null, options = {}) {
     const appStore = useAppStore()
     const activeWorkspaceId = workspaceId || appStore.activeWorkspaceId
     if (!activeWorkspaceId) {
       throw new Error('Create/select a workspace before running code.')
     }
-    console.debug('🚀 [API] Executing code...', { timeout })
+    const persistToTurn = options?.persistToTurn !== false
+    console.debug('🚀 [API] Executing code...', { timeout, persistToTurn })
     const response = await authorizedFetch(
       `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${activeWorkspaceId}/execute`,
       {
@@ -459,8 +460,10 @@ export const apiService = {
         body: JSON.stringify({
           code,
           timeout,
-          conversation_id: appStore.activeConversationId || null,
-          turn_id: appStore.activeTurnId || null,
+          ...(persistToTurn ? {
+            conversation_id: appStore.activeConversationId || null,
+            turn_id: appStore.activeTurnId || null,
+          } : {}),
         })
       }
     )

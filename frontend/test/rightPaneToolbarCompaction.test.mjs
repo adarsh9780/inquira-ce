@@ -16,12 +16,12 @@ test('figure toolbar keeps a contextual artifact selector and icon actions', () 
   assert.equal(source.includes('style="border-color: var(--color-border); color: var(--color-text-muted);"'), true)
 })
 
-test('other toolbar shows a compact execution count without another result filter', () => {
+test('runs toolbar shows a compact execution count without another result filter', () => {
   const outputTabPath = resolve(process.cwd(), 'src/components/analysis/OutputTab.vue')
   const source = readFileSync(outputTabPath, 'utf-8')
 
   assert.equal(source.includes("executionItems.length === 1 ? 'run' : 'runs'"), true)
-  assert.equal(source.includes('statusLabel'), true)
+  assert.equal(source.includes('outputSummary'), true)
   assert.equal(source.includes('formatTimestamp'), true)
   assert.equal(source.includes('FunnelIcon'), false)
   assert.equal(source.includes('<HeaderDropdown'), false)

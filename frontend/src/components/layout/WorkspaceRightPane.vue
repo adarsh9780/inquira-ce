@@ -40,7 +40,7 @@ import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import AppToolbar from '../ui/AppToolbar.vue'
 import {
   ChartBarIcon,
-  CommandLineIcon,
+  PlayCircleIcon,
   TableCellsIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -53,13 +53,13 @@ const OutputTab = defineAsyncComponent(() => import('../analysis/OutputTab.vue')
 const resultCategoryOptions = [
   { value: 'table', label: 'Tables', icon: TableCellsIcon },
   { value: 'chart', label: 'Charts', icon: ChartBarIcon },
-  { value: 'other', label: 'Other', icon: CommandLineIcon },
+  { value: 'runs', label: 'Runs', icon: PlayCircleIcon },
 ]
 
 function categoryForPane(pane) {
   if (pane === 'table') return 'table'
   if (pane === 'figure') return 'chart'
-  return 'other'
+  return 'runs'
 }
 
 function paneForCategory(category) {
@@ -71,7 +71,7 @@ function paneForCategory(category) {
 const selectedCategory = computed({
   get: () => categoryForPane(appStore.dataPane),
   set: (category) => {
-    const normalized = ['table', 'chart', 'other'].includes(category) ? category : 'other'
+    const normalized = ['table', 'chart', 'runs'].includes(category) ? category : 'runs'
     appStore.setDataPane(paneForCategory(normalized))
     const selected = resultCategoryOptions.find((option) => option.value === normalized)
     resultAnnouncement.value = selected ? `${selected.label} selected` : ''

@@ -1059,6 +1059,7 @@ function applyCommandResultToStore(commandResult) {
     appStore.setDataframes([
       {
         name: String(commandResult?.name || 'command_result'),
+        origin: 'ai',
         data: tableResult,
       },
     ])
@@ -1072,8 +1073,6 @@ function applyCommandResultToStore(commandResult) {
     appStore.setResultData(null)
     appStore.setFigures([])
     appStore.setPlotlyFigure(null)
-    appStore.revealArtifactsPane({ hasOutput: true })
-    appStore.setActiveTab('output')
   }
 
   const output = String(commandResult?.output || `/${commandResult?.name || 'command'} executed.`)
@@ -1081,6 +1080,8 @@ function applyCommandResultToStore(commandResult) {
   appStore.appendTerminalEntry({
     kind: 'output',
     source: 'analysis',
+    origin: 'ai',
+    conversationId: String(appStore.activeConversationId || ''),
     label: `/${String(commandResult?.name || 'command')}`,
     command: `/${String(commandResult?.name || 'command')}`,
     status: 'success',
@@ -1118,6 +1119,8 @@ function appendChatExecutionOutput(response, conversationId = appStore.activeCon
     appStore.appendTerminalEntry({
       kind: 'output',
       source: 'analysis',
+      origin: 'ai',
+      conversationId: String(conversationId || ''),
       label: execution.output_truncated ? 'Run output (truncated)' : 'Run output',
       command: String(code || ''),
       runId: String(response?.run_id || ''),
@@ -1269,6 +1272,8 @@ async function handleSlashCommand(questionText) {
       appStore.appendTerminalEntry({
         kind: 'output',
         source: 'analysis',
+        origin: 'ai',
+        conversationId: String(requestConversationId || ''),
         label: 'Command error',
         command: String(questionText || ''),
         status: 'error',
@@ -1276,8 +1281,6 @@ async function handleSlashCommand(questionText) {
         stderr: message,
         exitCode: 1,
       })
-      appStore.setDataPane('output')
-      appStore.setActiveTab('output')
     } else {
       appStore.patchConversationState(requestConversationId, {
         terminalOutput: `Error: ${message}`,
@@ -1559,13 +1562,26 @@ async function handleSubmit() {
       if (inlineFigure) {
         finalStatePatch.plotlyFigure = inlineFigure
         finalStatePatch.resultData = null
+        finalStatePatch.figures = [{
+          name: String(response?.result_name || 'figure'),
+          origin: 'ai',
+          runId: String(response?.run_id || ''),
+          data: inlineFigure,
+        }]
+        finalStatePatch.figureCount = 1
         applyConversationResultState(requestConversationId, finalStatePatch, { hasFigures: true })
       } else if (response.result?.columns && response.result?.data) {
         finalStatePatch.resultData = response.result
         finalStatePatch.plotlyFigure = null
+        finalStatePatch.dataframes = [{
+          name: String(response?.result_name || 'result'),
+          origin: 'ai',
+          runId: String(response?.run_id || ''),
+          data: response.result,
+        }]
         applyConversationResultState(requestConversationId, finalStatePatch, { hasDataframes: true })
       } else if (hasChatExecutionOutput) {
-        applyConversationResultState(requestConversationId, finalStatePatch, { hasOutput: true })
+        applyConversationResultState(requestConversationId, finalStatePatch)
       } else if (Object.keys(finalStatePatch).length > 0) {
         applyConversationResultState(requestConversationId, finalStatePatch)
       }
@@ -1581,6 +1597,8 @@ async function handleSubmit() {
         .filter((item) => String(item?.kind || '') === 'dataframe')
         .map((item) => ({
           name: String(item?.display_name || item?.logical_name || 'dataframe'),
+          origin: 'ai',
+          runId: String(response?.run_id || ''),
           data: {
             artifact_id: item?.artifact_id,
             logical_name: item?.logical_name || undefined,
@@ -1598,6 +1616,8 @@ async function handleSubmit() {
           if (!figure) return null
           return {
             name: String(item?.display_name || item?.logical_name || 'figure'),
+            origin: 'ai',
+            runId: String(response?.run_id || ''),
             artifact_id: item?.artifact_id || null,
             logical_name: item?.logical_name || undefined,
             display_name: item?.display_name || undefined,
@@ -1614,6 +1634,8 @@ async function handleSubmit() {
           const value = hasPayloadValue ? payload.value : item?.payload
           return {
             name: String(item?.display_name || item?.logical_name || item?.name || 'scalar'),
+            origin: 'ai',
+            runId: String(response?.run_id || ''),
             artifact_id: item?.artifact_id || null,
             logical_name: item?.logical_name || undefined,
             display_name: item?.display_name || undefined,
@@ -1635,14 +1657,14 @@ async function handleSubmit() {
         finalStatePatch.resultData = dataframeArtifacts[0].data
         applyConversationResultState(requestConversationId, finalStatePatch, { hasDataframes: true })
       } else if (scalarArtifacts.length > 0 || inlineScalarResult) {
-        applyConversationResultState(requestConversationId, finalStatePatch, { hasOutput: true })
+        applyConversationResultState(requestConversationId, finalStatePatch)
       } else if (artifactItems.length > 0) {
-        applyConversationResultState(requestConversationId, finalStatePatch, { hasOutput: true })
+        applyConversationResultState(requestConversationId, finalStatePatch)
       }
     } else {
       if (inlineScalarResult) {
         finalStatePatch.scalars = [inlineScalarResult]
-        applyConversationResultState(requestConversationId, finalStatePatch, { hasOutput: true })
+        applyConversationResultState(requestConversationId, finalStatePatch)
       } else if (Object.keys(finalStatePatch).length > 0) {
         applyConversationResultState(requestConversationId, finalStatePatch)
       }
@@ -1713,7 +1735,7 @@ async function handleSubmit() {
         category: 'llm_api',
       },
     )
-    applyConversationResultState(requestConversationId, { terminalOutput: `Error: ${errorMessage}` }, { hasOutput: true })
+    applyConversationResultState(requestConversationId, { terminalOutput: `Error: ${errorMessage}` })
     appStore.updateLastMessageExplanation(errorMessage, localMessageId, { conversationId: requestConversationId })
     if (attachmentsPayload.length > 0) {
       pendingAttachments.value = attachmentsPayload.map((item) => ({

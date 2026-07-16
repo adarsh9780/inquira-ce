@@ -3,16 +3,17 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('manual code execution refreshes artifact panes without reloading the turn', () => {
+test('manual code execution keeps structured artifacts inside its run block', () => {
   const codeTabSource = readFileSync(
     resolve(process.cwd(), 'src/components/analysis/CodeTab.vue'),
     'utf-8',
   )
 
-  assert.equal(codeTabSource.includes('appStore.refreshActiveTurnArtifacts()'), true)
+  assert.equal(codeTabSource.includes('appStore.refreshActiveTurnArtifacts()'), false)
   assert.equal(codeTabSource.includes('appStore.loadActiveTurnRelations('), false)
-  assert.equal(codeTabSource.includes('appStore.setScalars(scalars)'), true)
-  assert.equal(codeTabSource.includes("appStore.setSelectedTableArtifact(workspaceId, dataframes[0]?.data?.artifact_id || '')"), true)
-  assert.equal(codeTabSource.includes("appStore.setSelectedFigureArtifact(workspaceId, figures[0]?.artifact_id || '')"), true)
-  assert.equal(codeTabSource.includes('applyExecutionArtifactsToStore(orderedViewModel, effectiveRunId)'), true)
+  assert.equal(codeTabSource.includes('tableOutputs = stampRunResults(orderedViewModel.dataframes'), true)
+  assert.equal(codeTabSource.includes('chartOutputs = stampRunResults(orderedViewModel.figures'), true)
+  assert.equal(codeTabSource.includes('scalarOutputs = stampRunResults(orderedViewModel.scalars'), true)
+  assert.equal(codeTabSource.includes('appStore.setDataframes(dataframes)'), false)
+  assert.equal(codeTabSource.includes('appStore.setFigures(figures)'), false)
 })
