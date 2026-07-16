@@ -1,20 +1,60 @@
 <template>
   <div class="flex h-full min-h-0 flex-col overflow-hidden">
-    <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && appStore.dataPane === 'output'">
-      <div class="flex items-center gap-3">
+    <Teleport
+      to="#workspace-right-pane-toolbar-center"
+      v-if="isMounted && appStore.dataPane === 'output' && executionItems.length > 0"
+    >
+      <nav class="flex items-center gap-1" aria-label="Run history navigation" data-run-navigator>
         <button
-          v-if="focusedRunId"
+          type="button"
+          class="btn-icon h-7 w-7 shrink-0"
+          :disabled="!canGoPrevious"
+          :class="canGoPrevious ? '' : 'opacity-40'"
+          title="Previous run"
+          aria-label="Previous run"
+          @click="selectPreviousRun"
+        >
+          <ChevronLeftIcon class="h-3.5 w-3.5" />
+        </button>
+        <HeaderDropdown
+          v-model="selectedRunId"
+          :options="runHistoryOptions"
+          :trigger-label="runPositionLabel"
+          :dropdown-min-width="248"
+          placeholder="Select run"
+          aria-label="Select run from history"
+          max-width-class="w-[8.5rem]"
+        />
+        <button
+          type="button"
+          class="btn-icon h-7 w-7 shrink-0"
+          :disabled="!canGoNext"
+          :class="canGoNext ? '' : 'opacity-40'"
+          title="Next run"
+          aria-label="Next run"
+          @click="selectNextRun"
+        >
+          <ChevronRightIcon class="h-3.5 w-3.5" />
+        </button>
+      </nav>
+    </Teleport>
+
+    <Teleport
+      to="#workspace-right-pane-toolbar-right"
+      v-if="isMounted && appStore.dataPane === 'output' && focusedRunId"
+    >
+      <div class="flex items-center gap-2">
+        <button
           type="button"
           class="flex items-center gap-1.5 text-xs font-medium"
           style="color: var(--color-text-sub);"
+          aria-label="Preview output"
           @click="focusedRunId = ''"
         >
-          <ArrowLeftIcon class="h-3.5 w-3.5" />
-          All runs
+          <ArrowsPointingInIcon class="h-3.5 w-3.5" />
+          Preview
         </button>
-        <span class="text-xs tabular-nums" style="color: var(--color-text-muted);">
-          {{ focusedRunId ? 'Full output' : `${executionItems.length} ${executionItems.length === 1 ? 'run' : 'runs'}` }}
-        </span>
+        <span class="text-xs" style="color: var(--color-text-muted);">Full output</span>
       </div>
     </Teleport>
 
@@ -35,137 +75,154 @@
     </AppEmptyState>
 
     <div v-else class="min-h-0 flex-1 overflow-y-auto px-2 sm:px-4" data-runs-feed>
-      <div class="mx-auto w-full max-w-7xl divide-y" style="border-color: color-mix(in srgb, var(--color-border) 78%, transparent);">
-        <article
-          v-for="execution in visibleExecutionItems"
-          :key="execution.id"
-          class="py-4 first:pt-1 last:pb-10"
-          data-user-run
-        >
-          <header class="flex min-w-0 items-center gap-2 py-1.5">
-            <button
-              type="button"
-              class="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-              :aria-expanded="isRunOpen(execution.id)"
-              @click="toggleRun(execution.id)"
-            >
-              <ArrowPathIcon v-if="execution.status === 'running'" class="h-3.5 w-3.5 shrink-0 animate-spin" style="color: var(--color-text-muted);" />
-              <CheckCircleIcon v-else-if="execution.status === 'success'" class="h-3.5 w-3.5 shrink-0" style="color: var(--color-success);" />
-              <ExclamationTriangleIcon v-else class="h-3.5 w-3.5 shrink-0" style="color: var(--color-danger);" />
-              <span class="min-w-0">
-                <span class="block truncate text-xs font-semibold" style="color: var(--color-text-sub);">{{ execution.label }}</span>
-                <span class="mt-0.5 block text-[11px]" style="color: var(--color-text-muted);">{{ outputSummary(execution) }}</span>
-              </span>
-            </button>
-
-            <span class="hidden shrink-0 items-center gap-3 text-[11px] tabular-nums sm:flex" style="color: var(--color-text-muted);">
-              <span v-if="formatDuration(execution.durationMs)">{{ formatDuration(execution.durationMs) }}</span>
-              <span v-if="formatTimestamp(execution.createdAt)">{{ formatTimestamp(execution.createdAt) }}</span>
-            </span>
-            <button
-              v-if="hasLargeInlineOutput(execution) && focusedRunId !== execution.id"
-              type="button"
-              class="btn-icon h-7 w-7 shrink-0"
-              title="Open full output"
-              aria-label="Open full output"
-              @click="focusRun(execution.id)"
-            >
-              <ArrowsPointingOutIcon class="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              class="btn-icon h-7 w-7 shrink-0 hover:text-[var(--color-danger)]"
-              title="Delete run and release its output from memory"
-              aria-label="Delete run"
-              @click="deleteRun(execution)"
-            >
-              <TrashIcon class="h-3.5 w-3.5" />
-            </button>
-            <button
-              v-if="focusedRunId !== execution.id"
-              type="button"
-              class="btn-icon h-7 w-7 shrink-0"
-              :title="isRunOpen(execution.id) ? 'Collapse run' : 'Expand run'"
-              :aria-label="isRunOpen(execution.id) ? 'Collapse run' : 'Expand run'"
-              @click="toggleRun(execution.id)"
-            >
-              <ChevronDownIcon class="h-3.5 w-3.5 transition-transform" :class="isRunOpen(execution.id) ? 'rotate-180' : ''" />
-            </button>
-          </header>
-
-          <div v-if="isRunOpen(execution.id)" class="min-w-0 pb-2 pt-3" data-run-body>
-            <pre
-              class="max-h-40 overflow-auto whitespace-pre-wrap break-words px-0.5 text-[11px] font-mono leading-4"
-              :class="execution.code ? '' : 'italic'"
+      <article
+        v-if="selectedExecution"
+        :key="selectedExecution.id"
+        class="mx-auto w-full max-w-7xl pb-10 pt-1"
+        :data-selected-run-id="selectedExecution.id"
+        data-user-run
+      >
+        <header class="flex min-w-0 items-center gap-2 py-1.5">
+          <div class="flex min-w-0 flex-1 items-center gap-2.5">
+            <ArrowPathIcon
+              v-if="selectedExecution.status === 'running'"
+              class="h-3.5 w-3.5 shrink-0 animate-spin"
               style="color: var(--color-text-muted);"
-              data-execution-code
-            >{{ execution.code || '# Code was not captured for this run.' }}</pre>
+            />
+            <CheckCircleIcon
+              v-else-if="selectedExecution.status === 'success'"
+              class="h-3.5 w-3.5 shrink-0"
+              style="color: var(--color-success);"
+            />
+            <ExclamationTriangleIcon
+              v-else
+              class="h-3.5 w-3.5 shrink-0"
+              style="color: var(--color-danger);"
+            />
+            <span class="min-w-0">
+              <span class="block truncate text-xs font-semibold" style="color: var(--color-text-sub);">{{ selectedExecution.label }}</span>
+              <span class="mt-0.5 block text-[11px]" style="color: var(--color-text-muted);">{{ outputSummary(selectedExecution) }}</span>
+            </span>
+          </div>
 
-            <div class="mt-3 min-w-0 border-t pt-4" style="border-color: var(--color-border);">
-              <div v-if="execution.status === 'running'" class="flex items-center gap-2 py-1 text-sm" style="color: var(--color-text-muted);">
-                <ArrowPathIcon class="h-4 w-4 animate-spin" />
-                Running code…
-              </div>
+          <span class="hidden shrink-0 items-center gap-3 text-[11px] tabular-nums sm:flex" style="color: var(--color-text-muted);">
+            <span v-if="formatDuration(selectedExecution.durationMs)">{{ formatDuration(selectedExecution.durationMs) }}</span>
+            <span v-if="formatTimestamp(selectedExecution.createdAt)">{{ formatTimestamp(selectedExecution.createdAt) }}</span>
+          </span>
+          <button
+            v-if="hasLargeInlineOutput(selectedExecution) && focusedRunId !== selectedExecution.id"
+            type="button"
+            class="btn-icon h-7 w-7 shrink-0"
+            title="Open full output"
+            aria-label="Open full output"
+            @click="focusRun(selectedExecution.id)"
+          >
+            <ArrowsPointingOutIcon class="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            class="btn-icon h-7 w-7 shrink-0 hover:text-[var(--color-danger)]"
+            title="Delete run and release its output from memory"
+            aria-label="Delete run"
+            @click="deleteRun(selectedExecution)"
+          >
+            <TrashIcon class="h-3.5 w-3.5" />
+          </button>
+        </header>
 
-              <template v-else>
-                <pre
-                  v-if="execution.stdout"
-                  class="whitespace-pre-wrap break-words text-xs font-mono leading-5"
-                  style="color: var(--color-text-main);"
-                  data-execution-stdout
-                >{{ displayText(execution.stdout, execution) }}</pre>
-                <pre
-                  v-if="execution.stderr"
-                  class="whitespace-pre-wrap break-words border-l-2 pl-4 text-xs font-mono leading-5"
-                  :class="execution.stdout ? 'mt-4' : ''"
-                  style="color: var(--color-danger-text); border-color: var(--color-danger);"
-                  data-execution-stderr
-                >{{ displayText(execution.stderr, execution) }}</pre>
+        <div class="min-w-0 pb-2 pt-3" data-run-body>
+          <pre
+            class="max-h-40 overflow-auto whitespace-pre-wrap break-words px-0.5 text-[11px] font-mono leading-4"
+            :class="selectedExecution.code ? '' : 'italic'"
+            style="color: var(--color-text-muted);"
+            data-execution-code
+          >{{ selectedExecution.code || '# Code was not captured for this run.' }}</pre>
 
-                <pre
-                  v-if="execution.scalarOutputs.length > 0"
-                  class="whitespace-pre-wrap break-words text-xs font-mono leading-5"
-                  :class="(execution.stdout || execution.stderr) ? 'mt-4' : ''"
-                  style="color: var(--color-text-main);"
-                  data-run-scalar
-                >{{ displayScalar(execution.scalarOutputs[0]?.value, execution) }}</pre>
+          <div class="mt-3 min-w-0 border-t pt-4" style="border-color: var(--color-border);">
+            <div v-if="selectedExecution.status === 'running'" class="flex items-center gap-2 py-1 text-sm" style="color: var(--color-text-muted);">
+              <ArrowPathIcon class="h-4 w-4 animate-spin" />
+              Running code…
+            </div>
 
-                <section v-if="execution.tableOutputs.length > 0" class="min-w-0" :class="hasTextOutput(execution) ? 'mt-5' : ''">
-                  <div class="mb-2 flex justify-end">
-                    <button type="button" class="btn-secondary px-2.5 py-1 text-xs" @click="promoteTable(execution, execution.tableOutputs[0], 0)">
-                      Open in Tables
-                    </button>
-                  </div>
-                  <RunTableOutput :output="execution.tableOutputs[0]" />
-                </section>
+            <template v-else>
+              <pre
+                v-if="selectedExecution.stdout"
+                class="whitespace-pre-wrap break-words text-xs font-mono leading-5"
+                style="color: var(--color-text-main);"
+                data-execution-stdout
+              >{{ displayText(selectedExecution.stdout, selectedExecution) }}</pre>
+              <pre
+                v-if="selectedExecution.stderr"
+                class="whitespace-pre-wrap break-words border-l-2 pl-4 text-xs font-mono leading-5"
+                :class="selectedExecution.stdout ? 'mt-4' : ''"
+                style="color: var(--color-danger-text); border-color: var(--color-danger);"
+                data-execution-stderr
+              >{{ displayText(selectedExecution.stderr, selectedExecution) }}</pre>
 
-                <section v-if="execution.chartOutputs.length > 0" class="min-w-0" :class="hasTextOutput(execution) ? 'mt-5' : ''">
-                  <div class="mb-1 flex justify-end">
-                    <button type="button" class="btn-secondary px-2.5 py-1 text-xs" @click="promoteChart(execution, execution.chartOutputs[0], 0)">
-                      Open in Charts
-                    </button>
-                  </div>
-                  <RunChartOutput :output="execution.chartOutputs[0]" />
-                </section>
+              <pre
+                v-if="selectedExecution.scalarOutputs.length > 0"
+                class="whitespace-pre-wrap break-words text-xs font-mono leading-5"
+                :class="(selectedExecution.stdout || selectedExecution.stderr) ? 'mt-4' : ''"
+                style="color: var(--color-text-main);"
+                data-run-scalar
+              >{{ displayScalar(selectedExecution.scalarOutputs[0]?.value, selectedExecution) }}</pre>
 
-                <div
-                  v-if="hasLargeInlineOutput(execution) && focusedRunId !== execution.id"
-                  class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-[11px]"
-                  style="border-color: var(--color-border); color: var(--color-text-muted);"
-                >
-                  <span>Output shortened to keep Runs responsive.</span>
-                  <button type="button" class="font-semibold" style="color: var(--color-accent);" @click="focusRun(execution.id)">
-                    Open full output
+              <section
+                v-if="selectedExecution.tableOutputs.length > 0"
+                class="min-w-0"
+                :class="hasTextOutput(selectedExecution) ? 'mt-5' : ''"
+              >
+                <div class="mb-2 flex justify-end">
+                  <button
+                    type="button"
+                    class="btn-secondary px-2.5 py-1 text-xs"
+                    @click="promoteTable(selectedExecution, selectedExecution.tableOutputs[0], 0)"
+                  >
+                    Open in Tables
                   </button>
                 </div>
+                <RunTableOutput :output="selectedExecution.tableOutputs[0]" />
+              </section>
 
-                <p v-if="!hasOutput(execution)" class="py-1 text-sm" style="color: var(--color-text-muted);">No output</p>
-                <p v-if="execution.truncated" class="mt-3 text-[11px]" style="color: var(--color-text-muted);">Output was truncated by the runtime.</p>
-              </template>
-            </div>
+              <section
+                v-if="selectedExecution.chartOutputs.length > 0"
+                class="min-w-0"
+                :class="hasTextOutput(selectedExecution) ? 'mt-5' : ''"
+              >
+                <div class="mb-1 flex justify-end">
+                  <button
+                    type="button"
+                    class="btn-secondary px-2.5 py-1 text-xs"
+                    @click="promoteChart(selectedExecution, selectedExecution.chartOutputs[0], 0)"
+                  >
+                    Open in Charts
+                  </button>
+                </div>
+                <RunChartOutput :output="selectedExecution.chartOutputs[0]" />
+              </section>
+
+              <div
+                v-if="hasLargeInlineOutput(selectedExecution) && focusedRunId !== selectedExecution.id"
+                class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-[11px]"
+                style="border-color: var(--color-border); color: var(--color-text-muted);"
+              >
+                <span>Output shortened to keep Runs responsive.</span>
+                <button
+                  type="button"
+                  class="font-semibold"
+                  style="color: var(--color-accent);"
+                  @click="focusRun(selectedExecution.id)"
+                >
+                  Open full output
+                </button>
+              </div>
+
+              <p v-if="!hasOutput(selectedExecution)" class="py-1 text-sm" style="color: var(--color-text-muted);">No output</p>
+              <p v-if="selectedExecution.truncated" class="mt-3 text-[11px]" style="color: var(--color-text-muted);">Output was truncated by the runtime.</p>
+            </template>
           </div>
-        </article>
-      </div>
+        </div>
+      </article>
     </div>
   </div>
 </template>
@@ -175,13 +232,15 @@ import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { buildUserRunItems } from '../../utils/unifiedResults'
 import AppEmptyState from '../ui/AppEmptyState.vue'
+import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import RunTableOutput from './runs/RunTableOutput.vue'
 import {
-  ArrowLeftIcon,
   ArrowPathIcon,
+  ArrowsPointingInIcon,
   ArrowsPointingOutIcon,
   CheckCircleIcon,
-  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   ExclamationTriangleIcon,
   PlayIcon,
   TrashIcon,
@@ -191,7 +250,7 @@ const INLINE_TEXT_LIMIT = 4_000
 const RunChartOutput = defineAsyncComponent(() => import('./runs/RunChartOutput.vue'))
 const appStore = useAppStore()
 const isMounted = ref(false)
-const expandedRunIds = ref(new Set())
+const selectedRunId = ref('')
 const focusedRunId = ref('')
 let newestRunId = ''
 
@@ -204,48 +263,80 @@ const executionItems = computed(() => buildUserRunItems({
   conversationId: appStore.activeConversationId,
 }))
 
-const visibleExecutionItems = computed(() => {
-  if (!focusedRunId.value) return executionItems.value
-  return executionItems.value.filter((execution) => execution.id === focusedRunId.value)
+const selectedRunIndex = computed(() => (
+  executionItems.value.findIndex((execution) => execution.id === selectedRunId.value)
+))
+
+const selectedExecution = computed(() => (
+  selectedRunIndex.value >= 0 ? executionItems.value[selectedRunIndex.value] : null
+))
+
+const runPositionLabel = computed(() => {
+  const total = executionItems.value.length
+  if (!total || selectedRunIndex.value < 0) return 'Select run'
+  return `Run ${total - selectedRunIndex.value} of ${total}`
 })
 
+const runHistoryOptions = computed(() => {
+  const total = executionItems.value.length
+  return executionItems.value.map((execution, index) => ({
+    value: execution.id,
+    label: [
+      `Run ${total - index}`,
+      historySummary(execution),
+      formatTimestamp(execution.createdAt),
+    ].filter(Boolean).join(' · '),
+  }))
+})
+
+const canGoPrevious = computed(() => (
+  selectedRunIndex.value >= 0 && selectedRunIndex.value < executionItems.value.length - 1
+))
+
+const canGoNext = computed(() => selectedRunIndex.value > 0)
+
 watch(executionItems, (items) => {
-  if (focusedRunId.value && !items.some((item) => item.id === focusedRunId.value)) focusedRunId.value = ''
   const nextNewestId = String(items[0]?.id || '')
   if (!nextNewestId) {
-    expandedRunIds.value = new Set()
     newestRunId = ''
+    selectedRunId.value = ''
+    focusedRunId.value = ''
     return
   }
   if (nextNewestId !== newestRunId) {
     newestRunId = nextNewestId
-    expandedRunIds.value = new Set([nextNewestId])
+    selectedRunId.value = nextNewestId
+    return
+  }
+  if (!items.some((item) => item.id === selectedRunId.value)) {
+    selectedRunId.value = nextNewestId
   }
 }, { immediate: true })
 
-function isRunOpen(id) {
-  return focusedRunId.value === id || expandedRunIds.value.has(id)
+watch(selectedRunId, () => {
+  focusedRunId.value = ''
+})
+
+function selectPreviousRun() {
+  if (!canGoPrevious.value) return
+  selectedRunId.value = executionItems.value[selectedRunIndex.value + 1]?.id || selectedRunId.value
 }
 
-function toggleRun(id) {
-  if (focusedRunId.value === id) return
-  const next = new Set(expandedRunIds.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  expandedRunIds.value = next
+function selectNextRun() {
+  if (!canGoNext.value) return
+  selectedRunId.value = executionItems.value[selectedRunIndex.value - 1]?.id || selectedRunId.value
 }
 
 function focusRun(id) {
   focusedRunId.value = id
-  expandedRunIds.value = new Set([id])
 }
 
 function deleteRun(execution) {
   if (!execution?.entryId) return
+  const currentIndex = executionItems.value.findIndex((item) => item.id === execution.id)
+  const fallback = executionItems.value[currentIndex - 1] || executionItems.value[currentIndex + 1] || null
+  selectedRunId.value = fallback?.id || ''
   appStore.removeTerminalEntry(execution.entryId)
-  const next = new Set(expandedRunIds.value)
-  next.delete(execution.id)
-  expandedRunIds.value = next
   if (focusedRunId.value === execution.id) focusedRunId.value = ''
 }
 
@@ -302,6 +393,16 @@ function outputSummary(execution) {
   if (execution.tableOutputs.length) parts.push('table')
   if (execution.chartOutputs.length) parts.push('chart')
   return parts.length ? parts.join(' · ') : 'No output'
+}
+
+function historySummary(execution) {
+  if (execution.status === 'running') return 'Running'
+  if (execution.status === 'error' || execution.stderr) return 'Error'
+  if (execution.chartOutputs.length) return 'Chart'
+  if (execution.tableOutputs.length) return 'Table'
+  if (execution.scalarOutputs.length) return 'Value'
+  if (execution.stdout) return 'Text'
+  return 'No output'
 }
 
 function promoteTable(execution, table, index) {

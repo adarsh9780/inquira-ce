@@ -180,6 +180,10 @@ const props = defineProps({
     type: String,
     default: 'Select'
   },
+  triggerLabel: {
+    type: String,
+    default: ''
+  },
   ariaLabel: {
     type: String,
     default: 'Select option'
@@ -235,6 +239,10 @@ const props = defineProps({
   maxOptionsWithoutSearch: {
     type: Number,
     default: 0
+  },
+  dropdownMinWidth: {
+    type: Number,
+    default: 0
   }
 })
 
@@ -256,7 +264,7 @@ let backendSearchToken = 0
 
 const normalizedOptions = computed(() => normalizeModelOptions(props.options))
 const selectedOption = computed(() => normalizedOptions.value.find((option) => option.value === props.modelValue) ?? null)
-const selectedLabel = computed(() => selectedOption.value?.label || props.placeholder)
+const selectedLabel = computed(() => String(props.triggerLabel || '').trim() || selectedOption.value?.label || props.placeholder)
 const hasSelection = computed(() => !!selectedOption.value)
 const normalizedSearchQuery = computed(() => String(searchQuery.value || '').trim().toLowerCase())
 const filteredOptions = computed(() => {
@@ -343,6 +351,17 @@ function applyInlineStyle(element, style) {
 function updateFloatingPosition(element = null) {
   const nextStyle = updateFloatingDropdownPosition(triggerRef)
   if (!nextStyle) return
+  const requestedMinWidth = Number(props.dropdownMinWidth || 0)
+  if (requestedMinWidth > 0) {
+    const triggerElement = triggerRef.value?.el ?? triggerRef.value
+    const rect = triggerElement?.getBoundingClientRect?.()
+    if (rect) {
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || requestedMinWidth + 16
+      const width = Math.min(Math.max(rect.width, requestedMinWidth), Math.max(0, viewportWidth - 16))
+      nextStyle.width = `${Math.round(width)}px`
+      nextStyle.left = `${Math.round(Math.max(8, Math.min(rect.left, viewportWidth - width - 8)))}px`
+    }
+  }
   floatingOptionsStyle.value = nextStyle
   applyInlineStyle(element, nextStyle)
 }

@@ -189,8 +189,76 @@ test('large manual output can open in a focused full-output view', async ({ page
     await page.getByRole('button', { name: 'Open full output' }).first().click()
     await expect(page.getByText('Full output', { exact: true })).toBeVisible()
     await expect(stdout).toContainText('END')
-    await page.getByRole('button', { name: 'All runs' }).click()
+    await page.getByRole('button', { name: 'Preview output' }).click()
     await expect(page.getByRole('button', { name: 'Open full output' }).first()).toBeVisible()
+  } finally {
+    await cleanup()
+  }
+})
+
+test('manual run navigator defaults to latest and can move through history', async ({ page }) => {
+  const { cleanup } = await installCriticalWorkflowMocks(page, {
+    mockPreferences: true,
+    mockSchemaRegenerate: false,
+    mockChatStream: false,
+  })
+  let executionCount = 0
+
+  await page.route('**/api/v1/workspaces/*/execute', async (route) => {
+    executionCount += 1
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        stdout: `output-${executionCount}`,
+        stderr: '',
+        has_stdout: true,
+        has_stderr: false,
+        error: '',
+        result: null,
+        result_type: 'none',
+        result_kind: 'none',
+        result_name: '',
+        run_id: `pw-navigator-run-${executionCount}`,
+        artifacts: [],
+        variables: {},
+      }),
+    })
+  })
+
+  try {
+    await setupCriticalWorkspace(page)
+    await page.getByRole('tab', { name: 'Code', exact: true }).click()
+
+    const editor = page.locator('.cm-content').first()
+    await expect(editor).toBeVisible({ timeout: 30_000 })
+    await editor.click()
+    await page.keyboard.press(selectAllShortcut())
+    await page.keyboard.type("print('navigator')")
+
+    await page.getByTitle('Run Code (R)').click()
+    await expect(page.getByText('output-1', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await page.getByTitle('Run Code (R)').click()
+    await expect(page.getByText('output-2', { exact: true })).toBeVisible({ timeout: 30_000 })
+
+    const runSelector = page.getByRole('button', { name: 'Select run from history' })
+    await expect(runSelector).toContainText('Run 2 of 2')
+    await expect(page.locator('[data-runs-feed] [data-user-run]')).toHaveCount(1)
+    await expect(page.getByText('output-1', { exact: true })).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Previous run' }).click()
+    await expect(runSelector).toContainText('Run 1 of 2')
+    await expect(page.getByText('output-1', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Next run' }).click()
+    await expect(page.getByText('output-2', { exact: true })).toBeVisible()
+
+    await runSelector.click()
+    await page.getByRole('option', { name: /Run 1 · Text/ }).click()
+    await expect(page.getByText('output-1', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Delete run' }).click()
+    await expect(runSelector).toContainText('Run 1 of 1')
+    await expect(page.getByText('output-2', { exact: true })).toBeVisible()
   } finally {
     await cleanup()
   }

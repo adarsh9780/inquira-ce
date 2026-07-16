@@ -35,4 +35,6 @@ test('results uses an icon category dropdown with contextual artifact dropdowns'
   assert.equal(dropdown.includes('dropdownSurfaceClass'), true)
   assert.equal(dropdown.includes('updateFloatingDropdownPosition'), true)
   assert.equal(dropdown.includes('updateFloatingPosition'), true)
+  assert.equal(dropdown.includes('triggerLabel'), true)
+  assert.equal(dropdown.includes('dropdownMinWidth'), true)
 })
