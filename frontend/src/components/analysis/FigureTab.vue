@@ -1,5 +1,18 @@
 <template>
   <div class="flex flex-col h-full">
+    <Teleport to="#workspace-right-pane-toolbar-center" v-if="isMounted && appStore.dataPane === 'figure'">
+      <div v-if="figureDropdownOptions.length > 0" class="flex min-w-[11rem] max-w-full items-center" style="width: clamp(11rem, 28vw, 19rem);">
+        <HeaderDropdown
+          id="figure-select"
+          v-model="selectedArtifactId"
+          :options="figureDropdownOptions"
+          placeholder="Select chart"
+          aria-label="Select chart"
+          max-width-class="w-full"
+        />
+      </div>
+    </Teleport>
+
     <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && appStore.dataPane === 'figure'">
       <div class="flex min-w-0 items-center justify-end w-full gap-3">
         <div class="flex min-w-0 items-center space-x-3 text-sm">
@@ -87,6 +100,7 @@
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import Plotly from 'plotly.js-dist-min'
+import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import FloatingActionMenu from '../ui/FloatingActionMenu.vue'
 import AppEmptyState from '../ui/AppEmptyState.vue'
@@ -160,6 +174,12 @@ const orderedFigures = computed(() => {
   const persisted = persistedFigureArtifacts.value.map((fig) => ({ ...fig, source: 'artifact' }))
   return [...liveFigureArtifacts.value, ...persisted]
 })
+
+const figureDropdownOptions = computed(() => orderedFigures.value.map((figure, index) => ({
+  value: figure.artifact_id,
+  label: figure.display_name || figure.logical_name || `Chart ${index + 1}`,
+  key: figure.artifact_id,
+})))
 
 const selectedFigureMeta = computed(() => {
   if (!selectedArtifactId.value) return null

@@ -8,7 +8,17 @@
           :style="triggerStyle"
           :aria-label="ariaLabel"
         >
-          <span class="truncate" :title="selectedLabel">{{ selectedLabel }}</span>
+          <span class="flex min-w-0 items-center gap-2">
+            <span v-if="selectedOption?.icon" class="inline-flex h-4 w-4 shrink-0" data-header-dropdown-icon>
+              <component
+                :is="selectedOption.icon"
+                class="h-4 w-4"
+                style="color: var(--color-text-muted);"
+                aria-hidden="true"
+              />
+            </span>
+            <span class="truncate" :title="selectedLabel">{{ selectedLabel }}</span>
+          </span>
           <ChevronUpDownIcon class="h-3.5 w-3.5 shrink-0 opacity-70" />
         </ListboxButton>
 
@@ -59,8 +69,16 @@
                         :style="dropdownOptionStyle(active)"
                         :class="[dropdownOptionClass, 'pl-3 pr-9']"
                       >
-                        <span :class="selected ? 'font-semibold' : 'font-normal'" class="block truncate pr-2" :title="option.label">
-                          {{ option.label }}
+                        <span :class="selected ? 'font-semibold' : 'font-normal'" class="flex min-w-0 items-center gap-2 pr-2" :title="option.label">
+                          <span v-if="option.icon" class="inline-flex h-4 w-4 shrink-0" data-header-dropdown-icon>
+                            <component
+                              :is="option.icon"
+                              class="h-4 w-4"
+                              style="color: var(--color-text-muted);"
+                              aria-hidden="true"
+                            />
+                          </span>
+                          <span class="truncate">{{ option.label }}</span>
                         </span>
                         <span v-if="selected" class="absolute right-2.5 top-1/2 -translate-y-1/2">
                           <CheckIcon class="h-4 w-4" style="color: var(--color-text-muted);" />
@@ -91,8 +109,16 @@
                       :style="dropdownOptionStyle(active)"
                       :class="[dropdownOptionClass, 'pl-3 pr-9']"
                     >
-                      <span :class="selected ? 'font-semibold' : 'font-normal'" class="block truncate pr-2" :title="option.label">
-                        {{ option.label }}
+                      <span :class="selected ? 'font-semibold' : 'font-normal'" class="flex min-w-0 items-center gap-2 pr-2" :title="option.label">
+                        <span v-if="option.icon" class="inline-flex h-4 w-4 shrink-0" data-header-dropdown-icon>
+                          <component
+                            :is="option.icon"
+                            class="h-4 w-4"
+                            style="color: var(--color-text-muted);"
+                            aria-hidden="true"
+                          />
+                        </span>
+                        <span class="truncate">{{ option.label }}</span>
                       </span>
                       <span v-if="selected" class="absolute right-2.5 top-1/2 -translate-y-1/2">
                         <CheckIcon class="h-4 w-4" style="color: var(--color-text-muted);" />

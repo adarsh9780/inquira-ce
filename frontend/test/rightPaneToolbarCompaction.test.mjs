@@ -3,12 +3,12 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('figure toolbar keeps only contextual icon actions after selection moves to Results', () => {
+test('figure toolbar keeps a contextual artifact selector and icon actions', () => {
   const figureTabPath = resolve(process.cwd(), 'src/components/analysis/FigureTab.vue')
   const source = readFileSync(figureTabPath, 'utf-8')
 
-  assert.equal(source.includes('to="#workspace-right-pane-toolbar-center"'), false)
-  assert.equal(source.includes('<HeaderDropdown'), false)
+  assert.equal(source.includes('to="#workspace-right-pane-toolbar-center"'), true)
+  assert.equal(source.includes('<HeaderDropdown'), true)
   assert.equal(source.includes("label: 'Delete chart'"), true)
   assert.equal(source.includes(`:title="isDownloading ? 'Exporting chart' : 'Export chart'"`), true)
   assert.equal(source.includes('ChevronDownIcon'), false)
@@ -16,13 +16,13 @@ test('figure toolbar keeps only contextual icon actions after selection moves to
   assert.equal(source.includes('style="border-color: var(--color-border); color: var(--color-text-muted);"'), true)
 })
 
-test('output toolbar shows compact status metadata without another result filter', () => {
+test('other toolbar shows a compact execution count without another result filter', () => {
   const outputTabPath = resolve(process.cwd(), 'src/components/analysis/OutputTab.vue')
   const source = readFileSync(outputTabPath, 'utf-8')
 
-  assert.equal(source.includes('class="flex min-w-0 items-center justify-end gap-2 text-xs"'), true)
+  assert.equal(source.includes("executionItems.length === 1 ? 'run' : 'runs'"), true)
   assert.equal(source.includes('statusLabel'), true)
-  assert.equal(source.includes('formattedTimestamp'), true)
+  assert.equal(source.includes('formatTimestamp'), true)
   assert.equal(source.includes('FunnelIcon'), false)
   assert.equal(source.includes('<HeaderDropdown'), false)
 })

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('unified results header owns the shared HeaderDropdown instead of renderer-specific selects', () => {
+test('results uses an icon category dropdown with contextual artifact dropdowns', () => {
   const figureTabPath = resolve(process.cwd(), 'src/components/analysis/FigureTab.vue')
   const tableTabPath = resolve(process.cwd(), 'src/components/analysis/TableTab.vue')
   const rightPanePath = resolve(process.cwd(), 'src/components/layout/WorkspaceRightPane.vue')
@@ -15,13 +15,17 @@ test('unified results header owns the shared HeaderDropdown instead of renderer-
   const dropdown = readFileSync(dropdownPath, 'utf-8')
 
   assert.equal(rightPane.includes('<HeaderDropdown'), true)
-  assert.equal(rightPane.includes('v-model="selectedResultId"'), true)
-  assert.equal(rightPane.includes('aria-label="Select result"'), true)
-  assert.equal(figureTab.includes('<HeaderDropdown'), false)
-  assert.equal(tableTab.includes('<HeaderDropdown'), false)
+  assert.equal(rightPane.includes('v-model="selectedCategory"'), true)
+  assert.equal(rightPane.includes('aria-label="Select result category"'), true)
+  assert.equal(rightPane.includes("{ value: 'table', label: 'Tables', icon: TableCellsIcon }"), true)
+  assert.equal(rightPane.includes("{ value: 'chart', label: 'Charts', icon: ChartBarIcon }"), true)
+  assert.equal(rightPane.includes("{ value: 'other', label: 'Other', icon: CommandLineIcon }"), true)
+  assert.equal(figureTab.includes('<HeaderDropdown'), true)
+  assert.equal(tableTab.includes('<HeaderDropdown'), true)
   assert.equal(figureTab.includes('<select'), false)
   assert.equal(tableTab.includes('<select'), false)
-  assert.equal(rightPane.includes('max-width-class="w-[clamp(11rem,28vw,20rem)]"'), true)
+  assert.equal(rightPane.includes('max-width-class="w-[9.5rem]"'), true)
+  assert.equal(dropdown.includes('data-header-dropdown-icon'), true)
   assert.equal(dropdown.includes('const maxLabelChars = computed(() => {'), true)
   assert.equal(dropdown.includes('width: `${widthChars}ch`'), true)
   assert.equal(dropdown.includes("maxWidth: '100%'"), true)

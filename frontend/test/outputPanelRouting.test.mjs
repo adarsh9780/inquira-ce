@@ -3,32 +3,33 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('workspace right pane uses one result selector and routes by selected result kind', () => {
+test('workspace right pane routes through exactly three icon-labelled result categories', () => {
   const source = readFileSync(
     resolve(process.cwd(), 'src/components/layout/WorkspaceRightPane.vue'),
     'utf-8',
   )
 
   assert.equal(source.includes('<HeaderDropdown'), true)
-  assert.equal(source.includes('v-model="selectedResultId"'), true)
-  assert.equal(source.includes('buildUnifiedResultItems'), true)
-  assert.equal(source.includes("selectedResult?.kind === 'table'"), true)
-  assert.equal(source.includes("selectedResult?.kind === 'chart'"), true)
-  assert.equal(source.includes("selectedResult?.kind === 'log' || selectedResult?.kind === 'scalar'"), true)
+  assert.equal(source.includes('v-model="selectedCategory"'), true)
+  assert.equal(source.includes("selectedCategory === 'table'"), true)
+  assert.equal(source.includes("selectedCategory === 'chart'"), true)
+  assert.equal(source.includes("{ value: 'other', label: 'Other', icon: CommandLineIcon }"), true)
+  assert.equal(source.includes('resultCategoryOptions.length'), false)
   assert.equal(source.includes('<SegmentedControl'), false)
   assert.equal(source.includes('dataPaneOptions'), false)
 })
 
-test('output renderer is limited to logs and scalars without table or chart duplication', () => {
+test('other renderer pairs code with non-visual output without table or chart duplication', () => {
   const source = readFileSync(
     resolve(process.cwd(), 'src/components/analysis/OutputTab.vue'),
     'utf-8',
   )
 
-  assert.equal(source.includes("item.kind === 'log' || item.kind === 'scalar'"), true)
-  assert.equal(source.includes('Execution output'), true)
-  assert.equal(source.includes('Execution error'), true)
-  assert.equal(source.includes('Scalar result'), true)
+  assert.equal(source.includes('buildOtherExecutionItems'), true)
+  assert.equal(source.includes('execution.code'), true)
+  assert.equal(source.includes('execution.stdout'), true)
+  assert.equal(source.includes('execution.stderr'), true)
+  assert.equal(source.includes('execution.scalarOutputs'), true)
   assert.equal(source.includes('Open in Table tab'), false)
   assert.equal(source.includes('Open in Chart tab'), false)
   assert.equal(source.includes('<table'), false)

@@ -3,14 +3,15 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('table toolbar keeps contextual search and icon actions after selection moves to Results', () => {
+test('table toolbar keeps a contextual artifact selector with search and icon actions', () => {
   const tableTabPath = resolve(process.cwd(), 'src/components/analysis/TableTab.vue')
   const tableToolbarPath = resolve(process.cwd(), 'src/components/analysis/table/TableToolbar.vue')
   const source = readFileSync(tableTabPath, 'utf-8')
   const toolbar = readFileSync(tableToolbarPath, 'utf-8')
 
   assert.equal(source.includes('Teleport to="#workspace-right-pane-toolbar-right"'), true)
-  assert.equal(source.includes('Teleport to="#workspace-right-pane-toolbar-center"'), false)
+  assert.equal(source.includes('Teleport to="#workspace-right-pane-toolbar-center"'), true)
+  assert.equal(source.includes('aria-label="Select table"'), true)
   assert.equal(source.includes('<TableToolbar'), true)
   assert.equal(toolbar.includes('class="flex min-w-0 items-center justify-end w-full gap-2"'), true)
   assert.equal(source.includes('FunnelIcon'), true)

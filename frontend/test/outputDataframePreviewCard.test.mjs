@@ -15,5 +15,5 @@ test('dataframes render only through the full table renderer, not a duplicate ou
   assert.equal(output.includes('buildDataframePreview'), false)
   assert.equal(table.includes('<DataTable'), true)
   assert.equal(table.includes(':manual="useServerModel"'), true)
-  assert.equal(rightPane.includes("selectedResult?.kind === 'table'"), true)
+  assert.equal(rightPane.includes("selectedCategory === 'table'"), true)
 })

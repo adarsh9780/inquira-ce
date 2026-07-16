@@ -1,77 +1,139 @@
 <template>
   <div class="flex h-full min-h-0 flex-col overflow-hidden">
-    <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && appStore.dataPane === 'output' && selectedResult">
-      <div class="flex min-w-0 items-center justify-end gap-2 text-xs" style="color: var(--color-text-muted);">
-        <ArrowPathIcon v-if="selectedResult.status === 'running'" class="h-3.5 w-3.5 animate-spin" />
-        <CheckCircleIcon v-else-if="selectedResult.status === 'success'" class="h-3.5 w-3.5" style="color: var(--color-success);" />
-        <ExclamationTriangleIcon v-else class="h-3.5 w-3.5" style="color: var(--color-danger);" />
-        <span>{{ statusLabel }}</span>
-        <span v-if="formattedTimestamp" class="tabular-nums">{{ formattedTimestamp }}</span>
+    <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && appStore.dataPane === 'output'">
+      <div class="text-xs tabular-nums" style="color: var(--color-text-muted);">
+        {{ executionItems.length }} {{ executionItems.length === 1 ? 'run' : 'runs' }}
       </div>
     </Teleport>
 
     <p
       v-if="appStore.terminalEntriesTrimmedCount > 0"
-      class="px-1 py-1 text-[11px]"
+      class="shrink-0 px-1 py-1 text-[11px]"
       style="color: var(--color-text-muted);"
     >
       Older run output was trimmed to keep memory usage stable.
     </p>
 
     <AppEmptyState
-      v-if="!selectedResult"
-      title="No run output"
-      description="Run code that prints a value, returns a scalar, or raises an error."
-    />
+      v-if="executionItems.length === 0"
+      title="No other output"
+      description="Printed values, scalar results, and errors will appear here with the code that produced them."
+    >
+      <template #icon><CommandLineIcon class="h-7 w-7" /></template>
+    </AppEmptyState>
 
-    <div v-else-if="selectedResult.kind === 'scalar'" class="h-full overflow-auto px-1 py-2 sm:px-3 sm:py-4">
-      <div class="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center">
-        <p class="text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Scalar result</p>
-        <h2 class="mt-2 text-sm font-semibold" style="color: var(--color-text-main);">{{ selectedResult.label }}</h2>
-        <pre
-          class="mt-4 whitespace-pre-wrap break-words text-[clamp(1rem,2.4vw,1.5rem)] font-mono leading-relaxed"
-          style="color: var(--color-text-main);"
-        >{{ scalarValue }}</pre>
-        <p v-if="scalarType" class="mt-3 text-xs" style="color: var(--color-text-muted);">Type: {{ scalarType }}</p>
-      </div>
-    </div>
-
-    <div v-else class="h-full overflow-auto px-1 py-2 sm:px-3 sm:py-4">
-      <div class="mx-auto w-full max-w-4xl">
-        <div class="flex items-start justify-between gap-4 border-b pb-3" style="border-color: color-mix(in srgb, var(--color-border) 82%, transparent);">
-          <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">
-              {{ selectedResult.status === 'error' ? 'Execution error' : 'Execution output' }}
+    <div v-else class="min-h-0 flex-1 overflow-y-auto px-1 sm:px-3" data-other-output-feed>
+      <div class="mx-auto w-full max-w-5xl divide-y" style="border-color: color-mix(in srgb, var(--color-border) 78%, transparent);">
+        <article
+          v-for="execution in executionItems"
+          :key="execution.id"
+          class="py-5 first:pt-2 last:pb-8"
+          data-execution-output
+        >
+          <header class="flex flex-wrap items-start justify-between gap-x-5 gap-y-2">
+            <div class="flex min-w-0 items-center gap-2.5">
+              <ArrowPathIcon
+                v-if="execution.status === 'running'"
+                class="h-4 w-4 shrink-0 animate-spin"
+                style="color: var(--color-text-muted);"
+              />
+              <CheckCircleIcon
+                v-else-if="execution.status === 'success'"
+                class="h-4 w-4 shrink-0"
+                style="color: var(--color-success);"
+              />
+              <ExclamationTriangleIcon
+                v-else
+                class="h-4 w-4 shrink-0"
+                style="color: var(--color-danger);"
+              />
+              <div class="min-w-0">
+                <h2 class="truncate text-sm font-semibold" style="color: var(--color-text-main);">{{ execution.label }}</h2>
+                <p class="mt-0.5 text-[11px] uppercase tracking-[0.06em]" style="color: var(--color-text-muted);">
+                  {{ statusLabel(execution.status) }}
+                </p>
+              </div>
+            </div>
+            <p class="flex shrink-0 items-center gap-2 text-xs tabular-nums" style="color: var(--color-text-muted);">
+              <span v-if="formatDuration(execution.durationMs)">{{ formatDuration(execution.durationMs) }}</span>
+              <span v-if="formatTimestamp(execution.createdAt)">{{ formatTimestamp(execution.createdAt) }}</span>
             </p>
-            <h2 class="mt-1 truncate text-sm font-semibold" style="color: var(--color-text-main);">{{ selectedResult.label }}</h2>
-          </div>
-          <span v-if="durationLabel" class="shrink-0 text-xs tabular-nums" style="color: var(--color-text-muted);">{{ durationLabel }}</span>
-        </div>
+          </header>
 
-        <div v-if="selectedResult.status === 'running'" class="flex min-h-52 items-center justify-center gap-2 text-sm" style="color: var(--color-text-muted);">
-          <ArrowPathIcon class="h-4 w-4 animate-spin" />
-          Running code…
-        </div>
-
-        <template v-else>
-          <pre
-            v-if="selectedLog.stdout"
-            class="mt-4 whitespace-pre-wrap break-words rounded-md px-3 py-2 text-xs font-mono leading-5"
-            style="color: var(--color-text-main); background-color: color-mix(in srgb, var(--color-base) 86%, var(--color-surface));"
-          >{{ selectedLog.stdout }}</pre>
-          <pre
-            v-if="selectedLog.stderr"
-            class="mt-4 whitespace-pre-wrap break-words rounded-md border px-3 py-2 text-xs font-mono leading-5"
-            style="color: var(--color-danger-text); border-color: color-mix(in srgb, var(--color-danger) 70%, var(--color-border)); background-color: color-mix(in srgb, var(--color-danger-bg) 75%, var(--color-base));"
-          >{{ selectedLog.stderr }}</pre>
-          <div
-            v-if="!selectedLog.stdout && !selectedLog.stderr"
-            class="flex min-h-52 items-center justify-center text-sm"
-            style="color: var(--color-text-muted);"
-          >
-            Completed with no displayable output.
+          <div class="mt-4 grid gap-x-5 gap-y-2 md:grid-cols-[4.5rem_minmax(0,1fr)]">
+            <p class="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Code</p>
+            <pre
+              class="max-h-64 overflow-auto whitespace-pre-wrap break-words border-l-2 pl-4 text-xs font-mono leading-5"
+              :class="execution.code ? '' : 'italic'"
+              :style="execution.code
+                ? 'color: var(--color-text-main); border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border));'
+                : 'color: var(--color-text-muted); border-color: var(--color-border);'"
+              data-execution-code
+            >{{ execution.code || '# Code was not captured for this run.' }}</pre>
           </div>
-        </template>
+
+          <div class="mt-5 grid gap-x-5 gap-y-2 md:grid-cols-[4.5rem_minmax(0,1fr)]">
+            <p class="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Output</p>
+            <div class="min-w-0">
+              <div
+                v-if="execution.status === 'running'"
+                class="flex items-center gap-2 py-1 text-sm"
+                style="color: var(--color-text-muted);"
+              >
+                <ArrowPathIcon class="h-4 w-4 animate-spin" />
+                Running code…
+              </div>
+
+              <template v-else>
+                <pre
+                  v-if="execution.stdout"
+                  class="whitespace-pre-wrap break-words text-xs font-mono leading-5"
+                  style="color: var(--color-text-main);"
+                  data-execution-stdout
+                >{{ execution.stdout }}</pre>
+                <pre
+                  v-if="execution.stderr"
+                  class="whitespace-pre-wrap break-words border-l-2 pl-4 text-xs font-mono leading-5"
+                  :class="execution.stdout ? 'mt-4' : ''"
+                  style="color: var(--color-danger-text); border-color: var(--color-danger);"
+                  data-execution-stderr
+                >{{ execution.stderr }}</pre>
+
+                <dl
+                  v-if="execution.scalarOutputs.length > 0"
+                  class="divide-y border-y"
+                  :class="(execution.stdout || execution.stderr) ? 'mt-4' : ''"
+                  style="border-color: color-mix(in srgb, var(--color-border) 78%, transparent);"
+                >
+                  <div
+                    v-for="scalar in execution.scalarOutputs"
+                    :key="scalar.id"
+                    class="grid gap-2 py-2.5 sm:grid-cols-[minmax(7rem,0.35fr)_minmax(0,1fr)]"
+                  >
+                    <dt class="min-w-0 text-xs font-medium" style="color: var(--color-text-sub);">
+                      <span class="break-words">{{ scalar.name }}</span>
+                      <span v-if="scalar.type" class="ml-1 font-normal" style="color: var(--color-text-muted);">· {{ scalar.type }}</span>
+                    </dt>
+                    <dd class="min-w-0">
+                      <pre class="whitespace-pre-wrap break-words text-xs font-mono leading-5" style="color: var(--color-text-main);">{{ formatScalarValue(scalar.value) }}</pre>
+                    </dd>
+                  </div>
+                </dl>
+
+                <p
+                  v-if="!execution.stdout && !execution.stderr && execution.scalarOutputs.length === 0"
+                  class="py-1 text-sm"
+                  style="color: var(--color-text-muted);"
+                >
+                  Completed without text or scalar output.
+                </p>
+                <p v-if="execution.truncated" class="mt-3 text-[11px]" style="color: var(--color-text-muted);">
+                  Output was truncated by the runtime.
+                </p>
+              </template>
+            </div>
+          </div>
+        </article>
       </div>
     </div>
   </div>
@@ -80,20 +142,14 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useAppStore } from '../../stores/appStore'
-import { buildUnifiedResultItems } from '../../utils/unifiedResults'
+import { buildOtherExecutionItems } from '../../utils/unifiedResults'
 import AppEmptyState from '../ui/AppEmptyState.vue'
 import {
   ArrowPathIcon,
   CheckCircleIcon,
+  CommandLineIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
-
-const props = defineProps({
-  selectedResultId: {
-    type: String,
-    default: '',
-  },
-})
 
 const appStore = useAppStore()
 const isMounted = ref(false)
@@ -102,26 +158,36 @@ onMounted(() => {
   isMounted.value = true
 })
 
-const outputResults = computed(() => buildUnifiedResultItems({
-  scalars: appStore.scalars,
+const executionItems = computed(() => buildOtherExecutionItems({
   terminalEntries: appStore.terminalEntries,
+  scalars: appStore.scalars,
+  dataframes: appStore.dataframes,
+  figures: appStore.figures,
   activeTurnArtifacts: appStore.activeTurnArtifacts,
-}).filter((item) => item.kind === 'log' || item.kind === 'scalar'))
+  fallbackCode: appStore.activeTurnCode,
+}))
 
-const selectedResult = computed(() => (
-  outputResults.value.find((item) => item.id === props.selectedResultId) || null
-))
+function statusLabel(status) {
+  if (status === 'running') return 'Running'
+  if (status === 'error') return 'Failed'
+  return 'Complete'
+}
 
-const selectedLog = computed(() => {
-  if (selectedResult.value?.kind !== 'log') return { stdout: '', stderr: '' }
-  const raw = selectedResult.value.raw || {}
-  return {
-    stdout: String(raw.stdout || ''),
-    stderr: String(raw.stderr || ''),
-  }
-})
+function formatTimestamp(raw) {
+  const value = String(raw || '').trim()
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
 
-function formatValue(value) {
+function formatDuration(durationMs) {
+  const value = Number(durationMs)
+  if (!Number.isFinite(value) || value < 0) return ''
+  return `${(value / 1000).toFixed(2)}s`
+}
+
+function formatScalarValue(value) {
   if (value === undefined) return 'Result payload is unavailable.'
   if (value === null) return 'null'
   if (typeof value === 'string') return value
@@ -132,37 +198,4 @@ function formatValue(value) {
     return String(value)
   }
 }
-
-const scalarValue = computed(() => {
-  const raw = selectedResult.value?.raw || {}
-  const value = Object.prototype.hasOwnProperty.call(raw, 'display_value')
-    ? raw.display_value
-    : (Object.prototype.hasOwnProperty.call(raw, 'value') ? raw.value : raw?.payload?.value)
-  return formatValue(value)
-})
-
-const scalarType = computed(() => {
-  const raw = selectedResult.value?.raw || {}
-  return String(raw.result_type || raw.type || '').trim()
-})
-
-const statusLabel = computed(() => {
-  if (selectedResult.value?.status === 'running') return 'Running'
-  if (selectedResult.value?.status === 'error') return 'Failed'
-  return 'Complete'
-})
-
-const formattedTimestamp = computed(() => {
-  const raw = String(selectedResult.value?.createdAt || '').trim()
-  if (!raw) return ''
-  const date = new Date(raw)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-})
-
-const durationLabel = computed(() => {
-  const durationMs = Number(selectedResult.value?.raw?.durationMs)
-  if (!Number.isFinite(durationMs) || durationMs < 0) return ''
-  return `${(durationMs / 1000).toFixed(2)}s`
-})
 </script>

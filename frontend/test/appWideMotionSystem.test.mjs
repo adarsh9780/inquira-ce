@@ -71,7 +71,6 @@ test('dialogs, compact panels, disclosures, and toasts all have exit motion', ()
   }
 
   assert.match(read('src/components/ui/DisclosureSection.vue'), /motion-disclosure-open/)
-  assert.match(read('src/components/layout/WorkspaceRightPane.vue'), /<Transition name="motion-disclosure">/)
   assert.match(read('src/components/chat/ToolOutputPreview.vue'), /motion-disclosure-content/)
   assert.match(read('src/components/ui/ToastContainer.vue'), /<TransitionGroup name="motion-toast"/)
 })

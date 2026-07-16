@@ -3279,11 +3279,19 @@ export const useAppStore = defineStore('app', () => {
 
   function terminalEntryCharSize(entry) {
     if (!entry || typeof entry !== 'object') return 0
+    const scalarChars = Array.isArray(entry.scalarOutputs)
+      ? entry.scalarOutputs.reduce((sum, item) => (
+          sum
+          + String(item?.name || '').length
+          + String(item?.display_value ?? item?.value ?? '').length
+        ), 0)
+      : 0
     return (
       String(entry.command || '').length +
       String(entry.stdout || '').length +
       String(entry.stderr || '').length +
       String(entry.label || '').length +
+      scalarChars +
       32
     )
   }
@@ -3322,6 +3330,12 @@ export const useAppStore = defineStore('app', () => {
       stderr,
       exitCode: Number.isInteger(entry.exitCode) ? entry.exitCode : 0,
       runId: String(entry.runId || ''),
+      scalarOutputs: Array.isArray(entry.scalarOutputs)
+        ? entry.scalarOutputs.map((item) => ({ ...(item || {}) }))
+        : [],
+      hasTableOutput: Boolean(entry.hasTableOutput),
+      hasChartOutput: Boolean(entry.hasChartOutput),
+      truncated: Boolean(entry.truncated),
       status: normalizeTerminalEntryStatus(
         entry.status || (kind === 'output' ? (stderr.trim() ? 'error' : 'success') : 'success')
       ),
@@ -3368,6 +3382,16 @@ export const useAppStore = defineStore('app', () => {
         ? patch.exitCode
         : (Number.isInteger(current.exitCode) ? current.exitCode : 0),
       runId: patch.runId !== undefined ? String(patch.runId || '') : String(current.runId || ''),
+      scalarOutputs: patch.scalarOutputs !== undefined
+        ? (Array.isArray(patch.scalarOutputs) ? patch.scalarOutputs.map((item) => ({ ...(item || {}) })) : [])
+        : (Array.isArray(current.scalarOutputs) ? current.scalarOutputs : []),
+      hasTableOutput: patch.hasTableOutput !== undefined
+        ? Boolean(patch.hasTableOutput)
+        : Boolean(current.hasTableOutput),
+      hasChartOutput: patch.hasChartOutput !== undefined
+        ? Boolean(patch.hasChartOutput)
+        : Boolean(current.hasChartOutput),
+      truncated: patch.truncated !== undefined ? Boolean(patch.truncated) : Boolean(current.truncated),
       status: patch.status !== undefined
         ? normalizeTerminalEntryStatus(patch.status)
         : normalizeTerminalEntryStatus(current.status || (stderr.trim() ? 'error' : 'success')),

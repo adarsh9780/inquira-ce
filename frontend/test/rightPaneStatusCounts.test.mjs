@@ -3,13 +3,14 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('workspace right pane supports one searchable result selector and lazy result renderers', () => {
+test('workspace right pane supports one three-option category selector and lazy renderers', () => {
   const rightPanePath = resolve(process.cwd(), 'src/components/layout/WorkspaceRightPane.vue')
   const source = readFileSync(rightPanePath, 'utf-8')
 
   assert.equal(source.includes('HeaderDropdown'), true)
-  assert.equal(source.includes('v-model="selectedResultId"'), true)
-  assert.equal(source.includes(':searchable="resultOptions.length > 10"'), true)
+  assert.equal(source.includes('v-model="selectedCategory"'), true)
+  assert.equal(source.includes('resultCategoryOptions = ['), true)
+  assert.equal(source.includes(':searchable='), false)
   assert.equal(source.includes('defineAsyncComponent'), true)
   assert.equal(source.includes("defineAsyncComponent(() => import('../analysis/TableTab.vue'))"), true)
   assert.equal(source.includes("defineAsyncComponent(() => import('../analysis/FigureTab.vue'))"), true)
@@ -19,10 +20,9 @@ test('workspace right pane supports one searchable result selector and lazy resu
   assert.equal(source.includes('<SegmentedControl'), false)
   assert.equal(source.includes('dataPaneOptions'), false)
   assert.equal(source.includes('rounded-xl border p-1'), false)
-  assert.equal(source.includes('buildUnifiedResultItems'), true)
-  assert.equal(source.includes('appStore.dataframes'), true)
-  assert.equal(source.includes('appStore.figures'), true)
-  assert.equal(source.includes('appStore.scalars'), true)
+  assert.equal(source.includes("{ value: 'table', label: 'Tables', icon: TableCellsIcon }"), true)
+  assert.equal(source.includes("{ value: 'chart', label: 'Charts', icon: ChartBarIcon }"), true)
+  assert.equal(source.includes("{ value: 'other', label: 'Other', icon: CommandLineIcon }"), true)
 })
 
 test('status bar renders pane count from canonical table/chart counts and keeps table viewport label in parallel', () => {
@@ -41,13 +41,13 @@ test('status bar renders pane count from canonical table/chart counts and keeps 
   assert.equal(source.includes('subscribeWorkspaceArtifactUsage'), true)
 })
 
-test('figure renderer keeps contextual export actions while selection lives in Results', () => {
+test('figure renderer keeps a contextual artifact selector and export actions', () => {
   const figureTabPath = resolve(process.cwd(), 'src/components/analysis/FigureTab.vue')
   const source = readFileSync(figureTabPath, 'utf-8')
 
   assert.equal(source.includes('>Figure:</label>'), false)
-  assert.equal(source.includes('id="figure-select"'), false)
-  assert.equal(source.includes('<HeaderDropdown'), false)
+  assert.equal(source.includes('id="figure-select"'), true)
+  assert.equal(source.includes('<HeaderDropdown'), true)
   assert.equal(source.includes('Chart Ready'), false)
   assert.equal(source.includes('>Fullscreen<'), false)
   assert.equal(source.includes('>PNG<'), false)

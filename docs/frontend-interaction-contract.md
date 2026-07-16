@@ -7,15 +7,16 @@ The workspace follows progressive disclosure: frequent work stays visible, conte
 - Create a conversation.
 - Select a workspace or recent conversation.
 - Switch between Chat and Code.
-- Select and inspect tables, charts, scalar values, and execution logs in Results.
+- Switch Results between the icon-labelled Tables, Charts, and Other categories.
 - Attach a file, select a model, and submit or stop a prompt.
 - Open Settings and collapse or expand the sidebar.
 
 ## Contextual or secondary
 
 - Schema and Conversation Tree live under Workspace tools when the sidebar is expanded and remain direct icon actions when collapsed.
-- The result selector stays in the Results header; export, search, and other actions appear only when they apply to the selected result.
-- Execution output related to a table, chart, or scalar remains available from the selected result without duplicating the rendered result.
+- The category selector stays in the Results header; table and chart artifact selectors and actions appear only when they apply.
+- Other presents a chronological, cardless execution feed. Every entry keeps its code with its text, scalar, JSON, or error output.
+- Table and chart renderers remain full-canvas and are never duplicated in Other; non-visual output from a mixed run remains in Other.
 - Terminal controls appear only while the terminal is open.
 - New result indicators appear without stealing keyboard focus.
 

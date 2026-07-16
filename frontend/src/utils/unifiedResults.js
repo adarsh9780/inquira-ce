@@ -62,6 +62,156 @@ function scalarResultIdentity(item, index = 0) {
   }
 }
 
+function scalarOutputIdentity(item, index = 0) {
+  const artifactId = clean(item?.artifact_id)
+  const runId = clean(item?.runId || item?.run_id)
+  const name = resultName(item, `scalar_${index + 1}`)
+  return artifactId || [runId, name, index + 1].filter(Boolean).join(':')
+}
+
+function normalizeScalarOutput(item, index = 0) {
+  const raw = item && typeof item === 'object' ? item : { value: item }
+  const value = Object.prototype.hasOwnProperty.call(raw, 'display_value')
+    ? raw.display_value
+    : (Object.prototype.hasOwnProperty.call(raw, 'value') ? raw.value : raw?.payload?.value)
+  return {
+    id: scalarOutputIdentity(raw, index),
+    name: resultName(raw, `Scalar ${index + 1}`),
+    value,
+    type: clean(raw?.result_type || raw?.type),
+    runId: clean(raw?.runId || raw?.run_id),
+    createdAt: clean(raw?.createdAt || raw?.created_at),
+  }
+}
+
+function resultRunId(item) {
+  return clean(item?.runId || item?.run_id || item?.data?.runId || item?.data?.run_id)
+}
+
+function executionTimestamp(item) {
+  const raw = clean(item?.createdAt || item?.created_at)
+  const parsed = raw ? Date.parse(raw) : Number.NaN
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+export function buildOtherExecutionItems({
+  terminalEntries = [],
+  scalars = [],
+  dataframes = [],
+  figures = [],
+  activeTurnArtifacts = [],
+  fallbackCode = '',
+} = {}) {
+  const artifactScalars = asArray(activeTurnArtifacts)
+    .filter((item) => clean(item?.kind).toLowerCase() === 'scalar')
+    .map((item) => {
+      const payload = item?.payload
+      const value = payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'value')
+        ? payload.value
+        : payload
+      return {
+        ...item,
+        name: resultName(item, 'scalar'),
+        value,
+        result_type: clean(payload?.type || item?.result_type),
+      }
+    })
+  const scalarSources = [...asArray(scalars), ...artifactScalars]
+  const liveScalarMap = new Map()
+  scalarSources
+    .map(normalizeScalarOutput)
+    .forEach((scalar) => {
+      if (scalar.id && !liveScalarMap.has(scalar.id)) liveScalarMap.set(scalar.id, scalar)
+    })
+  const liveScalars = [...liveScalarMap.values()]
+  const liveScalarsByRun = new Map()
+  liveScalars.forEach((scalar) => {
+    if (!scalar.runId) return
+    const bucket = liveScalarsByRun.get(scalar.runId) || []
+    bucket.push(scalar)
+    liveScalarsByRun.set(scalar.runId, bucket)
+  })
+
+  const visualRunIds = new Set(
+    [...asArray(dataframes), ...asArray(figures)]
+      .map(resultRunId)
+      .filter(Boolean),
+  )
+  const consumedScalarIds = new Set()
+  const analysisEntries = asArray(terminalEntries)
+    .filter((entry) => entry?.kind === 'output' && entry?.source === 'analysis')
+
+  const executions = analysisEntries.map((entry, entryIndex) => {
+    const runId = clean(entry?.runId)
+    const storedScalars = asArray(entry?.scalarOutputs).map(normalizeScalarOutput)
+    const combinedScalars = [...storedScalars, ...(liveScalarsByRun.get(runId) || [])]
+    const scalarOutputs = []
+    const seenScalarIds = new Set()
+    combinedScalars.forEach((scalar) => {
+      if (!scalar.id || seenScalarIds.has(scalar.id)) return
+      seenScalarIds.add(scalar.id)
+      consumedScalarIds.add(scalar.id)
+      scalarOutputs.push(scalar)
+    })
+
+    const stdout = String(entry?.stdout || '')
+    const stderr = String(entry?.stderr || '')
+    const hasNonVisualOutput = Boolean(stdout.trim() || stderr.trim() || scalarOutputs.length)
+    const hasVisualOutput = Boolean(
+      entry?.hasTableOutput
+      || entry?.hasChartOutput
+      || (runId && visualRunIds.has(runId)),
+    )
+    if (hasVisualOutput && !hasNonVisualOutput) return null
+
+    const capturedCode = clean(entry?.command)
+    const canUseFallback = analysisEntries.length === 1 && entryIndex === 0
+    return {
+      id: `execution:${clean(entry?.id) || entryIndex + 1}`,
+      runId,
+      label: clean(entry?.label) || 'Code run',
+      status: clean(entry?.status) || (stderr.trim() ? 'error' : 'success'),
+      code: capturedCode || (canUseFallback ? String(fallbackCode || '') : ''),
+      stdout,
+      stderr,
+      scalarOutputs,
+      durationMs: Number.isFinite(Number(entry?.durationMs)) ? Number(entry.durationMs) : null,
+      createdAt: clean(entry?.createdAt),
+      truncated: Boolean(entry?.truncated),
+      sequence: entryIndex + 1,
+    }
+  }).filter(Boolean)
+
+  const orphanScalars = liveScalars.filter((scalar) => !consumedScalarIds.has(scalar.id))
+  if (orphanScalars.length > 0) {
+    const createdAt = orphanScalars
+      .map((scalar) => scalar.createdAt)
+      .filter(Boolean)
+      .sort()
+      .at(-1) || ''
+    executions.push({
+      id: `execution:scalars:${orphanScalars.map((scalar) => scalar.id).join('|')}`,
+      runId: clean(orphanScalars[0]?.runId),
+      label: orphanScalars.length === 1 ? 'Scalar result' : 'Scalar results',
+      status: 'success',
+      code: String(fallbackCode || ''),
+      stdout: '',
+      stderr: '',
+      scalarOutputs: orphanScalars,
+      durationMs: null,
+      createdAt,
+      truncated: false,
+      sequence: analysisEntries.length + 1,
+    })
+  }
+
+  return executions.sort((left, right) => {
+    const timestampDelta = executionTimestamp(right) - executionTimestamp(left)
+    if (timestampDelta !== 0) return timestampDelta
+    return Number(right.sequence || 0) - Number(left.sequence || 0)
+  })
+}
+
 function makeArtifactResult({ item, index, kind, identity }) {
   const label = resultName(item, `${RESULT_KIND_LABELS[kind]} ${index + 1}`)
   return {

@@ -538,12 +538,13 @@ function createRunId() {
   return `run_${ts}_${rand}`
 }
 
-function startRunEntry(scopeLabel, { selectResult = false } = {}) {
+function startRunEntry(scopeLabel, code, { selectResult = false } = {}) {
   const runId = createRunId()
   const entryId = appStore.appendTerminalEntry({
     kind: 'output',
     source: 'analysis',
     label: scopeLabel,
+    command: String(code || ''),
     runId,
     status: 'running',
     stdout: '',
@@ -603,20 +604,25 @@ async function executeSnippet(code, successLine, options = {}) {
   const runEntryPayload = {
     kind: 'output',
     source: 'analysis',
-    label: 'Run output',
     runId: effectiveRunId,
     status,
     stdout: outputStdout,
     stderr: outputStderr,
     exitCode: normalized?.error ? 1 : 0,
     durationMs: Math.round(execTime * 1000),
+    hasTableOutput: false,
+    hasChartOutput: false,
+    scalarOutputs: [],
   }
+  let effectiveRunEntryId = runEntryId
   if (runEntryId) {
     appStore.updateTerminalEntry(runEntryId, runEntryPayload)
   } else {
-    appStore.appendTerminalEntry({
+    effectiveRunEntryId = appStore.appendTerminalEntry({
       kind: 'output',
       source: 'analysis',
+      label: 'Code run',
+      command: String(code || ''),
       ...runEntryPayload,
     })
   }
@@ -625,7 +631,7 @@ async function executeSnippet(code, successLine, options = {}) {
     appStore.setTerminalOutput(viewModel.output)
     selectExecutionResult({
       runId: effectiveRunId,
-      runEntryId,
+      runEntryId: effectiveRunEntryId,
       normalized,
       hasConsoleOutput: Boolean(outputStdout || outputStderr),
       hasError: true,
@@ -652,8 +658,16 @@ async function executeSnippet(code, successLine, options = {}) {
   )
   const hasConsoleOutput = Boolean(outputStdout || outputStderr)
 
+  let storedArtifacts = null
   if (!preserveActiveTabOnNoOutput || hasArtifacts || hasConsoleOutput) {
-    applyExecutionArtifactsToStore(orderedViewModel, effectiveRunId)
+    storedArtifacts = applyExecutionArtifactsToStore(orderedViewModel, effectiveRunId)
+  }
+  if (effectiveRunEntryId) {
+    appStore.updateTerminalEntry(effectiveRunEntryId, {
+      hasTableOutput: orderedViewModel.dataframes.length > 0,
+      hasChartOutput: orderedViewModel.figures.length > 0,
+      scalarOutputs: storedArtifacts?.scalars || stampRunResults(orderedViewModel.scalars, effectiveRunId, new Date().toISOString()),
+    })
   }
   if (
     Array.isArray(normalized?.artifacts)
@@ -666,7 +680,7 @@ async function executeSnippet(code, successLine, options = {}) {
   if (hasArtifacts || hasConsoleOutput || !preserveActiveTabOnNoOutput) {
     selectExecutionResult({
       runId: effectiveRunId,
-      runEntryId,
+      runEntryId: effectiveRunEntryId,
       normalized,
       hasConsoleOutput,
       preferOutput: preferOutputPane,
@@ -695,7 +709,7 @@ async function runCode() {
   appStore.setCodeRunning(true)
   appStore.setActiveTab('output')
   appStore.setTerminalOutput('Running code...')
-  const runMeta = startRunEntry('Code run', { selectResult: true })
+  const runMeta = startRunEntry('Code run', appStore.pythonFileContent, { selectResult: true })
   try {
     await executeSnippet(appStore.pythonFileContent, 'Code executed successfully!', {
       runEntryId: runMeta.entryId,
@@ -733,7 +747,7 @@ async function runSelectedCode() {
 
   isRunning.value = true
   appStore.setCodeRunning(true)
-  const runMeta = startRunEntry('Selection run')
+  const runMeta = startRunEntry('Selection run', selectedCode)
 
   try {
     await executeSnippet(

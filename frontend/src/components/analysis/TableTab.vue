@@ -1,5 +1,18 @@
 <template>
   <div class="flex flex-col h-full" style="background-color: var(--color-base);">
+    <Teleport to="#workspace-right-pane-toolbar-center" v-if="isMounted && appStore.dataPane === 'table'">
+      <div v-if="tableDropdownOptions.length > 0" class="flex min-w-[11rem] max-w-full items-center" style="width: clamp(11rem, 28vw, 19rem);">
+        <HeaderDropdown
+          id="dataframe-select"
+          v-model="selectedArtifactId"
+          :options="tableDropdownOptions"
+          placeholder="Select table"
+          aria-label="Select table"
+          max-width-class="w-full"
+        />
+      </div>
+    </Teleport>
+
     <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && appStore.dataPane === 'table'">
       <TableToolbar>
         <div v-if="tableStatusMessage" class="flex items-center gap-2 text-[12px] leading-[1.3] mr-1" :class="tableStatusClass">
@@ -179,6 +192,7 @@
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import apiService from '../../services/apiService'
+import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import DataTable from './table/DataTable.vue'
 import TableEmptyState from './table/TableEmptyState.vue'
@@ -333,6 +347,12 @@ const displayArtifacts = computed(() => {
   }))
   return [...liveDataframeArtifacts.value, ...persistedArtifacts]
 })
+
+const tableDropdownOptions = computed(() => displayArtifacts.value.map((artifact, index) => ({
+  value: artifact.artifact_id,
+  label: artifact.display_name || artifact.logical_name || `Table ${index + 1}`,
+  key: artifact.artifact_id,
+})))
 
 const showArtifactListLoadingState = computed(() => {
   return isLoadingArtifacts.value && Boolean(String(appStore.activeTurnId || '').trim())

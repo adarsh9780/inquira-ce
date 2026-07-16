@@ -2,11 +2,85 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  buildOtherExecutionItems,
   buildUnifiedResultItems,
   executionLogResultId,
   preferredExecutionResultId,
   resultPaneForKind,
 } from '../src/utils/unifiedResults.js'
+
+test('buildOtherExecutionItems keeps code with non-visual output and excludes visual-only runs', () => {
+  const items = buildOtherExecutionItems({
+    terminalEntries: [
+      {
+        id: 'table-only',
+        kind: 'output',
+        source: 'analysis',
+        label: 'Code run',
+        command: 'result = query.df()\nresult',
+        runId: 'run-table',
+        status: 'success',
+        hasTableOutput: true,
+      },
+      {
+        id: 'mixed-run',
+        kind: 'output',
+        source: 'analysis',
+        label: 'Code run',
+        command: 'result = query.df()\nprint("rows=2")\nresult',
+        runId: 'run-mixed',
+        status: 'success',
+        stdout: 'rows=2',
+        hasTableOutput: true,
+      },
+    ],
+  })
+
+  assert.equal(items.length, 1)
+  assert.equal(items[0].id, 'execution:mixed-run')
+  assert.equal(items[0].code.includes('print("rows=2")'), true)
+  assert.equal(items[0].stdout, 'rows=2')
+})
+
+test('buildOtherExecutionItems retains scalar output on its originating execution', () => {
+  const items = buildOtherExecutionItems({
+    terminalEntries: [{
+      id: 'scalar-run',
+      kind: 'output',
+      source: 'analysis',
+      label: 'Selection run',
+      command: 'total = 42\ntotal',
+      runId: 'run-scalar',
+      status: 'success',
+      scalarOutputs: [{ name: 'total', value: 42, runId: 'run-scalar', result_type: 'int' }],
+    }],
+    scalars: [{ name: 'total', value: 42, runId: 'run-scalar', result_type: 'int' }],
+  })
+
+  assert.equal(items.length, 1)
+  assert.equal(items[0].code, 'total = 42\ntotal')
+  assert.equal(items[0].scalarOutputs.length, 1)
+  assert.equal(items[0].scalarOutputs[0].value, 42)
+  assert.equal(items[0].scalarOutputs[0].type, 'int')
+})
+
+test('buildOtherExecutionItems restores persisted scalar artifacts with turn code', () => {
+  const items = buildOtherExecutionItems({
+    activeTurnArtifacts: [{
+      artifact_id: 'scalar-artifact',
+      kind: 'scalar',
+      display_name: 'conversion_rate',
+      payload: { value: 0.42, type: 'float' },
+      created_at: '2026-07-16T08:00:00Z',
+    }],
+    fallbackCode: 'conversion_rate = converted / total\nconversion_rate',
+  })
+
+  assert.equal(items.length, 1)
+  assert.equal(items[0].code.includes('conversion_rate ='), true)
+  assert.equal(items[0].scalarOutputs[0].name, 'conversion_rate')
+  assert.equal(items[0].scalarOutputs[0].value, 0.42)
+})
 
 test('buildUnifiedResultItems normalizes one manual run without duplicating artifacts', () => {
   const items = buildUnifiedResultItems({

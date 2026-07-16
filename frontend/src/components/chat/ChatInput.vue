@@ -1082,6 +1082,7 @@ function applyCommandResultToStore(commandResult) {
     kind: 'output',
     source: 'analysis',
     label: `/${String(commandResult?.name || 'command')}`,
+    command: `/${String(commandResult?.name || 'command')}`,
     status: 'success',
     stdout: output,
     stderr: '',
@@ -1089,7 +1090,7 @@ function applyCommandResultToStore(commandResult) {
   })
 }
 
-function appendChatExecutionOutput(response, conversationId = appStore.activeConversationId) {
+function appendChatExecutionOutput(response, conversationId = appStore.activeConversationId, code = '') {
   const execution = response?.execution && typeof response.execution === 'object'
     ? response.execution
     : null
@@ -1097,7 +1098,17 @@ function appendChatExecutionOutput(response, conversationId = appStore.activeCon
 
   const stdout = String(execution.stdout || response?.stdout || response?.terminal_output || '')
   const stderr = String(execution.stderr || execution.error || '')
-  const hasOutput = Boolean(stdout.trim() || stderr.trim())
+  const scalarResult = normalizeScalarResult(response)
+  const artifacts = Array.isArray(response?.artifacts) ? response.artifacts : []
+  const hasTableOutput = Boolean(
+    (response?.result?.columns && response?.result?.data)
+    || artifacts.some((item) => String(item?.kind || '').toLowerCase() === 'dataframe'),
+  )
+  const hasChartOutput = Boolean(
+    normalizePlotlyFigure(response?.plotly_figure || response?.result)
+    || artifacts.some((item) => String(item?.kind || '').toLowerCase() === 'figure'),
+  )
+  const hasOutput = Boolean(stdout.trim() || stderr.trim() || scalarResult)
   if (!hasOutput) return false
 
   const success = execution.success !== false && String(execution.status || 'success').toLowerCase() !== 'failed'
@@ -1108,6 +1119,7 @@ function appendChatExecutionOutput(response, conversationId = appStore.activeCon
       kind: 'output',
       source: 'analysis',
       label: execution.output_truncated ? 'Run output (truncated)' : 'Run output',
+      command: String(code || ''),
       runId: String(response?.run_id || ''),
       status: success ? 'success' : 'error',
       stdout,
@@ -1115,6 +1127,9 @@ function appendChatExecutionOutput(response, conversationId = appStore.activeCon
       exitCode: success ? 0 : 1,
       durationMs: Number.isFinite(Number(execution.duration_ms)) ? Number(execution.duration_ms) : null,
       truncated: Boolean(execution.output_truncated),
+      scalarOutputs: scalarResult ? [scalarResult] : [],
+      hasTableOutput,
+      hasChartOutput,
     })
   } else {
     appStore.patchConversationState(conversationId, { terminalOutput })
@@ -1255,6 +1270,7 @@ async function handleSlashCommand(questionText) {
         kind: 'output',
         source: 'analysis',
         label: 'Command error',
+        command: String(questionText || ''),
         status: 'error',
         stdout: '',
         stderr: message,
@@ -1537,7 +1553,7 @@ async function handleSubmit() {
     }
 
     if (finalCode && finalCode.trim()) {
-      const hasChatExecutionOutput = appendChatExecutionOutput(response, requestConversationId)
+      const hasChatExecutionOutput = appendChatExecutionOutput(response, requestConversationId, finalCode)
 
       const inlineFigure = normalizePlotlyFigure(response.plotly_figure || response.result)
       if (inlineFigure) {
