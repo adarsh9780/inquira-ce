@@ -3,9 +3,12 @@ from datetime import UTC, datetime, timedelta
 from queue import Empty as QueueEmpty
 from types import SimpleNamespace
 
+import duckdb
 import pytest
 
 from app.services.workspace_kernel_manager import (
+    _FALLBACK_RESULT_PROBE_CODE,
+    _build_identifier_result_probe_code,
     WorkspaceKernelManager,
     WorkspaceKernelSession,
 )
@@ -19,6 +22,28 @@ def _session(workspace_id: str, workspace_duckdb_path: str) -> WorkspaceKernelSe
         manager=SimpleNamespace(),
         client=SimpleNamespace(),
     )
+
+
+@pytest.mark.parametrize(
+    "probe_code",
+    [
+        _build_identifier_result_probe_code("df"),
+        _FALLBACK_RESULT_PROBE_CODE,
+    ],
+)
+def test_result_probe_serializes_duckdb_relation_as_dataframe(probe_code):
+    connection = duckdb.connect(":memory:")
+    try:
+        namespace = {"df": connection.sql("select * from (values (1, 'Carla'), (2, 'Dev')) as results(id, name)")}
+
+        exec(probe_code, namespace)
+
+        assert namespace["_inquira_payload"] == {
+            "columns": ["id", "name"],
+            "data": [{"id": 1, "name": "Carla"}, {"id": 2, "name": "Dev"}],
+        }
+    finally:
+        connection.close()
 
 
 @pytest.mark.asyncio

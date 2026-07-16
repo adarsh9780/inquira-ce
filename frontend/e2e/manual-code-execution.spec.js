@@ -83,23 +83,40 @@ test('manual dataframe run stays in one block and can be promoted to Tables', as
   })
 
   await page.route('**/api/v1/workspaces/*/execute', async (route) => {
+    const columns = [
+      'customer_name',
+      'revenue',
+      'region',
+      'segment',
+      'orders',
+      'last_order',
+      'account_owner',
+      'status',
+    ]
+    const data = Array.from({ length: 120 }, (_, index) => [
+      index === 0 ? 'Carla' : (index === 1 ? 'Dev' : `Customer ${index + 1}`),
+      2400 - index,
+      index % 2 === 0 ? 'West' : 'East',
+      index % 3 === 0 ? 'Enterprise' : 'Growth',
+      20 + index,
+      `2026-07-${String((index % 28) + 1).padStart(2, '0')}`,
+      index % 2 === 0 ? 'Amara' : 'Noah',
+      index % 5 === 0 ? 'Review' : 'Active',
+    ])
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         success: true,
-        stdout: 'rows=2',
+        stdout: 'rows=120',
         stderr: '',
         has_stdout: true,
         has_stderr: false,
         error: '',
         result: {
-          columns: ['customer_name', 'revenue'],
-          data: [
-            ['Carla', 2400],
-            ['Dev', 1800],
-          ],
-          row_count: 2,
+          columns,
+          data,
+          row_count: 120,
         },
         result_type: 'DataFrame',
         result_kind: 'dataframe',
@@ -129,8 +146,14 @@ test('manual dataframe run stays in one block and can be promoted to Tables', as
     await expect(page.locator('[data-runs-feed] [data-user-run]')).toHaveCount(1)
     await expect(page.locator('[data-runs-feed] [data-run-table]')).toBeVisible({ timeout: 30_000 })
     await expect(page.locator('[data-runs-feed]').getByText('Carla', { exact: true })).toBeVisible()
-    await expect(page.getByText('rows=2', { exact: true })).toBeVisible()
+    await expect(page.getByText('rows=120', { exact: true })).toBeVisible()
     await expect(page.locator('[data-runs-feed] [data-execution-code]')).toContainText('result = conn.sql')
+    const tableViewport = page.locator('[data-runs-feed] [data-run-table-scroll]')
+    const tableOverflow = await tableViewport.evaluate((element) => ({
+      horizontal: element.scrollWidth > element.clientWidth,
+      vertical: element.scrollHeight > element.clientHeight,
+    }))
+    expect(tableOverflow).toEqual({ horizontal: true, vertical: true })
     await expect(page.locator('[data-inquira-data-grid]')).toHaveCount(0)
     await page.getByRole('button', { name: /open in tables/i }).click()
     await expect(categoryButton).toContainText('Tables')

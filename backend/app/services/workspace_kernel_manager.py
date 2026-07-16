@@ -27,7 +27,7 @@ from app.services.jupyter_message_parser import (
 from app.core.logger import logprint
 from app.services.runner_env import ensure_runner_kernel_dependencies, resolve_runner_python
 
-_FALLBACK_RESULT_PROBE_CODE = """
+_STRUCTURED_RESULT_PROBE_HELPERS = """
 import json as _json
 
 try:
@@ -36,9 +36,37 @@ except Exception:
     _pd = None
 
 try:
+    import duckdb as _duckdb
+except Exception:
+    _duckdb = None
+
+try:
     import plotly.graph_objects as _go
 except Exception:
     _go = None
+
+def _inquira_dataframe_payload(_frame):
+    _preview = _frame.head(1000)
+    return {
+        "columns": [str(c) for c in list(_preview.columns)],
+        "data": _json.loads(_preview.to_json(orient="records", date_format="iso")),
+    }
+
+def _inquira_structured_payload(_target):
+    if _target is None:
+        return None
+    if _pd is not None and isinstance(_target, _pd.DataFrame):
+        return _inquira_dataframe_payload(_target)
+    if _duckdb is not None and isinstance(_target, _duckdb.DuckDBPyRelation):
+        return _inquira_dataframe_payload(_target.limit(1000).df())
+    if _go is not None and isinstance(_target, _go.Figure):
+        return _target.to_plotly_json()
+    return _target
+"""
+
+_FALLBACK_RESULT_PROBE_CODE = (
+    _STRUCTURED_RESULT_PROBE_HELPERS
+    + """
 
 _inquira_target = None
 for _name in ("result", "final_df", "df", "fig", "figure"):
@@ -49,23 +77,11 @@ for _name in ("result", "final_df", "df", "fig", "figure"):
 if _inquira_target is None:
     _inquira_target = globals().get("_")
 
-if _inquira_target is None:
-    _inquira_payload = None
-elif _pd is not None and isinstance(_inquira_target, _pd.DataFrame):
-    _preview = _inquira_target.head(1000)
-    # Ensure the payload remains JSON-safe so Jupyter can emit application/json
-    # and frontend can classify it as a dataframe instead of scalar text.
-    _inquira_payload = {
-        "columns": [str(c) for c in list(_preview.columns)],
-        "data": _json.loads(_preview.to_json(orient="records", date_format="iso")),
-    }
-elif _go is not None and isinstance(_inquira_target, _go.Figure):
-    _inquira_payload = _inquira_target.to_plotly_json()
-else:
-    _inquira_payload = _inquira_target
+_inquira_payload = _inquira_structured_payload(_inquira_target)
 
 _inquira_payload
 """
+)
 
 _JUPYTER_RESULT_MODE_MARKER = "# inquira-result-mode: jupyter"
 
@@ -76,29 +92,9 @@ _inquira_get_active_exports()
 def _build_identifier_result_probe_code(identifier: str) -> str:
     target = repr(str(identifier))
     return (
-        "import json as _json\n"
-        "try:\n"
-        "    import pandas as _pd\n"
-        "except Exception:\n"
-        "    _pd = None\n"
-        "try:\n"
-        "    import plotly.graph_objects as _go\n"
-        "except Exception:\n"
-        "    _go = None\n"
-        f"_inquira_identifier = {target}\n"
+        _STRUCTURED_RESULT_PROBE_HELPERS + f"_inquira_identifier = {target}\n"
         "_inquira_target = globals().get(_inquira_identifier) if _inquira_identifier in globals() else None\n"
-        "if _inquira_target is None:\n"
-        "    _inquira_payload = None\n"
-        "elif _pd is not None and isinstance(_inquira_target, _pd.DataFrame):\n"
-        "    _preview = _inquira_target.head(1000)\n"
-        "    _inquira_payload = {\n"
-        "        'columns': [str(c) for c in list(_preview.columns)],\n"
-        "        'data': _json.loads(_preview.to_json(orient='records', date_format='iso')),\n"
-        "    }\n"
-        "elif _go is not None and isinstance(_inquira_target, _go.Figure):\n"
-        "    _inquira_payload = _inquira_target.to_plotly_json()\n"
-        "else:\n"
-        "    _inquira_payload = _inquira_target\n"
+        "_inquira_payload = _inquira_structured_payload(_inquira_target)\n"
         "_inquira_payload\n"
     )
 
