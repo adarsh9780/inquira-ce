@@ -45,6 +45,11 @@ try:
 except Exception:
     _go = None
 
+try:
+    from IPython.display import display as _inquira_display
+except Exception:
+    _inquira_display = None
+
 def _inquira_dataframe_payload(_frame):
     _preview = _frame.head(1000)
     return {
@@ -60,8 +65,16 @@ def _inquira_structured_payload(_target):
     if _duckdb is not None and isinstance(_target, _duckdb.DuckDBPyRelation):
         return _inquira_dataframe_payload(_target.limit(1000).df())
     if _go is not None and isinstance(_target, _go.Figure):
-        return _target.to_plotly_json()
+        return _json.loads(_target.to_json())
     return _target
+
+def _inquira_emit_payload(_payload):
+    _is_dataframe = isinstance(_payload, dict) and {"columns", "data"}.issubset(_payload)
+    _is_figure = isinstance(_payload, dict) and {"data", "layout"}.issubset(_payload)
+    if _inquira_display is not None and (_is_dataframe or _is_figure):
+        _inquira_display({"application/json": _payload}, raw=True)
+        return None
+    return _payload
 """
 
 _FALLBACK_RESULT_PROBE_CODE = (
@@ -79,7 +92,7 @@ if _inquira_target is None:
 
 _inquira_payload = _inquira_structured_payload(_inquira_target)
 
-_inquira_payload
+_inquira_emit_payload(_inquira_payload)
 """
 )
 
@@ -95,7 +108,7 @@ def _build_identifier_result_probe_code(identifier: str) -> str:
         _STRUCTURED_RESULT_PROBE_HELPERS + f"_inquira_identifier = {target}\n"
         "_inquira_target = globals().get(_inquira_identifier) if _inquira_identifier in globals() else None\n"
         "_inquira_payload = _inquira_structured_payload(_inquira_target)\n"
-        "_inquira_payload\n"
+        "_inquira_emit_payload(_inquira_payload)\n"
     )
 
 _KERNEL_RESOURCE_CLEANUP_CODE = """

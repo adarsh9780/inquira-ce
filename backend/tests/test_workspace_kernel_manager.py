@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import duckdb
 import pytest
+from jupyter_client import AsyncKernelManager
 
 from app.services.workspace_kernel_manager import (
     _FALLBACK_RESULT_PROBE_CODE,
@@ -44,6 +45,42 @@ def test_result_probe_serializes_duckdb_relation_as_dataframe(probe_code):
         }
     finally:
         connection.close()
+
+
+@pytest.mark.asyncio
+async def test_jupyter_dataframe_result_is_structured_by_real_kernel_probe():
+    kernel_manager = AsyncKernelManager(kernel_name="python3")
+    await kernel_manager.start_kernel()
+    kernel_client = kernel_manager.client()
+    kernel_client.start_channels()
+    try:
+        await kernel_client.wait_for_ready(timeout=15)
+        session = WorkspaceKernelSession(
+            workspace_id="probe-test",
+            workspace_duckdb_path=":memory:",
+            manager=kernel_manager,
+            client=kernel_client,
+        )
+        manager = WorkspaceKernelManager(idle_minutes=30)
+        response = await manager._execute_on_session(
+            session,
+            (
+                "# inquira-result-mode: jupyter\n"
+                "import pandas as pd\n"
+                "df = pd.DataFrame([{'id': 1, 'name': 'Carla'}])\n"
+                "df\n"
+            ),
+        )
+
+        assert response["result_type"] == "DataFrame"
+        assert response["result_kind"] == "dataframe"
+        assert response["result"] == {
+            "columns": ["id", "name"],
+            "data": [{"id": 1, "name": "Carla"}],
+        }
+    finally:
+        kernel_client.stop_channels()
+        await kernel_manager.shutdown_kernel(now=True)
 
 
 @pytest.mark.asyncio
