@@ -1,0 +1,1815 @@
+<template>
+  <div class="space-y-2">
+    <!-- Main Input Card (Cursor-style) -->
+    <div class="relative">
+      <div
+        ref="inputCardRef"
+        class="group/composer relative flex flex-col rounded-xl border transition-all duration-150"
+        @dragenter.prevent="handleAttachmentDragEnter"
+        @dragover.prevent="handleAttachmentDragOver"
+        @dragleave.prevent="handleAttachmentDragLeave"
+        @drop.prevent="handleAttachmentDrop"
+        style="
+          background-color: var(--color-base);
+          border-color: var(--color-border);
+          box-shadow: var(--shadow-button);
+        "
+        :style="composerCardStyle"
+      >
+      <input
+        ref="attachmentInputRef"
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        multiple
+        class="hidden"
+        @change="handleAttachmentSelection"
+      />
+      <!-- Textarea -->
+      <textarea
+        ref="textareaRef"
+        v-model="question"
+        @keydown="handleKeydown"
+        @input="handleInputChange"
+        @click="handleCaretInteraction"
+        @keyup="handleCaretInteraction"
+        @focus="isFocused = true"
+        @blur="isFocused = false"
+        placeholder="How can I help you today?"
+        class="w-full px-3 pt-3 pb-1.5 resize-none focus:outline-none text-[13px] leading-[1.55] bg-transparent border-none"
+        style="color: var(--color-text-main); min-height: 60px;"
+        :class="{ 'opacity-60 cursor-not-allowed': !appStore.canAnalyze || appStore.activeConversationIsLoading }"
+        :disabled="!appStore.canAnalyze || appStore.activeConversationIsLoading"
+      />
+
+      <ChatAttachmentTray
+        :attachments="pendingAttachments"
+        :format-size="formatAttachmentSize"
+        @remove="removePendingAttachment"
+      />
+
+      <Transition name="motion-fade">
+        <div
+          v-if="isAttachmentDragActive"
+          class="pointer-events-none absolute inset-3 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed"
+          style="border-color: var(--color-border-hover); background-color: color-mix(in srgb, var(--color-base) 80%, transparent);"
+        >
+          <div class="text-center">
+            <PhotoIcon class="mx-auto h-6 w-6" style="color: var(--color-text-main);" />
+            <p class="mt-2 text-sm font-medium" style="color: var(--color-text-main);">Drop images to attach</p>
+          </div>
+        </div>
+      </Transition>
+
+      <!-- Bottom Action Row -->
+      <ChatComposerActions>
+
+        <!-- Left: Add button + turn controls -->
+        <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            class="btn-icon"
+            title="Attach images"
+            aria-label="Attach images"
+            data-tooltip="Attach images"
+            @click="openAttachmentPicker"
+          >
+            <PlusIcon class="w-4 h-4" />
+          </button>
+          <template v-if="appStore.activeTurnId && hasTurnNavigation">
+            <button
+              type="button"
+              class="btn-icon opacity-60 transition-opacity group-focus-within/composer:opacity-100 group-hover/composer:opacity-100"
+              title="Previous turn"
+              aria-label="Previous turn"
+              data-tooltip="Previous turn"
+              :disabled="!appStore.activeTurnRelations?.previous_turn"
+              @click="appStore.goToPreviousTurn()"
+            >
+              <ChevronLeftIcon class="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              class="btn-icon opacity-60 transition-opacity group-focus-within/composer:opacity-100 group-hover/composer:opacity-100"
+              title="Next turn"
+              aria-label="Next turn"
+              data-tooltip="Next turn"
+              :disabled="!appStore.activeTurnRelations?.next_turn"
+              @click="appStore.goToNextTurn()"
+            >
+              <ChevronRightIcon class="w-4 h-4" />
+            </button>
+          </template>
+        </div>
+
+        <!-- Right: Model selector + action button -->
+        <div class="composer-model-actions flex min-w-0 flex-1 items-center justify-end gap-2 sm:min-w-[12rem] sm:gap-3">
+          <div class="min-w-0 flex-1" style="max-width: clamp(7rem, 30vw, 22rem);">
+            <ModelSelector
+              :selected-model="effectiveWorkspaceModel"
+              :model-options="workspaceModelOptions"
+              :provider="effectiveWorkspaceProvider"
+              :backend-search="searchProviderModels"
+              :search-loading="appStore.providerModelSearchLoading"
+              :search-debounce-ms="250"
+              :max-options-without-search="10"
+              @model-changed="handleModelChange"
+              @manage-models="appStore.openSettings('workspace-ai')"
+            />
+          </div>
+
+          <!-- Mic (empty) → ArrowUp (has text) -->
+          <button
+            @click="handleActionButtonClick"
+            :disabled="!canTriggerActionButton"
+            class="w-6 h-6 flex items-center justify-center transition-all duration-150 focus:outline-none"
+            :class="
+              canTriggerActionButton
+                ? 'hover:opacity-85'
+                : 'cursor-default opacity-50'
+            "
+            :title="actionButtonTitle"
+            :aria-label="actionButtonTitle"
+            :data-tooltip="actionButtonTitle"
+          >
+            <span
+              class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-text-main)] text-[var(--color-on-accent)] transition-all duration-300"
+              :class="{ 'voice-input-pulse': isVoiceInputActive }"
+            >
+              <StopIcon v-if="appStore.activeConversationIsLoading" class="w-3 h-3" />
+              <MicrophoneIcon v-else-if="isComposerEmpty" class="w-3 h-3" />
+              <ArrowUpIcon v-else class="w-3 h-3" />
+            </span>
+          </button>
+        </div>
+
+      </ChatComposerActions>
+      </div>
+
+      <Transition name="motion-popover">
+        <div
+          v-if="showCommandSuggestions"
+          class="motion-popover-surface absolute left-0 right-0 z-[70] overflow-hidden rounded-xl border shadow-lg suggestions-glass"
+          :class="suggestionsOpenUp ? 'motion-popover-from-bottom bottom-full mb-2' : 'top-full mt-1'"
+          style="border-color: var(--color-border);"
+        >
+        <ul class="py-1">
+          <li v-for="(item, index) in commandSuggestions" :key="item.name">
+            <button
+              type="button"
+              class="flex w-full items-start justify-between gap-3 px-3 py-2 text-left text-sm transition-colors"
+              :class="index === selectedCommandIndex ? 'bg-[var(--color-selected-surface)]' : 'hover:bg-[var(--color-surface-subtle)]'"
+              @mousedown.prevent="acceptCommandSuggestion(item)"
+            >
+              <span class="min-w-0">
+                <span class="block truncate font-medium" style="color: var(--color-text-main);">/{{ item.name }}</span>
+                <span class="block truncate text-xs" style="color: var(--color-text-muted);">{{ item.description }}</span>
+              </span>
+              <span class="shrink-0 rounded border px-1.5 py-0.5 text-[10px] uppercase" style="color: var(--color-text-muted); border-color: var(--color-border);">
+                {{ item.category }}
+              </span>
+            </button>
+          </li>
+        </ul>
+        </div>
+      </Transition>
+
+      <Transition name="motion-popover">
+        <ColumnSuggest
+          v-if="showColumnSuggestions"
+          :items="columnSuggestions"
+          :selected-index="selectedColumnIndex"
+          :open-up="suggestionsOpenUp"
+          @select="acceptColumnSuggestion"
+        />
+      </Transition>
+    </div>
+
+    <InlineNotice
+      v-if="!appStore.canAnalyze"
+      :title="setupNotice.title"
+      :message="setupNotice.message"
+      :action-label="setupNotice.actionLabel"
+      @action="setupNotice.action()"
+    />
+  </div>
+</template>
+
+<script setup>
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useAppStore } from '../../stores/appStore'
+import apiService from '../../services/apiService'
+import executionService from '../../services/executionService'
+import { executeCommand, getRegisteredCommands, isCommand } from '../../services/commandRegistry'
+import { toast } from '../../composables/useToast'
+import { extractApiErrorMessage } from '../../utils/apiError'
+import { buildBrowserDataPath, inferTableNameFromDataPath } from '../../utils/chatBootstrap'
+import { normalizePlotlyFigure } from '../../utils/figurePayload'
+import { modelSupportsImages, SUPPORTED_CHAT_IMAGE_TYPES } from '../../utils/modelCapabilities'
+import ModelSelector from '../ui/ModelSelector.vue'
+import ColumnSuggest from './ColumnSuggest.vue'
+import ChatAttachmentTray from './ChatAttachmentTray.vue'
+import ChatComposerActions from './ChatComposerActions.vue'
+import InlineNotice from '../ui/InlineNotice.vue'
+import { useChatAttachments } from '../../composables/useChatAttachments'
+import { useChatAutocomplete } from '../../composables/useChatAutocomplete'
+import { useVoiceInput } from '../../composables/useVoiceInput'
+import {
+  PlusIcon,
+  PhotoIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+} from '@heroicons/vue/24/outline'
+import { ArrowUpIcon, MicrophoneIcon, StopIcon } from '@heroicons/vue/24/solid'
+
+const appStore = useAppStore()
+const effectiveWorkspaceProvider = computed(() => appStore.workspaceAIConfig?.effective?.provider || appStore.llmProvider)
+const effectiveWorkspaceModel = computed(() => appStore.workspaceAIConfig?.effective?.main_model || appStore.selectedModel)
+const workspaceModelOptions = computed(() => {
+  const configured = appStore.workspaceAIConfig?.defaults?.provider === effectiveWorkspaceProvider.value
+    ? appStore.availableModels
+    : []
+  const values = Array.isArray(configured) ? [...configured] : []
+  if (effectiveWorkspaceModel.value && !values.includes(effectiveWorkspaceModel.value)) values.unshift(effectiveWorkspaceModel.value)
+  return values
+})
+const { formatAttachmentSize } = useChatAttachments()
+useChatAutocomplete()
+useVoiceInput()
+
+const question = ref('')
+const isFocused = ref(false)
+const textareaRef = ref(null)
+const inputCardRef = ref(null)
+const attachmentInputRef = ref(null)
+const commandSuggestions = ref([])
+const selectedCommandIndex = ref(0)
+const columnSuggestions = ref([])
+const selectedColumnIndex = ref(0)
+const questionHistoryIndex = ref(-1)
+const questionHistoryDraft = ref('')
+const missingSetupRequirements = computed(() => {
+  const requirements = []
+  if (!appStore.hasWorkspace) requirements.push('Create or select a workspace from the sidebar')
+  if (appStore.workspaceReadiness.state === 'no_data') requirements.push('Add a dataset to this workspace')
+  if (appStore.workspaceReadiness.state === 'model_connection_required') requirements.push('Connect the effective model provider in Settings')
+  if (appStore.workspaceReadiness.state === 'workspace_configuration_required') requirements.push('Review workspace AI settings')
+  return requirements.length ? requirements : ['Finish model setup in Settings']
+})
+const hasTurnNavigation = computed(() => Boolean(
+  appStore.activeTurnRelations?.previous_turn || appStore.activeTurnRelations?.next_turn,
+))
+const setupNotice = computed(() => {
+  if (!appStore.hasWorkspace) {
+    return {
+      title: 'Select a workspace to start',
+      message: 'Your conversations and artifacts are stored per workspace.',
+      actionLabel: 'Choose',
+      action: () => appStore.openSettings('workspace'),
+    }
+  }
+  if (appStore.workspaceReadiness.state === 'no_data') {
+    return { title: 'Add data to begin', message: missingSetupRequirements.value[0], actionLabel: 'Add data', action: () => appStore.openSettings('workspace-data') }
+  }
+  if (appStore.workspaceReadiness.state === 'workspace_configuration_required') {
+    return { title: 'Review workspace AI', message: missingSetupRequirements.value[0], actionLabel: 'Review', action: () => appStore.openSettings('workspace-ai') }
+  }
+  const provider = String(appStore.llmProvider || 'model provider').trim()
+  return {
+    title: `Configure ${provider}`,
+    message: missingSetupRequirements.value[0] || 'Add provider access to start an analysis.',
+    actionLabel: 'Open Settings',
+    action: () => appStore.openSettings('connections'),
+  }
+})
+const activeTokenRange = ref({ start: 0, end: 0, token: '' })
+const suggestionsOpenUp = ref(false)
+const dismissedSuggestionSignature = ref('')
+const pendingAttachments = ref([])
+const isAttachmentDragActive = ref(false)
+const dragDepth = ref(0)
+const supportsVoiceInput = ref(false)
+const isVoiceInputActive = ref(false)
+const speechRecognition = ref(null)
+const voiceDraftPrefix = ref('')
+const stoppedConversationIds = ref(new Set())
+
+const showCommandSuggestions = computed(() => commandSuggestions.value.length > 0)
+const showColumnSuggestions = computed(() => columnSuggestions.value.length > 0)
+const imageAttachmentsSupported = computed(() => modelSupportsImages(appStore.selectedModel))
+const composerCardStyle = computed(() => {
+  const style = isFocused.value
+    ? {
+      borderColor: 'var(--color-accent-border)',
+      boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-accent) 15%, transparent)',
+    }
+    : {}
+  if (isAttachmentDragActive.value) {
+    return {
+      ...style,
+      borderColor: 'var(--color-accent)',
+      boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent)',
+    }
+  }
+  return style
+})
+const canSend = computed(() =>
+  appStore.canAnalyze &&
+  (question.value.trim().length > 0 || pendingAttachments.value.length > 0) &&
+  question.value.length <= 1000 &&
+  !appStore.activeConversationIsLoading
+)
+const isComposerEmpty = computed(() =>
+  question.value.trim().length === 0 && pendingAttachments.value.length === 0
+)
+const canTriggerVoiceInput = computed(() =>
+  appStore.canAnalyze &&
+  isComposerEmpty.value &&
+  supportsVoiceInput.value &&
+  !appStore.activeConversationIsLoading
+)
+const canTriggerActionButton = computed(() => {
+  if (appStore.activeConversationIsLoading) return true
+  if (!appStore.canAnalyze) return false
+  if (canSend.value) return true
+  return isComposerEmpty.value && supportsVoiceInput.value
+})
+const actionButtonTitle = computed(() => {
+  if (appStore.activeConversationIsLoading) return 'Stop generation'
+  if (canSend.value) return 'Send (Enter)'
+  if (canTriggerVoiceInput.value) {
+    return isVoiceInputActive.value ? 'Stop voice input' : 'Start voice input'
+  }
+  if (isComposerEmpty.value) {
+    return 'Voice input unavailable on this device/browser'
+  }
+  return 'Type a message or attach images to send'
+})
+
+const FINAL_STREAM_NODES = new Set([
+  'explain_code',
+  'noncode_generator',
+  'general_purpose',
+  'unsafe_rejector',
+  'finalize',
+  'chat',
+  'reject'
+])
+const DEFAULT_ANALYZE_CANCEL_TIMEOUT_MS = 300000
+const FREE_MODEL_ANALYZE_CANCEL_TIMEOUT_MS = 900000
+const DEFAULT_SLOW_REQUEST_WARNING_TIMEOUT_MS = 120000
+
+function extractLangGraphTokenText(payload) {
+  if (!payload) return ''
+  if (typeof payload === 'string') return payload
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const nested = extractLangGraphTokenText(item)
+      if (nested) return nested
+    }
+    return ''
+  }
+  if (typeof payload === 'object') {
+    if (typeof payload.text === 'string' && payload.text) return payload.text
+    if (typeof payload.content === 'string' && payload.content) return payload.content
+    const content = payload.content
+    if (Array.isArray(content)) {
+      for (const item of content) {
+        if (item && typeof item === 'object' && item.type === 'text' && typeof item.text === 'string') {
+          if (item.text) return item.text
+        }
+      }
+    }
+  }
+  return ''
+}
+
+function resolveAnalyzeCancelTimeoutMs(modelId) {
+  const normalized = String(modelId || '').trim().toLowerCase()
+  if (!normalized) return DEFAULT_ANALYZE_CANCEL_TIMEOUT_MS
+  if (normalized.includes('/free') || normalized.endsWith('-free') || normalized.includes(':free')) {
+    return FREE_MODEL_ANALYZE_CANCEL_TIMEOUT_MS
+  }
+  return DEFAULT_ANALYZE_CANCEL_TIMEOUT_MS
+}
+
+function resolveSlowRequestWarningTimeoutMs(seconds) {
+  const parsed = Number.parseInt(seconds, 10)
+  if (!Number.isFinite(parsed)) return DEFAULT_SLOW_REQUEST_WARNING_TIMEOUT_MS
+  const clampedSeconds = Math.min(600, Math.max(5, parsed))
+  return clampedSeconds * 1000
+}
+
+async function refreshRuntimeStatusAfterExplicitWork(workspaceId) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  if (!normalizedWorkspaceId) return
+  try {
+    const payload = await apiService.v1GetWorkspaceRuntimeStatus(normalizedWorkspaceId)
+    appStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, payload?.status || 'missing')
+  } catch (_error) {
+    // Runtime status is informational; keep the completed chat response intact.
+  }
+}
+
+function parseArtifactTimestampMs(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return 0
+  const parsed = Date.parse(raw)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function sortArtifactsNewestFirst(items) {
+  if (!Array.isArray(items)) return []
+  return [...items].sort((left, right) => {
+    const delta = parseArtifactTimestampMs(right?.created_at) - parseArtifactTimestampMs(left?.created_at)
+    if (delta !== 0) return delta
+    return String(right?.artifact_id || '').localeCompare(String(left?.artifact_id || ''))
+  })
+}
+
+function buildAttachmentId(file) {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${String(file?.name || 'image')}`
+}
+
+function openAttachmentPicker() {
+  if (!imageAttachmentsSupported.value) {
+    toast.error('Images Not Supported', 'The selected model does not support image attachments.')
+    return
+  }
+  attachmentInputRef.value?.click()
+}
+
+async function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result || '')
+      resolve(result.includes(',') ? result.split(',')[1] : result)
+    }
+    reader.onerror = () => reject(reader.error || new Error('Failed to read image file.'))
+    reader.readAsDataURL(file)
+  })
+}
+
+async function appendPendingAttachments(files) {
+  if (!imageAttachmentsSupported.value) {
+    toast.error('Images Not Supported', 'Switch to a vision-capable model before attaching images.')
+    return
+  }
+  const normalizedFiles = Array.from(files || []).filter((file) => SUPPORTED_CHAT_IMAGE_TYPES.has(String(file?.type || '').toLowerCase()))
+  if (normalizedFiles.length === 0) {
+    toast.error('Unsupported File', 'Only PNG, JPG, WEBP, and GIF images can be attached.')
+    return
+  }
+
+  for (const file of normalizedFiles) {
+    const dataBase64 = await fileToBase64(file)
+    pendingAttachments.value.push({
+      attachment_id: buildAttachmentId(file),
+      filename: String(file.name || 'image'),
+      media_type: String(file.type || 'image/png'),
+      data_base64: dataBase64,
+      preview_url: `data:${String(file.type || 'image/png')};base64,${dataBase64}`,
+      size: Number(file.size || 0),
+    })
+  }
+}
+
+async function handleAttachmentSelection(event) {
+  try {
+    await appendPendingAttachments(event?.target?.files || [])
+  } catch (error) {
+    toast.error('Image Attach Failed', extractApiErrorMessage(error, 'Failed to attach image.'))
+  } finally {
+    if (event?.target) event.target.value = ''
+  }
+}
+
+function removePendingAttachment(attachmentId) {
+  const targetId = String(attachmentId || '').trim()
+  pendingAttachments.value = pendingAttachments.value.filter(
+    (item) => String(item?.attachment_id || '') !== targetId
+  )
+}
+
+function handleAttachmentDragEnter() {
+  dragDepth.value += 1
+  if (!imageAttachmentsSupported.value) return
+  isAttachmentDragActive.value = true
+}
+
+function handleAttachmentDragOver() {
+  if (!imageAttachmentsSupported.value) return
+  isAttachmentDragActive.value = true
+}
+
+function handleAttachmentDragLeave() {
+  dragDepth.value = Math.max(0, dragDepth.value - 1)
+  if (dragDepth.value === 0) {
+    isAttachmentDragActive.value = false
+  }
+}
+
+async function handleAttachmentDrop(event) {
+  dragDepth.value = 0
+  isAttachmentDragActive.value = false
+  try {
+    await appendPendingAttachments(event?.dataTransfer?.files || [])
+  } catch (error) {
+    toast.error('Image Attach Failed', extractApiErrorMessage(error, 'Failed to attach image.'))
+  }
+}
+
+async function handleModelChange(model) {
+  const config = appStore.workspaceAIConfig
+  if (!config || !appStore.activeWorkspaceId) return
+  const overrides = config.overrides || {}
+  await appStore.saveWorkspaceAIConfig({
+    llm_provider_override: overrides.provider,
+    main_model_override: model,
+    lite_model_override: overrides.lite_model,
+    llm_temperature_override: overrides.temperature,
+    llm_max_tokens_override: overrides.max_tokens,
+    llm_top_p_override: overrides.top_p,
+    allow_llm_data_samples: Boolean(overrides.allow_llm_data_samples),
+  })
+}
+
+async function searchProviderModels(query, limit = 25) {
+  const response = await apiService.v1SearchProviderModels(effectiveWorkspaceProvider.value, query, limit)
+  const models = response?.models
+  return Array.isArray(models) ? models : []
+}
+
+function initializeVoiceInput() {
+  if (typeof window === 'undefined') return
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+  if (!SpeechRecognition) {
+    supportsVoiceInput.value = false
+    speechRecognition.value = null
+    return
+  }
+
+  try {
+    const recognition = new SpeechRecognition()
+    recognition.lang = navigator?.language || 'en-US'
+    recognition.interimResults = true
+    recognition.continuous = true
+    recognition.maxAlternatives = 1
+    recognition.onstart = () => {
+      isVoiceInputActive.value = true
+    }
+    recognition.onend = () => {
+      isVoiceInputActive.value = false
+    }
+    recognition.onerror = (event) => {
+      isVoiceInputActive.value = false
+      const errorCode = String(event?.error || 'unknown')
+      if (errorCode === 'not-allowed' || errorCode === 'service-not-allowed') {
+        toast.error('Voice Input Blocked', 'Microphone permission is required for voice input.')
+        return
+      }
+      if (errorCode !== 'aborted') {
+        toast.error('Voice Input Error', `Voice input failed (${errorCode}).`)
+      }
+    }
+    recognition.onresult = (event) => {
+      const transcriptParts = []
+      for (let i = 0; i < event.results.length; i += 1) {
+        const text = String(event.results[i]?.[0]?.transcript || '').trim()
+        if (text) transcriptParts.push(text)
+      }
+      const spokenText = transcriptParts.join(' ').trim()
+      const prefix = voiceDraftPrefix.value.trim()
+      question.value = spokenText ? (prefix ? `${prefix} ${spokenText}` : spokenText) : prefix
+      nextTick(() => {
+        if (textareaRef.value) {
+          textareaRef.value.focus()
+          const caret = question.value.length
+          textareaRef.value.selectionStart = caret
+          textareaRef.value.selectionEnd = caret
+        }
+        void updateAutocompleteSuggestions()
+      })
+    }
+    speechRecognition.value = recognition
+    supportsVoiceInput.value = true
+  } catch (_error) {
+    supportsVoiceInput.value = false
+    speechRecognition.value = null
+  }
+}
+
+function startVoiceInput() {
+  if (!speechRecognition.value || !supportsVoiceInput.value) return
+  voiceDraftPrefix.value = question.value.trim()
+  try {
+    speechRecognition.value.start()
+  } catch (_error) {
+    isVoiceInputActive.value = false
+  }
+}
+
+function stopVoiceInput() {
+  if (!speechRecognition.value) return
+  try {
+    speechRecognition.value.stop()
+  } catch (_error) {
+    isVoiceInputActive.value = false
+  }
+}
+
+function handleStopGeneration() {
+  const conversationId = String(appStore.activeConversationId || '').trim()
+  if (!conversationId) return
+  stoppedConversationIds.value = new Set([...stoppedConversationIds.value, conversationId])
+  appStore.abortConversationRun(conversationId)
+}
+
+function handleActionButtonClick() {
+  if (appStore.activeConversationIsLoading) {
+    handleStopGeneration()
+    return
+  }
+  if (canSend.value) {
+    void handleSubmit()
+    return
+  }
+  if (canTriggerVoiceInput.value) {
+    if (isVoiceInputActive.value) {
+      stopVoiceInput()
+    } else {
+      startVoiceInput()
+    }
+  }
+}
+
+function isSimpleIdentifier(value) {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(value || '').trim())
+}
+
+function quoteSqlIdentifier(value) {
+  return `"${String(value || '').replace(/"/g, '""')}"`
+}
+
+function buildColumnReference(tableName, columnName) {
+  const table = String(tableName || '').trim()
+  const column = String(columnName || '').trim()
+  if (!table || !column) return ''
+  if (isSimpleIdentifier(column)) {
+    return `${table}.${column}`
+  }
+  return `${table}.${quoteSqlIdentifier(column)}`
+}
+
+function buildColumnSuggestion(item) {
+  const tableName = String(item?.table_name || '').trim()
+  const columnName = String(item?.column_name || '').trim()
+  if (!tableName || !columnName) return null
+
+  const displayText = buildColumnReference(tableName, columnName)
+  return {
+    ...item,
+    table_name: tableName,
+    column_name: columnName,
+    dtype: String(item?.dtype || ''),
+    displayText,
+    insertText: displayText,
+    dotText: `${tableName}.${columnName}`,
+    isSpecial: !isSimpleIdentifier(columnName),
+  }
+}
+
+function collectColumnCandidates() {
+  const merged = []
+  const seen = new Set()
+
+  const addCandidate = (tableName, columnName, dtype = '') => {
+    const table = String(tableName || '').trim()
+    const column = String(columnName || '').trim()
+    if (!table || !column) return
+    const key = `${table.toLowerCase()}::${column.toLowerCase()}`
+    if (seen.has(key)) return
+    seen.add(key)
+    const suggestion = buildColumnSuggestion({
+      table_name: table,
+      column_name: column,
+      dtype: String(dtype || ''),
+    })
+    if (suggestion) merged.push(suggestion)
+  }
+
+  const catalogItems = Array.isArray(appStore.columnCatalog) ? appStore.columnCatalog : []
+  catalogItems.forEach((item) => {
+    addCandidate(item?.table_name, item?.column_name, item?.dtype)
+  })
+
+  const activeTable = String(appStore.ingestedTableName || '').trim()
+  const ingestedItems = Array.isArray(appStore.ingestedColumns) ? appStore.ingestedColumns : []
+  ingestedItems.forEach((item) => {
+    addCandidate(
+      activeTable,
+      item?.name || item?.column_name,
+      item?.dtype || item?.type || ''
+    )
+  })
+
+  return merged
+}
+
+function clearSuggestions() {
+  commandSuggestions.value = []
+  selectedCommandIndex.value = 0
+  columnSuggestions.value = []
+  selectedColumnIndex.value = 0
+}
+
+function updateSuggestionPlacement() {
+  const target = inputCardRef.value || textareaRef.value
+  if (!target) {
+    suggestionsOpenUp.value = false
+    return
+  }
+  const rect = target.getBoundingClientRect()
+  const minDropdownHeight = 220
+  const spaceBelow = Math.max(0, window.innerHeight - rect.bottom)
+  suggestionsOpenUp.value = spaceBelow < minDropdownHeight
+}
+
+function currentCursorPosition() {
+  const target = textareaRef.value
+  if (!target) return question.value.length
+  return Number(target.selectionStart || 0)
+}
+
+function tokenRangeAtCursor(text, cursor) {
+  const safeText = String(text || '')
+  const safeCursor = Math.max(0, Math.min(Number(cursor || 0), safeText.length))
+  const prefix = safeText.slice(0, safeCursor)
+  const match = prefix.match(/([^\s]*)$/)
+  const token = String(match?.[1] || '')
+  return {
+    start: safeCursor - token.length,
+    end: safeCursor,
+    token,
+  }
+}
+
+function buildSuggestionDismissSignature(text = question.value, cursor = currentCursorPosition()) {
+  const safeText = String(text || '')
+  const range = tokenRangeAtCursor(safeText, cursor)
+  const token = String(range.token || '').trim()
+  return `${range.start}:${range.end}:${token}:${safeText}`
+}
+
+function applyTokenReplacement(replacement, { appendSpace = false } = {}) {
+  const value = String(question.value || '')
+  const { start, end } = activeTokenRange.value
+  const safeStart = Math.max(0, Math.min(start, value.length))
+  const safeEnd = Math.max(safeStart, Math.min(end, value.length))
+  const suffix = appendSpace ? ' ' : ''
+  const updated = `${value.slice(0, safeStart)}${replacement}${suffix}${value.slice(safeEnd)}`
+  question.value = updated
+  const caret = safeStart + replacement.length + suffix.length
+  nextTick(() => {
+    if (textareaRef.value) {
+      textareaRef.value.focus()
+      textareaRef.value.selectionStart = caret
+      textareaRef.value.selectionEnd = caret
+    }
+    void updateAutocompleteSuggestions()
+  })
+}
+
+function acceptCommandSuggestion(item = null) {
+  const selected = item || commandSuggestions.value[selectedCommandIndex.value]
+  if (!selected) return
+  applyTokenReplacement(`/${selected.name}`, { appendSpace: true })
+  clearSuggestions()
+}
+
+function acceptColumnSuggestion(item = null) {
+  const selected = item || columnSuggestions.value[selectedColumnIndex.value]
+  if (!selected) return
+  applyTokenReplacement(String(selected.insertText || `${selected.table_name}.${selected.column_name}`))
+  clearSuggestions()
+}
+
+function navigateSuggestion(step) {
+  if (showCommandSuggestions.value) {
+    const size = commandSuggestions.value.length
+    if (!size) return
+    selectedCommandIndex.value = (selectedCommandIndex.value + step + size) % size
+    return
+  }
+  if (showColumnSuggestions.value) {
+    const size = columnSuggestions.value.length
+    if (!size) return
+    selectedColumnIndex.value = (selectedColumnIndex.value + step + size) % size
+  }
+}
+
+async function updateAutocompleteSuggestions() {
+  const value = String(question.value || '')
+  const range = tokenRangeAtCursor(value, currentCursorPosition())
+  activeTokenRange.value = range
+
+  const token = String(range.token || '').trim()
+  const signature = `${range.start}:${range.end}:${token}:${value}`
+  if (
+    dismissedSuggestionSignature.value &&
+    dismissedSuggestionSignature.value === signature
+  ) {
+    clearSuggestions()
+    return
+  }
+  if (dismissedSuggestionSignature.value && dismissedSuggestionSignature.value !== signature) {
+    dismissedSuggestionSignature.value = ''
+  }
+
+  if (!token) {
+    clearSuggestions()
+    return
+  }
+
+  if (token.startsWith('/')) {
+    const prefixBeforeToken = value.slice(0, range.start)
+    if (prefixBeforeToken.trim().length > 0) {
+      clearSuggestions()
+      return
+    }
+
+    const prefix = token.slice(1).toLowerCase()
+    commandSuggestions.value = getRegisteredCommands()
+      .filter((item) => !prefix || item.name.startsWith(prefix))
+      .slice(0, 8)
+    selectedCommandIndex.value = 0
+    columnSuggestions.value = []
+    selectedColumnIndex.value = 0
+    updateSuggestionPlacement()
+    return
+  }
+
+  if (!Array.isArray(appStore.columnCatalog) || appStore.columnCatalog.length === 0) {
+    await appStore.fetchColumnCatalog()
+  }
+
+  const normalizedToken = token.toLowerCase()
+  columnSuggestions.value = collectColumnCandidates()
+    .filter((item) => {
+      const searchPool = [
+        String(item.displayText || ''),
+        String(item.dotText || ''),
+        String(item.column_name || ''),
+        String(item.table_name || ''),
+      ].map((entry) => entry.toLowerCase())
+      return (
+        searchPool.some((entry) => entry.startsWith(normalizedToken)) ||
+        searchPool.some((entry) => entry.includes(normalizedToken))
+      )
+    })
+    .slice(0, 8)
+  selectedColumnIndex.value = 0
+  commandSuggestions.value = []
+  updateSuggestionPlacement()
+}
+
+function handleInputChange() {
+  if (questionHistoryIndex.value !== -1) {
+    questionHistoryIndex.value = -1
+    questionHistoryDraft.value = ''
+  }
+  void updateAutocompleteSuggestions()
+}
+
+const SUGGESTION_NAVIGATION_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Tab', 'Enter', 'Escape'])
+
+function handleCaretInteraction(event = null) {
+  if (
+    event &&
+    SUGGESTION_NAVIGATION_KEYS.has(String(event.key || '')) &&
+    (showCommandSuggestions.value || showColumnSuggestions.value)
+  ) {
+    return
+  }
+  void updateAutocompleteSuggestions()
+}
+
+function setQuestionFromHistory(value) {
+  question.value = String(value || '')
+  clearSuggestions()
+  nextTick(() => {
+    if (textareaRef.value) {
+      const caret = question.value.length
+      textareaRef.value.focus()
+      textareaRef.value.selectionStart = caret
+      textareaRef.value.selectionEnd = caret
+    }
+  })
+}
+
+function isHistoryNavigationAllowed(event, step) {
+  if (!event) return false
+  if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return false
+  if (showCommandSuggestions.value || showColumnSuggestions.value) return false
+  const textarea = textareaRef.value
+  if (!textarea) return false
+  if (textarea.selectionStart !== textarea.selectionEnd) return false
+  const caret = Number(textarea.selectionStart || 0)
+  if (step < 0) return caret === 0
+  if (step > 0) return caret === String(question.value || '').length && questionHistoryIndex.value !== -1
+  return false
+}
+
+function navigateQuestionHistory(step) {
+  const history = Array.isArray(appStore.questionHistory) ? appStore.questionHistory : []
+  if (history.length === 0) return false
+
+  if (step < 0) {
+    if (questionHistoryIndex.value === -1) {
+      questionHistoryDraft.value = question.value
+      questionHistoryIndex.value = history.length - 1
+    } else if (questionHistoryIndex.value > 0) {
+      questionHistoryIndex.value -= 1
+    }
+    setQuestionFromHistory(history[questionHistoryIndex.value] || '')
+    return true
+  }
+
+  if (step > 0) {
+    if (questionHistoryIndex.value === -1) return false
+    if (questionHistoryIndex.value < history.length - 1) {
+      questionHistoryIndex.value += 1
+      setQuestionFromHistory(history[questionHistoryIndex.value] || '')
+      return true
+    }
+    const draft = questionHistoryDraft.value
+    questionHistoryIndex.value = -1
+    questionHistoryDraft.value = ''
+    setQuestionFromHistory(draft)
+    return true
+  }
+
+  return false
+}
+
+function handleKeydown(event) {
+  if (!event) return
+
+  if ((showCommandSuggestions.value || showColumnSuggestions.value) && event.key === 'ArrowDown') {
+    event.preventDefault()
+    navigateSuggestion(1)
+    return
+  }
+  if ((showCommandSuggestions.value || showColumnSuggestions.value) && event.key === 'ArrowUp') {
+    event.preventDefault()
+    navigateSuggestion(-1)
+    return
+  }
+  if ((showCommandSuggestions.value || showColumnSuggestions.value) && event.key === 'Tab') {
+    event.preventDefault()
+    if (showCommandSuggestions.value) {
+      acceptCommandSuggestion()
+    } else {
+      acceptColumnSuggestion()
+    }
+    return
+  }
+  if ((showCommandSuggestions.value || showColumnSuggestions.value) && event.key === 'Escape') {
+    event.preventDefault()
+    dismissedSuggestionSignature.value = buildSuggestionDismissSignature()
+    clearSuggestions()
+    return
+  }
+  if (event.key === 'ArrowUp' && isHistoryNavigationAllowed(event, -1)) {
+    const didNavigateHistory = navigateQuestionHistory(-1)
+    if (didNavigateHistory) {
+      event.preventDefault()
+      return
+    }
+  }
+  if (event.key === 'ArrowDown' && isHistoryNavigationAllowed(event, 1)) {
+    const didNavigateHistory = navigateQuestionHistory(1)
+    if (didNavigateHistory) {
+      event.preventDefault()
+      return
+    }
+  }
+
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    if (event.shiftKey) {
+      handleNewLine(event)
+      return
+    }
+    handleSubmit()
+  }
+}
+
+function isBrowserVirtualPath(path) {
+  const normalized = String(path || '').toLowerCase()
+  return normalized.startsWith('browser://') || normalized.startsWith('browser:/') || normalized.startsWith('/browser:/')
+}
+
+async function ensureWorkspaceDatasetReady(workspaceId) {
+  if (!workspaceId || !appStore.dataFilePath) return
+  const tableName = (
+    appStore.ingestedTableName ||
+    inferTableNameFromDataPath(appStore.dataFilePath)
+  ).trim()
+  if (!tableName) {
+    throw new Error('Dataset sync failed: missing selected table name.')
+  }
+
+  if (isBrowserVirtualPath(appStore.dataFilePath)) {
+    const columns = (Array.isArray(appStore.ingestedColumns) ? appStore.ingestedColumns : []).map((col) => ({
+      ...col,
+      samples: appStore.allowSchemaSampleValues && Array.isArray(col?.samples) ? col.samples : []
+    }))
+    await apiService.v1SyncBrowserDataset(workspaceId, {
+      table_name: tableName,
+      columns,
+      row_count: null,
+      allow_sample_values: appStore.allowSchemaSampleValues
+    })
+    return
+  }
+
+  try {
+    await apiService.v1AddDataset(workspaceId, appStore.dataFilePath)
+  } catch (_error) {
+    throw new Error('Dataset sync failed: selected file could not be attached to workspace.')
+  }
+}
+
+function applyCommandResultToStore(commandResult) {
+  const payload = commandResult?.result && typeof commandResult.result === 'object'
+    ? commandResult.result
+    : null
+  const columns = Array.isArray(payload?.columns) ? payload.columns.map((col) => String(col)) : []
+  const rows = Array.isArray(payload?.data) ? payload.data : []
+  const hasTablePayload = columns.length > 0
+
+  if (hasTablePayload) {
+    const tableResult = {
+      columns,
+      data: rows,
+      row_count: Number.isFinite(Number(payload?.row_count)) ? Number(payload.row_count) : rows.length,
+      result_type: String(payload?.result_type || commandResult?.result_type || 'table'),
+    }
+    appStore.setDataframes([
+      {
+        name: String(commandResult?.name || 'command_result'),
+        origin: 'ai',
+        data: tableResult,
+      },
+    ])
+    appStore.setResultData(tableResult)
+    appStore.setFigures([])
+    appStore.setPlotlyFigure(null)
+    appStore.revealArtifactsPane({ hasDataframes: true })
+    appStore.setActiveTab('table')
+  } else {
+    appStore.setDataframes([])
+    appStore.setResultData(null)
+    appStore.setFigures([])
+    appStore.setPlotlyFigure(null)
+  }
+
+  const output = String(commandResult?.output || `/${commandResult?.name || 'command'} executed.`)
+  appStore.setTerminalOutput(output)
+  appStore.appendTerminalEntry({
+    kind: 'output',
+    source: 'analysis',
+    origin: 'ai',
+    conversationId: String(appStore.activeConversationId || ''),
+    label: `/${String(commandResult?.name || 'command')}`,
+    command: `/${String(commandResult?.name || 'command')}`,
+    status: 'success',
+    stdout: output,
+    stderr: '',
+    exitCode: 0,
+  })
+}
+
+function appendChatExecutionOutput(response, conversationId = appStore.activeConversationId, code = '') {
+  const execution = response?.execution && typeof response.execution === 'object'
+    ? response.execution
+    : null
+  if (!execution) return false
+
+  const stdout = String(execution.stdout || response?.stdout || response?.terminal_output || '')
+  const stderr = String(execution.stderr || execution.error || '')
+  const scalarResult = normalizeScalarResult(response)
+  const artifacts = Array.isArray(response?.artifacts) ? response.artifacts : []
+  const hasTableOutput = Boolean(
+    (response?.result?.columns && response?.result?.data)
+    || artifacts.some((item) => String(item?.kind || '').toLowerCase() === 'dataframe'),
+  )
+  const hasChartOutput = Boolean(
+    normalizePlotlyFigure(response?.plotly_figure || response?.result)
+    || artifacts.some((item) => String(item?.kind || '').toLowerCase() === 'figure'),
+  )
+  const hasOutput = Boolean(stdout.trim() || stderr.trim() || scalarResult)
+  if (!hasOutput) return false
+
+  const success = execution.success !== false && String(execution.status || 'success').toLowerCase() !== 'failed'
+  const terminalOutput = stderr || stdout
+  if (String(conversationId || '').trim() === String(appStore.activeConversationId || '').trim()) {
+    appStore.setTerminalOutput(terminalOutput)
+    appStore.appendTerminalEntry({
+      kind: 'output',
+      source: 'analysis',
+      origin: 'ai',
+      conversationId: String(conversationId || ''),
+      label: execution.output_truncated ? 'Run output (truncated)' : 'Run output',
+      command: String(code || ''),
+      runId: String(response?.run_id || ''),
+      status: success ? 'success' : 'error',
+      stdout,
+      stderr,
+      exitCode: success ? 0 : 1,
+      durationMs: Number.isFinite(Number(execution.duration_ms)) ? Number(execution.duration_ms) : null,
+      truncated: Boolean(execution.output_truncated),
+      scalarOutputs: scalarResult ? [scalarResult] : [],
+      hasTableOutput,
+      hasChartOutput,
+    })
+  } else {
+    appStore.patchConversationState(conversationId, { terminalOutput })
+  }
+  return true
+}
+
+function scalarDisplayValue(value) {
+  if (value === undefined) return ''
+  if (value === null) return 'null'
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value)
+  }
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch (_error) {
+    return String(value)
+  }
+}
+
+function normalizeScalarResult(response) {
+  const execution = response?.execution && typeof response.execution === 'object'
+    ? response.execution
+    : {}
+  const resultKind = String(execution?.result_kind || response?.result_kind || '').trim().toLowerCase()
+  const resultType = String(execution?.result_type || response?.result_type || '').trim()
+  const hasExecutionResult = Object.prototype.hasOwnProperty.call(execution, 'result')
+  const hasResponseResult = Object.prototype.hasOwnProperty.call(response || {}, 'result')
+  if (resultKind !== 'scalar' && resultType.toLowerCase() !== 'scalar') return null
+  const value = hasExecutionResult ? execution.result : (hasResponseResult ? response.result : undefined)
+  if (value === undefined) return null
+  return {
+    name: String(execution?.result_name || response?.result_name || 'result'),
+    value,
+    display_value: scalarDisplayValue(value),
+    result_type: resultType || typeof value,
+    run_id: String(execution?.run_id || response?.run_id || ''),
+    created_at: new Date().toISOString(),
+  }
+}
+
+function preferredDataPane(payload = {}) {
+  if (payload?.hasFigures) return 'figure'
+  if (payload?.hasDataframes) return 'table'
+  if (payload?.hasOutput) return 'output'
+  return appStore.dataPane || 'table'
+}
+
+function applyConversationResultState(conversationId, statePatch = {}, revealPayload = {}) {
+  const targetConversationId = String(conversationId || '').trim()
+  if (!targetConversationId) return
+  const active = targetConversationId === String(appStore.activeConversationId || '').trim()
+  if (active) {
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'generatedCode')) appStore.setGeneratedCode(statePatch.generatedCode)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'pythonFileContent')) appStore.setPythonFileContent(statePatch.pythonFileContent)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'resultData')) appStore.setResultData(statePatch.resultData)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'plotlyFigure')) appStore.setPlotlyFigure(statePatch.plotlyFigure)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'dataframes')) appStore.setDataframes(statePatch.dataframes)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'figures')) appStore.setFigures(statePatch.figures)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'scalars')) appStore.setScalars(statePatch.scalars)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'terminalOutput')) appStore.setTerminalOutput(statePatch.terminalOutput)
+    appStore.revealArtifactsPane(revealPayload)
+    return
+  }
+  appStore.patchConversationState(targetConversationId, {
+    ...statePatch,
+    dataPane: preferredDataPane(revealPayload),
+  })
+}
+
+async function handleSlashCommand(questionText) {
+  let commandMessageCreated = false
+  let requestConversationId = ''
+  let operationId = ''
+  let commandFailed = false
+  try {
+    const workspaceId = appStore.activeWorkspaceId
+    if (!workspaceId) {
+      throw new Error('Create/select a workspace before analysis.')
+    }
+
+    requestConversationId = String(await appStore.ensureActiveConversation('New chat') || '').trim()
+    if (!requestConversationId) {
+      throw new Error('Could not create a chat for this command.')
+    }
+    appStore.setConversationRun(requestConversationId, {
+      status: 'running',
+      requestId: `command-${Date.now()}`,
+      startedAt: new Date().toISOString(),
+    })
+    operationId = appStore.startBackgroundOperation({
+      id: `chat-command-${requestConversationId}`,
+      type: 'chat',
+      title: 'Running command',
+      message: 'Executing chat command...',
+      priority: 70,
+    })
+    appStore.addChatMessage(questionText, 'Running command...', { conversationId: requestConversationId })
+    commandMessageCreated = true
+    await ensureWorkspaceDatasetReady(workspaceId)
+    const result = await executeCommand(questionText, { appStore, apiService, executionService })
+    const persistedConversationId = String(result?.conversation_id || '').trim()
+    if (
+      persistedConversationId &&
+      persistedConversationId !== String(appStore.activeConversationId || '').trim() &&
+      requestConversationId === String(appStore.activeConversationId || '').trim()
+    ) {
+      appStore.setActiveConversationId(persistedConversationId)
+    }
+    if (persistedConversationId) {
+      await appStore.fetchConversations()
+      await appStore.loadWorkspaceTurnTree()
+      try {
+        await appStore.fetchActiveConversationUsage(persistedConversationId)
+      } catch (_error) {
+        // Usage display is informational; command output should still render.
+      }
+    }
+    appStore.updateLastMessageExplanation(
+      String(result?.output || `/${String(result?.name || 'command')} executed.`),
+      null,
+      { conversationId: requestConversationId },
+    )
+    if (requestConversationId === String(appStore.activeConversationId || '').trim()) {
+      applyCommandResultToStore(result)
+    }
+  } catch (error) {
+    commandFailed = true
+    const message = extractApiErrorMessage(error, 'Failed to run command.')
+    if (commandMessageCreated) {
+      appStore.updateLastMessageExplanation(`Command failed: ${message}`, null, { conversationId: requestConversationId })
+    }
+    toast.error('Command Failed', message)
+    if (requestConversationId === String(appStore.activeConversationId || '').trim()) {
+      appStore.setTerminalOutput(`Error: ${message}`)
+      appStore.appendTerminalEntry({
+        kind: 'output',
+        source: 'analysis',
+        origin: 'ai',
+        conversationId: String(requestConversationId || ''),
+        label: 'Command error',
+        command: String(questionText || ''),
+        status: 'error',
+        stdout: '',
+        stderr: message,
+        exitCode: 1,
+      })
+    } else {
+      appStore.patchConversationState(requestConversationId, {
+        terminalOutput: `Error: ${message}`,
+        dataPane: 'output',
+      })
+    }
+  } finally {
+    if (requestConversationId) {
+      appStore.clearConversationRun(requestConversationId)
+    }
+    if (operationId) {
+      appStore.finishBackgroundOperation(operationId, {
+        status: commandFailed ? 'failed' : 'complete',
+        title: commandFailed ? 'Command failed' : 'Command complete',
+        message: commandFailed ? 'Chat command failed.' : 'Chat command finished.',
+      })
+    }
+  }
+}
+
+async function handleSubmit() {
+  if (!canSend.value) return
+  if (isVoiceInputActive.value) {
+    stopVoiceInput()
+  }
+  if (pendingAttachments.value.length > 0 && !imageAttachmentsSupported.value) {
+    toast.error('Images Not Supported', 'The selected model does not support image attachments.')
+    return
+  }
+
+  const rawQuestionText = question.value.trim()
+  const questionText = rawQuestionText || 'Please analyze the attached image(s).'
+  const attachmentsPayload = pendingAttachments.value.map((item) => ({
+    attachment_id: item.attachment_id,
+    filename: item.filename,
+    media_type: item.media_type,
+    data_base64: item.data_base64,
+  }))
+  if (rawQuestionText) {
+    appStore.addQuestionHistoryEntry(questionText)
+  }
+  questionHistoryIndex.value = -1
+  questionHistoryDraft.value = ''
+  question.value = ''
+  clearSuggestions()
+  pendingAttachments.value = []
+
+  if (isCommand(questionText)) {
+    if (attachmentsPayload.length > 0) {
+      toast.error('Slash Commands Do Not Support Images', 'Remove attached images before running a slash command.')
+      pendingAttachments.value = attachmentsPayload.map((item) => ({
+        ...item,
+        preview_url: `data:${item.media_type};base64,${item.data_base64}`,
+        size: 0,
+      }))
+      question.value = rawQuestionText
+      return
+    }
+    await handleSlashCommand(questionText)
+    return
+  }
+
+  let requestConversationId = ''
+  try {
+    requestConversationId = String(await appStore.ensureActiveConversation('New chat') || '').trim()
+  } catch (error) {
+    toast.error('Conversation Error', extractApiErrorMessage(error, 'Could not create a chat.'))
+    question.value = rawQuestionText
+    pendingAttachments.value = attachmentsPayload.map((item) => ({
+      ...item,
+      preview_url: `data:${item.media_type};base64,${item.data_base64}`,
+      size: 0,
+    }))
+    return
+  }
+  if (!requestConversationId) {
+    toast.error('Conversation Error', 'Could not create a chat.')
+    question.value = rawQuestionText
+    return
+  }
+  if (appStore.isConversationRunning(requestConversationId)) {
+    toast.warning('Conversation Running', 'Wait for this conversation to finish before sending another prompt.')
+    return
+  }
+  const localMessageId = `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  appStore.addChatMessage(questionText, '', { attachments: attachmentsPayload, localMessageId, conversationId: requestConversationId })
+  appStore.syncLiveTokenUsageFromChatHistory({ conversationId: requestConversationId })
+  const operationId = appStore.startBackgroundOperation({
+    id: `chat-stream-${requestConversationId}`,
+    type: 'chat',
+    title: 'Generating response',
+    message: 'Streaming chat response...',
+    priority: 80,
+  })
+  let operationStatus = 'complete'
+  let operationMessage = 'Chat response finished.'
+
+  const abortController = new AbortController()
+  appStore.setConversationRun(requestConversationId, {
+    status: 'running',
+    requestId: localMessageId,
+    startedAt: new Date().toISOString(),
+    abortController,
+  })
+  const signal = abortController.signal
+
+  let warningTimer = null
+  let cancelTimer = null
+
+  try {
+    const workspaceId = appStore.activeWorkspaceId
+    if (!workspaceId) {
+      throw new Error('Create/select a workspace before analysis.')
+    }
+
+    const warningAfterMs = resolveSlowRequestWarningTimeoutMs(appStore.slowRequestWarningSeconds)
+    warningTimer = setTimeout(() => {
+      toast.warning('Request Taking Longer', 'Your query is taking longer than expected.')
+    }, warningAfterMs)
+
+    const cancelAfterMs = resolveAnalyzeCancelTimeoutMs(effectiveWorkspaceModel.value)
+    cancelTimer = setTimeout(() => {
+      toast.error('Request Cancelled', 'Your query took too long and was cancelled.')
+      abortController.abort()
+    }, cancelAfterMs)
+
+    let response
+    const selectedParentTurnId = String(appStore.activeTurnId || '').trim()
+    response = await apiService.v1AnalyzeStream(
+      {
+        workspace_id: workspaceId,
+        conversation_id: requestConversationId,
+        question: questionText,
+        current_code: appStore.pythonFileContent || '',
+        model: effectiveWorkspaceModel.value,
+        context: appStore.schemaContext.trim() || null,
+        use_selected_turn_context: Boolean(selectedParentTurnId),
+        selected_parent_turn_id: selectedParentTurnId || null,
+        attachments: attachmentsPayload,
+        api_key: null
+      },
+      {
+        signal,
+        onEvent: (evt) => {
+          if ((evt.event === 'messages' || evt.event === 'messages/partial' || evt.event === 'messages-tuple')) {
+            const text = extractLangGraphTokenText(evt.data)
+            if (text) {
+              appStore.appendLastMessageExplanationChunk(text, localMessageId, { conversationId: requestConversationId })
+            }
+            return
+          }
+          if (evt.event === 'updates') {
+            return
+          }
+          if (evt.event === 'token' && typeof evt.data?.text === 'string') {
+            const nodeName = String(evt.data?.node || '').trim().toLowerCase()
+            if (FINAL_STREAM_NODES.has(nodeName)) {
+              appStore.appendLastMessageExplanationChunk(evt.data.text, localMessageId, { conversationId: requestConversationId })
+            } else {
+              appStore.appendLastMessagePlanChunk(evt.data.text, evt.data.node || '', localMessageId, { conversationId: requestConversationId })
+            }
+            return
+          }
+          if (evt.event === 'llm_progress' && evt.data?.message) {
+            appStore.appendLastMessageTraceEvent({
+              type: 'llm_progress',
+              stage: evt.data?.stage || '',
+              message: evt.data.message,
+              output: ''
+            }, localMessageId, { conversationId: requestConversationId })
+            return
+          }
+          if (evt.event === 'reasoning' && evt.data?.message) {
+            appStore.appendLastMessageReasoningEvent({
+              stage: evt.data?.stage || 'intent',
+              message: evt.data.message,
+              route: evt.data?.route || ''
+            }, localMessageId, { conversationId: requestConversationId })
+            return
+          }
+          if (evt.event === 'agent_status' && evt.data?.message) {
+            appStore.appendLastMessageTraceEvent({
+              type: 'status',
+              node: 'agent_status',
+              stage: evt.data.step || '',
+              message: evt.data.message,
+              output: evt.data?.detail || evt.data?.output || ''
+            }, localMessageId, { conversationId: requestConversationId })
+            return
+          }
+          if (evt.event === 'tool_call' && evt.data?.call_id) {
+            appStore.appendLastMessageToolCall(evt.data, localMessageId, { conversationId: requestConversationId })
+            return
+          }
+          if (evt.event === 'tool_progress' && evt.data?.call_id) {
+            appStore.appendLastMessageToolProgress(evt.data, localMessageId, { conversationId: requestConversationId })
+            return
+          }
+          if (evt.event === 'tool_result' && evt.data?.call_id) {
+            appStore.appendLastMessageToolResult(evt.data, localMessageId, { conversationId: requestConversationId })
+            return
+          }
+          if (evt.event === 'intervention_request' && evt.data?.id) {
+            appStore.setLastMessageInterventionRequest(evt.data, localMessageId, { conversationId: requestConversationId })
+            return
+          }
+          if (evt.event === 'intervention_response' && evt.data?.id) {
+            appStore.setLastMessageInterventionResponse(evt.data, localMessageId, { conversationId: requestConversationId })
+            return
+          }
+          if (evt.event === 'error') {
+            const streamErrorMessage = extractApiErrorMessage(
+              { data: evt.data },
+              'Streaming analysis failed.',
+            )
+            appStore.updateLastMessageExplanation(streamErrorMessage, localMessageId, { conversationId: requestConversationId })
+            return
+          }
+          if (evt.event === 'token_usage' && evt.data && typeof evt.data === 'object') {
+            const tokenUsage = evt.data?.token_usage
+            if (tokenUsage && typeof tokenUsage === 'object') {
+              appStore.setLiveTokenUsageForCurrentTurn(tokenUsage, { conversationId: requestConversationId })
+            }
+          }
+        }
+      }
+    )
+
+    if (
+      response?.conversation_id &&
+      response.conversation_id !== appStore.activeConversationId &&
+      requestConversationId === String(appStore.activeConversationId || '').trim()
+    ) {
+      appStore.setActiveConversationId(response.conversation_id)
+      await appStore.fetchConversations()
+    }
+
+    const responseTurnId = String(response?.turn_id || '').trim()
+    if (responseTurnId) {
+      appStore.setLastMessageTurnId(responseTurnId, localMessageId, { conversationId: requestConversationId })
+      if (String(response?.conversation_id || requestConversationId) === String(appStore.activeConversationId || '')) {
+        await appStore.loadActiveTurnRelations(responseTurnId)
+        await appStore.loadFinalTurn()
+      }
+      await appStore.loadWorkspaceTurnTree()
+    }
+
+    const { is_safe, code, current_code, explanation, result_explanation, code_explanation } = response
+    const finalCode = (code ?? current_code ?? '').toString()
+    appStore.setLastMessageAnalysisMetadata(response?.metadata || {}, localMessageId, { conversationId: requestConversationId })
+    try {
+      await appStore.fetchActiveConversationUsage(String(response?.conversation_id || requestConversationId || '').trim())
+    } catch (_error) {
+      // Usage display is informational; the completed response should still render.
+    }
+    const finalExplanation = (result_explanation ?? explanation ?? '').toString()
+    appStore.setLastMessageCodeSnapshot(finalCode, localMessageId, { conversationId: requestConversationId })
+    appStore.setLastMessageCodeExplanation((code_explanation ?? '').toString(), localMessageId, { conversationId: requestConversationId })
+
+    if (!is_safe) {
+      appStore.updateLastMessageExplanation(finalExplanation || 'Your query was flagged as potentially unsafe.', localMessageId, { conversationId: requestConversationId })
+      return
+    }
+
+    appStore.updateLastMessageExplanation(finalExplanation, localMessageId, { conversationId: requestConversationId })
+    const finalStatePatch = {}
+    if (finalCode.trim()) {
+      finalStatePatch.generatedCode = finalCode
+      finalStatePatch.pythonFileContent = finalCode
+      finalStatePatch.userEditedCode = ''
+      finalStatePatch.hasUserEditedCode = false
+      finalStatePatch.codeEditorSource = 'agent'
+    }
+
+    if (finalCode && finalCode.trim()) {
+      const hasChatExecutionOutput = appendChatExecutionOutput(response, requestConversationId, finalCode)
+
+      const inlineFigure = normalizePlotlyFigure(response.plotly_figure || response.result)
+      if (inlineFigure) {
+        finalStatePatch.plotlyFigure = inlineFigure
+        finalStatePatch.resultData = null
+        finalStatePatch.figures = [{
+          name: String(response?.result_name || 'figure'),
+          origin: 'ai',
+          runId: String(response?.run_id || ''),
+          data: inlineFigure,
+        }]
+        finalStatePatch.figureCount = 1
+        applyConversationResultState(requestConversationId, finalStatePatch, { hasFigures: true })
+      } else if (response.result?.columns && response.result?.data) {
+        finalStatePatch.resultData = response.result
+        finalStatePatch.plotlyFigure = null
+        finalStatePatch.dataframes = [{
+          name: String(response?.result_name || 'result'),
+          origin: 'ai',
+          runId: String(response?.run_id || ''),
+          data: response.result,
+        }]
+        applyConversationResultState(requestConversationId, finalStatePatch, { hasDataframes: true })
+      } else if (hasChatExecutionOutput) {
+        applyConversationResultState(requestConversationId, finalStatePatch)
+      } else if (Object.keys(finalStatePatch).length > 0) {
+        applyConversationResultState(requestConversationId, finalStatePatch)
+      }
+    }
+
+    const artifactItems = sortArtifactsNewestFirst(Array.isArray(response?.artifacts) ? response.artifacts : [])
+    const inlineScalarResult = normalizeScalarResult(response)
+    if (artifactItems.length === 0 && !inlineScalarResult) {
+      finalStatePatch.scalars = []
+    }
+    if (artifactItems.length > 0) {
+      const dataframeArtifacts = artifactItems
+        .filter((item) => String(item?.kind || '') === 'dataframe')
+        .map((item) => ({
+          name: String(item?.display_name || item?.logical_name || 'dataframe'),
+          origin: 'ai',
+          runId: String(response?.run_id || ''),
+          data: {
+            artifact_id: item?.artifact_id,
+            logical_name: item?.logical_name || undefined,
+            display_name: item?.display_name || undefined,
+            row_count: Number(item?.row_count || 0),
+            columns: Array.isArray(item?.schema) ? item.schema.map((col) => String(col?.name || '')) : [],
+            data: Array.isArray(item?.preview_rows) ? item.preview_rows : [],
+            created_at: String(item?.created_at || ''),
+          }
+        }))
+      const figureArtifacts = artifactItems
+        .filter((item) => String(item?.kind || '') === 'figure')
+        .map((item) => {
+          const figure = normalizePlotlyFigure(item?.payload?.figure ?? item?.payload)
+          if (!figure) return null
+          return {
+            name: String(item?.display_name || item?.logical_name || 'figure'),
+            origin: 'ai',
+            runId: String(response?.run_id || ''),
+            artifact_id: item?.artifact_id || null,
+            logical_name: item?.logical_name || undefined,
+            display_name: item?.display_name || undefined,
+            created_at: String(item?.created_at || ''),
+            data: figure,
+          }
+        })
+        .filter(Boolean)
+      const scalarArtifacts = artifactItems
+        .filter((item) => String(item?.kind || '') === 'scalar')
+        .map((item) => {
+          const payload = item?.payload && typeof item.payload === 'object' && !Array.isArray(item.payload) ? item.payload : {}
+          const hasPayloadValue = Object.prototype.hasOwnProperty.call(payload, 'value')
+          const value = hasPayloadValue ? payload.value : item?.payload
+          return {
+            name: String(item?.display_name || item?.logical_name || item?.name || 'scalar'),
+            origin: 'ai',
+            runId: String(response?.run_id || ''),
+            artifact_id: item?.artifact_id || null,
+            logical_name: item?.logical_name || undefined,
+            display_name: item?.display_name || undefined,
+            created_at: String(item?.created_at || ''),
+            value,
+            display_value: scalarDisplayValue(value),
+            result_type: String(payload?.type || typeof value),
+          }
+        })
+
+      finalStatePatch.dataframes = dataframeArtifacts
+      finalStatePatch.figures = figureArtifacts
+      finalStatePatch.scalars = inlineScalarResult ? [...scalarArtifacts, inlineScalarResult] : scalarArtifacts
+      finalStatePatch.figureCount = figureArtifacts.length
+      if (figureArtifacts.length > 0) {
+        finalStatePatch.plotlyFigure = figureArtifacts[0].data
+        applyConversationResultState(requestConversationId, finalStatePatch, { hasFigures: true })
+      } else if (dataframeArtifacts.length > 0) {
+        finalStatePatch.resultData = dataframeArtifacts[0].data
+        applyConversationResultState(requestConversationId, finalStatePatch, { hasDataframes: true })
+      } else if (scalarArtifacts.length > 0 || inlineScalarResult) {
+        applyConversationResultState(requestConversationId, finalStatePatch)
+      } else if (artifactItems.length > 0) {
+        applyConversationResultState(requestConversationId, finalStatePatch)
+      }
+    } else {
+      if (inlineScalarResult) {
+        finalStatePatch.scalars = [inlineScalarResult]
+        applyConversationResultState(requestConversationId, finalStatePatch)
+      } else if (Object.keys(finalStatePatch).length > 0) {
+        applyConversationResultState(requestConversationId, finalStatePatch)
+      }
+    }
+
+    setTimeout(() => {
+      const scrollableContainer = document.querySelector('[data-chat-scroll-container]')
+      if (scrollableContainer) {
+        scrollableContainer.scrollTop = scrollableContainer.scrollHeight
+      }
+    }, 200)
+
+  } catch (error) {
+    console.error('Analysis failed:', error)
+
+    if (warningTimer) clearTimeout(warningTimer)
+    if (cancelTimer) clearTimeout(cancelTimer)
+
+    let errorTitle = 'Analysis Failed'
+    let errorMessage = 'Failed to generate code. Please try again.'
+    const status = Number(error?.response?.status ?? error?.status ?? 0)
+    const backendDetail = extractApiErrorMessage(error, '')
+
+    if (error.name === 'AbortError' || signal.aborted) {
+      if (stoppedConversationIds.value.has(requestConversationId)) {
+        errorTitle = 'Generation Stopped'
+        errorMessage = 'Response generation was stopped.'
+        operationStatus = 'failed'
+        operationMessage = errorMessage
+        appStore.markLastMessageStreamStopped(errorMessage, localMessageId, { conversationId: requestConversationId })
+        toast.error(errorTitle, errorMessage)
+        return
+      } else {
+        errorTitle = 'Request Cancelled'
+        errorMessage = 'Your query was cancelled due to timeout.'
+      }
+    } else if (status === 400) {
+      errorTitle = 'Invalid Request'
+      errorMessage = backendDetail || 'The request is invalid. Please review your dataset and schema setup.'
+    } else if (status === 401) {
+      errorTitle = 'Authentication Error'
+      errorMessage = backendDetail || 'Please check your API key and try again.'
+    } else if (status === 403) {
+      errorTitle = 'Access Denied'
+      errorMessage = backendDetail || 'You do not have permission to perform this action.'
+    } else if (status === 429) {
+      errorTitle = 'Rate Limit Exceeded'
+      errorMessage = backendDetail || 'Too many requests. Please wait a moment and try again.'
+    } else if (status >= 500) {
+      errorTitle = 'Backend Error'
+      errorMessage = backendDetail || 'The server encountered an error. Please try again later.'
+    } else if (error.code === 'NETWORK_ERROR' || !navigator.onLine) {
+      errorTitle = 'Network Error'
+      errorMessage = 'Unable to connect to the server. Please check your internet connection.'
+    } else if (backendDetail) {
+      errorMessage = backendDetail
+    }
+
+    operationStatus = 'failed'
+    operationMessage = errorMessage
+    toast.error(
+      errorTitle,
+      errorMessage,
+      7000,
+      {
+        source: status > 0 ? 'Backend' : 'Frontend',
+        statusCode: status || null,
+        category: 'llm_api',
+      },
+    )
+    applyConversationResultState(requestConversationId, { terminalOutput: `Error: ${errorMessage}` })
+    appStore.updateLastMessageExplanation(errorMessage, localMessageId, { conversationId: requestConversationId })
+    if (attachmentsPayload.length > 0) {
+      pendingAttachments.value = attachmentsPayload.map((item) => ({
+        ...item,
+        preview_url: `data:${item.media_type};base64,${item.data_base64}`,
+        size: 0,
+      }))
+    }
+  } finally {
+    if (warningTimer) clearTimeout(warningTimer)
+    if (cancelTimer) clearTimeout(cancelTimer)
+    await refreshRuntimeStatusAfterExplicitWork(appStore.activeWorkspaceId)
+    const nextStopped = new Set(stoppedConversationIds.value)
+    nextStopped.delete(requestConversationId)
+    stoppedConversationIds.value = nextStopped
+    appStore.clearConversationRun(requestConversationId)
+    appStore.finishBackgroundOperation(operationId, {
+      status: operationStatus,
+      title: operationStatus === 'failed' ? 'Chat response failed' : 'Chat response complete',
+      message: operationMessage,
+    })
+  }
+}
+
+function handleNewLine(event) {
+  const textarea = event.target
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+
+  question.value = question.value.substring(0, start) + '\n' + question.value.substring(end)
+
+  setTimeout(() => {
+    textarea.selectionStart = textarea.selectionEnd = start + 1
+  }, 0)
+}
+
+onMounted(() => {
+  initializeVoiceInput()
+  window.addEventListener('resize', updateSuggestionPlacement)
+})
+
+onUnmounted(() => {
+  if (isVoiceInputActive.value) {
+    stopVoiceInput()
+  }
+  window.removeEventListener('resize', updateSuggestionPlacement)
+})
+
+watch(() => appStore.activeWorkspaceId, () => {
+  clearSuggestions()
+})
+
+watch(() => appStore.ingestedTableName, () => {
+  void updateAutocompleteSuggestions()
+})
+
+watch(() => appStore.ingestedColumns, () => {
+  void updateAutocompleteSuggestions()
+}, { deep: true })
+</script>
+
+<style scoped>
+.voice-input-pulse {
+  animation: voice-pulse 1.4s infinite ease-in-out;
+  background-color: var(--color-accent) !important;
+  color: var(--color-on-accent) !important;
+}
+
+@keyframes voice-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 65%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-accent) 0%, transparent);
+  }
+}
+</style>

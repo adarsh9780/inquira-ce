@@ -1,0 +1,51 @@
+<template>
+  <div
+    v-if="items.length > 0"
+    class="motion-popover-surface absolute left-0 right-0 z-[70] max-h-56 w-full overflow-y-auto rounded-xl border shadow-lg suggestions-glass"
+    :class="openUp ? 'motion-popover-from-bottom bottom-full mb-2' : 'top-full mt-1'"
+    style="border-color: var(--color-border);"
+  >
+    <ul class="py-1">
+      <li
+        v-for="(item, index) in items"
+        :key="`${item.table_name}.${item.column_name}:${index}`"
+      >
+        <button
+          type="button"
+          class="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors"
+          :class="index === selectedIndex ? 'bg-[var(--color-selected-surface)]' : 'hover:bg-[var(--color-surface-subtle)]'"
+          @mousedown.prevent="$emit('select', item)"
+        >
+          <span
+            class="truncate"
+            :style="item?.isSpecial ? 'color: var(--color-info);' : 'color: var(--color-text-main);'"
+          >
+            {{ item.displayText || `${item.table_name}.${item.column_name}` }}
+          </span>
+          <span class="ml-2 rounded border px-1.5 py-0.5 text-[10px] uppercase" style="color: var(--color-text-muted); border-color: var(--color-border);">
+            {{ item.dtype || 'UNKNOWN' }}
+          </span>
+        </button>
+      </li>
+    </ul>
+  </div>
+</template>
+
+<script setup>
+defineProps({
+  items: {
+    type: Array,
+    default: () => [],
+  },
+  selectedIndex: {
+    type: Number,
+    default: 0,
+  },
+  openUp: {
+    type: Boolean,
+    default: false,
+  },
+})
+
+defineEmits(['select'])
+</script>

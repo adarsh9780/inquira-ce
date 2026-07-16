@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inquira</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --color-base: #FBF8F2;
+        --color-text-main: #1E2430;
+        --color-text-muted: #6D726F;
+        --color-border: #DED5C8;
+        --color-accent: #B86A3D;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        font-family: "Manrope", "Avenir Next", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--color-base);
+        color: var(--color-text-main);
+      }
+
+      .shell {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px;
+      }
+
+      .logo {
+        width: 64px;
+        height: 64px;
+        margin-bottom: 30px;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 30px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+
+      .subtitle {
+        margin: 12px 0 0;
+        max-width: 560px;
+        font-size: 14px;
+        line-height: 1.45;
+        color: var(--color-text-muted);
+      }
+
+      .progress {
+        margin-top: 40px;
+        width: min(100%, 448px);
+      }
+
+      .progress-track {
+        height: 1px;
+        width: 100%;
+        overflow: hidden;
+        background: var(--color-border);
+      }
+
+      .progress-fill {
+        display: block;
+        height: 100%;
+        width: 38%;
+        background: var(--color-accent);
+        animation: sweep 1.35s ease-in-out infinite;
+      }
+
+      .status {
+        margin-top: 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--color-text-muted);
+        animation: pulse 1s ease-in-out infinite;
+      }
+
+      .status-label {
+        font-size: 11px;
+        color: var(--color-text-muted);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      @keyframes sweep {
+        0% {
+          transform: translateX(-110%);
+        }
+        100% {
+          transform: translateX(280%);
+        }
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 0.4;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.08);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <img class="logo" src="/favicon.svg" alt="Inquira logo" />
+      <h1 class="title">Starting Inquira.</h1>
+      <p class="subtitle">
+        Launching desktop services and verifying backend APIs are healthy before opening the app shell.
+      </p>
+      <section class="progress" aria-hidden="true">
+        <div class="progress-track">
+          <span class="progress-fill"></span>
+        </div>
+        <div class="status">
+          <span class="dot"></span>
+          <span class="status-label">Starting</span>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

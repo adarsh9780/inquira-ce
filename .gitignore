@@ -1,0 +1,8 @@
+build/bin
+frontend/dist
+frontend/node_modules
+frontend/test-results
+frontend/wailsjs
+internal/runtimeprovision/assets/manifest.json
+internal/runtimeprovision/assets/uv
+internal/runtimeprovision/assets/uv.exe

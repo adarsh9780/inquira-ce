@@ -1,0 +1,41 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+test('app registers global shortcuts for command palette, sidebar, settings, and terminal', () => {
+  const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
+  const shortcutsSource = readFileSync(resolve(process.cwd(), 'src/utils/keyboardShortcuts.js'), 'utf-8')
+
+  assert.equal(appSource.includes('function handleGlobalShortcuts(event) {'), true)
+  assert.equal(appSource.includes('const hasPrimaryModifier = event.metaKey || event.ctrlKey'), true)
+  assert.equal(appSource.includes("import { matchShortcut } from './utils/keyboardShortcuts'"), true)
+  assert.equal(appSource.includes('resolveWorkspaceLayoutShortcut'), false)
+  assert.equal(appSource.includes('appStore.setWorkspaceLayoutMode'), false)
+  assert.equal(appSource.includes("matchShortcut(event, 'conversation-tree')"), true)
+  assert.equal(appSource.includes("matchShortcut(event, 'schema')"), true)
+  assert.equal(appSource.includes("matchShortcut(event, 'keyboard-shortcuts')"), false)
+  assert.equal(appSource.includes("matchShortcut(event, 'settings')"), true)
+  assert.equal(appSource.includes("matchShortcut(event, 'sidebar')"), true)
+  assert.equal(appSource.includes("matchShortcut(event, 'dataset-import')"), true)
+  assert.equal(appSource.includes("matchShortcut(event, 'command-palette')"), true)
+  assert.equal(appSource.includes("matchShortcut(event, 'terminal')"), true)
+  assert.equal(appSource.includes("matchShortcut(event, 'layout-cycle')"), false)
+  assert.equal(appSource.includes("appStore.setActiveTab('conversation-tree')"), true)
+  assert.equal(appSource.includes("appStore.setActiveTab('schema-editor')"), true)
+  assert.equal(appSource.includes("appStore.openSettings('setup')"), true)
+  assert.equal(appSource.includes('appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)'), true)
+  assert.equal(appSource.includes('appStore.openKeyboardShortcuts()'), false)
+  assert.equal(appSource.includes('<KeyboardShortcutsModal'), true)
+  assert.equal(appSource.includes('appStore.toggleCommandPalette()'), true)
+  assert.equal(appSource.includes('CommandPaletteModal'), true)
+  assert.equal(appSource.includes('appStore.toggleTerminal()'), true)
+  assert.equal(appSource.includes("window.addEventListener('inquira:open-dataset-picker', handleOpenDatasetPickerRequest)"), true)
+  assert.equal(shortcutsSource.includes("{ id: 'command-palette', category: 'Workspace', label: 'Open Command Palette', keys: ['mod', 'k']"), true)
+  assert.equal(shortcutsSource.includes("{ id: 'sidebar', category: 'Workspace', label: 'Toggle Sidebar', keys: ['mod', 'b']"), true)
+  assert.equal(shortcutsSource.includes("{ id: 'settings', category: 'Navigation', label: 'Open Settings', keys: ['mod', ',']"), true)
+  assert.equal(shortcutsSource.includes("id: 'keyboard-shortcuts'"), false)
+  assert.equal(appSource.includes('appStore.cycleWorkspaceLayoutMode()'), false)
+  assert.equal(appSource.includes("document.addEventListener('keydown', handleGlobalShortcuts)"), true)
+  assert.equal(appSource.includes("document.removeEventListener('keydown', handleGlobalShortcuts)"), true)
+})

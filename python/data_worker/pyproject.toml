@@ -1,0 +1,12 @@
+[project]
+name = "inquira-data-worker"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[project.scripts]
+inquira-data-worker = "inquira_data_worker.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

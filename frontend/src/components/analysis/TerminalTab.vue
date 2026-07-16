@@ -1,0 +1,324 @@
+<template>
+  <div class="flex h-full flex-col overflow-hidden" style="background-color: var(--color-base);">
+    <!-- Terminal Header (Teleported to RightPanel) -->
+    <Teleport to="#terminal-toolbar" v-if="isMounted && !(useTauriPty && appStore.terminalConsentGranted)">
+      <div class="flex items-center gap-1.5 text-[10px]" style="color: var(--color-text-muted);">
+        <span class="rounded px-1.5 py-0.5 font-medium" style="background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent); color: var(--color-text-main);">{{ shellLabel }}</span>
+        <span class="hidden md:inline font-mono truncate max-w-[150px]" :title="displayCwd">cwd: {{ displayCwd }}</span>
+      </div>
+    </Teleport>
+
+    <div v-if="!appStore.terminalConsentGranted" class="flex-1 p-5">
+      <div class="mx-auto max-w-xl rounded-lg border border-[var(--color-accent-border)] bg-[var(--color-warning-bg)] p-4 text-sm text-[var(--color-warning-text)]">
+        <p class="font-semibold">Local terminal access</p>
+        <p class="mt-2">Commands here run on your machine with your user permissions in the active workspace context. Terminal execution is not sandboxed.</p>
+        <p class="mt-1">Consent is required before terminal use and is remembered for your account.</p>
+        <p class="mt-1 text-xs">Some commands may be blocked by terminal security policy.</p>
+        <button
+          class="mt-4 rounded bg-[var(--color-warning)] px-3 py-2 text-sm font-medium text-[var(--color-on-accent)] hover:opacity-90"
+          @click="grantConsent"
+        >
+          Enable terminal
+        </button>
+      </div>
+    </div>
+
+    <template v-else-if="useTauriPty">
+      <TauriTerminalPane />
+    </template>
+
+    <template v-else>
+      <div
+        ref="scrollRef"
+        class="terminal-shell min-h-0 flex-1 overflow-y-auto p-4 font-mono text-sm"
+        style="background-color: var(--color-base); color: var(--color-text-main);"
+        @click="focusCommandInput"
+      >
+        <div class="mb-2" style="color: var(--color-text-muted);">
+          Terminal ready.
+          <span style="color: var(--color-text-main);">Enter</span> to run,
+          <span style="color: var(--color-text-main);">↑/↓</span> for history.
+        </div>
+
+        <div v-for="(entry, idx) in entries" :key="idx" class="mb-3">
+          <template v-if="entry.kind !== 'output'">
+            <div class="flex items-center gap-2">
+              <span class="text-[var(--color-success)]">{{ promptPrefix }}</span>
+              <span class="text-[var(--color-info)]">{{ entry.command }}</span>
+            </div>
+            <pre v-if="entry.stdout" class="whitespace-pre-wrap break-words">{{ entry.stdout }}</pre>
+            <pre v-if="entry.stderr" class="whitespace-pre-wrap break-words text-[var(--color-danger-text)]">{{ entry.stderr }}</pre>
+            <div class="text-xs" :class="entry.exitCode === 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-warning-text)]'">
+              exit {{ entry.exitCode }}
+            </div>
+          </template>
+          <template v-else>
+            <div class="text-xs uppercase tracking-wide" style="color: var(--color-text-muted);">{{ entry.label || 'Output' }}</div>
+            <pre v-if="entry.stdout" class="whitespace-pre-wrap break-words">{{ entry.stdout }}</pre>
+            <pre v-if="entry.stderr" class="whitespace-pre-wrap break-words text-[var(--color-danger-text)]">{{ entry.stderr }}</pre>
+          </template>
+        </div>
+
+        <div v-if="isRunning && liveCommand" class="mb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-[var(--color-success)]">{{ promptPrefix }}</span>
+            <span class="text-[var(--color-info)]">{{ liveCommand }}</span>
+          </div>
+          <pre v-if="liveStdout" class="whitespace-pre-wrap break-words">{{ liveStdout }}</pre>
+          <pre v-if="liveStderr" class="whitespace-pre-wrap break-words text-[var(--color-danger-text)]">{{ liveStderr }}</pre>
+          <div class="text-xs text-[var(--color-warning-text)]">running...</div>
+        </div>
+
+        <form class="mt-2 pt-3" style="border-top: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);" @submit.prevent="runCommand">
+          <div class="flex items-center gap-2">
+            <span class="text-[var(--color-success)]">{{ promptPrefix }}</span>
+            <input
+              ref="commandInputRef"
+              v-model="command"
+              type="text"
+              class="w-full bg-transparent outline-none placeholder:text-[var(--color-text-muted)]"
+              style="color: var(--color-text-main); caret-color: var(--color-accent);"
+              placeholder="type command..."
+              autocomplete="off"
+              spellcheck="false"
+              :disabled="isRunning || !appStore.activeWorkspaceId"
+              @keydown="handleInputKeydown"
+            />
+          </div>
+        </form>
+      </div>
+
+      <div class="px-3 py-2" style="background-color: color-mix(in srgb, var(--color-surface) 60%, var(--color-base) 40%);">
+        <div class="flex items-center justify-between text-xs" style="color: var(--color-text-muted);">
+          <span>Shell: {{ shellLabel }}</span>
+          <div class="flex items-center gap-2">
+            <button
+              class="btn-icon h-7 w-7 p-1.5 rounded-md"
+              style="color: var(--color-text-muted);"
+              title="Reset terminal session"
+              aria-label="Reset terminal session"
+              @click="resetSession"
+            >
+              <ArrowPathIcon class="h-4 w-4" />
+            </button>
+            <button
+              class="btn-icon h-7 w-7 p-1.5 rounded-md"
+              style="color: var(--color-text-muted);"
+              title="Clear terminal output"
+              aria-label="Clear terminal output"
+              @click="clearTerminal"
+            >
+              <TrashIcon class="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+</template>
+
+<script setup>
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { ArrowPathIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { useAppStore } from '../../stores/appStore'
+import apiService from '../../services/apiService'
+import { toast } from '../../composables/useToast'
+import TauriTerminalPane from './TauriTerminalPane.vue'
+import { filenameFromPath } from '../../utils/pathUtils'
+
+const appStore = useAppStore()
+const isMounted = ref(false)
+
+const command = ref('')
+const entries = computed(() => appStore.terminalEntries || [])
+const isRunning = ref(false)
+const scrollRef = ref(null)
+const shell = ref('')
+const liveCommand = ref('')
+const liveStdout = ref('')
+const liveStderr = ref('')
+const commandInputRef = ref(null)
+const commandHistory = ref([])
+const commandHistoryIndex = ref(-1)
+const useTauriPty = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
+
+const displayCwd = computed(() => appStore.terminalCwd || 'n/a')
+const promptPrefix = computed(() => `${filenameFromPath(displayCwd.value, '~')} $`)
+const shellLabel = computed(() => {
+  if (shell.value) return shell.value
+  const p = navigator.platform.toLowerCase()
+  if (p.includes('win')) return 'PowerShell/cmd'
+  return 'bash/sh'
+})
+
+onMounted(async () => {
+  isMounted.value = true
+  await ensureWorkspaceCwd()
+  if (!useTauriPty) {
+    focusCommandInput()
+  }
+})
+
+watch(() => appStore.activeWorkspaceId, async () => {
+  await ensureWorkspaceCwd()
+  clearTerminal()
+})
+
+async function ensureWorkspaceCwd() {
+  if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) {
+    appStore.setTerminalCwd('')
+    return
+  }
+  try {
+    const paths = await apiService.getDatabasePaths()
+    if (paths?.base_directory) {
+      appStore.setTerminalCwd(paths.base_directory)
+    }
+  } catch (_error) {
+    // Keep terminal usable even if path lookup fails.
+  }
+}
+
+function grantConsent() {
+  appStore.setTerminalConsentGranted(true)
+}
+
+function clearTerminal() {
+  appStore.clearTerminalEntries()
+  appStore.setTerminalOutput('')
+  focusCommandInput()
+}
+
+function focusCommandInput() {
+  if (!commandInputRef.value) return
+  commandInputRef.value.focus()
+}
+
+function handleInputKeydown(event) {
+  if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    if (commandHistory.value.length === 0) return
+    if (commandHistoryIndex.value < 0) {
+      commandHistoryIndex.value = commandHistory.value.length - 1
+    } else if (commandHistoryIndex.value > 0) {
+      commandHistoryIndex.value -= 1
+    }
+    command.value = commandHistory.value[commandHistoryIndex.value] || ''
+    return
+  }
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    if (commandHistory.value.length === 0 || commandHistoryIndex.value < 0) return
+    if (commandHistoryIndex.value < commandHistory.value.length - 1) {
+      commandHistoryIndex.value += 1
+      command.value = commandHistory.value[commandHistoryIndex.value] || ''
+      return
+    }
+    commandHistoryIndex.value = -1
+    command.value = ''
+  }
+}
+
+async function runCommand() {
+  const raw = command.value.trim()
+  if (!raw || !appStore.activeWorkspaceId || isRunning.value) return
+
+  isRunning.value = true
+  commandHistory.value.push(raw)
+  commandHistoryIndex.value = -1
+  liveCommand.value = raw
+  liveStdout.value = ''
+  liveStderr.value = ''
+  try {
+    const payload = await apiService.executeTerminalCommandStream(
+      appStore.activeWorkspaceId,
+      {
+        command: raw,
+        cwd: appStore.terminalCwd || null,
+        timeout: 180,
+      },
+      {
+        onEvent: async (evt) => {
+          if (evt?.event === 'output') {
+            const line = String(evt?.data?.line || '')
+            if (line) {
+              liveStdout.value = liveStdout.value ? `${liveStdout.value}\n${line}` : line
+              await nextTick()
+              if (scrollRef.value) {
+                scrollRef.value.scrollTop = scrollRef.value.scrollHeight
+              }
+            }
+          } else if (evt?.event === 'error') {
+            const detail = String(evt?.data?.detail || '')
+            if (detail) {
+              liveStderr.value = detail
+            }
+          }
+        },
+      },
+    )
+    shell.value = payload?.shell || shell.value
+    if (payload?.cwd) appStore.setTerminalCwd(payload.cwd)
+
+    appStore.appendTerminalEntry({
+      kind: 'command',
+      source: 'terminal',
+      command: raw,
+      stdout: payload?.stdout || liveStdout.value || '',
+      stderr: payload?.stderr || liveStderr.value || '',
+      exitCode: Number.isInteger(payload?.exit_code) ? payload.exit_code : 1,
+    })
+
+    appStore.setTerminalOutput([
+      payload?.stdout || liveStdout.value || '',
+      payload?.stderr || liveStderr.value || '',
+    ].filter(Boolean).join('\n'))
+    command.value = ''
+    liveCommand.value = ''
+    liveStdout.value = ''
+    liveStderr.value = ''
+
+    await nextTick()
+    if (scrollRef.value) {
+      scrollRef.value.scrollTop = scrollRef.value.scrollHeight
+    }
+    focusCommandInput()
+  } catch (error) {
+    const message = error?.message || 'Terminal execution failed.'
+    appStore.appendTerminalEntry({
+      kind: 'command',
+      source: 'terminal',
+      command: raw,
+      stdout: '',
+      stderr: message,
+      exitCode: 1,
+    })
+    appStore.setTerminalOutput(message)
+    toast.error('Terminal command failed', message)
+  } finally {
+    liveCommand.value = ''
+    liveStdout.value = ''
+    liveStderr.value = ''
+    isRunning.value = false
+    focusCommandInput()
+  }
+}
+
+async function resetSession() {
+  if (!appStore.activeWorkspaceId) return
+  try {
+    await apiService.resetTerminalSession(appStore.activeWorkspaceId)
+    appStore.clearTerminalEntries()
+    shell.value = ''
+    await ensureWorkspaceCwd()
+    commandHistory.value = []
+    commandHistoryIndex.value = -1
+    command.value = ''
+    focusCommandInput()
+    toast.success('Terminal session reset', 'Started a fresh shell for this workspace.')
+  } catch (error) {
+    const message = error?.message || 'Failed to reset terminal session.'
+    toast.error('Terminal reset failed', message)
+  }
+}
+</script>

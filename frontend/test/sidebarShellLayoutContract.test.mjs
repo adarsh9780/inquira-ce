@@ -1,0 +1,64 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+test('app shell owns sidebar rail sizing while UnifiedSidebar fills the provided space', () => {
+  const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
+  const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
+
+  assert.equal(appSource.includes('class="h-full shrink-0 app-nav-pane"'), true)
+  assert.equal(appSource.includes("'app-nav-pane-collapsed': appStore.isSidebarCollapsed"), true)
+  assert.equal(appSource.includes('app-nav-pane-hidden'), false)
+  assert.equal(appSource.includes('.app-nav-pane {'), true)
+  assert.equal(appSource.includes('width: 244px;'), true)
+  assert.equal(appSource.includes('.app-nav-pane-collapsed {'), true)
+  assert.equal(appSource.includes('width: 52px;'), true)
+
+  assert.equal(
+    sidebarSource.includes('class="relative z-40 flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden sidebar-root"'),
+    true,
+  )
+  assert.equal(sidebarSource.includes("'w-[244px]'"), false)
+  assert.equal(sidebarSource.includes("'w-[52px]'"), false)
+  assert.equal(sidebarSource.includes('transition-[width]'), false)
+})
+
+test('workspace shell owns pane sizing while child panes stay fluid', () => {
+  const panelSource = readFileSync(resolve(process.cwd(), 'src/components/layout/RightPanel.vue'), 'utf-8')
+  const leftPaneSource = readFileSync(resolve(process.cwd(), 'src/components/layout/WorkspaceLeftPane.vue'), 'utf-8')
+  const rightPaneSource = readFileSync(resolve(process.cwd(), 'src/components/layout/WorkspaceRightPane.vue'), 'utf-8')
+
+  assert.equal(
+    panelSource.includes(`class="flex h-full min-w-0 flex-col border-r workspace-center-pane"`),
+    true,
+  )
+  assert.equal(
+    panelSource.includes(`width: isCompactLayout ? '100%' : leftPaneWidth + '%'`),
+    true,
+  )
+  assert.equal(
+    panelSource.includes(`class="flex h-full min-w-0 flex-col overflow-hidden workspace-data-pane"`),
+    true,
+  )
+  assert.equal(
+    panelSource.includes("width: isCompactLayout ? '100%' : `${rightPaneWidth}%`"),
+    true,
+  )
+  assert.equal(panelSource.includes('v-if="appStore.showLeftPane"'), false)
+  assert.equal(panelSource.includes(':aria-hidden="!appStore.showRightPane"'), false)
+
+  assert.equal(
+    leftPaneSource.includes('class="flex h-full w-full min-h-0 min-w-0 flex-col"'),
+    true,
+  )
+  assert.equal(leftPaneSource.includes('leftPaneWidth +'), false)
+  assert.equal(leftPaneSource.includes('class="flex h-full flex-col"'), false)
+
+  assert.equal(
+    rightPaneSource.includes('class="flex h-full w-full min-h-0 min-w-0 flex-col"'),
+    true,
+  )
+  assert.equal(rightPaneSource.includes('rightPaneWidth +'), false)
+  assert.equal(rightPaneSource.includes('class="flex h-full flex-col"'), false)
+})

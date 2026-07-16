@@ -1,0 +1,27 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { existsSync, readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+test('chat tab uses compact header controls without history modal', () => {
+  const componentPath = resolve(process.cwd(), 'src/components/chat/ChatTab.vue')
+  const obsoleteHistoryModalPath = resolve(process.cwd(), 'src/components/chat/ConversationHistoryModal.vue')
+  const source = readFileSync(componentPath, 'utf-8')
+
+  assert.equal(existsSync(obsoleteHistoryModalPath), false)
+  assert.equal(source.includes('ConversationHistoryModal'), false)
+  assert.equal(source.includes('title="Conversation history"'), false)
+  assert.equal(source.includes('title="New Conversation"'), false)
+  assert.equal(source.includes('PlusIcon'), false)
+  assert.equal(source.includes('title="Clear Conversation"'), false)
+  assert.equal(source.includes('clearConversation'), false)
+  assert.equal(source.includes('title="Delete Conversation"'), false)
+  assert.equal(source.includes('<h3 class="text-sm font-semibold text-gray-700">Conversations</h3>'), false)
+  assert.equal(source.includes('flex flex-wrap items-center'), false)
+  assert.equal(source.includes('overflow-x-auto'), false)
+  assert.equal(source.includes('class="min-w-0 truncate text-sm font-bold text-gray-900'), false)
+  assert.equal(source.includes('data-chat-scroll-container'), true)
+  assert.equal(source.includes('class="chat-scroll-shell flex-1 min-h-0 overflow-y-auto"'), true)
+  assert.equal(source.includes('.chat-scroll-shell::-webkit-scrollbar {'), true)
+  assert.equal(source.includes('width: 6px;'), true)
+})

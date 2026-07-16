@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inquira Terms &amp; Conditions</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-color: #ffffff;
+      color: #18181b;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: inherit;
+      color: inherit;
+    }
+
+    .layout {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 4rem;
+      line-height: 1.7;
+    }
+
+    .card {
+      background-color: #ffffff;
+      border: 1px solid #e4e4e7;
+      border-radius: 1.5rem;
+      box-shadow: 0 18px 48px rgba(24, 24, 27, 0.08);
+      padding: 2.5rem;
+    }
+
+    h1, h2 {
+      color: #18181b;
+      line-height: 1.25;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 4vw, 2.8rem);
+      margin-top: 0;
+    }
+
+    h2 {
+      font-size: clamp(1.35rem, 3vw, 1.8rem);
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    p, ul {
+      margin-bottom: 1rem;
+    }
+
+    ul {
+      padding-left: 1.35rem;
+    }
+
+    li {
+      margin-bottom: 0.45rem;
+    }
+
+    code {
+      background: #f4f4f5;
+      padding: 0.15rem 0.35rem;
+      border-radius: 0.35rem;
+      font-size: 0.95rem;
+    }
+
+    .meta {
+      color: #52525b;
+      margin-bottom: 2rem;
+    }
+
+    @media (max-width: 640px) {
+      .layout {
+        padding: 2rem 1rem 3rem;
+      }
+
+      .card {
+        padding: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="layout">
+    <article class="card">
+      <h1>Inquira Terms &amp; Conditions</h1>
+      <p class="meta">Last Updated: 2026-06-07</p>
+
+      <p>
+        These Terms &amp; Conditions explain what Inquira does today, what it does not promise, and what risks you accept when using it.
+      </p>
+
+      <h2>1. What Inquira Is</h2>
+      <ul>
+        <li>Inquira is a desktop-first data analysis product that helps generate and run Python/DuckDB workflows.</li>
+        <li>It can use a third-party AI provider selected by you to generate or explain analysis.</li>
+        <li>The public website currently provides documentation and downloads, not a full hosted account portal.</li>
+      </ul>
+
+      <h2>2. What We Do Not Promise</h2>
+      <ul>
+        <li>We do not claim perfect accuracy.</li>
+        <li>We do not claim generated code is always safe.</li>
+        <li>We do not claim third-party providers will handle your data in any specific way beyond those providers' own policies.</li>
+        <li>We do not claim that every planned auth, billing, or account-management feature already exists in the current product.</li>
+      </ul>
+
+      <h2>3. Main Risks</h2>
+      <ul>
+        <li>Generated Python, manually entered Python, and terminal commands run locally with your operating-system user permissions.</li>
+        <li>Execution is not sandboxed. Code and commands can access files, processes, network resources, environment information, and memory available to your user account.</li>
+        <li>Timeouts, output bounds, workspace organization, prompts, and policy checks reduce some risks but are not a security boundary.</li>
+        <li>Wrong code or wrong model output can produce wrong analysis, wrong business conclusions, or data loss.</li>
+        <li>You are responsible for reviewing code before execution and maintaining your own backups.</li>
+      </ul>
+
+      <h2>4. Data Storage and Ownership</h2>
+      <ul>
+        <li>Your files, questions, generated schema, runtime outputs, and related project artifacts are primarily stored on your device.</li>
+        <li>Inquira does not upload your full selected data files by default.</li>
+        <li>You remain the owner and responsible party for your data and outputs.</li>
+      </ul>
+
+      <p>Typical local paths include <code>~/.inquira/</code>, the app's local application-data directory, and per-user or per-workspace runtime folders created by the product.</p>
+
+      <h2>5. Authentication and Account State</h2>
+      <ul>
+        <li>Inquira CE runs in local workspace mode without account sign-in.</li>
+        <li>Account sign-in, cloud sync, hosted account management, and paid plan gates are not included in this open-source build.</li>
+        <li>If you use a separate paid edition, that edition may provide its own account system under its own configuration and terms.</li>
+      </ul>
+
+      <h2>6. What Is Sent to AI Providers</h2>
+      <p>You choose the AI provider and are responsible for what you send.</p>
+      <ul>
+        <li>your prompt or question</li>
+        <li>schema context needed to generate code</li>
+        <li>execution context or result summaries needed for follow-up explanation</li>
+        <li>system or developer instruction text needed to run the workflow</li>
+      </ul>
+
+      <p>The model is not intended to receive your full raw dataset by default, but you are responsible for reviewing prompts and outputs to ensure sensitive content is not sent unintentionally.</p>
+
+      <h2>7. Secrets and Session Storage</h2>
+      <ul>
+        <li>AI provider API keys may be stored through the host OS keychain where supported by the app's secure-storage path.</li>
+        <li>Current desktop auth session persistence is handled through local app storage rather than the OS keychain.</li>
+      </ul>
+
+      <h2>8. License Scope</h2>
+      <p>Use of Inquira remains subject to the repository license and any separate commercial licensing terms that may apply. These Terms do not grant rights beyond the applicable software license.</p>
+
+      <h2>9. Warranty Disclaimer</h2>
+      <p>INQUIRA IS PROVIDED "AS IS" WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED. YOU USE IT AT YOUR OWN RISK.</p>
+
+      <h2>10. Limitation of Liability</h2>
+      <p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE AUTHORS OR OPERATORS ARE NOT LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR SIMILAR DAMAGES ARISING FROM USE OF INQUIRA.</p>
+
+      <h2>11. Changes to Terms</h2>
+      <p>We may update these Terms. The "Last Updated" date will reflect the latest version.</p>
+
+      <h2>12. Contact</h2>
+      <p>For issues or questions, please open an issue in the repository or consult the project README.</p>
+    </article>
+  </main>
+</body>
+</html>

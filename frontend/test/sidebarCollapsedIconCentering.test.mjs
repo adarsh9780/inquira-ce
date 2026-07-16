@@ -1,0 +1,55 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+test('collapsed sidebar relies on app-shell width and visually hidden label copy', () => {
+  const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
+  const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
+
+  assert.equal(appSource.includes('width: 52px;'), true)
+  assert.equal(sidebarSource.includes("max-w-0 opacity-0 ml-0"), true)
+  assert.equal(sidebarSource.includes("'max-w-[176px] opacity-100 ml-2.5'"), true)
+})
+
+test('collapsed sidebar rows keep a stable fixed-size icon rail', () => {
+  const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
+  const styleSource = readFileSync(resolve(process.cwd(), 'src/style.css'), 'utf-8')
+
+  assert.ok(sidebarSource.includes('class="sidebar-nav-row sidebar-primary-row justify-start px-2.5"'))
+  assert.ok(sidebarSource.includes('class="sidebar-workspace-row justify-start px-2.5"'))
+  assert.ok(sidebarSource.includes("'sidebar-root-collapsed': appStore.isSidebarCollapsed"))
+  assert.ok(sidebarSource.includes('.sidebar-root-collapsed .sidebar-nav-row'))
+  assert.ok(sidebarSource.includes('.sidebar-root-collapsed .sidebar-workspace-row'))
+  assert.ok(sidebarSource.includes('width: var(--size-sidebar-rail-control);'))
+  assert.ok(sidebarSource.includes('justify-content: center;'))
+  assert.ok(sidebarSource.includes('padding-inline: 0 !important;'))
+  assert.ok(sidebarSource.includes('.sidebar-root-collapsed .sidebar-tools'))
+  assert.ok(sidebarSource.includes('class="sidebar-tools shrink-0 px-0.5 pb-1"'))
+  assert.ok(sidebarSource.includes('.sidebar-row-icon'))
+  assert.ok(sidebarSource.includes('height: calc(var(--size-sidebar-inline-icon) + 0.5rem);'))
+  assert.ok(sidebarSource.includes('width: calc(var(--size-sidebar-inline-icon) + 0.5rem);'))
+  assert.ok(sidebarSource.includes('height: var(--size-sidebar-row-height);'))
+  assert.ok(styleSource.includes('--size-sidebar-row-height: 2.125rem;'))
+  assert.ok(sidebarSource.includes('.sidebar-row-icon :deep(svg)'))
+  assert.ok(sidebarSource.includes('workspaceInitials(workspace.name)'))
+  assert.ok(sidebarSource.includes('.sidebar-workspace-initials'))
+  assert.ok(sidebarSource.includes('height: var(--size-sidebar-rail-glyph);'))
+  assert.ok(sidebarSource.includes('width: var(--size-sidebar-rail-glyph);'))
+  assert.ok(styleSource.includes('--size-sidebar-inline-icon: 1rem;'))
+  assert.ok(styleSource.includes('--size-sidebar-rail-control: 2.1875rem;'))
+  assert.ok(styleSource.includes('--size-sidebar-rail-glyph: 1.5rem;'))
+  assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'justify-center' : 'justify-start'"), false)
+  assert.equal(sidebarSource.includes('transition: all var(--motion-duration-slow) var(--motion-ease-emphasized)'), false)
+})
+
+test('conversation ellipsis menu is restored on the sidebar conversation list', () => {
+  const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
+  const rowSource = readFileSync(resolve(process.cwd(), 'src/components/layout/sidebar/SidebarConversationRow.vue'), 'utf-8')
+  const menuSource = readFileSync(resolve(process.cwd(), 'src/components/layout/sidebar/SidebarConversationActionsMenu.vue'), 'utf-8')
+
+  assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'hidden' :"), false)
+  assert.equal(sidebarSource.includes('<SidebarConversationRow'), true)
+  assert.equal(menuSource.includes('data-conversation-actions-menu'), true)
+  assert.equal(rowSource.includes('EllipsisHorizontalIcon'), true)
+})

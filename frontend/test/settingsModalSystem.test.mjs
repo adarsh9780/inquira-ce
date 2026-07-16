@@ -1,0 +1,84 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+function read(relativePath) {
+  return readFileSync(resolve(process.cwd(), relativePath), 'utf-8')
+}
+
+test('settings modal uses v-model contract and two-column panel navigation', () => {
+  const source = read('src/components/modals/SettingsModal.vue')
+
+  assert.equal(source.includes('modelValue'), true)
+  assert.equal(source.includes("defineEmits(['update:modelValue'])"), true)
+  assert.equal(source.includes('const navLevel = ref(1)'), false)
+  assert.equal(source.includes("const activeSection = ref('setup')"), true)
+  assert.equal(source.includes("const currentPanel = ref('setup')"), true)
+  assert.equal(source.includes("const panelDirection = ref('forward')"), true)
+  assert.equal(source.includes('w-[176px]'), true)
+  assert.equal(source.includes('max-w-[860px]'), true)
+  assert.equal(source.includes('max-w-[980px]'), false)
+  assert.equal(source.includes('openWorkspaceSection'), true)
+  assert.equal(source.includes('closeWorkspaceLevel'), false)
+  assert.equal(source.includes('@click="openWorkspaceSection"'), true)
+  assert.equal(source.includes('Appearance'), true)
+  assert.equal(source.includes("@click=\"openLeafSection('appearance')\""), true)
+  assert.equal(source.includes('<AppearanceTab />'), true)
+  assert.equal(source.includes("candidate === 'setup' || candidate === 'connections'"), true)
+  assert.equal(source.includes('<SetupTab />'), true)
+  assert.equal(source.includes('<span class="text-xs">›</span>'), false)
+  assert.equal(source.includes('navigateTo'), true)
+  assert.equal(source.includes("<LLMSettingsTab @close-request=\"closeModal\" />"), true)
+  assert.equal(source.includes('scrollbar-hidden absolute inset-0 overflow-y-auto'), true)
+  assert.equal(source.includes('<WorkspaceTab'), true)
+  assert.equal(source.includes('panel-mode='), false)
+  assert.equal(source.includes("panelClass('workspace')"), true)
+  assert.equal(source.includes('Active Details'), false)
+  assert.equal(source.includes('panelClass(\'account\')'), true)
+  assert.equal(source.includes("candidate === 'data' || candidate === 'models' || candidate.startsWith('workspace-')"), true)
+  assert.equal(source.includes(':initial-section="workspaceInitialSection"'), true)
+  assert.equal(source.includes("if (candidate === 'api' || candidate === 'llm') return 'connections'"), true)
+  assert.equal(source.includes('activeTab ==='), false)
+  assert.equal(source.includes("@import url('https://fonts.googleapis.com/css2?family=Ubuntu"), false)
+})
+
+test('workspace tab uses a unified active-workspace surface instead of panel or step routing', () => {
+  const tabSource = read('src/components/modals/tabs/WorkspaceTab.vue')
+
+  assert.equal(tabSource.includes('workspaceSurface'), false)
+  assert.equal(tabSource.includes('New workspace'), true)
+  assert.equal(tabSource.includes('@click="beginInlineCreate"'), true)
+  assert.equal(tabSource.includes('@click="returnToWorkspaceSummary"'), false)
+  assert.equal(tabSource.includes('max-w-[660px]'), false)
+  assert.equal(tabSource.includes('No workspaces yet'), true)
+  assert.equal(tabSource.includes('Create your first workspace'), true)
+  assert.equal(tabSource.includes('Delete workspace'), true)
+  assert.equal(tabSource.includes('data-testid="workspace-import-datasets-dropzone"'), true)
+  assert.equal(tabSource.includes('title="Remove dataset"'), true)
+  assert.equal(tabSource.includes('@click="saveWorkspaceContext"'), true)
+  assert.equal(tabSource.includes('workspace-stepper'), false)
+  assert.equal(tabSource.includes('rounded-xl border border-[var(--color-border)] bg-[var(--color-base)]'), false)
+  assert.equal(tabSource.includes('const currentStep = ref(1)'), false)
+  assert.equal(tabSource.includes('const savingStep = ref(0)'), false)
+  assert.equal(tabSource.includes("setInlineToast('Dataset added')"), false)
+})
+
+test('settings tab nested scroll containers hide scrollbars while keeping overflow active', () => {
+  const tabPaths = [
+    'src/components/modals/tabs/AccountTab.vue',
+    'src/components/modals/tabs/AppearanceTab.vue',
+    'src/components/modals/tabs/LLMSettingsTab.vue',
+    'src/components/modals/tabs/WorkspaceTab.vue',
+  ]
+
+  for (const path of tabPaths) {
+    const source = read(path)
+    assert.equal(source.includes('scrollbar-hidden'), true, `${path} should hide native scrollbars`)
+    assert.equal(source.includes('overflow-y-auto'), true, `${path} should keep scroll behavior active`)
+  }
+
+  const llmSource = read('src/components/modals/tabs/LLMSettingsTab.vue')
+  assert.equal(llmSource.includes('class="scrollbar-hidden relative h-full overflow-y-auto"'), true)
+  assert.equal(llmSource.includes(":class=\"showAdvanced ? 'scrollbar-hidden' : ''\""), false)
+})
