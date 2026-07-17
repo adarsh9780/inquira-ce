@@ -34,6 +34,7 @@ type Preferences struct {
 	PresencePenalty           float64
 	SlowRequestWarningSeconds int
 	AllowLLMDataSamples       bool
+	ModelOnboardingCompleted  bool
 	OllamaBaseURL             string
 	Catalogs                  map[string]Catalog
 }
@@ -107,6 +108,12 @@ type RefreshRequest struct {
 type VerifyResponse struct {
 	Valid bool   `json:"valid"`
 	Error string `json:"error"`
+}
+
+type OnboardingStatus struct {
+	Completed       bool   `json:"completed"`
+	ConnectionReady bool   `json:"connection_ready"`
+	Provider        string `json:"provider"`
 }
 
 type SearchResponse struct {

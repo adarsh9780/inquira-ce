@@ -76,6 +76,21 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 			return fmt.Errorf("apply settings migration: %w", err)
 		}
 	}
+	var onboardingMigrationApplied bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(
+		SELECT 1 FROM schema_migrations WHERE version = 2
+	)`).Scan(&onboardingMigrationApplied); err != nil {
+		return fmt.Errorf("inspect onboarding migration: %w", err)
+	}
+	if !onboardingMigrationApplied {
+		if _, err := tx.ExecContext(ctx, `ALTER TABLE model_preferences
+			ADD COLUMN model_onboarding_completed INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return fmt.Errorf("add model onboarding preference: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations(version) VALUES (2)`); err != nil {
+			return fmt.Errorf("record onboarding migration: %w", err)
+		}
+	}
 
 	defaults := defaultPreferences()
 	catalogs, err := json.Marshal(defaults.Catalogs)
@@ -110,14 +125,15 @@ func (r *SQLiteRepository) Load(ctx context.Context) (Preferences, error) {
 		llm_provider, selected_model, selected_lite_model, selected_coding_model,
 		llm_temperature, llm_max_tokens, llm_top_p, llm_top_k,
 		llm_frequency_penalty, llm_presence_penalty, slow_request_warning_seconds,
-		allow_llm_data_samples, ollama_base_url, provider_catalogs_json
+		allow_llm_data_samples, model_onboarding_completed, ollama_base_url, provider_catalogs_json
 		FROM model_preferences WHERE id = 1`).Scan(
 		&preferences.LLMProvider, &preferences.SelectedModel,
 		&preferences.SelectedLiteModel, &preferences.SelectedCodingModel,
 		&preferences.Temperature, &preferences.MaxTokens, &preferences.TopP,
 		&preferences.TopK, &preferences.FrequencyPenalty,
 		&preferences.PresencePenalty, &preferences.SlowRequestWarningSeconds,
-		&preferences.AllowLLMDataSamples, &preferences.OllamaBaseURL, &catalogsJSON,
+		&preferences.AllowLLMDataSamples, &preferences.ModelOnboardingCompleted,
+		&preferences.OllamaBaseURL, &catalogsJSON,
 	)
 	if err != nil {
 		return Preferences{}, fmt.Errorf("load model preferences: %w", err)
@@ -139,13 +155,15 @@ func (r *SQLiteRepository) Save(ctx context.Context, preferences Preferences) er
 		llm_provider = ?, selected_model = ?, selected_lite_model = ?, selected_coding_model = ?,
 		llm_temperature = ?, llm_max_tokens = ?, llm_top_p = ?, llm_top_k = ?,
 		llm_frequency_penalty = ?, llm_presence_penalty = ?, slow_request_warning_seconds = ?,
-		allow_llm_data_samples = ?, ollama_base_url = ?, provider_catalogs_json = ?,
+		allow_llm_data_samples = ?, model_onboarding_completed = ?,
+		ollama_base_url = ?, provider_catalogs_json = ?,
 		updated_at = CURRENT_TIMESTAMP WHERE id = 1`,
 		preferences.LLMProvider, preferences.SelectedModel, preferences.SelectedLiteModel,
 		preferences.SelectedCodingModel, preferences.Temperature, preferences.MaxTokens,
 		preferences.TopP, preferences.TopK, preferences.FrequencyPenalty,
 		preferences.PresencePenalty, preferences.SlowRequestWarningSeconds,
-		preferences.AllowLLMDataSamples, preferences.OllamaBaseURL, string(catalogs),
+		preferences.AllowLLMDataSamples, preferences.ModelOnboardingCompleted,
+		preferences.OllamaBaseURL, string(catalogs),
 	)
 	if err != nil {
 		return fmt.Errorf("save model preferences: %w", err)

@@ -152,6 +152,86 @@ func TestUpdatePreferencesRejectsUnsafeValues(t *testing.T) {
 	}
 }
 
+func TestModelOnboardingRequiresAReadyConnectionAndPersistsCompletion(t *testing.T) {
+	repository, err := OpenSQLite(filepath.Join(t.TempDir(), "inquira.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	secrets := &memorySecrets{values: map[string]string{}}
+	service := NewService(repository, secrets, roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return response(http.StatusOK, `{}`), nil
+	}))
+	defer service.Close()
+
+	status, err := service.GetOnboardingStatus(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Completed || status.ConnectionReady || status.Provider != "openrouter" {
+		t.Fatalf("fresh onboarding status = %#v", status)
+	}
+	if _, err := service.CompleteOnboarding(context.Background()); err == nil {
+		t.Fatal("expected completion to require a model connection")
+	}
+	if err := secrets.Set("openrouter", "saved-secret"); err != nil {
+		t.Fatal(err)
+	}
+	status, err = service.CompleteOnboarding(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !status.Completed || !status.ConnectionReady {
+		t.Fatalf("completed onboarding status = %#v", status)
+	}
+	reloaded, err := repository.Load(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reloaded.ModelOnboardingCompleted {
+		t.Fatal("onboarding completion was not persisted")
+	}
+}
+
+func TestOllamaOnboardingRequiresSuccessfulModelRefresh(t *testing.T) {
+	repository, err := OpenSQLite(filepath.Join(t.TempDir(), "inquira.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(repository, &memorySecrets{values: map[string]string{}}, roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return response(http.StatusOK, `{}`), nil
+	}))
+	defer service.Close()
+
+	preferences, err := repository.Load(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	preferences.LLMProvider = "ollama"
+	if err := repository.Save(context.Background(), preferences); err != nil {
+		t.Fatal(err)
+	}
+	status, err := service.GetOnboardingStatus(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.ConnectionReady {
+		t.Fatal("default Ollama catalog must not count as a tested connection")
+	}
+	catalog := preferences.Catalogs["ollama"]
+	catalog.Source = "refreshed"
+	preferences.Catalogs["ollama"] = catalog
+	if err := repository.Save(context.Background(), preferences); err != nil {
+		t.Fatal(err)
+	}
+	status, err = service.GetOnboardingStatus(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !status.ConnectionReady {
+		t.Fatal("refreshed Ollama catalog should mark the connection ready")
+	}
+}
+
 func TestRefreshErrorDoesNotExposeTransportDetails(t *testing.T) {
 	repository, err := OpenSQLite(filepath.Join(t.TempDir(), "inquira.db"))
 	if err != nil {

@@ -7,6 +7,7 @@ prepare-uv:
 
 test:
 	go test ./...
+	cd frontend && node --test test/firstRunModelOnboarding.test.mjs test/llmConfigTabFlow.test.mjs test/workspaceAiReadinessExperience.test.mjs
 	cd frontend && npm run test:runtime
 	cd frontend && npm run build
 

@@ -20,6 +20,16 @@ export const modelConnectionService = {
     return !!wailsApp()
   },
 
+  getOnboardingStatus() {
+    if (this.isNative()) return callWails('GetModelOnboardingStatus')
+    return Promise.resolve({ completed: true, connection_ready: false, provider: 'openrouter' })
+  },
+
+  completeOnboarding() {
+    if (this.isNative()) return callWails('CompleteModelOnboarding')
+    return Promise.resolve({ completed: true, connection_ready: false, provider: 'openrouter' })
+  },
+
   getPreferences(provider = null) {
     if (this.isNative()) return callWails('GetModelPreferences', String(provider || ''))
     return v1Api.preferences.get(provider)

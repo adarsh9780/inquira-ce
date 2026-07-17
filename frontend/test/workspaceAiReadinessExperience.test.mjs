@@ -50,7 +50,7 @@ test('settings puts workspace models with workspace data and isolates credential
   assert.match(chatInput, /@manage-models="appStore\.openSettings\('workspace-ai'\)"/)
 })
 
-test('first-run surfaces follow workspace data connection configuration readiness order', () => {
+test('first-run surfaces connect a model before workspace and data setup', () => {
   const setup = read('src/components/modals/tabs/SetupTab.vue')
   const chat = read('src/components/chat/ChatTab.vue')
   const store = read('src/stores/appStore.js')
@@ -58,6 +58,8 @@ test('first-run surfaces follow workspace data connection configuration readines
   assert.match(setup, /Workspace/)
   assert.match(setup, /Model connection/)
   assert.match(setup, /Workspace AI/)
+  assert.ok(setup.indexOf("key: 'connection'") < setup.indexOf("key: 'workspace'"))
+  assert.ok(setup.indexOf("key: 'workspace'") < setup.indexOf("key: 'data'"))
   assert.match(chat, /Create your first workspace/)
   assert.match(chat, /Add data to begin/)
   assert.match(chat, /Connect a model/)

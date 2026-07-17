@@ -3,7 +3,7 @@
     <ToastContainer />
 
     <div
-      v-show="!startupFailure && !desktopStartup.ready"
+      v-show="!startupFailure && (!desktopStartup.ready || !modelOnboarding.checked)"
       class="fixed inset-0 flex items-center justify-center bg-[var(--color-base)]"
       role="status"
       aria-live="polite"
@@ -75,7 +75,13 @@
       </div>
     </div>
 
-    <div v-if="authStore.isAuthenticated && appBootstrap.ready" class="flex flex-col h-screen">
+    <FirstRunModelOnboarding
+      v-if="modelOnboarding.checked && modelOnboarding.required"
+      :initial-status="modelOnboarding.status"
+      @complete="handleModelOnboardingComplete"
+    />
+
+    <div v-if="authStore.isAuthenticated && appBootstrap.ready && !modelOnboarding.required" class="flex flex-col h-screen">
       <div class="flex-1 flex overflow-hidden app-shell-frame relative">
         <div
           class="h-full shrink-0 app-nav-pane"
@@ -161,9 +167,11 @@ import { useAuthStore } from './stores/authStore'
 import { settingsWebSocket } from './services/websocketService'
 import { previewService } from './services/previewService'
 import { apiService } from './services/apiService'
+import { modelConnectionService } from './services/modelConnectionService'
 import { themeService } from './services/themeService'
 import { fontService } from './services/fontService'
 import { toast } from './composables/useToast'
+import { extractApiErrorMessage } from './utils/apiError'
 import { normalizeThemeId } from './constants/themes'
 import { normalizeAppFontId, normalizeCodeFontId } from './constants/fonts'
 import { filterSupportedDatasetPaths, getDroppedDatasetPaths, SUPPORTED_DATASET_EXTENSIONS } from './utils/datasetImport'
@@ -177,6 +185,7 @@ import StartupFailureActions from './components/startup/StartupFailureActions.vu
 import SettingsModal from './components/modals/SettingsModal.vue'
 import CommandPaletteModal from './components/modals/CommandPaletteModal.vue'
 import KeyboardShortcutsModal from './components/modals/KeyboardShortcutsModal.vue'
+import FirstRunModelOnboarding from './components/onboarding/FirstRunModelOnboarding.vue'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -195,6 +204,11 @@ const desktopStartup = reactive({
   ready: false,
   message: '',
   error: '',
+})
+const modelOnboarding = reactive({
+  checked: false,
+  required: false,
+  status: null,
 })
 const wsUnsubscribers = ref([])
 const lastRuntimeErrorToast = ref('')
@@ -710,6 +724,13 @@ async function handleAuthenticated(userData) {
     await appStore.loadLocalConfig(userId)
   }
 
+  if (modelConnectionService.isNative()) {
+    appBootstrap.active = false
+    appBootstrap.ready = true
+    appBootstrap.message = ''
+    return
+  }
+
   // Establish persistent WebSocket connection
   if (isE2EMode) {
     void settingsWebSocket.connectPersistent(userId).catch((wsError) => {
@@ -746,6 +767,29 @@ async function handleAuthenticated(userData) {
     appBootstrap.ready = true
     appBootstrap.message = ''
   }
+}
+
+async function loadModelOnboardingStatus() {
+  try {
+    const status = await modelConnectionService.getOnboardingStatus()
+    modelOnboarding.status = status
+    modelOnboarding.required = !status?.completed
+  } catch (error) {
+    modelOnboarding.status = {
+      completed: false,
+      connection_ready: false,
+      provider: 'openrouter',
+      error: extractApiErrorMessage(error, 'Could not load first-run setup.'),
+    }
+    modelOnboarding.required = true
+  } finally {
+    modelOnboarding.checked = true
+  }
+}
+
+function handleModelOnboardingComplete(status) {
+  modelOnboarding.status = status
+  modelOnboarding.required = false
 }
 
 function handleAuthClose() {
@@ -853,6 +897,8 @@ onMounted(async () => {
   if (!startupOk) {
     return
   }
+
+  await loadModelOnboardingStatus()
 
   await authStore.initialize()
   if (authStore.isAuthenticated && !appBootstrap.ready && !appBootstrap.active) {

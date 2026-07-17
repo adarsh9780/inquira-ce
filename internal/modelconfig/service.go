@@ -40,6 +40,44 @@ func (s *Service) GetPreferences(ctx context.Context, providerHint string) (Pref
 	return s.response(preferences, provider)
 }
 
+func (s *Service) GetOnboardingStatus(ctx context.Context) (OnboardingStatus, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	preferences, err := s.repository.Load(ctx)
+	if err != nil {
+		return OnboardingStatus{}, apperror.Wrap("settings_read_failed", "Could not load onboarding status.", err)
+	}
+	ready, err := s.connectionReady(preferences)
+	if err != nil {
+		return OnboardingStatus{}, err
+	}
+	return OnboardingStatus{
+		Completed: preferences.ModelOnboardingCompleted, ConnectionReady: ready,
+		Provider: normalizeProvider(preferences.LLMProvider),
+	}, nil
+}
+
+func (s *Service) CompleteOnboarding(ctx context.Context) (OnboardingStatus, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	preferences, err := s.repository.Load(ctx)
+	if err != nil {
+		return OnboardingStatus{}, apperror.Wrap("settings_read_failed", "Could not load onboarding status.", err)
+	}
+	ready, err := s.connectionReady(preferences)
+	if err != nil {
+		return OnboardingStatus{}, err
+	}
+	if !ready {
+		return OnboardingStatus{}, apperror.New("model_connection_required", "Connect and verify a model provider before continuing.")
+	}
+	preferences.ModelOnboardingCompleted = true
+	if err := s.repository.Save(ctx, preferences); err != nil {
+		return OnboardingStatus{}, apperror.Wrap("settings_write_failed", "Could not complete onboarding.", err)
+	}
+	return OnboardingStatus{Completed: true, ConnectionReady: true, Provider: normalizeProvider(preferences.LLMProvider)}, nil
+}
+
 func (s *Service) UpdatePreferences(ctx context.Context, request UpdateRequest) (PreferencesResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -362,4 +400,17 @@ func verifyMessage(code string) string {
 	default:
 		return "The provider rejected this API key."
 	}
+}
+
+func (s *Service) connectionReady(preferences Preferences) (bool, error) {
+	provider := normalizeProvider(preferences.LLMProvider)
+	if provider == "ollama" {
+		catalog := preferences.Catalogs[provider]
+		return catalog.Source == "refreshed" && len(catalog.MainModels) > 0, nil
+	}
+	ready, err := s.secrets.Has(provider)
+	if err != nil {
+		return false, apperror.Wrap("keychain_read_failed", "Could not inspect secure API-key storage.", err)
+	}
+	return ready, nil
 }

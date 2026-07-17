@@ -82,6 +82,22 @@ func (a *App) GetModelPreferences(provider string) (modelconfig.PreferencesRespo
 	return service.GetPreferences(a.appContext(), provider)
 }
 
+func (a *App) GetModelOnboardingStatus() (modelconfig.OnboardingStatus, error) {
+	service, err := a.modelService()
+	if err != nil {
+		return modelconfig.OnboardingStatus{}, err
+	}
+	return service.GetOnboardingStatus(a.appContext())
+}
+
+func (a *App) CompleteModelOnboarding() (modelconfig.OnboardingStatus, error) {
+	service, err := a.modelService()
+	if err != nil {
+		return modelconfig.OnboardingStatus{}, err
+	}
+	return service.CompleteOnboarding(a.appContext())
+}
+
 func (a *App) UpdateModelPreferences(request modelconfig.UpdateRequest) (modelconfig.PreferencesResponse, error) {
 	service, err := a.modelService()
 	if err != nil {

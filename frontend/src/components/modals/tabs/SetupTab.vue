@@ -24,21 +24,34 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useAppStore } from '../../../stores/appStore'
+import { modelConnectionService } from '../../../services/modelConnectionService'
 
 const appStore = useAppStore()
+const modelConnectionReady = ref(false)
+
+onMounted(async () => {
+  try {
+    const status = await modelConnectionService.getOnboardingStatus()
+    modelConnectionReady.value = Boolean(status?.connection_ready)
+  } catch (_error) {
+    modelConnectionReady.value = Boolean(
+      !appStore.providerRequiresApiKey || appStore.selectedProviderApiKeyPresent,
+    )
+  }
+})
 
 const readinessItems = computed(() => {
   const state = appStore.workspaceReadiness.state
   const hasWorkspace = state !== 'no_workspace'
   const hasData = !['no_workspace', 'no_data', 'data_processing'].includes(state)
-  const hasConnection = !['no_workspace', 'no_data', 'data_processing', 'model_connection_required'].includes(state)
+  const hasConnection = modelConnectionReady.value
   const configured = state === 'ready'
   const steps = [
+    { key: 'connection', label: 'Model connection', description: hasConnection ? 'The application provider is connected.' : 'Connect a provider once for all workspaces.', complete: hasConnection, actionLabel: 'Connect model', action: () => appStore.openSettings('connections') },
     { key: 'workspace', label: 'Workspace', description: hasWorkspace ? 'An active workspace is selected.' : 'Create a place for your data and conversations.', complete: hasWorkspace, actionLabel: 'Create workspace', action: () => appStore.openSettings('workspace-general') },
     { key: 'data', label: 'Data', description: hasData ? 'Workspace data is prepared.' : 'Add a dataset to analyze.', complete: hasData, actionLabel: 'Add data', action: () => appStore.openSettings('workspace-data') },
-    { key: 'connection', label: 'Model connection', description: hasConnection ? 'The effective provider is connected.' : 'Connect a provider once for all workspaces.', complete: hasConnection, actionLabel: 'Connect model', action: () => appStore.openSettings('connections') },
     { key: 'configuration', label: 'Workspace AI', description: configured ? 'Models and privacy are configured.' : 'Review workspace models and data-sharing permission.', complete: configured, actionLabel: 'Review', action: () => appStore.openSettings('workspace-ai') },
   ]
   const firstIncomplete = steps.findIndex((step) => !step.complete)

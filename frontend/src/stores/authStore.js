@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { apiService } from '../services/apiService'
+import { modelConnectionService } from '../services/modelConnectionService'
 
 const DEFAULT_LOCAL_USER = Object.freeze({
   user_id: 'local-user',
@@ -88,6 +89,10 @@ export const useAuthStore = defineStore('auth', () => {
     clearError()
     try {
       apiService.setAuthToken('')
+      if (modelConnectionService.isNative()) {
+        setLocalState()
+        return true
+      }
       await checkAuth({ preserveSession: true })
       return true
     } catch (_initError) {

@@ -451,7 +451,7 @@ async function saveKey() {
     return { ok: false, error: 'missing_key' }
   }
 
-  await modelConnectionService.setApiKey({
+  const response = await modelConnectionService.setApiKey({
     provider: selectedProvider,
     api_key: key,
     allow_llm_data_samples: Boolean(allowLlmDataSamples.value),
@@ -461,10 +461,13 @@ async function saveKey() {
     [selectedProvider]: true,
   }
   selectedProviderApiKeyPresent.value = true
+  if (response && typeof response === 'object') {
+    applyProviderModelState(selectedProvider, response, true)
+  }
   keyMask.value = 'sk-••••••••••••••••••••YzBp'
   apiKey.value = keyMask.value
   usingMaskedKey.value = true
-  return { ok: true }
+  return { ok: true, response }
 }
 
 async function saveDataSamplesPreference() {

@@ -22,6 +22,12 @@ The Vue model-settings flow uses direct Wails bindings in the desktop build and
 retains its existing HTTP fallback for browser/Tauri development. Other product
 areas still use the Python API until their own vertical slices are migrated.
 
+On first Wails launch, Inquira now opens a focused model-connection flow before
+the workspace shell. Completion is persisted in SQLite only after a key-backed
+provider is configured or an Ollama endpoint successfully returns models. The
+in-app Setup checklist uses the same native connection status and then guides
+the user to workspace and local-data setup.
+
 ## Runtime modes
 
 The embedded UV runtime supports three provisioning policies:
