@@ -1,0 +1,24 @@
+package connection
+
+import "testing"
+
+func TestAdapterKindForPathSupportsTheFirstFileAdapters(t *testing.T) {
+	tests := map[string]AdapterKind{
+		"sales.csv": AdapterCSV, "SALES.CSV": AdapterCSV,
+		"events.parquet": AdapterParquet, "EVENTS.PARQUET": AdapterParquet,
+	}
+	for path, expected := range tests {
+		kind, err := AdapterKindForPath(path)
+		if err != nil || kind != expected {
+			t.Fatalf("AdapterKindForPath(%q) = %q, %v", path, kind, err)
+		}
+	}
+}
+
+func TestAdapterKindForPathRejectsAmbiguousOrFutureFormats(t *testing.T) {
+	for _, path := range []string{"data", ".csv", "data.csv.gz", "book.xlsx", "data.sqlite", "data.json", "data.txt"} {
+		if _, err := AdapterKindForPath(path); appErrorCode(err) != "adapter_not_supported" {
+			t.Fatalf("AdapterKindForPath(%q) error = %v", path, err)
+		}
+	}
+}

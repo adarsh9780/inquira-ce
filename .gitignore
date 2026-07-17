@@ -6,3 +6,6 @@ frontend/wailsjs
 internal/runtimeprovision/assets/manifest.json
 internal/runtimeprovision/assets/uv
 internal/runtimeprovision/assets/uv.exe
+python/data_worker/.venv
+python/data_worker/**/__pycache__
+python/data_worker/.pytest_cache

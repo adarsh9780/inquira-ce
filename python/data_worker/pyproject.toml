@@ -2,7 +2,17 @@
 name = "inquira-data-worker"
 version = "0.1.0"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "duckdb>=1.1,<2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<9",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [project.scripts]
 inquira-data-worker = "inquira_data_worker.__main__:main"
