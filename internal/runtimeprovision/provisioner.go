@@ -2,6 +2,8 @@ package runtimeprovision
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -24,11 +26,13 @@ type Plan struct {
 }
 
 type Status struct {
-	RuntimeRoot     string     `json:"runtimeRoot"`
-	BundleAvailable bool       `json:"bundleAvailable"`
-	Bundle          BundleInfo `json:"bundle"`
-	BundleError     string     `json:"bundleError,omitempty"`
-	SupportedModes  []Mode     `json:"supportedModes"`
+	RuntimeRoot      string     `json:"runtimeRoot"`
+	BundleAvailable  bool       `json:"bundleAvailable"`
+	Bundle           BundleInfo `json:"bundle"`
+	BundleError      string     `json:"bundleError,omitempty"`
+	SupportedModes   []Mode     `json:"supportedModes"`
+	Ready            bool       `json:"ready"`
+	PythonExecutable string     `json:"pythonExecutable"`
 }
 
 type Diagnostics struct {
@@ -57,10 +61,12 @@ func NewProvisioner(runtimeRoot string) *Provisioner {
 func (p *Provisioner) Status() Status {
 	info, err := loadBundleInfo(bundledAssets)
 	status := Status{
-		RuntimeRoot:    p.runtimeRoot,
-		Bundle:         info,
-		SupportedModes: SupportedModes(),
+		RuntimeRoot:      p.runtimeRoot,
+		Bundle:           info,
+		SupportedModes:   SupportedModes(),
+		PythonExecutable: p.PythonExecutable(),
 	}
+	status.Ready = p.runtimeReady()
 	if err != nil {
 		status.BundleError = err.Error()
 		return status
@@ -103,8 +109,20 @@ func (p *Provisioner) Plan(config Config) (Plan, error) {
 		"UV_PYTHON_INSTALL_DIR":  pythonDir,
 		"UV_PROJECT_ENVIRONMENT": environmentDir,
 	}
+	if strings.TrimSpace(config.DefaultIndex) != "" {
+		environment["UV_DEFAULT_INDEX"] = strings.TrimSpace(config.DefaultIndex)
+	}
 	if config.UseSystemCerts {
 		environment["UV_SYSTEM_CERTS"] = "true"
+	}
+	if strings.TrimSpace(config.HTTPProxy) != "" {
+		environment["HTTP_PROXY"] = strings.TrimSpace(config.HTTPProxy)
+	}
+	if strings.TrimSpace(config.HTTPSProxy) != "" {
+		environment["HTTPS_PROXY"] = strings.TrimSpace(config.HTTPSProxy)
+	}
+	if strings.TrimSpace(config.NoProxy) != "" {
+		environment["NO_PROXY"] = strings.TrimSpace(config.NoProxy)
 	}
 
 	plan := Plan{Mode: config.Mode, Environment: environment}
@@ -122,12 +140,18 @@ func (p *Provisioner) Plan(config Config) (Plan, error) {
 		}
 	case ModeInternalMirror:
 		environment["UV_PYTHON_INSTALL_MIRROR"] = config.PythonInstallMirror
-		environment["UV_DEFAULT_INDEX"] = config.DefaultIndex
 		plan.Steps = []Step{
 			{Name: "install-python-from-mirror", Executable: uvPath, Arguments: []string{"python", "install", config.PythonVersion, "--install-dir", pythonDir, "--no-progress"}},
 			{Name: "create-data-environment", Executable: uvPath, Arguments: []string{"venv", environmentDir, "--python", config.PythonVersion, "--managed-python"}},
 		}
 	}
+	plan.Steps = append(plan.Steps, Step{
+		Name:       "install-data-worker",
+		Executable: uvPath,
+		Arguments: []string{
+			"sync", "--project", filepath.Join(p.runtimeRoot, "worker"), "--locked", "--no-progress",
+		},
+	})
 	return plan, nil
 }
 
@@ -140,6 +164,7 @@ func (p *Provisioner) Provision(ctx context.Context, config Config) (Result, err
 	if err != nil {
 		return Result{}, err
 	}
+	_ = os.Remove(p.workerMarkerPath())
 	for index := range plan.Steps {
 		if strings.HasSuffix(plan.Steps[index].Executable, executableName("uv")) {
 			plan.Steps[index].Executable = uvPath
@@ -148,6 +173,9 @@ func (p *Provisioner) Provision(ctx context.Context, config Config) (Result, err
 			return Result{}, fmt.Errorf("%s: %w", plan.Steps[index].Name, err)
 		}
 	}
+	if err := p.markWorkerReady(); err != nil {
+		return Result{}, err
+	}
 
 	return Result{
 		Mode:             config.Mode,
@@ -155,6 +183,57 @@ func (p *Provisioner) Provision(ctx context.Context, config Config) (Result, err
 		UVExecutable:     uvPath,
 	}, nil
 }
+
+func (p *Provisioner) runtimeReady() bool {
+	info, err := os.Stat(p.PythonExecutable())
+	if err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+	digest, err := p.workerLockDigest()
+	if err != nil {
+		return false
+	}
+	marker, err := os.ReadFile(p.workerMarkerPath())
+	return err == nil && strings.TrimSpace(string(marker)) == digest
+}
+
+func (p *Provisioner) markWorkerReady() error {
+	digest, err := p.workerLockDigest()
+	if err != nil {
+		return fmt.Errorf("fingerprint data worker lockfile: %w", err)
+	}
+	marker := p.workerMarkerPath()
+	if err := os.MkdirAll(filepath.Dir(marker), 0o700); err != nil {
+		return fmt.Errorf("create data worker environment directory: %w", err)
+	}
+	temporary := marker + ".tmp"
+	if err := os.WriteFile(temporary, []byte(digest+"\n"), 0o600); err != nil {
+		return fmt.Errorf("write data worker installation marker: %w", err)
+	}
+	if err := os.Rename(temporary, marker); err != nil {
+		return fmt.Errorf("publish data worker installation marker: %w", err)
+	}
+	return nil
+}
+
+func (p *Provisioner) workerLockDigest() (string, error) {
+	content, err := os.ReadFile(filepath.Join(p.runtimeRoot, "worker", "uv.lock"))
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256(content)
+	return hex.EncodeToString(digest[:]), nil
+}
+
+func (p *Provisioner) workerMarkerPath() string {
+	return filepath.Join(p.runtimeRoot, "environments", "data-worker", ".inquira-worker-lock")
+}
+
+func (p *Provisioner) PythonExecutable() string {
+	return environmentPython(filepath.Join(p.runtimeRoot, "environments", "data-worker"))
+}
+
+func (p *Provisioner) Ready() bool { return p.runtimeReady() }
 
 func runStep(ctx context.Context, environment map[string]string, step Step) error {
 	command := exec.CommandContext(ctx, step.Executable, step.Arguments...)

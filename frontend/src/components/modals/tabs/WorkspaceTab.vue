@@ -159,6 +159,129 @@
             </div>
           </div>
 
+          <div v-if="isNativeWorkspaceMetadata && activeWorkspaceSection === 'connections'" class="space-y-3" role="tabpanel" aria-label="Workspace connections">
+            <section v-if="!nativeRuntimeStatus.ready" class="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] p-4">
+              <h4 class="section-label">Data runtime setup</h4>
+              <p class="mt-1 text-xs leading-5 text-[var(--color-warning-text)]">Choose how Inquira should obtain Python and DuckDB. Nothing is downloaded until you start setup.</p>
+              <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                <label class="block sm:col-span-2">
+                  <span class="input-label">Runtime source</span>
+                  <select v-model="runtimeConfig.mode" class="input-base input-outlined" :disabled="runtimeProvisioning">
+                    <option value="managed">Managed Python</option>
+                    <option value="external-python">Company Python</option>
+                    <option value="internal-mirror">Internal mirror</option>
+                  </select>
+                </label>
+                <label v-if="runtimeConfig.mode !== 'external-python'" class="block">
+                  <span class="input-label">Python version</span>
+                  <input v-model="runtimeConfig.pythonVersion" class="input-base input-outlined" placeholder="3.12" :disabled="runtimeProvisioning" />
+                </label>
+                <label v-if="runtimeConfig.mode === 'external-python'" class="block sm:col-span-2">
+                  <span class="input-label">Python executable path</span>
+                  <input v-model="runtimeConfig.pythonExecutable" class="input-base input-outlined font-mono text-xs" placeholder="/company/tools/python3.12" :disabled="runtimeProvisioning" />
+                </label>
+                <label v-if="runtimeConfig.mode === 'internal-mirror'" class="block sm:col-span-2">
+                  <span class="input-label">Python download mirror</span>
+                  <input v-model="runtimeConfig.pythonInstallMirror" class="input-base input-outlined" placeholder="https://packages.company/python" :disabled="runtimeProvisioning" />
+                </label>
+                <label class="block sm:col-span-2">
+                  <span class="input-label">Package index</span>
+                  <input v-model="runtimeConfig.defaultIndex" class="input-base input-outlined" placeholder="https://packages.company/simple (optional for managed Python)" :disabled="runtimeProvisioning" />
+                </label>
+                <label class="block">
+                  <span class="input-label">HTTP proxy</span>
+                  <input v-model="runtimeConfig.httpProxy" class="input-base input-outlined" placeholder="http://proxy.company:8080" :disabled="runtimeProvisioning" />
+                </label>
+                <label class="block">
+                  <span class="input-label">HTTPS proxy</span>
+                  <input v-model="runtimeConfig.httpsProxy" class="input-base input-outlined" placeholder="https://proxy.company:8443" :disabled="runtimeProvisioning" />
+                </label>
+                <label class="block sm:col-span-2">
+                  <span class="input-label">Proxy bypass list</span>
+                  <input v-model="runtimeConfig.noProxy" class="input-base input-outlined" placeholder="localhost,.company.internal" :disabled="runtimeProvisioning" />
+                </label>
+                <label class="flex items-center gap-2 text-xs text-[var(--color-text-main)] sm:col-span-2">
+                  <input v-model="runtimeConfig.useSystemCertificates" type="checkbox" :disabled="runtimeProvisioning" />
+                  Use operating-system certificates
+                </label>
+              </div>
+              <div class="mt-4 flex items-center justify-between gap-3">
+                <p class="text-[10px] text-[var(--color-text-muted)]">Proxy and mirror credentials are used for this setup run and are not saved by Inquira.</p>
+                <button type="button" class="btn-primary shrink-0 px-4 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="provisionDataRuntime">{{ runtimeProvisioning ? 'Setting up…' : 'Set up runtime' }}</button>
+              </div>
+            </section>
+
+            <section class="rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)] p-4">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <h4 class="section-label">Connections</h4>
+                  <p class="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">Create refreshable local snapshots from CSV and Parquet files.</p>
+                </div>
+                <button type="button" class="btn-primary px-3 py-1.5 text-xs" :disabled="connectionActionLoading || !isWorkspaceActive || !nativeRuntimeStatus.ready" @click="chooseConnectionFile">
+                  Add connection
+                </button>
+              </div>
+
+              <p v-if="connectionError" class="mt-3 rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-xs text-[var(--color-danger-text)]" role="alert">{{ connectionError }}</p>
+
+              <div v-if="pendingConnection" class="mt-4 space-y-3 rounded-lg border border-[var(--color-accent-border)] bg-[var(--color-base)] p-3">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="truncate text-xs font-semibold text-[var(--color-text-main)]">{{ pendingConnection.source_path }}</p>
+                    <p class="mt-1 text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">{{ pendingConnection.adapter_kind === 'csv' ? 'CSV' : 'Parquet' }} · {{ pendingConnection.columns.length }} columns</p>
+                  </div>
+                  <button type="button" class="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]" :disabled="connectionActionLoading" @click="cancelPendingConnection">Cancel</button>
+                </div>
+                <label class="block">
+                  <span class="input-label">Connection name</span>
+                  <input v-model="pendingConnection.name" class="input-base input-outlined" maxlength="120" :disabled="connectionActionLoading" />
+                </label>
+                <div class="flex flex-wrap gap-1.5">
+                  <span v-for="column in pendingConnection.columns" :key="column.name" class="rounded-full bg-[var(--color-base-soft)] px-2 py-1 text-[10px] text-[var(--color-text-muted)]">
+                    {{ column.name }} · {{ column.data_type }}
+                  </span>
+                </div>
+                <div v-if="pendingConnection.preview_rows.length" class="overflow-hidden rounded-lg border border-[var(--color-border)]">
+                  <div class="overflow-x-auto">
+                    <table class="min-w-full text-left text-[10px]">
+                      <thead class="bg-[var(--color-base-soft)] text-[var(--color-text-muted)]"><tr><th v-for="column in pendingConnection.columns" :key="column.name" class="px-2 py-1.5 font-medium">{{ column.name }}</th></tr></thead>
+                      <tbody><tr v-for="(row, index) in pendingConnection.preview_rows.slice(0, 5)" :key="index" class="border-t border-[var(--color-border)]"><td v-for="column in pendingConnection.columns" :key="column.name" class="max-w-48 truncate px-2 py-1.5 text-[var(--color-text-main)]">{{ row[column.name] ?? '—' }}</td></tr></tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="flex justify-end">
+                  <button type="button" class="btn-primary px-4 py-1.5 text-xs" :disabled="connectionActionLoading || !pendingConnection.name.trim()" @click="createPendingConnection">
+                    {{ connectionActionLoading ? 'Creating snapshot…' : 'Create connection' }}
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section v-if="nativeConnections.length" class="space-y-2">
+              <article v-for="item in nativeConnections" :key="item.id" class="rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)] px-3 py-3">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <p class="truncate text-xs font-semibold text-[var(--color-text-main)]">{{ item.name }}</p>
+                      <span class="rounded-full px-2 py-0.5 text-[9px]" :class="item.status === 'error' ? 'bg-[var(--color-danger-bg)] text-[var(--color-danger-text)]' : 'bg-[var(--color-success-bg)] text-[var(--color-success)]'">{{ item.status }}</span>
+                    </div>
+                    <p class="mt-1 truncate text-[10px] text-[var(--color-text-muted)]">{{ item.source_path }}</p>
+                    <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">{{ connectionOutputSummary(item) }}</p>
+                    <p v-if="item.error_message" class="mt-1 text-[10px] text-[var(--color-danger-text)]">{{ item.error_message }}</p>
+                  </div>
+                  <div class="flex shrink-0 items-center gap-2">
+                    <button type="button" class="text-xs font-medium text-[var(--color-accent)] hover:underline" :disabled="refreshingConnectionIds.has(item.id)" @click="refreshNativeConnection(item.id)">{{ refreshingConnectionIds.has(item.id) ? 'Refreshing…' : 'Refresh' }}</button>
+                    <button type="button" class="text-xs font-medium text-[var(--color-danger)] hover:underline" :disabled="connectionActionLoading" @click="deleteNativeConnection(item.id)">Delete</button>
+                  </div>
+                </div>
+              </article>
+            </section>
+            <div v-else-if="!pendingConnection && !connectionActionLoading" class="rounded-lg border border-dashed border-[var(--color-border)] py-8 text-center">
+              <p class="text-xs font-medium text-[var(--color-text-main)]">No connections yet</p>
+              <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">Start with a local CSV or Parquet file.</p>
+            </div>
+          </div>
+
           <div v-if="!isNativeWorkspaceMetadata && activeWorkspaceSection === 'ai'" role="tabpanel" aria-label="Workspace AI settings">
             <WorkspaceAIConfigSection v-if="activeWorkspace?.id" :workspace-id="activeWorkspace.id" />
           </div>
@@ -256,6 +379,8 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { stat } from '@tauri-apps/plugin-fs'
 import { apiService } from '../../../services/apiService'
 import { workspaceService } from '../../../services/workspaceService'
+import { connectionService } from '../../../services/connectionService'
+import { runtimeProvisionService } from '../../../services/runtimeProvisionService'
 import { previewService } from '../../../services/previewService'
 import { settingsWebSocket } from '../../../services/websocketService'
 import { useAppStore } from '../../../stores/appStore'
@@ -296,13 +421,31 @@ const appStore = useAppStore()
 useWorkspaceDatasets()
 const isNativeWorkspaceMetadata = workspaceService.isNative()
 const workspaceSections = isNativeWorkspaceMetadata
-  ? [{ id: 'general', label: 'General' }]
+  ? [{ id: 'general', label: 'General' }, { id: 'connections', label: 'Connections' }]
   : [
       { id: 'general', label: 'General' },
       { id: 'data', label: 'Data' },
       { id: 'ai', label: 'AI' },
     ]
 const activeWorkspaceSection = ref('general')
+const nativeConnections = ref([])
+const pendingConnection = ref(null)
+const connectionActionLoading = ref(false)
+const connectionError = ref('')
+const refreshingConnectionIds = ref(new Set())
+const nativeRuntimeStatus = ref({ ready: false })
+const runtimeProvisioning = ref(false)
+const runtimeConfig = ref({
+  mode: 'managed',
+  pythonVersion: '3.12',
+  pythonExecutable: '',
+  pythonInstallMirror: '',
+  defaultIndex: '',
+  useSystemCertificates: false,
+  httpProxy: '',
+  httpsProxy: '',
+  noProxy: '',
+})
 const workspaceActionsOpen = ref(false)
 const workspaceActionsRef = ref(null)
 
@@ -519,7 +662,8 @@ watch(
   () => props.initialSection,
   (section) => {
     const normalized = String(section || '').trim().toLowerCase()
-    activeWorkspaceSection.value = workspaceSections.some((item) => item.id === normalized) ? normalized : 'general'
+    const requested = isNativeWorkspaceMetadata && normalized === 'data' ? 'connections' : normalized
+    activeWorkspaceSection.value = workspaceSections.some((item) => item.id === requested) ? requested : 'general'
   },
   { immediate: true },
 )
@@ -545,6 +689,7 @@ watch(
     await loadWorkspaceDatasets()
     await loadActiveDatasetDeletionJobs()
     syncSetupIdentity()
+    await loadNativeConnections()
   },
   { immediate: true },
 )
@@ -560,8 +705,151 @@ onMounted(async () => {
   }
   await hydrateWorkspaceCards()
   await loadActiveDatasetDeletionJobs()
+  await loadNativeConnections()
+  await loadNativeRuntimeStatus()
   syncSetupIdentity()
 })
+
+async function loadNativeRuntimeStatus() {
+  if (!isNativeWorkspaceMetadata) return
+  try {
+    nativeRuntimeStatus.value = await runtimeProvisionService.status()
+  } catch (error) {
+    connectionError.value = extractApiErrorMessage(error, 'Could not read data runtime status.')
+  }
+}
+
+async function provisionDataRuntime() {
+  runtimeProvisioning.value = true
+  connectionError.value = ''
+  try {
+    await runtimeProvisionService.provision({ ...runtimeConfig.value })
+    await loadNativeRuntimeStatus()
+    if (!nativeRuntimeStatus.value?.ready) throw new Error('The data runtime did not become ready.')
+    runtimeConfig.value.defaultIndex = ''
+    runtimeConfig.value.httpProxy = ''
+    runtimeConfig.value.httpsProxy = ''
+    runtimeConfig.value.noProxy = ''
+    toast.success('Data runtime ready', 'CSV and Parquet connections can now be created.')
+  } catch (error) {
+    connectionError.value = extractApiErrorMessage(error, 'Could not set up the data runtime.')
+  } finally {
+    runtimeProvisioning.value = false
+  }
+}
+
+async function loadNativeConnections() {
+  if (!isNativeWorkspaceMetadata) return
+  const workspaceId = String(props.activeWorkspaceId || '').trim()
+  if (!workspaceId) {
+    nativeConnections.value = []
+    return
+  }
+  try {
+    const response = await connectionService.list(workspaceId)
+    nativeConnections.value = Array.isArray(response?.connections) ? response.connections : []
+  } catch (error) {
+    connectionError.value = extractApiErrorMessage(error, 'Could not load connections.')
+  }
+}
+
+async function chooseConnectionFile() {
+  connectionError.value = ''
+  connectionActionLoading.value = true
+  try {
+    const selection = await connectionService.chooseFile()
+    const sourcePath = String(selection?.source_path || '').trim()
+    const adapterKind = String(selection?.adapter_kind || '').trim().toLowerCase()
+    if (!sourcePath || !adapterKind) return
+    const [discovery, preview] = await Promise.all([
+      connectionService.discover(adapterKind, sourcePath),
+      connectionService.preview(adapterKind, sourcePath, 25),
+    ])
+    const sourceObject = discovery?.objects?.[0] || {}
+    pendingConnection.value = {
+      source_path: sourcePath,
+      adapter_kind: adapterKind,
+      name: String(sourceObject?.name || formatFilename(sourcePath) || 'Local connection').trim(),
+      selected_object_ids: [String(sourceObject?.id || 'file')],
+      columns: Array.isArray(preview?.columns) ? preview.columns : (sourceObject?.columns || []),
+      preview_rows: Array.isArray(preview?.rows) ? preview.rows : [],
+    }
+  } catch (error) {
+    connectionError.value = extractApiErrorMessage(error, 'Could not inspect the selected file.')
+  } finally {
+    connectionActionLoading.value = false
+  }
+}
+
+function cancelPendingConnection() {
+  if (connectionActionLoading.value) return
+  pendingConnection.value = null
+  connectionError.value = ''
+}
+
+async function createPendingConnection() {
+  const pending = pendingConnection.value
+  const workspaceId = String(props.activeWorkspaceId || '').trim()
+  if (!pending || !workspaceId) return
+  connectionError.value = ''
+  connectionActionLoading.value = true
+  try {
+    await connectionService.create({
+      workspace_id: workspaceId,
+      name: String(pending.name || '').trim(),
+      adapter_kind: pending.adapter_kind,
+      source_path: pending.source_path,
+      selected_object_ids: pending.selected_object_ids,
+      options: {},
+    })
+    pendingConnection.value = null
+    await loadNativeConnections()
+    toast.success('Connection created', 'The local snapshot is ready for analysis.')
+  } catch (error) {
+    connectionError.value = extractApiErrorMessage(error, 'Could not create the connection.')
+  } finally {
+    connectionActionLoading.value = false
+  }
+}
+
+async function refreshNativeConnection(connectionId) {
+  const next = new Set(refreshingConnectionIds.value)
+  next.add(connectionId)
+  refreshingConnectionIds.value = next
+  connectionError.value = ''
+  try {
+    await connectionService.refresh(connectionId)
+    await loadNativeConnections()
+    toast.success('Connection refreshed', 'The local snapshot is up to date.')
+  } catch (error) {
+    connectionError.value = extractApiErrorMessage(error, 'Could not refresh the connection.')
+    await loadNativeConnections()
+  } finally {
+    const remaining = new Set(refreshingConnectionIds.value)
+    remaining.delete(connectionId)
+    refreshingConnectionIds.value = remaining
+  }
+}
+
+async function deleteNativeConnection(connectionId) {
+  connectionError.value = ''
+  connectionActionLoading.value = true
+  try {
+    await connectionService.remove(connectionId)
+    await loadNativeConnections()
+    toast.success('Connection deleted', 'The connection and its local snapshots were removed.')
+  } catch (error) {
+    connectionError.value = extractApiErrorMessage(error, 'Could not delete the connection.')
+  } finally {
+    connectionActionLoading.value = false
+  }
+}
+
+function connectionOutputSummary(connection) {
+  const outputs = Array.isArray(connection?.outputs) ? connection.outputs : []
+  const rows = outputs.reduce((total, output) => total + Number(output?.row_count || 0), 0)
+  return `${connection?.adapter_kind === 'csv' ? 'CSV' : 'Parquet'} · ${outputs.length} table${outputs.length === 1 ? '' : 's'} · ${rows.toLocaleString()} rows`
+}
 
 onUnmounted(() => {
   if (typeof unsubscribeProgress === 'function') {

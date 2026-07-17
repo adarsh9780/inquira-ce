@@ -2,12 +2,17 @@ package main
 
 import (
 	"context"
+	"path/filepath"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"inquira-go/internal/appdirs"
+	"inquira-go/internal/connection"
 	"inquira-go/internal/modelconfig"
 	"inquira-go/internal/netclient"
 	"inquira-go/internal/runtimeprovision"
 	"inquira-go/internal/workspace"
+	dataworkerbundle "inquira-go/python/data_worker"
 )
 
 // App struct
@@ -17,6 +22,7 @@ type App struct {
 	provisioner *runtimeprovision.Provisioner
 	models      *modelconfig.Service
 	workspaces  *workspace.Service
+	connections *connection.Service
 	initErr     error
 }
 
@@ -51,6 +57,26 @@ func NewApp() *App {
 		return app
 	}
 	app.workspaces = workspace.NewService(workspaceRepository)
+	workerProject := filepath.Join(paths.RuntimeDir, "worker")
+	if err := dataworkerbundle.Extract(workerProject); err != nil {
+		_ = app.workspaces.Close()
+		_ = app.models.Close()
+		app.initErr = err
+		return app
+	}
+	connectionRepository, err := connection.OpenSQLite(paths.DatabasePath)
+	if err != nil {
+		_ = app.workspaces.Close()
+		_ = app.models.Close()
+		app.initErr = err
+		return app
+	}
+	transport := connection.NewSubprocessTransport(
+		app.provisioner.PythonExecutable(), filepath.Join(workerProject, "src"), nil,
+	).WithReadinessCheck(app.provisioner.Ready)
+	app.connections = connection.NewService(
+		connectionRepository, connection.NewWorkerGateway(transport), filepath.Join(paths.DataDir, "snapshots"),
+	)
 	return app
 }
 
@@ -61,12 +87,22 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) shutdown(context.Context) {
+	if a.connections != nil {
+		_ = a.connections.Close()
+	}
 	if a.workspaces != nil {
 		_ = a.workspaces.Close()
 	}
 	if a.models != nil {
 		_ = a.models.Close()
 	}
+}
+
+func (a *App) connectionService() (*connection.Service, error) {
+	if a.initErr != nil {
+		return nil, a.initErr
+	}
+	return a.connections, nil
 }
 
 func (a *App) workspaceService() (*workspace.Service, error) {
@@ -210,7 +246,89 @@ func (a *App) DeleteWorkspace(workspaceID string) (workspace.DeletionResult, err
 	if err != nil {
 		return workspace.DeletionResult{}, err
 	}
+	connectionService, err := a.connectionService()
+	if err != nil {
+		return workspace.DeletionResult{}, err
+	}
+	if err := connectionService.DeleteWorkspaceConnections(a.appContext(), workspaceID); err != nil {
+		return workspace.DeletionResult{}, err
+	}
 	return service.Delete(a.appContext(), workspaceID)
+}
+
+func (a *App) ListConnections(workspaceID string) (connection.ListResponse, error) {
+	service, err := a.connectionService()
+	if err != nil {
+		return connection.ListResponse{}, err
+	}
+	return service.List(a.appContext(), workspaceID)
+}
+
+func (a *App) DiscoverLocalConnection(request connection.DiscoverRequest) (connection.Discovery, error) {
+	service, err := a.connectionService()
+	if err != nil {
+		return connection.Discovery{}, err
+	}
+	return service.Discover(a.appContext(), request)
+}
+
+func (a *App) PreviewLocalConnection(request connection.PreviewRequest) (connection.Preview, error) {
+	service, err := a.connectionService()
+	if err != nil {
+		return connection.Preview{}, err
+	}
+	return service.Preview(a.appContext(), request)
+}
+
+func (a *App) CreateLocalConnection(request connection.CreateRequest) (connection.Connection, error) {
+	service, err := a.connectionService()
+	if err != nil {
+		return connection.Connection{}, err
+	}
+	return service.Create(a.appContext(), request)
+}
+
+func (a *App) RefreshConnection(connectionID string) (connection.Connection, error) {
+	service, err := a.connectionService()
+	if err != nil {
+		return connection.Connection{}, err
+	}
+	return service.Refresh(a.appContext(), connectionID)
+}
+
+func (a *App) DeleteConnection(connectionID string) (connection.DeleteResult, error) {
+	service, err := a.connectionService()
+	if err != nil {
+		return connection.DeleteResult{}, err
+	}
+	if err := service.Delete(a.appContext(), connectionID); err != nil {
+		return connection.DeleteResult{}, err
+	}
+	return connection.DeleteResult{Deleted: true}, nil
+}
+
+type LocalConnectionFileSelection struct {
+	SourcePath  string                 `json:"source_path"`
+	AdapterKind connection.AdapterKind `json:"adapter_kind"`
+}
+
+func (a *App) ChooseLocalConnectionFile() (LocalConnectionFileSelection, error) {
+	path, err := runtime.OpenFileDialog(a.appContext(), runtime.OpenDialogOptions{
+		Title: "Choose a local data source",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "CSV or Parquet", Pattern: "*.csv;*.CSV;*.parquet;*.PARQUET"},
+			{DisplayName: "CSV", Pattern: "*.csv;*.CSV"},
+			{DisplayName: "Parquet", Pattern: "*.parquet;*.PARQUET"},
+		},
+	})
+	if err != nil || path == "" {
+		return LocalConnectionFileSelection{}, err
+	}
+	kind, err := connection.AdapterKindForPath(path)
+	if err != nil {
+		return LocalConnectionFileSelection{}, err
+	}
+	return LocalConnectionFileSelection{SourcePath: path, AdapterKind: kind}, nil
 }
 
 // RuntimeStatus reports the embedded UV bundle and supported provisioning modes.

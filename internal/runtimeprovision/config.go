@@ -2,6 +2,7 @@ package runtimeprovision
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -14,8 +15,8 @@ const (
 	ModeInternalMirror Mode = "internal-mirror"
 )
 
-// Config is safe to persist. Credentials for private indexes must be supplied
-// separately through the operating-system keychain or process environment.
+// Config is a transient provisioning request. Proxy and index URLs may contain
+// credentials, so callers must not persist the complete value.
 type Config struct {
 	Mode                Mode   `json:"mode"`
 	PythonVersion       string `json:"pythonVersion"`
@@ -23,6 +24,9 @@ type Config struct {
 	PythonInstallMirror string `json:"pythonInstallMirror,omitempty"`
 	DefaultIndex        string `json:"defaultIndex,omitempty"`
 	UseSystemCerts      bool   `json:"useSystemCertificates"`
+	HTTPProxy           string `json:"httpProxy,omitempty"`
+	HTTPSProxy          string `json:"httpsProxy,omitempty"`
+	NoProxy             string `json:"noProxy,omitempty"`
 }
 
 func DefaultConfig() Config {
@@ -40,6 +44,12 @@ func SupportedModes() []Mode {
 func (c Config) Validate() error {
 	if c.Mode == "" {
 		return fmt.Errorf("runtime mode is required")
+	}
+	if err := validateProxyURL("HTTP proxy", c.HTTPProxy); err != nil {
+		return err
+	}
+	if err := validateProxyURL("HTTPS proxy", c.HTTPSProxy); err != nil {
+		return err
 	}
 
 	switch c.Mode {
@@ -65,5 +75,17 @@ func (c Config) Validate() error {
 		return fmt.Errorf("unsupported runtime mode %q", c.Mode)
 	}
 
+	return nil
+}
+
+func validateProxyURL(label, value string) error {
+	normalized := strings.TrimSpace(value)
+	if normalized == "" {
+		return nil
+	}
+	parsed, err := url.Parse(normalized)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return fmt.Errorf("%s must be a valid HTTP or HTTPS URL", label)
+	}
 	return nil
 }

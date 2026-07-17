@@ -134,6 +134,10 @@ func TestCreatePersistsAReadyConnectionAndPublishedSnapshot(t *testing.T) {
 	if _, err := os.Stat(created.Outputs[0].SnapshotPath); err != nil {
 		t.Fatalf("published snapshot missing: %v", err)
 	}
+	listed, err := service.List(context.Background(), workspaceID)
+	if err != nil || len(listed.Connections) != 1 || len(listed.Connections[0].Outputs) != 1 {
+		t.Fatalf("List() = %#v, %v", listed, err)
+	}
 
 	reopened, err := OpenSQLite(databasePath)
 	if err != nil {
@@ -206,6 +210,46 @@ func TestCreateRejectsUnsafeOrInconsistentAdapterOutputsWithoutPublishing(t *tes
 	listed, listErr := service.List(context.Background(), workspaceID)
 	if listErr != nil || len(listed.Connections) != 0 {
 		t.Fatalf("connections = %#v, error = %v", listed.Connections, listErr)
+	}
+}
+
+func TestCreateRejectsOutputsThatWereNotSelected(t *testing.T) {
+	gateway := &fakeGateway{materialization: Materialization{
+		Fingerprint: "fingerprint",
+		Outputs:     []MaterializedOutput{{SourceObjectID: "unexpected", Name: "bad", RelativePath: "data.parquet", Format: "parquet", RowCount: 1}},
+	}}
+	service, workspaceID, _ := newTestService(t, gateway)
+	_, err := service.Create(context.Background(), CreateRequest{
+		WorkspaceID: workspaceID, Name: "Unexpected", AdapterKind: AdapterCSV,
+		SourcePath: createSource(t, ".csv"), SelectedObjectIDs: []string{"file"},
+	})
+	if appErrorCode(err) != "adapter_invalid_output" {
+		t.Fatalf("unselected output error = %v", err)
+	}
+}
+
+func TestConnectionContractPersistsMultipleSelectedOutputs(t *testing.T) {
+	gateway := &fakeGateway{materialization: Materialization{
+		Fingerprint: "multi",
+		Outputs: []MaterializedOutput{
+			{SourceObjectID: "sheet:orders", Name: "orders", RelativePath: "orders.parquet", Format: "parquet", RowCount: 4},
+			{SourceObjectID: "sheet:customers", Name: "customers", RelativePath: "customers.parquet", Format: "parquet", RowCount: 3},
+		},
+	}}
+	service, workspaceID, _ := newTestService(t, gateway)
+	created, err := service.Create(context.Background(), CreateRequest{
+		WorkspaceID: workspaceID, Name: "Workbook", AdapterKind: AdapterCSV,
+		SourcePath: createSource(t, ".csv"), SelectedObjectIDs: []string{"sheet:orders", "sheet:customers"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(created.Outputs) != 2 || created.Outputs[0].ConnectionID != created.ID || created.Outputs[1].ConnectionID != created.ID {
+		t.Fatalf("outputs = %#v", created.Outputs)
+	}
+	persisted, err := service.Get(context.Background(), created.ID)
+	if err != nil || len(persisted.Outputs) != 2 {
+		t.Fatalf("persisted = %#v, %v", persisted, err)
 	}
 }
 
@@ -359,6 +403,29 @@ func TestDeletingAWorkspaceCascadesConnectionMetadata(t *testing.T) {
 	_ = workspaceService.Close()
 	if _, err := service.Get(context.Background(), created.ID); appErrorCode(err) != "connection_not_found" {
 		t.Fatalf("connection should cascade with workspace, error = %v", err)
+	}
+}
+
+func TestDeleteWorkspaceConnectionsRemovesSnapshotsBeforeWorkspaceDeletion(t *testing.T) {
+	gateway := &fakeGateway{materialization: defaultMaterialization("first")}
+	service, workspaceID, _ := newTestService(t, gateway)
+	created, err := service.Create(context.Background(), CreateRequest{
+		WorkspaceID: workspaceID, Name: "Sales", AdapterKind: AdapterCSV,
+		SourcePath: createSource(t, ".csv"), SelectedObjectIDs: []string{"file"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	connectionRoot := filepath.Dir(filepath.Dir(filepath.Dir(created.Outputs[0].SnapshotPath)))
+	if err := service.DeleteWorkspaceConnections(context.Background(), workspaceID); err != nil {
+		t.Fatal(err)
+	}
+	listed, err := service.List(context.Background(), workspaceID)
+	if err != nil || len(listed.Connections) != 0 {
+		t.Fatalf("connections = %#v, error = %v", listed.Connections, err)
+	}
+	if _, err := os.Stat(connectionRoot); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("connection root remains after workspace cleanup: %v", err)
 	}
 }
 

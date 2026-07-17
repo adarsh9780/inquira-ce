@@ -1,6 +1,7 @@
 package runtimeprovision
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -12,6 +13,63 @@ func TestSupportedModes(t *testing.T) {
 	}
 	if modes[0] != ModeManaged || modes[1] != ModeExternalPython || modes[2] != ModeInternalMirror {
 		t.Fatalf("unexpected supported modes: %#v", modes)
+	}
+}
+
+func TestRuntimeReadinessRequiresTheInstalledWorkerToMatchItsLockfile(t *testing.T) {
+	runtimeRoot := filepath.Join(t.TempDir(), "runtime")
+	provisioner := NewProvisioner(runtimeRoot)
+	if err := os.MkdirAll(filepath.Dir(provisioner.PythonExecutable()), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(provisioner.PythonExecutable(), []byte("python"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(runtimeRoot, "worker"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runtimeRoot, "worker", "uv.lock"), []byte("version one"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if provisioner.runtimeReady() {
+		t.Fatal("runtime without a matching installation marker must not be ready")
+	}
+	if err := provisioner.markWorkerReady(); err != nil {
+		t.Fatal(err)
+	}
+	if !provisioner.runtimeReady() {
+		t.Fatal("runtime should be ready after successful worker installation")
+	}
+	if err := os.WriteFile(filepath.Join(runtimeRoot, "worker", "uv.lock"), []byte("version two"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if provisioner.runtimeReady() {
+		t.Fatal("runtime must become stale when the bundled worker lockfile changes")
+	}
+}
+
+func TestRuntimePlanPassesTransientProxyAndNoProxySettings(t *testing.T) {
+	provisioner := NewProvisioner(filepath.Join(t.TempDir(), "runtime"))
+	config := DefaultConfig()
+	config.HTTPProxy = "http://proxy.company:8080"
+	config.HTTPSProxy = "https://secure-proxy.company:8443"
+	config.NoProxy = "localhost,.company.internal"
+	plan, err := provisioner.Plan(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Environment["HTTP_PROXY"] != config.HTTPProxy || plan.Environment["HTTPS_PROXY"] != config.HTTPSProxy || plan.Environment["NO_PROXY"] != config.NoProxy {
+		t.Fatalf("proxy environment = %#v", plan.Environment)
+	}
+}
+
+func TestRuntimeConfigRejectsInvalidProxyURLs(t *testing.T) {
+	config := DefaultConfig()
+	for _, value := range []string{"proxy.company:8080", "ftp://proxy.company", "://bad"} {
+		config.HTTPProxy = value
+		if err := config.Validate(); err == nil {
+			t.Fatalf("expected proxy %q to be rejected", value)
+		}
 	}
 }
 
@@ -70,5 +128,38 @@ func TestPlansKeepExternalModeOfflineAndMirrorModePrivate(t *testing.T) {
 	}
 	if mirrorPlan.Environment["UV_SYSTEM_CERTS"] != "true" {
 		t.Fatal("system certificates were not enabled")
+	}
+}
+
+func TestEveryRuntimePlanInstallsTheBundledDataWorkerIntoTheEnvironment(t *testing.T) {
+	runtimeRoot := filepath.Join(t.TempDir(), "runtime")
+	provisioner := NewProvisioner(runtimeRoot)
+	configs := []Config{DefaultConfig()}
+	external := DefaultConfig()
+	external.Mode = ModeExternalPython
+	external.PythonExecutable = "/company/python"
+	external.DefaultIndex = "https://packages.example/simple"
+	configs = append(configs, external)
+	mirror := DefaultConfig()
+	mirror.Mode = ModeInternalMirror
+	mirror.PythonInstallMirror = "https://packages.example/python"
+	mirror.DefaultIndex = "https://packages.example/simple"
+	configs = append(configs, mirror)
+
+	for _, config := range configs {
+		plan, err := provisioner.Plan(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		last := plan.Steps[len(plan.Steps)-1]
+		if last.Name != "install-data-worker" || last.Executable != filepath.Join(runtimeRoot, "tools", executableName("uv")) {
+			t.Fatalf("%s final step = %#v", config.Mode, last)
+		}
+		if got := plan.Environment["UV_PROJECT_ENVIRONMENT"]; got != filepath.Join(runtimeRoot, "environments", "data-worker") {
+			t.Fatalf("%s environment = %q", config.Mode, got)
+		}
+		if config.DefaultIndex != "" && plan.Environment["UV_DEFAULT_INDEX"] != config.DefaultIndex {
+			t.Fatalf("%s private index not applied", config.Mode)
+		}
 	}
 }

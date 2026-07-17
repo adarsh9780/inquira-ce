@@ -33,10 +33,23 @@ The first workspace becomes active automatically, names are case-insensitively
 unique, and deleting the active workspace selects a remaining workspace. The
 browser/Tauri build retains its Python HTTP fallback.
 
-DuckDB files, dataset ingestion, conversations, workspace runtimes, and
-workspace-specific AI overrides are intentionally outside this slice. Their
-controls remain hidden in the Wails workspace view until those services are
-migrated.
+Local data now starts with refreshable connections rather than uploads. The
+first adapters support CSV and Parquet files through a shared discover,
+preview, materialize, refresh, and status contract. Go owns connection metadata
+and atomic snapshot publication; the bundled Python worker uses DuckDB to write
+canonical Parquet snapshots without an application row or memory cap. Preview
+limits do not limit materialization.
+
+A fresh installation asks the user to configure the data runtime before any
+download. Managed Python, a company-provided Python executable, and internal
+Python/package mirrors are supported. Proxy, bypass, index, and system
+certificate settings are passed only to that setup run and are not saved by
+Inquira.
+
+Excel and SQLite adapters are intentionally next: both will use discovery plus
+explicit sheet/table selection and may produce multiple outputs from one
+connection. Conversations, analysis runtimes, and workspace-specific AI
+overrides remain outside the current migration slice.
 
 ## Runtime modes
 
@@ -75,10 +88,11 @@ On Windows, run `build\\bin\\inquira-go.exe runtime-info`.
 cmd/prepareuv/                 Build-time UV bundler
 frontend/                      Existing Inquira Vue UI
 internal/appdirs/              Central application path resolution
+internal/connection/           Connection metadata, snapshots, refresh, and worker RPC
 internal/modelconfig/          SQLite, keychain, provider, and model services
 internal/netclient/            Proxy and certificate-aware HTTP client
 internal/runtimeprovision/     Runtime policy and provisioning service
 internal/workspace/            Native workspace metadata and activation service
-python/data_worker/            Minimal Python worker boundary
+python/data_worker/            Embedded DuckDB adapter worker and contract tests
 build/                         Wails platform packaging assets
 ```

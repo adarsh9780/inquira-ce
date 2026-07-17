@@ -12,6 +12,13 @@ test('native workspace data uses connection language and exposes CSV and Parquet
   assert.match(workspaceTab, /CSV/)
   assert.match(workspaceTab, /Parquet/)
   assert.match(workspaceTab, /connectionService/)
+  assert.match(workspaceTab, /Managed Python/)
+  assert.match(workspaceTab, /Company Python/)
+  assert.match(workspaceTab, /Internal mirror/)
+  assert.match(workspaceTab, /Package index/)
+  assert.match(workspaceTab, /HTTP proxy/)
+  assert.match(workspaceTab, /system certificates/i)
+  assert.match(workspaceTab, /normalized === 'data' \? 'connections'/)
   assert.doesNotMatch(workspaceTab, /Upload a dataset/)
 })
 
