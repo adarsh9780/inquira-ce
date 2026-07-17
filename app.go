@@ -7,6 +7,7 @@ import (
 	"inquira-go/internal/modelconfig"
 	"inquira-go/internal/netclient"
 	"inquira-go/internal/runtimeprovision"
+	"inquira-go/internal/workspace"
 )
 
 // App struct
@@ -15,6 +16,7 @@ type App struct {
 	paths       appdirs.Paths
 	provisioner *runtimeprovision.Provisioner
 	models      *modelconfig.Service
+	workspaces  *workspace.Service
 	initErr     error
 }
 
@@ -42,6 +44,13 @@ func NewApp() *App {
 		return app
 	}
 	app.models = modelconfig.NewService(repository, modelconfig.OSKeychain{}, httpClient)
+	workspaceRepository, err := workspace.OpenSQLite(paths.DatabasePath)
+	if err != nil {
+		_ = app.models.Close()
+		app.initErr = err
+		return app
+	}
+	app.workspaces = workspace.NewService(workspaceRepository)
 	return app
 }
 
@@ -52,9 +61,19 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) shutdown(context.Context) {
+	if a.workspaces != nil {
+		_ = a.workspaces.Close()
+	}
 	if a.models != nil {
 		_ = a.models.Close()
 	}
+}
+
+func (a *App) workspaceService() (*workspace.Service, error) {
+	if a.initErr != nil {
+		return nil, a.initErr
+	}
+	return a.workspaces, nil
 }
 
 func (a *App) appContext() context.Context {
@@ -144,6 +163,54 @@ func (a *App) DeleteProviderAPIKey(provider string) (map[string]any, error) {
 		return nil, err
 	}
 	return service.DeleteKey(a.appContext(), provider)
+}
+
+func (a *App) ListWorkspaces() (workspace.ListResponse, error) {
+	service, err := a.workspaceService()
+	if err != nil {
+		return workspace.ListResponse{}, err
+	}
+	return service.List(a.appContext())
+}
+
+func (a *App) CreateWorkspace(request workspace.CreateRequest) (workspace.Workspace, error) {
+	service, err := a.workspaceService()
+	if err != nil {
+		return workspace.Workspace{}, err
+	}
+	return service.Create(a.appContext(), request)
+}
+
+func (a *App) ActivateWorkspace(workspaceID string) (workspace.Workspace, error) {
+	service, err := a.workspaceService()
+	if err != nil {
+		return workspace.Workspace{}, err
+	}
+	return service.Activate(a.appContext(), workspaceID)
+}
+
+func (a *App) UpdateWorkspace(request workspace.UpdateRequest) (workspace.Workspace, error) {
+	service, err := a.workspaceService()
+	if err != nil {
+		return workspace.Workspace{}, err
+	}
+	return service.Update(a.appContext(), request)
+}
+
+func (a *App) GetWorkspaceSummary(workspaceID string) (workspace.Summary, error) {
+	service, err := a.workspaceService()
+	if err != nil {
+		return workspace.Summary{}, err
+	}
+	return service.Summary(a.appContext(), workspaceID)
+}
+
+func (a *App) DeleteWorkspace(workspaceID string) (workspace.DeletionResult, error) {
+	service, err := a.workspaceService()
+	if err != nil {
+		return workspace.DeletionResult{}, err
+	}
+	return service.Delete(a.appContext(), workspaceID)
 }
 
 // RuntimeStatus reports the embedded UV bundle and supported provisioning modes.

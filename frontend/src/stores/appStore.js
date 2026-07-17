@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch, markRaw } from 'vue'
 import { apiService } from '../services/apiService'
+import { workspaceService } from '../services/workspaceService'
 import { localStateService } from '../services/localStateService'
 import { useAuthStore } from './authStore'
 import { normalizePlotlyFigure } from '../utils/figurePayload'
@@ -2412,7 +2413,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function fetchWorkspaces() {
-    const response = await apiService.v1ListWorkspaces()
+    const response = await workspaceService.list()
     const items = response?.workspaces || []
     workspaces.value = items
     await fetchWorkspaceDeletionJobs()
@@ -2465,7 +2466,7 @@ export const useAppStore = defineStore('app', () => {
       return null
     }
     try {
-      const summary = await apiService.v1GetWorkspaceSummary(target)
+      const summary = await workspaceService.summary(target)
       if (target === activeWorkspaceId.value) activeWorkspaceSummary.value = summary
       return summary
     } catch (_error) {
@@ -2477,6 +2478,10 @@ export const useAppStore = defineStore('app', () => {
   async function fetchWorkspaceAIConfig(workspaceId = activeWorkspaceId.value) {
     const target = String(workspaceId || '').trim()
     if (!target) {
+      workspaceAIConfig.value = null
+      return null
+    }
+    if (workspaceService.isNative()) {
       workspaceAIConfig.value = null
       return null
     }
@@ -2507,7 +2512,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function createWorkspace(name, schemaContext = '') {
-    const ws = await apiService.v1CreateWorkspace(name, schemaContext)
+    const ws = await workspaceService.create(name, schemaContext)
     if (ws?.id) {
       await activateWorkspace(ws.id)
     }
@@ -2517,7 +2522,7 @@ export const useAppStore = defineStore('app', () => {
 
   async function activateWorkspace(workspaceId) {
     if (workspaceDeletionJobs.value.some((job) => job.workspace_id === workspaceId)) return
-    await apiService.v1ActivateWorkspace(workspaceId)
+    await workspaceService.activate(workspaceId)
     activeWorkspaceId.value = workspaceId
     workspaces.value = workspaces.value.map((workspace) => ({
       ...workspace,
@@ -2538,7 +2543,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function renameWorkspace(workspaceId, name, schemaContext = undefined) {
-    const updated = await apiService.v1RenameWorkspace(workspaceId, name, schemaContext)
+    const updated = await workspaceService.update(workspaceId, name, schemaContext)
     const idx = workspaces.value.findIndex((ws) => ws.id === workspaceId)
     if (idx >= 0) {
       workspaces.value[idx] = { ...workspaces.value[idx], ...updated }
@@ -2862,7 +2867,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function fetchWorkspaceDeletionJobs() {
-    const response = await apiService.v1ListWorkspaceDeletionJobs()
+    const response = await workspaceService.listDeletionJobs()
     workspaceDeletionJobs.value = response?.jobs || []
     workspaceDeletionJobs.value.forEach((job) => {
       if (job?.job_id) {
@@ -2885,10 +2890,10 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function deleteWorkspaceAsync(workspaceId) {
-    const job = await apiService.v1DeleteWorkspace(workspaceId)
-    upsertWorkspaceDeletionJob(job)
+    const job = await workspaceService.delete(workspaceId)
+    if (!workspaceService.isNative()) upsertWorkspaceDeletionJob(job)
     const jobId = String(job?.job_id || '').trim()
-    if (jobId) {
+    if (jobId && !workspaceService.isNative()) {
       startBackgroundOperation({
         id: `workspace-deletion-${jobId}`,
         type: 'workspace-delete',
@@ -2909,7 +2914,7 @@ export const useAppStore = defineStore('app', () => {
       profileData.value = null
       saveLocalConfig()
     }
-    pollWorkspaceDeletionJob(job.job_id)
+    if (!workspaceService.isNative()) pollWorkspaceDeletionJob(job.job_id)
     return job
   }
 

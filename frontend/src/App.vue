@@ -790,6 +790,7 @@ async function loadModelOnboardingStatus() {
 function handleModelOnboardingComplete(status) {
   modelOnboarding.status = status
   modelOnboarding.required = false
+  appStore.openSettings('workspace-general')
 }
 
 function handleAuthClose() {

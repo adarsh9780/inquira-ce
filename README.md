@@ -19,14 +19,24 @@ Model connection is handled natively by Go when the UI runs inside Wails:
   cached catalog.
 
 The Vue model-settings flow uses direct Wails bindings in the desktop build and
-retains its existing HTTP fallback for browser/Tauri development. Other product
-areas still use the Python API until their own vertical slices are migrated.
+retains its existing HTTP fallback for browser/Tauri development.
 
 On first Wails launch, Inquira now opens a focused model-connection flow before
 the workspace shell. Completion is persisted in SQLite only after a key-backed
 provider is configured or an Ollama endpoint successfully returns models. The
 in-app Setup checklist uses the same native connection status and then guides
 the user to workspace and local-data setup.
+
+Workspace metadata is also native in the Wails build. Go now creates, lists,
+activates, renames, and deletes workspaces in the same migrated SQLite database.
+The first workspace becomes active automatically, names are case-insensitively
+unique, and deleting the active workspace selects a remaining workspace. The
+browser/Tauri build retains its Python HTTP fallback.
+
+DuckDB files, dataset ingestion, conversations, workspace runtimes, and
+workspace-specific AI overrides are intentionally outside this slice. Their
+controls remain hidden in the Wails workspace view until those services are
+migrated.
 
 ## Runtime modes
 
@@ -68,6 +78,7 @@ internal/appdirs/              Central application path resolution
 internal/modelconfig/          SQLite, keychain, provider, and model services
 internal/netclient/            Proxy and certificate-aware HTTP client
 internal/runtimeprovision/     Runtime policy and provisioning service
+internal/workspace/            Native workspace metadata and activation service
 python/data_worker/            Minimal Python worker boundary
 build/                         Wails platform packaging assets
 ```

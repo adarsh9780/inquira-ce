@@ -98,8 +98,8 @@
                 <Transition name="motion-popover">
                   <div v-if="workspaceActionsOpen" class="motion-popover-surface absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-[var(--color-border)] bg-[var(--color-base)] p-1 shadow-lg">
                     <button v-if="isWorkspaceActive" type="button" class="nav-tab w-full text-left" @click="runWorkspaceAction(startRename)">Rename workspace</button>
-                    <button v-if="isWorkspaceActive" type="button" class="nav-tab w-full text-left" :disabled="isRuntimeActionInProgress" @click="runWorkspaceAction(retryWorkspaceRuntime)">Retry runtime</button>
-                    <button v-if="isWorkspaceActive" type="button" class="nav-tab w-full text-left" :disabled="isRuntimeActionInProgress" @click="runWorkspaceAction(hardResetWorkspaceRuntime)">Reset runtime</button>
+                    <button v-if="isWorkspaceActive && !isNativeWorkspaceMetadata" type="button" class="nav-tab w-full text-left" :disabled="isRuntimeActionInProgress" @click="runWorkspaceAction(retryWorkspaceRuntime)">Retry runtime</button>
+                    <button v-if="isWorkspaceActive && !isNativeWorkspaceMetadata" type="button" class="nav-tab w-full text-left" :disabled="isRuntimeActionInProgress" @click="runWorkspaceAction(hardResetWorkspaceRuntime)">Reset runtime</button>
                     <button type="button" class="nav-tab w-full text-left text-[var(--color-danger)]" @click="runWorkspaceAction(requestDeleteWorkspace, activeWorkspace.id)">Delete workspace</button>
                   </div>
                 </Transition>
@@ -148,7 +148,7 @@
               <p v-else class="text-xs text-[var(--color-text-muted)]">No workspace context added yet.</p>
             </div>
           </WorkspaceContextSection>
-            <div class="border-t border-[var(--color-border)] pt-4">
+            <div v-if="!isNativeWorkspaceMetadata" class="border-t border-[var(--color-border)] pt-4">
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <h4 class="section-label">Runtime</h4>
@@ -159,11 +159,11 @@
             </div>
           </div>
 
-          <div v-show="activeWorkspaceSection === 'ai'" role="tabpanel" aria-label="Workspace AI settings">
+          <div v-if="!isNativeWorkspaceMetadata && activeWorkspaceSection === 'ai'" role="tabpanel" aria-label="Workspace AI settings">
             <WorkspaceAIConfigSection v-if="activeWorkspace?.id" :workspace-id="activeWorkspace.id" />
           </div>
 
-          <div v-show="activeWorkspaceSection === 'data'" role="tabpanel" aria-label="Workspace data settings">
+          <div v-if="!isNativeWorkspaceMetadata && activeWorkspaceSection === 'data'" role="tabpanel" aria-label="Workspace data settings">
             <WorkspaceDatasetSection>
             <div class="flex items-center justify-between gap-3">
               <h4 class="section-label">Linked Datasets</h4>
@@ -255,6 +255,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { stat } from '@tauri-apps/plugin-fs'
 import { apiService } from '../../../services/apiService'
+import { workspaceService } from '../../../services/workspaceService'
 import { previewService } from '../../../services/previewService'
 import { settingsWebSocket } from '../../../services/websocketService'
 import { useAppStore } from '../../../stores/appStore'
@@ -293,11 +294,14 @@ const emit = defineEmits(['select-workspace', 'activate-workspace', 'workspace-o
 
 const appStore = useAppStore()
 useWorkspaceDatasets()
-const workspaceSections = [
-  { id: 'general', label: 'General' },
-  { id: 'data', label: 'Data' },
-  { id: 'ai', label: 'AI' },
-]
+const isNativeWorkspaceMetadata = workspaceService.isNative()
+const workspaceSections = isNativeWorkspaceMetadata
+  ? [{ id: 'general', label: 'General' }]
+  : [
+      { id: 'general', label: 'General' },
+      { id: 'data', label: 'Data' },
+      { id: 'ai', label: 'AI' },
+    ]
 const activeWorkspaceSection = ref('general')
 const workspaceActionsOpen = ref(false)
 const workspaceActionsRef = ref(null)
@@ -610,7 +614,7 @@ async function hydrateWorkspaceCards() {
   await Promise.all(
     ids.map(async (workspaceId) => {
       try {
-        const summary = await apiService.v1GetWorkspaceSummary(workspaceId)
+        const summary = await workspaceService.summary(workspaceId)
         summaries[workspaceId] = summary
       } catch {
         summaries[workspaceId] = {}
@@ -671,7 +675,7 @@ async function loadWorkspaceDetail() {
     return
   }
   try {
-    workspaceDetail.value = await apiService.v1GetWorkspaceSummary(workspaceId)
+    workspaceDetail.value = await workspaceService.summary(workspaceId)
   } catch {
     workspaceDetail.value = null
   } finally {
@@ -775,6 +779,10 @@ async function ensureWorkspaceIdentityPersisted({
 async function loadWorkspaceDatasets() {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   if (!workspaceId) {
+    datasetEntries.value = []
+    return
+  }
+  if (isNativeWorkspaceMetadata) {
     datasetEntries.value = []
     return
   }
@@ -1301,6 +1309,7 @@ async function retryLastDatasetIngestion() {
 }
 
 async function loadActiveDatasetDeletionJobs() {
+  if (isNativeWorkspaceMetadata) return
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   if (!workspaceId) return
   try {
@@ -1616,7 +1625,10 @@ async function deleteWorkspace() {
     if (fallbackId) {
       emit('select-workspace', fallbackId)
     }
-    toast.success('Workspace deletion started', 'Workspace deletion is running in background.')
+    toast.success(
+      isNativeWorkspaceMetadata ? 'Workspace deleted' : 'Workspace deletion started',
+      isNativeWorkspaceMetadata ? 'Workspace metadata was deleted.' : 'Workspace deletion is running in background.',
+    )
   } catch (error) {
     toast.error('Delete failed', extractApiErrorMessage(error, 'Failed to delete workspace.'))
   } finally {

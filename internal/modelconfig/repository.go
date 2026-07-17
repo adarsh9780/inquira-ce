@@ -31,6 +31,10 @@ func OpenSQLite(path string) (*SQLiteRepository, error) {
 	}
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
+	if _, err := db.Exec(`PRAGMA busy_timeout = 5000`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("configure settings database: %w", err)
+	}
 	repository := &SQLiteRepository{db: db}
 	if err := repository.migrate(context.Background()); err != nil {
 		_ = db.Close()

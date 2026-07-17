@@ -100,6 +100,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAppStore } from '../stores/appStore'
 import { toast } from '../composables/useToast'
 import { extractApiErrorMessage } from '../utils/apiError'
+import { workspaceService } from '../services/workspaceService'
 import WorkspaceRenameModal from './modals/WorkspaceRenameModal.vue'
 import ConfirmationModal from './modals/ConfirmationModal.vue'
 import FloatingActionMenu from './ui/FloatingActionMenu.vue'
@@ -120,11 +121,16 @@ const workspaceContextMenuX = ref(0)
 const workspaceContextMenuY = ref(0)
 const contextWorkspaceId = ref('')
 
-const workspaceContextMenuItems = [
-  { id: 'rename', label: 'Rename Workspace' },
-  { id: 'clear', label: 'Clear Workspace Database' },
-  { id: 'delete', label: 'Delete Workspace', destructive: true, dividerBefore: true },
-]
+const workspaceContextMenuItems = workspaceService.isNative()
+  ? [
+      { id: 'rename', label: 'Rename Workspace' },
+      { id: 'delete', label: 'Delete Workspace', destructive: true, dividerBefore: true },
+    ]
+  : [
+      { id: 'rename', label: 'Rename Workspace' },
+      { id: 'clear', label: 'Clear Workspace Database' },
+      { id: 'delete', label: 'Delete Workspace', destructive: true, dividerBefore: true },
+    ]
 
 const activeWorkspaceName = computed(() => {
   const active = appStore.workspaces.find((w) => w.id === appStore.activeWorkspaceId)
@@ -138,9 +144,11 @@ function toggleOpen() {
 async function activateWorkspace(workspaceId) {
   try {
     await appStore.activateWorkspace(workspaceId)
-    await appStore.fetchConversations()
-    if (appStore.activeConversationId) {
-      await appStore.fetchConversationTurns({ reset: true })
+    if (!workspaceService.isNative()) {
+      await appStore.fetchConversations()
+      if (appStore.activeConversationId) {
+        await appStore.fetchConversationTurns({ reset: true })
+      }
     }
     isOpen.value = false
   } catch (error) {
@@ -172,7 +180,9 @@ function closeDeleteDialog() {
 const deleteDialogMessage = computed(() => {
   const target = appStore.workspaces.find((ws) => ws.id === pendingDeleteWorkspaceId.value)
   const name = target?.name || 'this workspace'
-  return `Are you sure you want to delete ${name}? Cleanup will run in the background and cannot be undone.`
+  return workspaceService.isNative()
+    ? `Are you sure you want to delete ${name}? This cannot be undone.`
+    : `Are you sure you want to delete ${name}? Cleanup will run in the background and cannot be undone.`
 })
 
 async function deleteWorkspace() {
@@ -180,7 +190,12 @@ async function deleteWorkspace() {
   if (!workspaceId) return
   try {
     const job = await appStore.deleteWorkspaceAsync(workspaceId)
-    toast.info('Workspace Deletion Started', `Deleting workspace in background (job: ${job.job_id.slice(0, 8)}...).`)
+    if (workspaceService.isNative()) {
+      await appStore.fetchWorkspaces()
+      toast.success('Workspace Deleted', 'Workspace metadata was deleted.')
+    } else {
+      toast.info('Workspace Deletion Started', `Deleting workspace in background (job: ${job.job_id.slice(0, 8)}...).`)
+    }
     closeDeleteDialog()
   } catch (error) {
     toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to delete workspace'))
