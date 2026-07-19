@@ -55,6 +55,15 @@ func (f *fakeCatalogGateway) Build(_ context.Context, request BuildRequest) (Bui
 	f.request = request
 	started, continueRun := f.started, f.continueRun
 	result, err := f.result, f.err
+	if result.DatabasePath == "" {
+		result.DatabasePath = request.DatabasePath
+	}
+	if result.Fingerprint == "" {
+		result.Fingerprint = request.Fingerprint
+	}
+	if result.TableCount == 0 && len(request.Tables) > 0 {
+		result.TableCount = len(request.Tables)
+	}
 	f.mu.Unlock()
 	if started != nil {
 		started <- struct{}{}
@@ -161,6 +170,14 @@ func TestPrepareValidatesWorkspaceAndSafeStorageIdentity(t *testing.T) {
 	service = NewService(fakeWorkspaces{summary: workspace.Summary{ID: "../escape"}}, fakeConnections{}, gateway, t.TempDir())
 	if _, err := service.Prepare(context.Background(), "../escape"); errorCode(err) != "catalog_workspace_invalid" {
 		t.Fatalf("unsafe id error = %v", err)
+	}
+}
+
+func TestPrepareRejectsAWorkerResultForAnotherCatalog(t *testing.T) {
+	gateway := &fakeCatalogGateway{result: BuildResult{DatabasePath: "/wrong/catalog.duckdb", Fingerprint: "wrong", TableCount: 99}}
+	service := NewService(fakeWorkspaces{summary: workspace.Summary{ID: "workspace-1"}}, fakeConnections{}, gateway, t.TempDir())
+	if _, err := service.Prepare(context.Background(), "workspace-1"); errorCode(err) != "catalog_invalid_result" {
+		t.Fatalf("invalid result error = %v", err)
 	}
 }
 

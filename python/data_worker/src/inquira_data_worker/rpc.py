@@ -6,6 +6,7 @@ from dataclasses import asdict, is_dataclass
 from typing import Any
 
 from .adapters.registry import get_adapter
+from .catalog import build_catalog
 from .errors import AdapterError
 from .models import AdapterRequest, MaterializeRequest
 
@@ -24,8 +25,11 @@ def handle_request(request: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(params, dict):
             raise AdapterError("invalid_params", "RPC params must be an object.")
         method = request["method"]
-        if method not in {"discover", "preview", "materialize"}:
+        if method not in {"discover", "preview", "materialize", "build_catalog"}:
             raise AdapterError("method_not_found", f"RPC method {method} was not found.")
+        if method == "build_catalog":
+            response["result"] = _result(build_catalog(params))
+            return response
         adapter_kind = params.get("adapter_kind")
         source_path = params.get("source_path")
         if not isinstance(adapter_kind, str) or not isinstance(source_path, str) or not source_path.strip():

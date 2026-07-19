@@ -39,6 +39,7 @@ def test_catalog_builds_queryable_views_for_snapshot_paths_and_unicode_names(tmp
     assert result.byte_size == database.stat().st_size
     connection = duckdb.connect(str(database), read_only=True)
     try:
+        assert {row[0] for row in connection.execute("SHOW TABLES").fetchall()} == {"north_sales", "東京_sales"}
         assert connection.execute('SELECT label FROM "north_sales"').fetchone()[0] == "José"
         assert connection.execute('SELECT label FROM "東京_sales"').fetchone()[0] == "東京"
     finally:

@@ -50,10 +50,12 @@ certificate settings are passed only to that setup run and are not saved by
 Inquira.
 
 Legacy `.xls` files are not accepted because the streaming reader supports the
-modern Office Open XML format only. SQLite is the next planned adapter and will
-reuse the same discovery, explicit table selection, and multi-output contract.
-Conversations, analysis runtimes, and workspace-specific AI overrides remain
-outside the current migration slice.
+modern Office Open XML format only. The SQLite connector is deferred. Before
+chat or code execution starts, Go can now prepare an atomic workspace DuckDB
+catalog whose read-only views point at the latest connection snapshots. This
+gives future analysis processes one stable database contract without copying
+the imported data again. Conversations, analysis execution, and
+workspace-specific AI overrides remain outside the current migration slice.
 
 ## Runtime modes
 

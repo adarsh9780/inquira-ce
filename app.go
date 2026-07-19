@@ -7,7 +7,9 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"inquira-go/internal/appdirs"
+	"inquira-go/internal/apperror"
 	"inquira-go/internal/connection"
+	"inquira-go/internal/datacatalog"
 	"inquira-go/internal/modelconfig"
 	"inquira-go/internal/netclient"
 	"inquira-go/internal/runtimeprovision"
@@ -23,6 +25,7 @@ type App struct {
 	models      *modelconfig.Service
 	workspaces  *workspace.Service
 	connections *connection.Service
+	catalog     *datacatalog.Service
 	initErr     error
 }
 
@@ -77,6 +80,9 @@ func NewApp() *App {
 	app.connections = connection.NewService(
 		connectionRepository, connection.NewWorkerGateway(transport), filepath.Join(paths.DataDir, "snapshots"),
 	)
+	app.catalog = datacatalog.NewService(
+		app.workspaces, app.connections, datacatalog.NewWorkerGateway(transport), filepath.Join(paths.DataDir, "workspaces"),
+	)
 	return app
 }
 
@@ -103,6 +109,16 @@ func (a *App) connectionService() (*connection.Service, error) {
 		return nil, a.initErr
 	}
 	return a.connections, nil
+}
+
+func (a *App) catalogService() (*datacatalog.Service, error) {
+	if a.initErr != nil {
+		return nil, a.initErr
+	}
+	if a.catalog == nil {
+		return nil, apperror.New("catalog_unavailable", "Workspace analysis catalog is unavailable.")
+	}
+	return a.catalog, nil
 }
 
 func (a *App) workspaceService() (*workspace.Service, error) {
@@ -250,10 +266,23 @@ func (a *App) DeleteWorkspace(workspaceID string) (workspace.DeletionResult, err
 	if err != nil {
 		return workspace.DeletionResult{}, err
 	}
+	if catalogService, catalogErr := a.catalogService(); catalogErr != nil {
+		return workspace.DeletionResult{}, catalogErr
+	} else if catalogErr := catalogService.Remove(workspaceID); catalogErr != nil {
+		return workspace.DeletionResult{}, catalogErr
+	}
 	if err := connectionService.DeleteWorkspaceConnections(a.appContext(), workspaceID); err != nil {
 		return workspace.DeletionResult{}, err
 	}
 	return service.Delete(a.appContext(), workspaceID)
+}
+
+func (a *App) PrepareWorkspaceCatalog(workspaceID string) (datacatalog.Catalog, error) {
+	service, err := a.catalogService()
+	if err != nil {
+		return datacatalog.Catalog{}, err
+	}
+	return service.Prepare(a.appContext(), workspaceID)
 }
 
 func (a *App) ListConnections(workspaceID string) (connection.ListResponse, error) {
