@@ -40,3 +40,11 @@ test('native file picker accepts modern Excel workbooks without claiming legacy 
   assert.match(app, /\*\.xlsx;\*\.XLSX/)
   assert.doesNotMatch(app, /\*\.xls;/)
 })
+
+test('native workspace exposes an analysis catalog built from connection snapshots', () => {
+  const app = read('../app.go')
+  const service = read('src/services/catalogService.js')
+  assert.match(app, /PrepareWorkspaceCatalog/)
+  assert.match(service, /PrepareWorkspaceCatalog/)
+  assert.match(service, /workspaceId/)
+})

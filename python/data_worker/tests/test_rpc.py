@@ -81,3 +81,20 @@ def test_rpc_passes_excel_sheet_selection_to_preview(tmp_path: Path) -> None:
 
     assert response["error"] is None
     assert response["result"]["rows"] == [{"id": 1}]
+
+
+def test_rpc_builds_a_workspace_catalog(tmp_path: Path) -> None:
+    source = tmp_path / "source.parquet"
+    import duckdb
+    duckdb.sql(f"COPY (SELECT 1 AS id) TO '{source}' (FORMAT PARQUET)")
+    response = handle_request({
+        "id": "catalog",
+        "method": "build_catalog",
+        "params": {
+            "database_path": str(tmp_path / "workspace.duckdb"),
+            "fingerprint": "one",
+            "tables": [{"id": "table-1", "name": "sales", "snapshot_path": str(source)}],
+        },
+    })
+    assert response["error"] is None
+    assert response["result"]["table_count"] == 1
