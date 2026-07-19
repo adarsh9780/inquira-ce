@@ -196,6 +196,125 @@ func TestAnalyzeRejectsConversationFromAnotherWorkspaceAndInvalidInput(t *testin
 	}
 }
 
+func TestAnalyzeSendsOnlySelectedBranchContextAndSafeArtifactMetadata(t *testing.T) {
+	gateway := &fakeAgentGateway{result: AgentWorkerResult{
+		Success: true, Answer: "West remains the largest region.", Code: "result = conn.sql('select 1').df()",
+		Execution: analysisruntime.ExecuteWorkerResult{Success: true, Result: json.RawMessage(`1`), ResultKind: "scalar"},
+	}}
+	service, conversations, workspaceID, _ := newAgentService(t, gateway)
+	created, err := conversations.CreateConversation(context.Background(), conversation.CreateConversationRequest{WorkspaceID: workspaceID, Title: "Regional sales"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := conversations.CreateTurn(context.Background(), conversation.CreateTurnRequest{
+		ConversationID: created.ID, UserText: "Which region has the most sales?",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err = conversations.CompleteTurn(context.Background(), conversation.CompleteTurnRequest{
+		TurnID: root.ID, AssistantText: "West has the most sales.", CodeSnapshot: "result = sales_by_region",
+		ResultKind: "dataframe", ResultJSON: `{"columns":["region","sales"],"rows":[{"region":"West","sales":42}]}`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := conversations.PublishArtifact(context.Background(), conversation.PublishArtifactRequest{
+		ConversationID: created.ID, TurnID: root.ID, Kind: "dataframe", LogicalName: "sales_by_region",
+		DisplayName: "Sales by region", PayloadFormat: "parquet", MediaType: "application/vnd.apache.parquet",
+	}, strings.NewReader("PAR1-history"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	child, err := conversations.CreateTurn(context.Background(), conversation.CreateTurnRequest{
+		ConversationID: created.ID, ParentTurnID: &root.ID, UserText: "How much did West sell?",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	child, err = conversations.CompleteTurn(context.Background(), conversation.CompleteTurnRequest{
+		TurnID: child.ID, AssistantText: "West sold 42.", ResultKind: "scalar", ResultJSON: `42`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sibling, err := conversations.CreateTurn(context.Background(), conversation.CreateTurnRequest{
+		ConversationID: created.ID, ParentTurnID: &root.ID, UserText: "Ignore West and discuss East.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversations.CompleteTurn(context.Background(), conversation.CompleteTurnRequest{
+		TurnID: sibling.ID, AssistantText: "East branch answer.", ResultKind: "scalar", ResultJSON: `18`,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := service.Analyze(context.Background(), AnalyzeRequest{
+		WorkspaceID: workspaceID, ConversationID: created.ID, ParentTurnID: &child.ID,
+		Question: "Is it still the largest?", TimeoutSeconds: 30,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(gateway.request.Context.Turns) != 2 {
+		t.Fatalf("context = %#v", gateway.request.Context)
+	}
+	if gateway.request.Context.Turns[0].TurnID != root.ID || gateway.request.Context.Turns[1].TurnID != child.ID {
+		t.Fatalf("context order = %#v", gateway.request.Context.Turns)
+	}
+	encoded, _ := json.Marshal(gateway.request.Context)
+	if strings.Contains(string(encoded), "East branch") || strings.Contains(string(encoded), "West\",\"sales\":42") || strings.Contains(string(encoded), artifact.RelativePath) {
+		t.Fatalf("context leaked sibling, row samples, or storage path: %s", encoded)
+	}
+	if len(gateway.request.Context.Turns[0].Artifacts) != 1 || gateway.request.Context.Turns[0].Artifacts[0].LogicalName != "sales_by_region" {
+		t.Fatalf("artifact context = %#v", gateway.request.Context.Turns[0].Artifacts)
+	}
+	persisted, err := conversations.GetTurn(context.Background(), result.Turn.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(persisted.MetadataJSON, root.ID) || !strings.Contains(persisted.MetadataJSON, child.ID) || strings.Contains(persisted.MetadataJSON, "runtime-secret") {
+		t.Fatalf("context references were not persisted safely: %s", persisted.MetadataJSON)
+	}
+}
+
+func TestAnalyzeIncludesHistoricalResultSamplesOnlyWhenEnabled(t *testing.T) {
+	gateway := &fakeAgentGateway{result: AgentWorkerResult{
+		Success: true, Answer: "Answer", Code: "result = 1",
+		Execution: analysisruntime.ExecuteWorkerResult{Success: true, Result: json.RawMessage(`1`), ResultKind: "scalar"},
+	}}
+	service, conversations, workspaceID, _ := newAgentService(t, gateway)
+	service.models = &fakeModelSource{config: modelconfig.RuntimeConfiguration{
+		Provider: "openai", Model: "gpt-test", APIKey: "runtime-secret", AllowDataSamples: true,
+	}}
+	created, err := conversations.CreateConversation(context.Background(), conversation.CreateConversationRequest{WorkspaceID: workspaceID, Title: "Samples"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := conversations.CreateTurn(context.Background(), conversation.CreateTurnRequest{ConversationID: created.ID, UserText: "Show sales"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err = conversations.CompleteTurn(context.Background(), conversation.CompleteTurnRequest{
+		TurnID: root.ID, AssistantText: "West sold 42.", ResultKind: "dataframe",
+		ResultJSON: `{"columns":["region","sales"],"rows":[{"region":"West","sales":42}]}`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Analyze(context.Background(), AnalyzeRequest{
+		WorkspaceID: workspaceID, ConversationID: created.ID, ParentTurnID: &root.ID,
+		Question: "Repeat that", TimeoutSeconds: 30,
+	}, nil); err != nil {
+		t.Fatal(err)
+	}
+	encoded, _ := json.Marshal(gateway.request.Context)
+	if !strings.Contains(string(encoded), `West`) || !strings.Contains(string(encoded), `42`) {
+		t.Fatalf("enabled historical samples missing: %s", encoded)
+	}
+}
+
 func appErrorCode(err error) string {
 	var appError *apperror.Error
 	if errors.As(err, &appError) {

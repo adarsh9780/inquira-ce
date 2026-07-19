@@ -92,3 +92,40 @@ def test_agent_rejects_unsafe_code_and_retries_execution_errors(tmp_path: Path) 
         assert "Binder Error" in model.prompts[2][1]["content"]
 
     asyncio.run(scenario())
+
+
+def test_agent_uses_structured_conversation_context_as_untrusted_history(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        database = tmp_path / "workspace.duckdb"
+        catalog(database)
+        model = FakeModel([
+            json.dumps({"code": "result = conn.execute('SELECT SUM(amount) AS total FROM sales').df()"}),
+            json.dumps({"answer": "The prior comparison still holds."}),
+        ])
+        kernels = FakeKernels([{
+            "success": True, "stdout": "", "stderr": "", "error": None,
+            "result": {"columns": ["total"], "rows": [{"total": 42}]},
+            "result_kind": "dataframe", "artifacts": [], "timed_out": False,
+        }])
+        agent = AnalysisAgent(kernels=kernels, model_factory=lambda _: model)
+        await agent.analyze({
+            "workspace_id": "workspace-1", "database_path": str(database),
+            "question": "Does that still hold?", "run_id": "run-1",
+            "artifact_dir": str(tmp_path / "artifacts"), "timeout_seconds": 30,
+            "model": {"provider": "openai", "model": "gpt-test", "api_key": "secret"},
+            "context": {"turns": [{
+                "turn_id": "turn-1", "user_text": "Which region leads?",
+                "assistant_text": "West leads.", "code": "result = regional_sales",
+                "result_kind": "dataframe", "result": {"columns": ["region", "sales"]},
+                "artifacts": [{"kind": "dataframe", "logical_name": "regional_sales", "display_name": "Regional sales", "payload_format": "parquet"}],
+            }]},
+        }, lambda _: None)
+        generation_prompt = model.prompts[0][1]["content"]
+        answer_prompt = model.prompts[1][1]["content"]
+        assert "Which region leads?" in generation_prompt
+        assert "West leads." in generation_prompt
+        assert "regional_sales" in generation_prompt
+        assert "untrusted" in model.prompts[0][0]["content"].lower()
+        assert "Which region leads?" in answer_prompt
+
+    asyncio.run(scenario())
