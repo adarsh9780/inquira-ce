@@ -145,7 +145,7 @@ func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func
 		if persistErr != nil {
 			return AnalyzeResult{}, persistErr
 		}
-		return AnalyzeResult{Conversation: ownedConversation, Turn: turn, Answer: workerResult.Answer, Code: workerResult.Code, Execution: workerResult.Execution}, nil
+		return AnalyzeResult{Conversation: ownedConversation, Turn: turn, Answer: workerResult.Answer, Code: workerResult.Code, RunID: run.ID, Execution: workerResult.Execution}, nil
 	}
 	artifacts, err := s.runs.PublishCandidates(ctx, ownedConversation, turn, run, workerResult.Execution.Artifacts)
 	if err != nil {
@@ -164,7 +164,7 @@ func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func
 	}
 	return AnalyzeResult{
 		Conversation: ownedConversation, Turn: completed, Answer: workerResult.Answer, Code: workerResult.Code,
-		Execution: workerResult.Execution, Artifacts: artifacts,
+		RunID: run.ID, Execution: workerResult.Execution, Artifacts: artifacts,
 	}, nil
 }
 

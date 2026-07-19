@@ -7,6 +7,7 @@ import { normalizeExecutionResponse } from '../utils/runtimeExecution'
 import { extractApiErrorMessage } from '../utils/apiError'
 import { useAppStore } from '../stores/appStore'
 import { invoke } from '@tauri-apps/api/core'
+import { EventsOn } from '../../wailsjs/runtime/runtime'
 
 
 // ------------------------------------------------------------------
@@ -34,6 +35,115 @@ function getDefaultApiBase() {
   }
 
   return 'http://127.0.0.1:8000'
+}
+
+function nativeWailsApp() {
+  if (typeof window === 'undefined') return null
+  return window.go?.main?.App || null
+}
+
+function normalizeNativeTurn(turn) {
+  if (!turn || typeof turn !== 'object') return turn
+  const parse = (value, fallback) => {
+    if (typeof value !== 'string' || !value.trim()) return fallback
+    try { return JSON.parse(value) } catch (_error) { return fallback }
+  }
+  return {
+    ...turn,
+    metadata: parse(turn.metadata_json, {}),
+    tool_events: parse(turn.tool_events_json, []),
+    result: parse(turn.result_json, null),
+  }
+}
+
+function nativeTurnTree(turns) {
+  const normalized = (Array.isArray(turns) ? turns : []).map(normalizeNativeTurn)
+  const nodes = new Map(normalized.map((turn) => [String(turn.id), {
+    ...turn,
+    display_no: Number(turn.sequence || 0),
+    children: [],
+  }]))
+  const roots = []
+  for (const turn of normalized) {
+    const node = nodes.get(String(turn.id))
+    const parent = turn.parent_turn_id ? nodes.get(String(turn.parent_turn_id)) : null
+    if (parent) parent.children.push(node)
+    else roots.push(node)
+  }
+  return { turns: normalized, roots }
+}
+
+function nativeStatusMessage(stage) {
+  return ({
+    reading_schema: 'Reading the workspace schema…',
+    generating: 'Writing analysis code…',
+    executing: 'Running analysis code…',
+    retrying: 'Correcting the analysis…',
+    explaining: 'Explaining the result…',
+    completed: 'Analysis complete.',
+  })[String(stage || '')] || 'Working on the analysis…'
+}
+
+function normalizeNativeAnalysis(raw) {
+  const execution = raw?.execution && typeof raw.execution === 'object' ? raw.execution : {}
+  const publishedArtifacts = (Array.isArray(raw?.artifacts) ? raw.artifacts : []).map((artifact) => ({
+    ...artifact,
+    artifact_id: String(artifact?.artifact_id || artifact?.id || ''),
+  }))
+  let result = execution.result ?? null
+  if (String(execution.result_kind || '').toLowerCase() === 'dataframe' && result && Array.isArray(result.rows)) {
+    result = { ...result, data: result.rows, row_count: result.rows.length }
+  }
+  return {
+    conversation_id: String(raw?.conversation?.id || ''),
+    turn_id: String(raw?.turn?.id || ''),
+    is_safe: execution.success !== false,
+    is_relevant: true,
+    code: String(raw?.code || ''),
+    explanation: String(raw?.answer || ''),
+    result_explanation: String(raw?.answer || ''),
+    code_explanation: '',
+    run_id: String(raw?.run_id || ''),
+    execution: { ...execution, run_id: String(raw?.run_id || ''), artifacts: publishedArtifacts },
+    result,
+    result_kind: execution.result_kind || '',
+    artifacts: publishedArtifacts,
+    metadata: {},
+  }
+}
+
+async function nativeAnalyze(payload, { signal = null, onEvent = null } = {}) {
+  const app = nativeWailsApp()
+  if (!app || typeof app.AnalyzeQuestion !== 'function') return null
+  const request = {
+    workspace_id: String(payload?.workspace_id || ''),
+    conversation_id: String(payload?.conversation_id || ''),
+    parent_turn_id: payload?.selected_parent_turn_id ? String(payload.selected_parent_turn_id) : null,
+    question: String(payload?.question || ''),
+    timeout_seconds: 360,
+  }
+  let unsubscribe = () => {}
+  if (onEvent && window.runtime?.EventsOnMultiple) {
+    unsubscribe = EventsOn('agent-runtime-event', (event) => {
+      const type = String(event?.type || 'status')
+      const data = event?.data && typeof event.data === 'object' ? { ...event.data } : {}
+      if (type === 'agent_status' && !data.message) data.message = nativeStatusMessage(data.stage)
+      onEvent({ event: type, data })
+    }) || (() => {})
+  }
+  const onAbort = () => {
+    if (typeof app.InterruptWorkspaceKernel === 'function') {
+      void app.InterruptWorkspaceKernel(request.workspace_id)
+    }
+  }
+  if (signal) signal.addEventListener('abort', onAbort, { once: true })
+  try {
+    const raw = await withAbortSignal(app.AnalyzeQuestion(request), signal)
+    return normalizeNativeAnalysis(raw)
+  } finally {
+    if (signal) signal.removeEventListener('abort', onAbort)
+    unsubscribe()
+  }
 }
 
 const resolvedEnvBase = (import.meta.env.VITE_API_BASE || '').trim()
@@ -938,14 +1048,25 @@ export const apiService = {
   },
 
   async v1ListConversations(workspaceId, limit = 50) {
+    const app = nativeWailsApp()
+    if (app?.ListConversations) {
+      const conversations = await app.ListConversations(String(workspaceId || ''))
+      return { conversations: (Array.isArray(conversations) ? conversations : []).slice(0, limit) }
+    }
     return v1Api.conversations.list(workspaceId, limit)
   },
 
   async v1CreateConversation(workspaceId, title = null) {
+    const app = nativeWailsApp()
+    if (app?.CreateConversation) {
+      return app.CreateConversation({ workspace_id: String(workspaceId || ''), title: String(title || 'New conversation') })
+    }
     return v1Api.conversations.create(workspaceId, title)
   },
 
   async v1DeleteConversation(conversationId) {
+    const app = nativeWailsApp()
+    if (app?.DeleteConversation) return app.DeleteConversation(String(conversationId || ''))
     return v1Api.conversations.remove(conversationId)
   },
 
@@ -954,30 +1075,70 @@ export const apiService = {
   },
 
   async v1GetConversationUsage(conversationId) {
+    if (nativeWailsApp()) {
+      return { conversation_id: String(conversationId || ''), request_count: 0, usage: {} }
+    }
     return v1Api.conversations.usage(conversationId)
   },
 
   async v1ListTurns(conversationId, limit = 5, before = null) {
+    const app = nativeWailsApp()
+    if (app?.ListConversationTurns) {
+      const all = (await app.ListConversationTurns(String(conversationId || ''))).map(normalizeNativeTurn).reverse()
+      return { turns: all.slice(0, limit), next_cursor: null }
+    }
     const params = { limit }
     if (before) params.before = before
     return v1Api.conversations.turns(conversationId, params)
   },
 
   async v1GetTurn(conversationId, turnId) {
+    const app = nativeWailsApp()
+    if (app?.GetConversationTurn) return normalizeNativeTurn(await app.GetConversationTurn(String(turnId || '')))
     return axios.get(`/api/v1/conversations/${conversationId}/turns/${turnId}`)
   },
 
   async v1GetTurnRelations(conversationId, turnId) {
+    const app = nativeWailsApp()
+    if (app?.ListConversationTurns) {
+      const turns = (await app.ListConversationTurns(String(conversationId || ''))).map(normalizeNativeTurn)
+      const index = turns.findIndex((turn) => String(turn.id) === String(turnId))
+      const current = index >= 0 ? turns[index] : null
+      return {
+        current,
+        parent: current?.parent_turn_id ? turns.find((turn) => String(turn.id) === String(current.parent_turn_id)) || null : null,
+        children: current ? turns.filter((turn) => String(turn.parent_turn_id || '') === String(current.id)) : [],
+        previous_turn: index > 0 ? turns[index - 1] : null,
+        next_turn: index >= 0 && index < turns.length - 1 ? turns[index + 1] : null,
+      }
+    }
     return axios.get(`/api/v1/conversations/${conversationId}/turns/${turnId}/relations`)
   },
 
   async v1GetTurnTree(conversationId, currentTurnId = null) {
+    const app = nativeWailsApp()
+    if (app?.ListConversationTurns) {
+      const tree = nativeTurnTree(await app.ListConversationTurns(String(conversationId || '')))
+      return { conversation_id: String(conversationId || ''), current_turn_id: currentTurnId, roots: tree.roots }
+    }
     const params = {}
     if (currentTurnId) params.current_turn_id = currentTurnId
     return axios.get(`/api/v1/conversations/${conversationId}/turn-tree`, { params })
   },
 
   async v1GetWorkspaceTurnTree(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.ListConversations && app?.ListConversationTurns) {
+      const conversations = await app.ListConversations(String(workspaceId || ''))
+      return {
+        workspace_id: String(workspaceId || ''),
+        conversations: await Promise.all((Array.isArray(conversations) ? conversations : []).map(async (item) => {
+          const tree = nativeTurnTree(await app.ListConversationTurns(String(item.id || '')))
+          const finalTurn = [...tree.turns].reverse().find((turn) => turn.status === 'completed') || null
+          return { ...item, roots: tree.roots, final_turn_id: finalTurn?.id || null, usage_summary: null }
+        })),
+      }
+    }
     return axios.get(`/api/v1/workspaces/${workspaceId}/turn-tree`)
   },
 
@@ -999,6 +1160,11 @@ export const apiService = {
   },
 
   async v1GetFinalTurn(conversationId) {
+    const app = nativeWailsApp()
+    if (app?.ListConversationTurns) {
+      const turns = (await app.ListConversationTurns(String(conversationId || ''))).map(normalizeNativeTurn)
+      return [...turns].reverse().find((turn) => turn.status === 'completed') || null
+    }
     return axios.get(`/api/v1/conversations/${conversationId}/final-turn`)
   },
 
@@ -1011,6 +1177,8 @@ export const apiService = {
   },
 
   async v1Analyze(payload) {
+    const native = await nativeAnalyze(payload)
+    if (native) return native
     return v1Api.chat.analyze(payload)
   },
 
@@ -1069,6 +1237,8 @@ export const apiService = {
   },
 
   async v1AnalyzeStream(payload, { signal = null, onEvent = null } = {}) {
+    const native = await nativeAnalyze(payload, { signal, onEvent })
+    if (native) return native
     const url = `${apiBaseUrl.replace(/\/+$/, '')}${v1Api.chat.stream}`
     const response = await authorizedFetch(url, {
       method: 'POST',

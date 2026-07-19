@@ -387,6 +387,14 @@ func (a *App) ListConversationTurns(conversationID string) ([]conversation.Turn,
 	return service.ListTurns(a.appContext(), conversationID)
 }
 
+func (a *App) GetConversationTurn(turnID string) (conversation.Turn, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return conversation.Turn{}, err
+	}
+	return service.GetTurn(a.appContext(), turnID)
+}
+
 func (a *App) CompleteConversationTurn(request conversation.CompleteTurnRequest) (conversation.Turn, error) {
 	service, err := a.conversationService()
 	if err != nil {

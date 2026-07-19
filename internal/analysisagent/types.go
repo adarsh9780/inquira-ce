@@ -37,6 +37,7 @@ type AnalyzeResult struct {
 	Turn         conversation.Turn                   `json:"turn"`
 	Answer       string                              `json:"answer"`
 	Code         string                              `json:"code"`
+	RunID        string                              `json:"run_id"`
 	Execution    analysisruntime.ExecuteWorkerResult `json:"execution"`
 	Artifacts    []conversation.Artifact             `json:"artifacts"`
 }
