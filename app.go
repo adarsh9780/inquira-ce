@@ -9,6 +9,7 @@ import (
 	"inquira-go/internal/appdirs"
 	"inquira-go/internal/apperror"
 	"inquira-go/internal/connection"
+	"inquira-go/internal/conversation"
 	"inquira-go/internal/datacatalog"
 	"inquira-go/internal/modelconfig"
 	"inquira-go/internal/netclient"
@@ -19,14 +20,15 @@ import (
 
 // App struct
 type App struct {
-	ctx         context.Context
-	paths       appdirs.Paths
-	provisioner *runtimeprovision.Provisioner
-	models      *modelconfig.Service
-	workspaces  *workspace.Service
-	connections *connection.Service
-	catalog     *datacatalog.Service
-	initErr     error
+	ctx           context.Context
+	paths         appdirs.Paths
+	provisioner   *runtimeprovision.Provisioner
+	models        *modelconfig.Service
+	workspaces    *workspace.Service
+	connections   *connection.Service
+	conversations *conversation.Service
+	catalog       *datacatalog.Service
+	initErr       error
 }
 
 // NewApp creates a new App application struct
@@ -83,6 +85,25 @@ func NewApp() *App {
 	app.catalog = datacatalog.NewService(
 		app.workspaces, app.connections, datacatalog.NewWorkerGateway(transport), filepath.Join(paths.DataDir, "workspaces"),
 	)
+	conversationRepository, err := conversation.OpenSQLite(paths.DatabasePath)
+	if err != nil {
+		_ = app.connections.Close()
+		_ = app.workspaces.Close()
+		_ = app.models.Close()
+		app.initErr = err
+		return app
+	}
+	app.conversations = conversation.NewService(
+		conversationRepository, conversation.NewFileHeap(filepath.Join(paths.DataDir, "workspaces")),
+	)
+	if _, err := app.conversations.ReconcileAll(context.Background()); err != nil {
+		_ = app.conversations.Close()
+		_ = app.connections.Close()
+		_ = app.workspaces.Close()
+		_ = app.models.Close()
+		app.initErr = err
+		return app
+	}
 	return app
 }
 
@@ -93,6 +114,9 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) shutdown(context.Context) {
+	if a.conversations != nil {
+		_ = a.conversations.Close()
+	}
 	if a.connections != nil {
 		_ = a.connections.Close()
 	}
@@ -102,6 +126,16 @@ func (a *App) shutdown(context.Context) {
 	if a.models != nil {
 		_ = a.models.Close()
 	}
+}
+
+func (a *App) conversationService() (*conversation.Service, error) {
+	if a.initErr != nil {
+		return nil, a.initErr
+	}
+	if a.conversations == nil {
+		return nil, apperror.New("conversation_unavailable", "Conversation storage is unavailable.")
+	}
+	return a.conversations, nil
 }
 
 func (a *App) connectionService() (*connection.Service, error) {
@@ -275,6 +309,70 @@ func (a *App) DeleteWorkspace(workspaceID string) (workspace.DeletionResult, err
 		return workspace.DeletionResult{}, err
 	}
 	return service.Delete(a.appContext(), workspaceID)
+}
+
+func (a *App) CreateConversation(request conversation.CreateConversationRequest) (conversation.Conversation, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return conversation.Conversation{}, err
+	}
+	return service.CreateConversation(a.appContext(), request)
+}
+
+func (a *App) ListConversations(workspaceID string) ([]conversation.Conversation, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return nil, err
+	}
+	return service.ListConversations(a.appContext(), workspaceID)
+}
+
+func (a *App) CreateConversationTurn(request conversation.CreateTurnRequest) (conversation.Turn, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return conversation.Turn{}, err
+	}
+	return service.CreateTurn(a.appContext(), request)
+}
+
+func (a *App) ListConversationTurns(conversationID string) ([]conversation.Turn, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return nil, err
+	}
+	return service.ListTurns(a.appContext(), conversationID)
+}
+
+func (a *App) CompleteConversationTurn(request conversation.CompleteTurnRequest) (conversation.Turn, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return conversation.Turn{}, err
+	}
+	return service.CompleteTurn(a.appContext(), request)
+}
+
+func (a *App) FailConversationTurn(request conversation.FailTurnRequest) (conversation.Turn, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return conversation.Turn{}, err
+	}
+	return service.FailTurn(a.appContext(), request)
+}
+
+func (a *App) ListTurnArtifacts(turnID string) ([]conversation.Artifact, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return nil, err
+	}
+	return service.ListArtifacts(a.appContext(), turnID)
+}
+
+func (a *App) DeleteConversation(conversationID string) (conversation.DeleteResult, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return conversation.DeleteResult{}, err
+	}
+	return service.DeleteConversation(a.appContext(), conversationID)
 }
 
 func (a *App) PrepareWorkspaceCatalog(workspaceID string) (datacatalog.Catalog, error) {

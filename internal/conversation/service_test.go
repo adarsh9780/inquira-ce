@@ -2,10 +2,12 @@ package conversation
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -216,6 +218,37 @@ func TestArtifactPayloadsAreImmutableHeapObjectsReferencedBySQLite(t *testing.T)
 	}
 }
 
+func TestArtifactPointersCannotResolveOutsideTheirConversationHeap(t *testing.T) {
+	service, workspaceID, databasePath, workspaceRoot := newTestService(t)
+	ctx := context.Background()
+	conversation, _ := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID})
+	turn, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, UserText: "Question"})
+	artifact, err := service.PublishArtifact(ctx, PublishArtifactRequest{
+		ConversationID: conversation.ID, TurnID: turn.ID, Kind: "figure",
+		LogicalName: "chart", PayloadFormat: "json",
+	}, strings.NewReader(`{"data":[]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalogPath := filepath.Join(workspaceRoot, workspaceID, "workspace.duckdb")
+	if err := os.WriteFile(catalogPath, []byte("catalog"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	database, err := sql.Open("sqlite", databasePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.Exec(`UPDATE artifacts SET relative_path = 'workspace.duckdb' WHERE id = ?`, artifact.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ArtifactPath(ctx, artifact.ID); appErrorCode(err) != "artifact_path_invalid" {
+		t.Fatalf("corrupt pointer error = %v", err)
+	}
+}
+
 func TestInvalidWritesAndReaderFailuresLeaveNoDatabaseOrHeapGarbage(t *testing.T) {
 	service, workspaceID, _, workspaceRoot := newTestService(t)
 	ctx := context.Background()
@@ -313,6 +346,41 @@ func TestReconciliationRepairsOrphansAndMissingPointers(t *testing.T) {
 	listed, err := service.ListArtifacts(ctx, turn.ID)
 	if err != nil || len(listed) != 1 || listed[0].Status != ArtifactStatusMissing {
 		t.Fatalf("missing artifact state = %#v, %v", listed, err)
+	}
+}
+
+func TestReconciliationNeverFollowsHeapSymlinks(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation may require elevated Windows privileges")
+	}
+	service, workspaceID, _, workspaceRoot := newTestService(t)
+	ctx := context.Background()
+	conversation, _ := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID})
+	attachments := filepath.Join(workspaceRoot, workspaceID, "conversations", conversation.ID, StorageClassAttachments)
+	if err := os.Remove(attachments); err != nil {
+		t.Fatal(err)
+	}
+	external := t.TempDir()
+	externalFile := filepath.Join(external, "must-remain.txt")
+	if err := os.WriteFile(externalFile, []byte("private"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(external, attachments); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	result, err := service.ReconcileWorkspace(ctx, workspaceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OrphansRemoved != 1 {
+		t.Fatalf("reconciliation = %#v", result)
+	}
+	if contents, err := os.ReadFile(externalFile); err != nil || string(contents) != "private" {
+		t.Fatalf("external file was changed: %q, %v", contents, err)
+	}
+	info, err := os.Lstat(attachments)
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("attachments directory was not repaired: %#v, %v", info, err)
 	}
 }
 

@@ -53,9 +53,18 @@ Legacy `.xls` files are not accepted because the streaming reader supports the
 modern Office Open XML format only. The SQLite connector is deferred. Before
 chat or code execution starts, Go can now prepare an atomic workspace DuckDB
 catalog whose read-only views point at the latest connection snapshots. This
-gives future analysis processes one stable database contract without copying
-the imported data again. Conversations, analysis execution, and
-workspace-specific AI overrides remain outside the current migration slice.
+gives analysis processes one stable database contract without copying the
+imported data again.
+
+Conversation persistence uses SQLite as the authoritative index and the local
+filesystem as an immutable payload heap. Messages, generated code, branching,
+execution state, and artifact pointers live only in SQLite. A conversation has
+one local directory containing flat, UUID-named artifact and attachment files;
+there are no per-question folders or duplicate Markdown, Python, or manifest
+files. Payloads are staged and atomically published before their SQLite pointer
+is committed. Startup reconciliation removes unreferenced files, completes
+interrupted conversation deletion, and marks missing payloads without touching
+the workspace DuckDB catalog.
 
 ## Runtime modes
 
@@ -95,6 +104,7 @@ cmd/prepareuv/                 Build-time UV bundler
 frontend/                      Existing Inquira Vue UI
 internal/appdirs/              Central application path resolution
 internal/connection/           Connection metadata, snapshots, refresh, and worker RPC
+internal/conversation/         SQLite conversation index and filesystem artifact heap
 internal/modelconfig/          SQLite, keychain, provider, and model services
 internal/netclient/            Proxy and certificate-aware HTTP client
 internal/runtimeprovision/     Runtime policy and provisioning service
