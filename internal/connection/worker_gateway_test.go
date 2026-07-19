@@ -39,11 +39,11 @@ func TestWorkerGatewayMapsTheAdapterContractToRPC(t *testing.T) {
 	}
 
 	transport.result = Preview{Rows: []map[string]any{{"id": float64(1)}}}
-	if _, err := gateway.Preview(context.Background(), AdapterRequest{AdapterKind: AdapterCSV}, 25); err != nil || transport.method != "preview" {
+	if _, err := gateway.Preview(context.Background(), AdapterRequest{AdapterKind: AdapterExcel, SourceObjectID: "sheet:Sales"}, 25); err != nil || transport.method != "preview" {
 		t.Fatalf("Preview() error = %v; method = %q", err, transport.method)
 	}
 	params := transport.params.(map[string]any)
-	if params["limit"] != 25 {
+	if params["limit"] != 25 || params["source_object_id"] != "sheet:Sales" {
 		t.Fatalf("preview params = %#v", params)
 	}
 

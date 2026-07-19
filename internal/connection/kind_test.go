@@ -6,6 +6,7 @@ func TestAdapterKindForPathSupportsTheFirstFileAdapters(t *testing.T) {
 	tests := map[string]AdapterKind{
 		"sales.csv": AdapterCSV, "SALES.CSV": AdapterCSV,
 		"events.parquet": AdapterParquet, "EVENTS.PARQUET": AdapterParquet,
+		"workbook.xlsx": AdapterExcel, "WORKBOOK.XLSX": AdapterExcel,
 	}
 	for path, expected := range tests {
 		kind, err := AdapterKindForPath(path)
@@ -16,7 +17,7 @@ func TestAdapterKindForPathSupportsTheFirstFileAdapters(t *testing.T) {
 }
 
 func TestAdapterKindForPathRejectsAmbiguousOrFutureFormats(t *testing.T) {
-	for _, path := range []string{"data", ".csv", "data.csv.gz", "book.xlsx", "data.sqlite", "data.json", "data.txt"} {
+	for _, path := range []string{"data", ".csv", "data.csv.gz", "book.xls", "data.sqlite", "data.json", "data.txt"} {
 		if _, err := AdapterKindForPath(path); appErrorCode(err) != "adapter_not_supported" {
 			t.Fatalf("AdapterKindForPath(%q) error = %v", path, err)
 		}

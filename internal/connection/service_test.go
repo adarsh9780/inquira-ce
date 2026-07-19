@@ -20,6 +20,7 @@ type fakeGateway struct {
 	materialization     Materialization
 	discoverErr         error
 	previewErr          error
+	previewRequest      AdapterRequest
 	materializeErr      error
 	materializeCalls    int
 	materializeStarted  chan struct{}
@@ -32,9 +33,10 @@ func (f *fakeGateway) Discover(context.Context, AdapterRequest) (Discovery, erro
 	return f.discovery, f.discoverErr
 }
 
-func (f *fakeGateway) Preview(context.Context, AdapterRequest, int) (Preview, error) {
+func (f *fakeGateway) Preview(_ context.Context, request AdapterRequest, _ int) (Preview, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.previewRequest = request
 	return f.preview, f.previewErr
 }
 
@@ -165,7 +167,7 @@ func TestCreateValidatesWorkspaceNameKindSourceAndSelection(t *testing.T) {
 		{"missing workspace", CreateRequest{Name: "Data", AdapterKind: AdapterCSV, SourcePath: csvPath, SelectedObjectIDs: []string{"file"}}, "workspace_required"},
 		{"unknown workspace", CreateRequest{WorkspaceID: "missing", Name: "Data", AdapterKind: AdapterCSV, SourcePath: csvPath, SelectedObjectIDs: []string{"file"}}, "workspace_not_found"},
 		{"blank name", CreateRequest{WorkspaceID: workspaceID, Name: " ", AdapterKind: AdapterCSV, SourcePath: csvPath, SelectedObjectIDs: []string{"file"}}, "connection_name_required"},
-		{"unsupported kind", CreateRequest{WorkspaceID: workspaceID, Name: "Data", AdapterKind: AdapterExcel, SourcePath: csvPath, SelectedObjectIDs: []string{"file"}}, "adapter_not_supported"},
+		{"unsupported kind", CreateRequest{WorkspaceID: workspaceID, Name: "Data", AdapterKind: AdapterSQLite, SourcePath: csvPath, SelectedObjectIDs: []string{"file"}}, "adapter_not_supported"},
 		{"missing source", CreateRequest{WorkspaceID: workspaceID, Name: "Data", AdapterKind: AdapterCSV, SourcePath: filepath.Join(t.TempDir(), "missing.csv"), SelectedObjectIDs: []string{"file"}}, "source_not_found"},
 		{"directory source", CreateRequest{WorkspaceID: workspaceID, Name: "Data", AdapterKind: AdapterCSV, SourcePath: t.TempDir(), SelectedObjectIDs: []string{"file"}}, "source_not_file"},
 		{"wrong extension", CreateRequest{WorkspaceID: workspaceID, Name: "Data", AdapterKind: AdapterParquet, SourcePath: csvPath, SelectedObjectIDs: []string{"file"}}, "source_extension_mismatch"},
@@ -177,6 +179,48 @@ func TestCreateValidatesWorkspaceNameKindSourceAndSelection(t *testing.T) {
 				t.Fatalf("error = %v, want code %q", err, test.code)
 			}
 		})
+	}
+}
+
+func TestExcelPreviewPassesTheSelectedSheetToTheAdapter(t *testing.T) {
+	gateway := &fakeGateway{preview: Preview{Rows: []map[string]any{{"id": float64(1)}}}}
+	service, _, _ := newTestService(t, gateway)
+	path := createSource(t, ".xlsx")
+	_, err := service.Preview(context.Background(), PreviewRequest{
+		AdapterKind: AdapterExcel, SourcePath: path, SourceObjectID: "sheet:Sales", Limit: 25,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gateway.previewRequest.SourceObjectID != "sheet:Sales" {
+		t.Fatalf("preview request = %#v", gateway.previewRequest)
+	}
+}
+
+func TestRefreshMarksExcelConnectionAsNeedingAttentionWhenASelectedSheetDisappears(t *testing.T) {
+	gateway := &fakeGateway{
+		materialization: Materialization{Fingerprint: "first", Outputs: []MaterializedOutput{
+			{SourceObjectID: "sheet:Sales", Name: "Sales", RelativePath: "sales.parquet", Format: "parquet", RowCount: 2},
+		}},
+		discovery: Discovery{Fingerprint: "changed", Objects: []SourceObject{{ID: "sheet:Renamed", Name: "Renamed", Kind: "sheet"}}},
+	}
+	service, workspaceID, _ := newTestService(t, gateway)
+	created, err := service.Create(context.Background(), CreateRequest{
+		WorkspaceID: workspaceID, Name: "Workbook", AdapterKind: AdapterExcel,
+		SourcePath: createSource(t, ".xlsx"), SelectedObjectIDs: []string{"sheet:Sales"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Refresh(context.Background(), created.ID); appErrorCode(err) != "connection_needs_attention" {
+		t.Fatalf("refresh error = %v", err)
+	}
+	persisted, err := service.Get(context.Background(), created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if persisted.Status != StatusNeedsAttention || persisted.Outputs[0].SnapshotPath != created.Outputs[0].SnapshotPath {
+		t.Fatalf("persisted = %#v", persisted)
 	}
 }
 

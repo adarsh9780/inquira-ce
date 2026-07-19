@@ -46,7 +46,7 @@ def test_rpc_discover_preview_and_materialize_round_trip(tmp_path: Path) -> None
         ({}, "invalid_request"),
         ({"id": "1", "method": "unknown", "params": {}}, "method_not_found"),
         ({"id": "1", "method": "discover", "params": {"adapter_kind": "csv"}}, "invalid_params"),
-        ({"id": "1", "method": "discover", "params": {"adapter_kind": "excel", "source_path": "/tmp/a.xlsx"}}, "adapter_not_supported"),
+        ({"id": "1", "method": "discover", "params": {"adapter_kind": "sqlite", "source_path": "/tmp/a.sqlite"}}, "adapter_not_supported"),
     ],
 )
 def test_rpc_returns_structured_errors(payload: dict, code: str) -> None:
@@ -54,3 +54,30 @@ def test_rpc_returns_structured_errors(payload: dict, code: str) -> None:
     assert response["result"] is None
     assert response["error"]["code"] == code
     assert response["error"]["message"]
+
+
+def test_rpc_passes_excel_sheet_selection_to_preview(tmp_path: Path) -> None:
+    from openpyxl import Workbook
+
+    path = tmp_path / "book.xlsx"
+    workbook = Workbook()
+    workbook.active.title = "Sales"
+    workbook.active.append(["id"])
+    workbook.active.append([1])
+    workbook.save(path)
+    workbook.close()
+
+    response = handle_request({
+        "id": "preview-excel",
+        "method": "preview",
+        "params": {
+            "adapter_kind": "excel",
+            "source_path": str(path),
+            "source_object_id": "sheet:Sales",
+            "limit": 10,
+            "options": {},
+        },
+    })
+
+    assert response["error"] is None
+    assert response["result"]["rows"] == [{"id": 1}]

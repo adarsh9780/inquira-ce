@@ -20,7 +20,7 @@ describe('connectionService Wails bridge', () => {
 
     await connectionService.list('workspace-1')
     await connectionService.discover('csv', '/tmp/sales.csv')
-    await connectionService.preview('csv', '/tmp/sales.csv', 25)
+    await connectionService.preview('excel', '/tmp/book.xlsx', 'sheet:Sales', 25, { formula_mode: 'cached' })
     await connectionService.create({
       workspace_id: 'workspace-1',
       name: 'Sales',
@@ -33,7 +33,13 @@ describe('connectionService Wails bridge', () => {
 
     expect(app.ListConnections).toHaveBeenCalledWith('workspace-1')
     expect(app.DiscoverLocalConnection).toHaveBeenCalledWith({ adapter_kind: 'csv', source_path: '/tmp/sales.csv' })
-    expect(app.PreviewLocalConnection).toHaveBeenCalledWith({ adapter_kind: 'csv', source_path: '/tmp/sales.csv', limit: 25 })
+    expect(app.PreviewLocalConnection).toHaveBeenCalledWith({
+      adapter_kind: 'excel',
+      source_path: '/tmp/book.xlsx',
+      source_object_id: 'sheet:Sales',
+      limit: 25,
+      options: { formula_mode: 'cached' },
+    })
     expect(app.CreateLocalConnection).toHaveBeenCalledWith(expect.objectContaining({ name: 'Sales', selected_object_ids: ['file'] }))
     expect(app.RefreshConnection).toHaveBeenCalledWith('connection-1')
     expect(app.DeleteConnection).toHaveBeenCalledWith('connection-1')

@@ -49,7 +49,7 @@ def test_registry_resolves_supported_adapters_case_insensitively(kind: str, suff
     assert len(result.objects) == 1
 
 
-@pytest.mark.parametrize("kind", ["excel", "sqlite", "postgres", "unknown", ""])
+@pytest.mark.parametrize("kind", ["sqlite", "postgres", "unknown", ""])
 def test_registry_rejects_unimplemented_adapters(kind: str) -> None:
     with pytest.raises(AdapterError, match="not supported"):
         get_adapter(kind)
