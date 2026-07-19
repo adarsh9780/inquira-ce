@@ -3,7 +3,6 @@ package analysisagent
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"strings"
 	"unicode/utf8"
 
@@ -14,15 +13,24 @@ import (
 	"inquira-go/internal/modelconfig"
 )
 
-const maxTimeoutSeconds = 3600
+const (
+	maxTimeoutSeconds = 3600
+	maxContextTurns   = 12
+	maxQuestionRunes  = 4000
+	maxAnswerRunes    = 8000
+	maxCodeRunes      = 12000
+	maxErrorRunes     = 4000
+	maxResultBytes    = 32768
+)
 
 type conversationStore interface {
 	CreateConversation(context.Context, conversation.CreateConversationRequest) (conversation.Conversation, error)
 	GetConversation(context.Context, string) (conversation.Conversation, error)
+	ListTurns(context.Context, string) ([]conversation.Turn, error)
+	ListArtifacts(context.Context, string) ([]conversation.Artifact, error)
 	CreateTurn(context.Context, conversation.CreateTurnRequest) (conversation.Turn, error)
 	CompleteTurn(context.Context, conversation.CompleteTurnRequest) (conversation.Turn, error)
 	FailTurn(context.Context, conversation.FailTurnRequest) (conversation.Turn, error)
-	PublishArtifact(context.Context, conversation.PublishArtifactRequest, io.Reader) (conversation.Artifact, error)
 }
 
 type catalogSource interface {
@@ -93,6 +101,9 @@ func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func
 		return AnalyzeResult{}, err
 	}
 	if conversationID == "" {
+		if request.ParentTurnID != nil {
+			return AnalyzeResult{}, apperror.New("turn_parent_not_found", "Parent turn not found in this conversation.")
+		}
 		ownedConversation, err = s.conversations.CreateConversation(ctx, conversation.CreateConversationRequest{
 			WorkspaceID: workspaceID, Title: questionTitle(question),
 		})
@@ -100,8 +111,13 @@ func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func
 			return AnalyzeResult{}, err
 		}
 	}
+	conversationContext, err := s.conversationContext(ctx, ownedConversation.ID, request.ParentTurnID, model.AllowDataSamples)
+	if err != nil {
+		return AnalyzeResult{}, err
+	}
+	metadata := contextMetadata(conversationContext, model)
 	turn, err := s.conversations.CreateTurn(ctx, conversation.CreateTurnRequest{
-		ConversationID: ownedConversation.ID, ParentTurnID: request.ParentTurnID, UserText: question,
+		ConversationID: ownedConversation.ID, ParentTurnID: request.ParentTurnID, UserText: question, MetadataJSON: metadata,
 	})
 	if err != nil {
 		return AnalyzeResult{}, err
@@ -120,7 +136,8 @@ func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func
 	}
 	workerResult, err := s.agent.Analyze(ctx, AgentWorkerRequest{
 		WorkspaceID: workspaceID, DatabasePath: catalog.DatabasePath, Question: question,
-		RunID: run.ID, ArtifactDirectory: run.StagingDirectory, TimeoutSeconds: request.TimeoutSeconds, Model: model,
+		RunID: run.ID, ArtifactDirectory: run.StagingDirectory, TimeoutSeconds: request.TimeoutSeconds,
+		Model: model, Context: conversationContext,
 	}, forward)
 	if err != nil {
 		persistContext := ctx
@@ -166,6 +183,131 @@ func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func
 		Conversation: ownedConversation, Turn: completed, Answer: workerResult.Answer, Code: workerResult.Code,
 		RunID: run.ID, Execution: workerResult.Execution, Artifacts: artifacts,
 	}, nil
+}
+
+func (s *Service) conversationContext(
+	ctx context.Context,
+	conversationID string,
+	parentTurnID *string,
+	allowDataSamples bool,
+) (ConversationContext, error) {
+	result := ConversationContext{Turns: []ContextTurn{}}
+	if parentTurnID == nil {
+		return result, nil
+	}
+	parentID := strings.TrimSpace(*parentTurnID)
+	if parentID == "" {
+		return ConversationContext{}, apperror.New("turn_parent_not_found", "Parent turn not found in this conversation.")
+	}
+	turns, err := s.conversations.ListTurns(ctx, conversationID)
+	if err != nil {
+		return ConversationContext{}, err
+	}
+	byID := make(map[string]conversation.Turn, len(turns))
+	for _, turn := range turns {
+		byID[turn.ID] = turn
+	}
+	branch := make([]conversation.Turn, 0, maxContextTurns)
+	seen := make(map[string]bool, maxContextTurns)
+	currentID := parentID
+	for currentID != "" && len(branch) < maxContextTurns {
+		if seen[currentID] {
+			return ConversationContext{}, apperror.New("turn_context_invalid", "Conversation history contains an invalid parent cycle.")
+		}
+		seen[currentID] = true
+		turn, exists := byID[currentID]
+		if !exists {
+			return ConversationContext{}, apperror.New("turn_parent_not_found", "Parent turn not found in this conversation.")
+		}
+		branch = append(branch, turn)
+		if turn.ParentTurnID == nil {
+			break
+		}
+		currentID = strings.TrimSpace(*turn.ParentTurnID)
+	}
+	for left, right := 0, len(branch)-1; left < right; left, right = left+1, right-1 {
+		branch[left], branch[right] = branch[right], branch[left]
+	}
+	for _, turn := range branch {
+		artifacts, err := s.conversations.ListArtifacts(ctx, turn.ID)
+		if err != nil {
+			return ConversationContext{}, err
+		}
+		contextArtifacts := make([]ContextArtifact, 0, len(artifacts))
+		for _, artifact := range artifacts {
+			contextArtifacts = append(contextArtifacts, ContextArtifact{
+				ArtifactID: artifact.ID, Kind: artifact.Kind, LogicalName: artifact.LogicalName,
+				DisplayName: artifact.DisplayName, PayloadFormat: artifact.PayloadFormat,
+				MediaType: artifact.MediaType, ByteSize: artifact.ByteSize,
+			})
+		}
+		result.Turns = append(result.Turns, ContextTurn{
+			TurnID: turn.ID, Status: turn.Status, UserText: truncateRunes(turn.UserText, maxQuestionRunes),
+			AssistantText: truncateRunes(turn.AssistantText, maxAnswerRunes), Code: truncateRunes(turn.CodeSnapshot, maxCodeRunes),
+			ResultKind: turn.ResultKind, Result: historicalResult(turn, allowDataSamples),
+			Error: truncateRunes(turn.ErrorMessage, maxErrorRunes), Artifacts: contextArtifacts,
+		})
+	}
+	return result, nil
+}
+
+func historicalResult(turn conversation.Turn, allowDataSamples bool) json.RawMessage {
+	raw := strings.TrimSpace(turn.ResultJSON)
+	if raw == "" || raw == "null" {
+		return nil
+	}
+	if allowDataSamples {
+		if len(raw) > maxResultBytes {
+			return json.RawMessage(`{"omitted":"Historical result exceeded the prompt budget; use its artifact metadata or query the workspace again."}`)
+		}
+		return json.RawMessage(raw)
+	}
+	switch strings.ToLower(strings.TrimSpace(turn.ResultKind)) {
+	case "dataframe":
+		var value map[string]any
+		if json.Unmarshal([]byte(raw), &value) != nil {
+			return nil
+		}
+		delete(value, "rows")
+		delete(value, "data")
+		delete(value, "preview_rows")
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return nil
+		}
+		return encoded
+	case "figure":
+		return nil
+	default:
+		if len(raw) <= maxResultBytes {
+			return json.RawMessage(raw)
+		}
+		return nil
+	}
+}
+
+func contextMetadata(history ConversationContext, model modelconfig.RuntimeConfiguration) string {
+	turnIDs := make([]string, 0, len(history.Turns))
+	for _, turn := range history.Turns {
+		turnIDs = append(turnIDs, turn.TurnID)
+	}
+	encoded, err := json.Marshal(map[string]any{
+		"context_turn_ids": turnIDs,
+		"model":            map[string]string{"provider": model.Provider, "id": model.Model},
+	})
+	if err != nil {
+		return "{}"
+	}
+	return string(encoded)
+}
+
+func truncateRunes(value string, limit int) string {
+	value = strings.TrimSpace(value)
+	if utf8.RuneCountInString(value) <= limit {
+		return value
+	}
+	runes := []rune(value)
+	return strings.TrimSpace(string(runes[:limit-1])) + "…"
 }
 
 func (s *Service) fail(ctx context.Context, turnID, code, message string, cause error) error {
