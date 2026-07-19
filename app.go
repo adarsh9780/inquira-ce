@@ -6,6 +6,7 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"inquira-go/internal/analysisruntime"
 	"inquira-go/internal/appdirs"
 	"inquira-go/internal/apperror"
 	"inquira-go/internal/connection"
@@ -14,6 +15,7 @@ import (
 	"inquira-go/internal/modelconfig"
 	"inquira-go/internal/netclient"
 	"inquira-go/internal/runtimeprovision"
+	workerruntime "inquira-go/internal/worker"
 	"inquira-go/internal/workspace"
 	dataworkerbundle "inquira-go/python/data_worker"
 )
@@ -27,6 +29,8 @@ type App struct {
 	workspaces    *workspace.Service
 	connections   *connection.Service
 	conversations *conversation.Service
+	analysis      *analysisruntime.Service
+	worker        *workerruntime.PersistentTransport
 	catalog       *datacatalog.Service
 	initErr       error
 }
@@ -76,9 +80,12 @@ func NewApp() *App {
 		app.initErr = err
 		return app
 	}
-	transport := connection.NewSubprocessTransport(
-		app.provisioner.PythonExecutable(), filepath.Join(workerProject, "src"), nil,
-	).WithReadinessCheck(app.provisioner.Ready)
+	transport := workerruntime.NewPersistentTransport(workerruntime.Config{
+		PythonExecutable: app.provisioner.PythonExecutable(),
+		WorkerSourceDir:  filepath.Join(workerProject, "src"),
+		ReadinessCheck:   app.provisioner.Ready,
+	})
+	app.worker = transport
 	app.connections = connection.NewService(
 		connectionRepository, connection.NewWorkerGateway(transport), filepath.Join(paths.DataDir, "snapshots"),
 	)
@@ -87,6 +94,7 @@ func NewApp() *App {
 	)
 	conversationRepository, err := conversation.OpenSQLite(paths.DatabasePath)
 	if err != nil {
+		_ = app.worker.Close()
 		_ = app.connections.Close()
 		_ = app.workspaces.Close()
 		_ = app.models.Close()
@@ -97,6 +105,7 @@ func NewApp() *App {
 		conversationRepository, conversation.NewFileHeap(filepath.Join(paths.DataDir, "workspaces")),
 	)
 	if _, err := app.conversations.ReconcileAll(context.Background()); err != nil {
+		_ = app.worker.Close()
 		_ = app.conversations.Close()
 		_ = app.connections.Close()
 		_ = app.workspaces.Close()
@@ -104,6 +113,10 @@ func NewApp() *App {
 		app.initErr = err
 		return app
 	}
+	app.analysis = analysisruntime.NewService(
+		app.conversations, analysisruntime.NewWorkerGateway(transport),
+		filepath.Join(paths.DataDir, "workspaces"), filepath.Join(paths.DataDir, "execution-staging"),
+	)
 	return app
 }
 
@@ -114,6 +127,9 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) shutdown(context.Context) {
+	if a.worker != nil {
+		_ = a.worker.Close()
+	}
 	if a.conversations != nil {
 		_ = a.conversations.Close()
 	}
@@ -126,6 +142,16 @@ func (a *App) shutdown(context.Context) {
 	if a.models != nil {
 		_ = a.models.Close()
 	}
+}
+
+func (a *App) analysisService() (*analysisruntime.Service, error) {
+	if a.initErr != nil {
+		return nil, a.initErr
+	}
+	if a.analysis == nil {
+		return nil, apperror.New("analysis_unavailable", "Python analysis is unavailable.")
+	}
+	return a.analysis, nil
 }
 
 func (a *App) conversationService() (*conversation.Service, error) {
@@ -300,6 +326,9 @@ func (a *App) DeleteWorkspace(workspaceID string) (workspace.DeletionResult, err
 	if err != nil {
 		return workspace.DeletionResult{}, err
 	}
+	if a.worker != nil && a.worker.Running() && a.analysis != nil {
+		_, _ = a.analysis.Reset(a.appContext(), workspaceID)
+	}
 	if catalogService, catalogErr := a.catalogService(); catalogErr != nil {
 		return workspace.DeletionResult{}, catalogErr
 	} else if catalogErr := catalogService.Remove(workspaceID); catalogErr != nil {
@@ -373,6 +402,40 @@ func (a *App) DeleteConversation(conversationID string) (conversation.DeleteResu
 		return conversation.DeleteResult{}, err
 	}
 	return service.DeleteConversation(a.appContext(), conversationID)
+}
+
+func (a *App) ExecuteConversationCode(request analysisruntime.ExecuteRequest) (analysisruntime.ExecuteResult, error) {
+	service, err := a.analysisService()
+	if err != nil {
+		return analysisruntime.ExecuteResult{}, err
+	}
+	return service.Execute(a.appContext(), request, func(event analysisruntime.WorkerEvent) {
+		runtime.EventsEmit(a.appContext(), "analysis-runtime-event", event)
+	})
+}
+
+func (a *App) GetWorkspaceKernelStatus(workspaceID string) (analysisruntime.KernelStatus, error) {
+	service, err := a.analysisService()
+	if err != nil {
+		return analysisruntime.KernelStatus{}, err
+	}
+	return service.Status(a.appContext(), workspaceID)
+}
+
+func (a *App) ResetWorkspaceKernel(workspaceID string) (bool, error) {
+	service, err := a.analysisService()
+	if err != nil {
+		return false, err
+	}
+	return service.Reset(a.appContext(), workspaceID)
+}
+
+func (a *App) InterruptWorkspaceKernel(workspaceID string) (bool, error) {
+	service, err := a.analysisService()
+	if err != nil {
+		return false, err
+	}
+	return service.Interrupt(a.appContext(), workspaceID)
 }
 
 func (a *App) PrepareWorkspaceCatalog(workspaceID string) (datacatalog.Catalog, error) {

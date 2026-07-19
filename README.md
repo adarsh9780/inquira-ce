@@ -66,6 +66,15 @@ is committed. Startup reconciliation removes unreferenced files, completes
 interrupted conversation deletion, and marks missing payloads without touching
 the workspace DuckDB catalog.
 
+Python analysis runs through one lazily started worker process owned by Go.
+That process maintains one Jupyter kernel per active workspace, opens the
+workspace DuckDB catalog read-only, preserves notebook state between turns,
+and isolates state across workspaces. Go routes concurrent JSON-RPC requests
+and execution events by request ID. Dataframe and figure outputs are written to
+short-lived staging paths and then copied into the conversation heap through
+the same atomic artifact publication contract; Python never writes final heap
+pointers or application metadata.
+
 ## Runtime modes
 
 The embedded UV runtime supports three provisioning policies:
@@ -108,6 +117,7 @@ internal/conversation/         SQLite conversation index and filesystem artifact
 internal/modelconfig/          SQLite, keychain, provider, and model services
 internal/netclient/            Proxy and certificate-aware HTTP client
 internal/runtimeprovision/     Runtime policy and provisioning service
+internal/worker/               Persistent Python process and concurrent JSON-RPC routing
 internal/workspace/            Native workspace metadata and activation service
 python/data_worker/            Embedded DuckDB adapter worker and contract tests
 build/                         Wails platform packaging assets

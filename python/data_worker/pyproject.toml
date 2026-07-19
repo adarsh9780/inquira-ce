@@ -4,7 +4,11 @@ version = "0.1.0"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "duckdb>=1.1,<2",
+    "ipykernel>=6.30,<8",
+    "jupyter-client>=8.6,<9",
     "openpyxl>=3.1.5,<4",
+    "pandas>=2.2,<4",
+    "plotly>=6,<7",
 ]
 
 [dependency-groups]

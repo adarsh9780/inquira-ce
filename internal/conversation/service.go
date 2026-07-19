@@ -99,6 +99,21 @@ func (s *Service) ListConversations(ctx context.Context, workspaceID string) ([]
 	return conversations, nil
 }
 
+func (s *Service) GetConversation(ctx context.Context, conversationID string) (Conversation, error) {
+	id := strings.TrimSpace(conversationID)
+	if id == "" {
+		return Conversation{}, apperror.New("conversation_required", "Conversation identity is required.")
+	}
+	conversation, err := s.repository.GetConversation(ctx, id, false)
+	if errors.Is(err, errConversationNotFound) {
+		return Conversation{}, apperror.New("conversation_not_found", "Conversation not found.")
+	}
+	if err != nil {
+		return Conversation{}, apperror.Wrap("conversation_read_failed", "Could not load the conversation.", err)
+	}
+	return conversation, nil
+}
+
 func (s *Service) CreateTurn(ctx context.Context, request CreateTurnRequest) (Turn, error) {
 	conversationID := strings.TrimSpace(request.ConversationID)
 	if conversationID == "" {
@@ -151,6 +166,21 @@ func (s *Service) ListTurns(ctx context.Context, conversationID string) ([]Turn,
 		return nil, apperror.Wrap("turn_list_failed", "Could not load conversation turns.", err)
 	}
 	return turns, nil
+}
+
+func (s *Service) GetTurn(ctx context.Context, turnID string) (Turn, error) {
+	id := strings.TrimSpace(turnID)
+	if id == "" {
+		return Turn{}, apperror.New("turn_required", "Turn identity is required.")
+	}
+	turn, err := s.repository.GetTurn(ctx, id)
+	if errors.Is(err, errTurnNotFound) {
+		return Turn{}, apperror.New("turn_not_found", "Turn not found.")
+	}
+	if err != nil {
+		return Turn{}, apperror.Wrap("turn_read_failed", "Could not load the conversation turn.", err)
+	}
+	return turn, nil
 }
 
 func (s *Service) CompleteTurn(ctx context.Context, request CompleteTurnRequest) (Turn, error) {
