@@ -77,15 +77,14 @@ func (s *Service) Execute(ctx context.Context, request ExecuteRequest, emit func
 	if err != nil {
 		return ExecuteResult{}, apperror.New("catalog_not_ready", "Prepare the workspace analysis catalog before running Python.")
 	}
-	runID := uuid.NewString()
-	staging, err := s.prepareStaging(runID)
+	run, err := s.PrepareRun()
 	if err != nil {
 		return ExecuteResult{}, apperror.Wrap("execution_staging_failed", "Could not prepare execution staging.", err)
 	}
-	defer os.RemoveAll(staging)
+	defer s.CleanupRun(run)
 	workerResult, err := s.kernels.Execute(ctx, ExecuteWorkerRequest{
 		WorkspaceID: ownedConversation.WorkspaceID, DatabasePath: catalog, Code: request.Code,
-		RunID: runID, ArtifactDirectory: staging, TimeoutSeconds: request.TimeoutSeconds,
+		RunID: run.ID, ArtifactDirectory: run.StagingDirectory, TimeoutSeconds: request.TimeoutSeconds,
 	}, emitOrDiscard(emit))
 	if err != nil {
 		persistContext := ctx
@@ -119,16 +118,13 @@ func (s *Service) Execute(ctx context.Context, request ExecuteRequest, emit func
 		result.Error = message
 		return result, nil
 	}
-	for _, candidate := range workerResult.Artifacts {
-		artifact, err := s.publishCandidate(ctx, ownedConversation, turn, staging, candidate)
-		if err != nil {
-			_, _ = s.conversations.FailTurn(ctx, conversation.FailTurnRequest{
-				TurnID: turnID, CodeSnapshot: request.Code, ErrorMessage: err.Error(),
-				ToolEventsJSON: executionEventsJSON(false, workerResult.Stdout, workerResult.Stderr, err.Error(), false),
-			})
-			return ExecuteResult{}, err
-		}
-		result.Artifacts = append(result.Artifacts, artifact)
+	result.Artifacts, err = s.PublishCandidates(ctx, ownedConversation, turn, run, workerResult.Artifacts)
+	if err != nil {
+		_, _ = s.conversations.FailTurn(ctx, conversation.FailTurnRequest{
+			TurnID: turnID, CodeSnapshot: request.Code, ErrorMessage: err.Error(),
+			ToolEventsJSON: executionEventsJSON(false, workerResult.Stdout, workerResult.Stderr, err.Error(), false),
+		})
+		return ExecuteResult{}, err
 	}
 	resultJSON := ""
 	if len(workerResult.Result) > 0 && string(workerResult.Result) != "null" {
@@ -185,6 +181,39 @@ func (s *Service) prepareStaging(runID string) (string, error) {
 		return "", err
 	}
 	return staging, nil
+}
+
+func (s *Service) PrepareRun() (Run, error) {
+	runID := uuid.NewString()
+	staging, err := s.prepareStaging(runID)
+	if err != nil {
+		return Run{}, err
+	}
+	return Run{ID: runID, StagingDirectory: staging}, nil
+}
+
+func (s *Service) CleanupRun(run Run) {
+	if strings.TrimSpace(run.StagingDirectory) != "" {
+		_ = os.RemoveAll(run.StagingDirectory)
+	}
+}
+
+func (s *Service) PublishCandidates(
+	ctx context.Context,
+	ownedConversation conversation.Conversation,
+	turn conversation.Turn,
+	run Run,
+	candidates []ArtifactCandidate,
+) ([]conversation.Artifact, error) {
+	artifacts := make([]conversation.Artifact, 0, len(candidates))
+	for _, candidate := range candidates {
+		artifact, err := s.publishCandidate(ctx, ownedConversation, turn, run.StagingDirectory, candidate)
+		if err != nil {
+			return nil, err
+		}
+		artifacts = append(artifacts, artifact)
+	}
+	return artifacts, nil
 }
 
 func (s *Service) Status(ctx context.Context, workspaceID string) (KernelStatus, error) {

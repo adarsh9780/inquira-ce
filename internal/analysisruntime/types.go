@@ -6,6 +6,11 @@ import (
 	"inquira-go/internal/conversation"
 )
 
+type Run struct {
+	ID               string `json:"id"`
+	StagingDirectory string `json:"staging_directory"`
+}
+
 type ExecuteRequest struct {
 	ConversationID string `json:"conversation_id"`
 	TurnID         string `json:"turn_id"`

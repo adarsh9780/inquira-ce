@@ -6,6 +6,7 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"inquira-go/internal/analysisagent"
 	"inquira-go/internal/analysisruntime"
 	"inquira-go/internal/appdirs"
 	"inquira-go/internal/apperror"
@@ -30,6 +31,7 @@ type App struct {
 	connections   *connection.Service
 	conversations *conversation.Service
 	analysis      *analysisruntime.Service
+	agent         *analysisagent.Service
 	worker        *workerruntime.PersistentTransport
 	catalog       *datacatalog.Service
 	initErr       error
@@ -117,6 +119,9 @@ func NewApp() *App {
 		app.conversations, analysisruntime.NewWorkerGateway(transport),
 		filepath.Join(paths.DataDir, "workspaces"), filepath.Join(paths.DataDir, "execution-staging"),
 	)
+	app.agent = analysisagent.NewService(
+		app.conversations, app.catalog, app.models, analysisagent.NewWorkerGateway(transport), app.analysis,
+	)
 	return app
 }
 
@@ -152,6 +157,16 @@ func (a *App) analysisService() (*analysisruntime.Service, error) {
 		return nil, apperror.New("analysis_unavailable", "Python analysis is unavailable.")
 	}
 	return a.analysis, nil
+}
+
+func (a *App) agentService() (*analysisagent.Service, error) {
+	if a.initErr != nil {
+		return nil, a.initErr
+	}
+	if a.agent == nil {
+		return nil, apperror.New("agent_unavailable", "The analysis agent is unavailable.")
+	}
+	return a.agent, nil
 }
 
 func (a *App) conversationService() (*conversation.Service, error) {
@@ -411,6 +426,16 @@ func (a *App) ExecuteConversationCode(request analysisruntime.ExecuteRequest) (a
 	}
 	return service.Execute(a.appContext(), request, func(event analysisruntime.WorkerEvent) {
 		runtime.EventsEmit(a.appContext(), "analysis-runtime-event", event)
+	})
+}
+
+func (a *App) AnalyzeQuestion(request analysisagent.AnalyzeRequest) (analysisagent.AnalyzeResult, error) {
+	service, err := a.agentService()
+	if err != nil {
+		return analysisagent.AnalyzeResult{}, err
+	}
+	return service.Analyze(a.appContext(), request, func(event analysisruntime.WorkerEvent) {
+		runtime.EventsEmit(a.appContext(), "agent-runtime-event", event)
 	})
 }
 
