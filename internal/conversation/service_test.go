@@ -167,6 +167,176 @@ func TestTurnsSupportBranchesAndAllocateUniqueSequencesConcurrently(t *testing.T
 	}
 }
 
+func TestConversationTreeMutationsAreTransactionalAndTrackFinalTurn(t *testing.T) {
+	service, workspaceID, _, _ := newTestService(t)
+	ctx := context.Background()
+	conversation, err := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID, Title: "Before"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	conversation, err = service.UpdateConversation(ctx, conversation.ID, "  After  ")
+	if err != nil || conversation.Title != "After" {
+		t.Fatalf("UpdateConversation() = %#v, %v", conversation, err)
+	}
+
+	root, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, UserText: "root"})
+	left, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, ParentTurnID: &root.ID, UserText: "left"})
+	right, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, ParentTurnID: &root.ID, UserText: "right"})
+	leaf, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, ParentTurnID: &left.ID, UserText: "leaf"})
+	for _, turn := range []Turn{root, left, right, leaf} {
+		if _, err := service.CompleteTurn(ctx, CompleteTurnRequest{TurnID: turn.ID, AssistantText: "done"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := service.MarkFinalTurn(ctx, conversation.ID, left.ID); appErrorCode(err) != "turn_not_leaf" {
+		t.Fatalf("non-leaf final error = %v", err)
+	}
+	final, err := service.MarkFinalTurn(ctx, conversation.ID, leaf.ID)
+	if err != nil || final.ID != leaf.ID {
+		t.Fatalf("MarkFinalTurn() = %#v, %v", final, err)
+	}
+	stored, _ := service.GetConversation(ctx, conversation.ID)
+	if stored.FinalTurnID == nil || *stored.FinalTurnID != leaf.ID {
+		t.Fatalf("final turn = %#v", stored.FinalTurnID)
+	}
+
+	if _, err := service.MoveTurn(ctx, MoveTurnRequest{ConversationID: conversation.ID, TurnID: left.ID, ParentTurnID: &leaf.ID}); appErrorCode(err) != "turn_cycle" {
+		t.Fatalf("cycle error = %v", err)
+	}
+	if _, err := service.ReorderTurns(ctx, ReorderTurnsRequest{ConversationID: conversation.ID, ParentTurnID: &root.ID, TurnIDs: []string{right.ID}}); appErrorCode(err) != "turn_order_invalid" {
+		t.Fatalf("incomplete reorder error = %v", err)
+	}
+	other, _ := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID, Title: "other"})
+	foreignParent, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: other.ID, UserText: "foreign"})
+	if _, err := service.ReorderTurns(ctx, ReorderTurnsRequest{ConversationID: conversation.ID, ParentTurnID: &foreignParent.ID}); appErrorCode(err) != "turn_parent_not_found" {
+		t.Fatalf("foreign reorder parent error = %v", err)
+	}
+	ordered, err := service.ReorderTurns(ctx, ReorderTurnsRequest{ConversationID: conversation.ID, ParentTurnID: &root.ID, TurnIDs: []string{right.ID, left.ID}})
+	if err != nil || len(ordered) != 2 || ordered[0].ID != right.ID || ordered[0].SiblingOrder != 0 || ordered[1].ID != left.ID {
+		t.Fatalf("ReorderTurns() = %#v, %v", ordered, err)
+	}
+	moved, err := service.MoveTurn(ctx, MoveTurnRequest{ConversationID: conversation.ID, TurnID: right.ID, ParentTurnID: &left.ID})
+	if err != nil || moved.ParentTurnID == nil || *moved.ParentTurnID != left.ID {
+		t.Fatalf("MoveTurn() = %#v, %v", moved, err)
+	}
+}
+
+func TestDeleteTurnRemovesSubtreeHeapAndFallsFinalBackToParent(t *testing.T) {
+	service, workspaceID, _, _ := newTestService(t)
+	ctx := context.Background()
+	conversation, _ := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID})
+	root, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, UserText: "root"})
+	child, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, ParentTurnID: &root.ID, UserText: "child"})
+	leaf, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, ParentTurnID: &child.ID, UserText: "leaf"})
+	for _, turn := range []Turn{root, child, leaf} {
+		_, _ = service.CompleteTurn(ctx, CompleteTurnRequest{TurnID: turn.ID, AssistantText: "done"})
+	}
+	artifact, err := service.PublishArtifact(ctx, PublishArtifactRequest{ConversationID: conversation.ID, TurnID: leaf.ID, Kind: "figure", LogicalName: "plot", PayloadFormat: "json"}, strings.NewReader(`{"data":[]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, _ := service.ArtifactPath(ctx, artifact.ID)
+	_, _ = service.MarkFinalTurn(ctx, conversation.ID, leaf.ID)
+	result, err := service.DeleteTurn(ctx, conversation.ID, child.ID)
+	if err != nil || len(result.DeletedTurnIDs) != 2 {
+		t.Fatalf("DeleteTurn() = %#v, %v", result, err)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("artifact still exists: %v", err)
+	}
+	stored, _ := service.GetConversation(ctx, conversation.ID)
+	if stored.FinalTurnID == nil || *stored.FinalTurnID != root.ID {
+		t.Fatalf("final fallback = %#v", stored.FinalTurnID)
+	}
+	if _, err := service.GetTurn(ctx, child.ID); appErrorCode(err) != "turn_not_found" {
+		t.Fatalf("deleted child error = %v", err)
+	}
+}
+
+func TestDeletingAnUnselectedBranchPreservesFinalTurn(t *testing.T) {
+	service, workspaceID, _, _ := newTestService(t)
+	ctx := context.Background()
+	conversation, _ := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID})
+	root, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, UserText: "root"})
+	selected, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, ParentTurnID: &root.ID, UserText: "selected"})
+	discarded, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, ParentTurnID: &root.ID, UserText: "discarded"})
+	for _, turn := range []Turn{root, selected, discarded} {
+		_, _ = service.CompleteTurn(ctx, CompleteTurnRequest{TurnID: turn.ID, AssistantText: "done"})
+	}
+	_, _ = service.MarkFinalTurn(ctx, conversation.ID, selected.ID)
+	if _, err := service.DeleteTurn(ctx, conversation.ID, discarded.ID); err != nil {
+		t.Fatal(err)
+	}
+	stored, _ := service.GetConversation(ctx, conversation.ID)
+	if stored.FinalTurnID == nil || *stored.FinalTurnID != selected.ID {
+		t.Fatalf("final turn changed after unrelated delete: %#v", stored.FinalTurnID)
+	}
+}
+
+func TestPrepareFinalRerunCreatesChildFromStoredCode(t *testing.T) {
+	service, workspaceID, _, _ := newTestService(t)
+	ctx := context.Background()
+	conversation, _ := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID})
+	root, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, UserText: "revenue"})
+	root, _ = service.CompleteTurn(ctx, CompleteTurnRequest{TurnID: root.ID, CodeSnapshot: "result = 42", AssistantText: "Forty two"})
+	_, _ = service.MarkFinalTurn(ctx, conversation.ID, root.ID)
+	prepared, err := service.PrepareFinalRerun(ctx, conversation.ID)
+	if err != nil || prepared.Code != "result = 42" || prepared.SourceTurn.ID != root.ID || prepared.Turn.ParentTurnID == nil || *prepared.Turn.ParentTurnID != root.ID || prepared.Turn.UserText != root.UserText {
+		t.Fatalf("PrepareFinalRerun() = %#v, %v", prepared, err)
+	}
+	stored, _ := service.GetConversation(ctx, conversation.ID)
+	if stored.FinalTurnID != nil {
+		t.Fatalf("final turn remained selected after gaining child: %#v", stored.FinalTurnID)
+	}
+}
+
+func TestPrepareFinalRerunRequiresFinalTurnWithCode(t *testing.T) {
+	service, workspaceID, _, _ := newTestService(t)
+	ctx := context.Background()
+	conversation, _ := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID})
+	if _, err := service.PrepareFinalRerun(ctx, conversation.ID); appErrorCode(err) != "final_turn_not_found" {
+		t.Fatalf("missing final error = %v", err)
+	}
+	root, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, UserText: "question"})
+	_, _ = service.CompleteTurn(ctx, CompleteTurnRequest{TurnID: root.ID, AssistantText: "answer"})
+	_, _ = service.MarkFinalTurn(ctx, conversation.ID, root.ID)
+	if _, err := service.PrepareFinalRerun(ctx, conversation.ID); appErrorCode(err) != "final_turn_code_missing" {
+		t.Fatalf("missing code error = %v", err)
+	}
+}
+
+func TestConversationMigrationAddsFinalTurnToExistingDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	database, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	statements := []string{
+		`CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY)`,
+		`CREATE TABLE workspaces(id TEXT PRIMARY KEY)`,
+		`INSERT INTO workspaces(id) VALUES ('w1')`,
+		`CREATE TABLE conversations(id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL REFERENCES workspaces(id), title TEXT NOT NULL, status TEXT NOT NULL, next_turn_sequence INTEGER NOT NULL DEFAULT 1, last_turn_at TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
+		`INSERT INTO conversations(id,workspace_id,title,status,created_at,updated_at) VALUES ('c1','w1','Legacy','active','now','now')`,
+	}
+	for _, statement := range statements {
+		if _, err := database.Exec(statement); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := database.Close(); err != nil {
+		t.Fatal(err)
+	}
+	repository, err := OpenSQLite(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer repository.Close()
+	conversation, err := repository.GetConversation(context.Background(), "c1", false)
+	if err != nil || conversation.Title != "Legacy" || conversation.FinalTurnID != nil {
+		t.Fatalf("migrated conversation = %#v, %v", conversation, err)
+	}
+}
+
 func TestArtifactPayloadsAreImmutableHeapObjectsReferencedBySQLite(t *testing.T) {
 	service, workspaceID, _, workspaceRoot := newTestService(t)
 	ctx := context.Background()
@@ -216,6 +386,19 @@ func TestArtifactPayloadsAreImmutableHeapObjectsReferencedBySQLite(t *testing.T)
 	if err != nil || len(listed) != 2 {
 		t.Fatalf("ListArtifacts() = %#v, %v", listed, err)
 	}
+	attachmentPath, err := service.ArtifactPath(ctx, attachment.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.DeleteArtifact(ctx, attachment.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(attachmentPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("deleted artifact payload still exists: %v", err)
+	}
+	if _, err := service.GetArtifact(ctx, attachment.ID); appErrorCode(err) != "artifact_not_found" {
+		t.Fatalf("deleted artifact metadata error = %v", err)
+	}
 }
 
 func TestArtifactPointersCannotResolveOutsideTheirConversationHeap(t *testing.T) {
@@ -246,6 +429,34 @@ func TestArtifactPointersCannotResolveOutsideTheirConversationHeap(t *testing.T)
 	}
 	if _, err := service.ArtifactPath(ctx, artifact.ID); appErrorCode(err) != "artifact_path_invalid" {
 		t.Fatalf("corrupt pointer error = %v", err)
+	}
+}
+
+func TestArtifactPathRejectsPayloadSymlinks(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation may require elevated privileges")
+	}
+	service, workspaceID, _, _ := newTestService(t)
+	ctx := context.Background()
+	conversation, _ := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID})
+	turn, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, UserText: "Question"})
+	artifact, err := service.PublishArtifact(ctx, PublishArtifactRequest{ConversationID: conversation.ID, TurnID: turn.ID, Kind: "figure", LogicalName: "chart", PayloadFormat: "json"}, strings.NewReader(`{"data":[]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, _ := service.ArtifactPath(ctx, artifact.ID)
+	external := filepath.Join(t.TempDir(), "external.json")
+	if err := os.WriteFile(external, []byte(`{"private":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(external, path); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if _, err := service.ArtifactPath(ctx, artifact.ID); appErrorCode(err) != "artifact_path_invalid" {
+		t.Fatalf("payload symlink error = %v", err)
 	}
 }
 

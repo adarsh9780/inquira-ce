@@ -10,6 +10,7 @@ import (
 	"inquira-go/internal/analysisruntime"
 	"inquira-go/internal/appdirs"
 	"inquira-go/internal/apperror"
+	"inquira-go/internal/artifactbrowser"
 	"inquira-go/internal/connection"
 	"inquira-go/internal/conversation"
 	"inquira-go/internal/datacatalog"
@@ -30,11 +31,21 @@ type App struct {
 	workspaces    *workspace.Service
 	connections   *connection.Service
 	conversations *conversation.Service
+	artifacts     *artifactbrowser.Service
 	analysis      *analysisruntime.Service
 	agent         *analysisagent.Service
 	worker        *workerruntime.PersistentTransport
 	catalog       *datacatalog.Service
 	initErr       error
+}
+
+type RerunFinalResult struct {
+	Conversation conversation.Conversation     `json:"conversation"`
+	Turn         conversation.Turn             `json:"turn"`
+	Answer       string                        `json:"answer"`
+	Code         string                        `json:"code"`
+	Execution    analysisruntime.ExecuteResult `json:"execution"`
+	Artifacts    []conversation.Artifact       `json:"artifacts"`
 }
 
 // NewApp creates a new App application struct
@@ -106,6 +117,7 @@ func NewApp() *App {
 	app.conversations = conversation.NewService(
 		conversationRepository, conversation.NewFileHeap(filepath.Join(paths.DataDir, "workspaces")),
 	)
+	app.artifacts = artifactbrowser.NewService(app.conversations, artifactbrowser.NewWorkerGateway(transport))
 	if _, err := app.conversations.ReconcileAll(context.Background()); err != nil {
 		_ = app.worker.Close()
 		_ = app.conversations.Close()
@@ -177,6 +189,16 @@ func (a *App) conversationService() (*conversation.Service, error) {
 		return nil, apperror.New("conversation_unavailable", "Conversation storage is unavailable.")
 	}
 	return a.conversations, nil
+}
+
+func (a *App) artifactService() (*artifactbrowser.Service, error) {
+	if a.initErr != nil {
+		return nil, a.initErr
+	}
+	if a.artifacts == nil {
+		return nil, apperror.New("artifact_unavailable", "Artifact browsing is unavailable.")
+	}
+	return a.artifacts, nil
 }
 
 func (a *App) connectionService() (*connection.Service, error) {
@@ -371,6 +393,14 @@ func (a *App) ListConversations(workspaceID string) ([]conversation.Conversation
 	return service.ListConversations(a.appContext(), workspaceID)
 }
 
+func (a *App) UpdateConversation(conversationID, title string) (conversation.Conversation, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return conversation.Conversation{}, err
+	}
+	return service.UpdateConversation(a.appContext(), conversationID, title)
+}
+
 func (a *App) CreateConversationTurn(request conversation.CreateTurnRequest) (conversation.Turn, error) {
 	service, err := a.conversationService()
 	if err != nil {
@@ -395,6 +425,93 @@ func (a *App) GetConversationTurn(turnID string) (conversation.Turn, error) {
 	return service.GetTurn(a.appContext(), turnID)
 }
 
+func (a *App) DeleteConversationTurn(conversationID, turnID string) (conversation.DeleteTurnResult, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return conversation.DeleteTurnResult{}, err
+	}
+	return service.DeleteTurn(a.appContext(), conversationID, turnID)
+}
+
+func (a *App) MoveConversationTurn(request conversation.MoveTurnRequest) (conversation.Turn, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return conversation.Turn{}, err
+	}
+	return service.MoveTurn(a.appContext(), request)
+}
+
+func (a *App) ReorderConversationTurns(request conversation.ReorderTurnsRequest) ([]conversation.Turn, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return nil, err
+	}
+	return service.ReorderTurns(a.appContext(), request)
+}
+
+func (a *App) GetFinalConversationTurn(conversationID string) (*conversation.Turn, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return nil, err
+	}
+	return service.GetFinalTurn(a.appContext(), conversationID)
+}
+
+func (a *App) MarkFinalConversationTurn(conversationID, turnID string) (conversation.Turn, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return conversation.Turn{}, err
+	}
+	return service.MarkFinalTurn(a.appContext(), conversationID, turnID)
+}
+
+func (a *App) RerunFinalConversationTurn(conversationID string) (RerunFinalResult, error) {
+	conversations, err := a.conversationService()
+	if err != nil {
+		return RerunFinalResult{}, err
+	}
+	prepared, err := conversations.PrepareFinalRerun(a.appContext(), conversationID)
+	if err != nil {
+		return RerunFinalResult{}, err
+	}
+	analysis, err := a.analysisService()
+	if err != nil {
+		return RerunFinalResult{}, err
+	}
+	execution, err := analysis.Execute(a.appContext(), analysisruntime.ExecuteRequest{
+		ConversationID: prepared.Conversation.ID,
+		TurnID:         prepared.Turn.ID,
+		Code:           prepared.Code,
+		TimeoutSeconds: 360,
+	}, func(event analysisruntime.WorkerEvent) {
+		runtime.EventsEmit(a.appContext(), "agent-runtime-event", event)
+	})
+	if err != nil {
+		return RerunFinalResult{}, err
+	}
+	turn, err := conversations.GetTurn(a.appContext(), prepared.Turn.ID)
+	if err != nil {
+		return RerunFinalResult{}, err
+	}
+	if turn.Status == conversation.TurnStatusCompleted {
+		if _, err := conversations.MarkFinalTurn(a.appContext(), prepared.Conversation.ID, turn.ID); err != nil {
+			return RerunFinalResult{}, err
+		}
+	}
+	updatedConversation, err := conversations.GetConversation(a.appContext(), prepared.Conversation.ID)
+	if err != nil {
+		return RerunFinalResult{}, err
+	}
+	return RerunFinalResult{
+		Conversation: updatedConversation,
+		Turn:         turn,
+		Answer:       prepared.SourceTurn.AssistantText,
+		Code:         prepared.Code,
+		Execution:    execution,
+		Artifacts:    execution.Artifacts,
+	}, nil
+}
+
 func (a *App) CompleteConversationTurn(request conversation.CompleteTurnRequest) (conversation.Turn, error) {
 	service, err := a.conversationService()
 	if err != nil {
@@ -417,6 +534,70 @@ func (a *App) ListTurnArtifacts(turnID string) ([]conversation.Artifact, error) 
 		return nil, err
 	}
 	return service.ListArtifacts(a.appContext(), turnID)
+}
+
+func (a *App) ListWorkspaceArtifacts(workspaceID, kind string) (artifactbrowser.ListResponse, error) {
+	service, err := a.artifactService()
+	if err != nil {
+		return artifactbrowser.ListResponse{}, err
+	}
+	return service.ListWorkspace(a.appContext(), workspaceID, kind)
+}
+func (a *App) ListTurnArtifactSummaries(conversationID, turnID, kind string) (artifactbrowser.ListResponse, error) {
+	service, err := a.artifactService()
+	if err != nil {
+		return artifactbrowser.ListResponse{}, err
+	}
+	return service.ListTurn(a.appContext(), conversationID, turnID, kind)
+}
+func (a *App) GetWorkspaceArtifactMetadata(workspaceID, artifactID string) (artifactbrowser.Metadata, error) {
+	service, err := a.artifactService()
+	if err != nil {
+		return artifactbrowser.Metadata{}, err
+	}
+	return service.MetadataForWorkspace(a.appContext(), workspaceID, artifactID)
+}
+func (a *App) GetTurnArtifactMetadata(conversationID, turnID, artifactID string) (artifactbrowser.Metadata, error) {
+	service, err := a.artifactService()
+	if err != nil {
+		return artifactbrowser.Metadata{}, err
+	}
+	return service.MetadataForTurn(a.appContext(), conversationID, turnID, artifactID)
+}
+func (a *App) GetWorkspaceArtifactRows(workspaceID, artifactID string, request artifactbrowser.RowsRequest) (artifactbrowser.RowsResult, error) {
+	service, err := a.artifactService()
+	if err != nil {
+		return artifactbrowser.RowsResult{}, err
+	}
+	return service.RowsForWorkspace(a.appContext(), workspaceID, artifactID, request)
+}
+func (a *App) GetTurnArtifactRows(conversationID, turnID, artifactID string, request artifactbrowser.RowsRequest) (artifactbrowser.RowsResult, error) {
+	service, err := a.artifactService()
+	if err != nil {
+		return artifactbrowser.RowsResult{}, err
+	}
+	return service.RowsForTurn(a.appContext(), conversationID, turnID, artifactID, request)
+}
+func (a *App) GetWorkspaceArtifactUsage(workspaceID string) (artifactbrowser.Usage, error) {
+	service, err := a.artifactService()
+	if err != nil {
+		return artifactbrowser.Usage{}, err
+	}
+	return service.Usage(a.appContext(), workspaceID)
+}
+func (a *App) DeleteWorkspaceArtifact(workspaceID, artifactID string) (artifactbrowser.DeleteResult, error) {
+	service, err := a.artifactService()
+	if err != nil {
+		return artifactbrowser.DeleteResult{}, err
+	}
+	return service.DeleteForWorkspace(a.appContext(), workspaceID, artifactID)
+}
+func (a *App) DeleteTurnArtifact(conversationID, turnID, artifactID string) (artifactbrowser.DeleteResult, error) {
+	service, err := a.artifactService()
+	if err != nil {
+		return artifactbrowser.DeleteResult{}, err
+	}
+	return service.DeleteForTurn(a.appContext(), conversationID, turnID, artifactID)
 }
 
 func (a *App) DeleteConversation(conversationID string) (conversation.DeleteResult, error) {

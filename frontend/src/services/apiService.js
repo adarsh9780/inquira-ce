@@ -70,6 +70,9 @@ function nativeTurnTree(turns) {
     if (parent) parent.children.push(node)
     else roots.push(node)
   }
+  const compare = (left, right) => Number(left?.sibling_order || 0) - Number(right?.sibling_order || 0) || Number(left?.sequence || 0) - Number(right?.sequence || 0)
+  roots.sort(compare)
+  for (const node of nodes.values()) node.children.sort(compare)
   return { turns: normalized, roots }
 }
 
@@ -615,6 +618,15 @@ export const apiService = {
 
     if (!inFlight) {
       inFlight = (async () => {
+        const app = nativeWailsApp()
+        if (app?.GetWorkspaceArtifactRows) {
+          const payload = await app.GetWorkspaceArtifactRows(String(workspaceId || ''), String(artifactId || ''), {
+            offset: Number(offset || 0), limit: Number(limit || 0), sort_model: normalizedSortModel,
+            filter_model: normalizedFilterModel, search_text: normalizedSearchText,
+          })
+          writeArtifactRowsCache(requestKey, payload)
+          return cloneArtifactRowsPayload(payload)
+        }
         const queryParams = new URLSearchParams({
           offset: String(offset),
           limit: String(limit),
@@ -681,6 +693,15 @@ export const apiService = {
 
     if (!inFlight) {
       inFlight = (async () => {
+        const app = nativeWailsApp()
+        if (app?.GetTurnArtifactRows) {
+          const payload = await app.GetTurnArtifactRows(String(conversationId || ''), String(turnId || ''), String(artifactId || ''), {
+            offset: Number(offset || 0), limit: Number(limit || 0), sort_model: normalizedSortModel,
+            filter_model: normalizedFilterModel, search_text: normalizedSearchText,
+          })
+          writeArtifactRowsCache(requestKey, payload)
+          return cloneArtifactRowsPayload(payload)
+        }
         const queryParams = new URLSearchParams({
           offset: String(offset),
           limit: String(limit),
@@ -1071,6 +1092,8 @@ export const apiService = {
   },
 
   async v1UpdateConversation(conversationId, title) {
+    const app = nativeWailsApp()
+    if (app?.UpdateConversation) return app.UpdateConversation(String(conversationId || ''), String(title || ''))
     return v1Api.conversations.update(conversationId, { title })
   },
 
@@ -1134,8 +1157,7 @@ export const apiService = {
         workspace_id: String(workspaceId || ''),
         conversations: await Promise.all((Array.isArray(conversations) ? conversations : []).map(async (item) => {
           const tree = nativeTurnTree(await app.ListConversationTurns(String(item.id || '')))
-          const finalTurn = [...tree.turns].reverse().find((turn) => turn.status === 'completed') || null
-          return { ...item, roots: tree.roots, final_turn_id: finalTurn?.id || null, usage_summary: null }
+          return { ...item, roots: tree.roots, final_turn_id: item.final_turn_id || null, usage_summary: null }
         })),
       }
     }
@@ -1143,16 +1165,22 @@ export const apiService = {
   },
 
   async v1DeleteTurn(conversationId, turnId) {
+    const app = nativeWailsApp()
+    if (app?.DeleteConversationTurn) return app.DeleteConversationTurn(String(conversationId || ''), String(turnId || ''))
     return axios.delete(`/api/v1/conversations/${conversationId}/turns/${turnId}`)
   },
 
   async v1MoveTurn(conversationId, turnId, parentTurnId) {
+    const app = nativeWailsApp()
+    if (app?.MoveConversationTurn) return app.MoveConversationTurn({ conversation_id: String(conversationId || ''), turn_id: String(turnId || ''), parent_turn_id: parentTurnId ? String(parentTurnId) : null })
     return axios.patch(`/api/v1/conversations/${conversationId}/turns/${turnId}/parent`, {
       parent_turn_id: parentTurnId,
     })
   },
 
   async v1ReorderTurns(conversationId, parentTurnId, turnIds) {
+    const app = nativeWailsApp()
+    if (app?.ReorderConversationTurns) return app.ReorderConversationTurns({ conversation_id: String(conversationId || ''), parent_turn_id: parentTurnId ? String(parentTurnId) : null, turn_ids: Array.isArray(turnIds) ? turnIds.map(String) : [] })
     return axios.patch(`/api/v1/conversations/${conversationId}/turns/order`, {
       parent_turn_id: parentTurnId || null,
       turn_ids: Array.isArray(turnIds) ? turnIds : [],
@@ -1161,6 +1189,7 @@ export const apiService = {
 
   async v1GetFinalTurn(conversationId) {
     const app = nativeWailsApp()
+    if (app?.GetFinalConversationTurn) return normalizeNativeTurn(await app.GetFinalConversationTurn(String(conversationId || '')))
     if (app?.ListConversationTurns) {
       const turns = (await app.ListConversationTurns(String(conversationId || ''))).map(normalizeNativeTurn)
       return [...turns].reverse().find((turn) => turn.status === 'completed') || null
@@ -1169,10 +1198,14 @@ export const apiService = {
   },
 
   async v1MarkFinalTurn(conversationId, turnId) {
+    const app = nativeWailsApp()
+    if (app?.MarkFinalConversationTurn) return normalizeNativeTurn(await app.MarkFinalConversationTurn(String(conversationId || ''), String(turnId || '')))
     return axios.post(`/api/v1/conversations/${conversationId}/turns/${turnId}/final`)
   },
 
   async v1RerunFinalTurn(conversationId) {
+    const app = nativeWailsApp()
+    if (app?.RerunFinalConversationTurn) return normalizeNativeAnalysis(await app.RerunFinalConversationTurn(String(conversationId || '')))
     return axios.post(`/api/v1/conversations/${conversationId}/final-turn/rerun`)
   },
 
@@ -1330,6 +1363,8 @@ export const apiService = {
   },
 
   async v1ListWorkspaceArtifacts(workspaceId, kind = 'dataframe', options = {}) {
+    const app = nativeWailsApp()
+    if (app?.ListWorkspaceArtifacts) return app.ListWorkspaceArtifacts(String(workspaceId || ''), String(kind || ''))
     const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts?kind=${encodeURIComponent(kind)}`
     const response = await authorizedFetch(url, {
       method: 'GET',
@@ -1345,6 +1380,8 @@ export const apiService = {
   },
 
   async v1ListTurnArtifacts(conversationId, turnId, kind = 'dataframe', options = {}) {
+    const app = nativeWailsApp()
+    if (app?.ListTurnArtifactSummaries) return app.ListTurnArtifactSummaries(String(conversationId || ''), String(turnId || ''), String(kind || ''))
     const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/conversations/${conversationId}/turns/${turnId}/artifacts?kind=${encodeURIComponent(kind)}`
     const response = await authorizedFetch(url, {
       method: 'GET',
@@ -1360,6 +1397,8 @@ export const apiService = {
   },
 
   async v1GetTurnArtifactMetadata(conversationId, turnId, artifactId, options = {}) {
+    const app = nativeWailsApp()
+    if (app?.GetTurnArtifactMetadata) return app.GetTurnArtifactMetadata(String(conversationId || ''), String(turnId || ''), String(artifactId || ''))
     const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/conversations/${conversationId}/turns/${turnId}/artifacts/${artifactId}`
     const response = await authorizedFetch(url, {
       method: 'GET',
@@ -1375,6 +1414,8 @@ export const apiService = {
   },
 
   async v1DeleteTurnArtifact(conversationId, turnId, artifactId, options = {}) {
+    const app = nativeWailsApp()
+    if (app?.DeleteTurnArtifact) return app.DeleteTurnArtifact(String(conversationId || ''), String(turnId || ''), String(artifactId || ''))
     const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/conversations/${conversationId}/turns/${turnId}/artifacts/${artifactId}`
     const response = await authorizedFetch(url, {
       method: 'DELETE',
@@ -1390,6 +1431,8 @@ export const apiService = {
   },
 
   async v1GetWorkspaceArtifactUsage(workspaceId, options = {}) {
+    const app = nativeWailsApp()
+    if (app?.GetWorkspaceArtifactUsage) return app.GetWorkspaceArtifactUsage(String(workspaceId || ''))
     const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/usage`
     const response = await authorizedFetch(url, {
       method: 'GET',
@@ -1405,6 +1448,8 @@ export const apiService = {
   },
 
   async v1GetWorkspaceArtifactMetadata(workspaceId, artifactId, options = {}) {
+    const app = nativeWailsApp()
+    if (app?.GetWorkspaceArtifactMetadata) return app.GetWorkspaceArtifactMetadata(String(workspaceId || ''), String(artifactId || ''))
     const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/${artifactId}`
     const response = await authorizedFetch(url, {
       method: 'GET',
@@ -1420,6 +1465,8 @@ export const apiService = {
   },
 
   async v1DeleteWorkspaceArtifact(workspaceId, artifactId, options = {}) {
+    const app = nativeWailsApp()
+    if (app?.DeleteWorkspaceArtifact) return app.DeleteWorkspaceArtifact(String(workspaceId || ''), String(artifactId || ''))
     const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/${artifactId}`
     const response = await authorizedFetch(url, {
       method: 'DELETE',

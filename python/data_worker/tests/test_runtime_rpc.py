@@ -16,26 +16,45 @@ def test_runtime_rpc_manages_workspace_kernel_lifecycle(tmp_path: Path) -> None:
         runtime = WorkerRuntime(idle_seconds=300)
         events: list[dict] = []
         try:
-            pong = await runtime.handle({"id": "ping", "method": "ping", "params": {}}, events.append)
+            pong = await runtime.handle(
+                {"id": "ping", "method": "ping", "params": {}}, events.append
+            )
             assert pong["result"]["status"] == "ready"
-            executed = await runtime.handle({
-                "id": "execute",
-                "method": "kernel_execute",
-                "params": {
-                    "workspace_id": "workspace-1",
-                    "database_path": str(catalog),
-                    "code": "21 * 2",
-                    "run_id": "run-1",
-                    "artifact_dir": str(tmp_path / "artifacts"),
-                    "timeout_seconds": 10,
+            executed = await runtime.handle(
+                {
+                    "id": "execute",
+                    "method": "kernel_execute",
+                    "params": {
+                        "workspace_id": "workspace-1",
+                        "database_path": str(catalog),
+                        "code": "21 * 2",
+                        "run_id": "run-1",
+                        "artifact_dir": str(tmp_path / "artifacts"),
+                        "timeout_seconds": 10,
+                    },
                 },
-            }, events.append)
+                events.append,
+            )
             assert executed["error"] is None
             assert executed["result"]["result"] == 42
             assert any(event["type"] == "kernel_status" for event in events)
-            status = await runtime.handle({"id": "status", "method": "kernel_status", "params": {"workspace_id": "workspace-1"}}, events.append)
+            status = await runtime.handle(
+                {
+                    "id": "status",
+                    "method": "kernel_status",
+                    "params": {"workspace_id": "workspace-1"},
+                },
+                events.append,
+            )
             assert status["result"]["status"] == "ready"
-            reset = await runtime.handle({"id": "reset", "method": "kernel_reset", "params": {"workspace_id": "workspace-1"}}, events.append)
+            reset = await runtime.handle(
+                {
+                    "id": "reset",
+                    "method": "kernel_reset",
+                    "params": {"workspace_id": "workspace-1"},
+                },
+                events.append,
+            )
             assert reset["result"]["reset"] is True
         finally:
             await runtime.shutdown()
@@ -47,13 +66,54 @@ def test_runtime_rpc_rejects_unsafe_or_missing_execution_params(tmp_path: Path) 
     async def scenario() -> None:
         runtime = WorkerRuntime(idle_seconds=300)
         try:
-            response = await runtime.handle({
-                "id": "bad",
-                "method": "kernel_execute",
-                "params": {"workspace_id": "../escape", "database_path": str(tmp_path / "missing.duckdb")},
-            }, lambda _: None)
+            response = await runtime.handle(
+                {
+                    "id": "bad",
+                    "method": "kernel_execute",
+                    "params": {
+                        "workspace_id": "../escape",
+                        "database_path": str(tmp_path / "missing.duckdb"),
+                    },
+                },
+                lambda _: None,
+            )
             assert response["result"] is None
             assert response["error"]["code"] == "invalid_params"
+        finally:
+            await runtime.shutdown()
+
+    asyncio.run(scenario())
+
+
+def test_runtime_rpc_exposes_artifact_inspection_and_rows(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        artifact = tmp_path / "data.parquet"
+        connection = duckdb.connect()
+        connection.execute(
+            "COPY (SELECT 1 AS id UNION ALL SELECT 2) TO ? (FORMAT PARQUET)",
+            [str(artifact)],
+        )
+        connection.close()
+        runtime = WorkerRuntime()
+        try:
+            inspected = await runtime.handle(
+                {
+                    "id": "inspect",
+                    "method": "artifact_inspect",
+                    "params": {"artifact_path": str(artifact)},
+                },
+                lambda _: None,
+            )
+            assert inspected["error"] is None and inspected["result"]["row_count"] == 2
+            rows = await runtime.handle(
+                {
+                    "id": "rows",
+                    "method": "artifact_rows",
+                    "params": {"artifact_path": str(artifact), "offset": 1, "limit": 1},
+                },
+                lambda _: None,
+            )
+            assert rows["error"] is None and rows["result"]["rows"] == [{"id": 2}]
         finally:
             await runtime.shutdown()
 

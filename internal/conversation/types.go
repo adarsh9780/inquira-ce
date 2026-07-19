@@ -19,13 +19,39 @@ const (
 )
 
 type Conversation struct {
-	ID          string `json:"id"`
-	WorkspaceID string `json:"workspace_id"`
-	Title       string `json:"title"`
-	Status      string `json:"status"`
-	LastTurnAt  string `json:"last_turn_at"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+	ID          string  `json:"id"`
+	WorkspaceID string  `json:"workspace_id"`
+	Title       string  `json:"title"`
+	Status      string  `json:"status"`
+	FinalTurnID *string `json:"final_turn_id,omitempty"`
+	LastTurnAt  string  `json:"last_turn_at"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
+}
+
+type MoveTurnRequest struct {
+	ConversationID string  `json:"conversation_id"`
+	TurnID         string  `json:"turn_id"`
+	ParentTurnID   *string `json:"parent_turn_id"`
+}
+
+type ReorderTurnsRequest struct {
+	ConversationID string   `json:"conversation_id"`
+	ParentTurnID   *string  `json:"parent_turn_id"`
+	TurnIDs        []string `json:"turn_ids"`
+}
+
+type DeleteTurnResult struct {
+	ConversationID string   `json:"conversation_id"`
+	DeletedTurnIDs []string `json:"deleted_turn_ids"`
+	Deleted        bool     `json:"deleted"`
+}
+
+type FinalRerun struct {
+	Conversation Conversation `json:"conversation"`
+	SourceTurn   Turn         `json:"source_turn"`
+	Turn         Turn         `json:"turn"`
+	Code         string       `json:"code"`
 }
 
 type Turn struct {

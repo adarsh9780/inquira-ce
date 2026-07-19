@@ -26,17 +26,43 @@ type repository interface {
 	WorkspaceIDs(context.Context) ([]string, error)
 	MarkConversationDeleting(context.Context, string, string) error
 	PurgeConversation(context.Context, string) error
+	UpdateConversationTitle(context.Context, string, string, string) (Conversation, error)
 	CreateTurn(context.Context, Turn) (Turn, error)
 	GetTurn(context.Context, string) (Turn, error)
 	ListTurns(context.Context, string) ([]Turn, error)
 	CompleteTurn(context.Context, Turn) (Turn, error)
 	FailTurn(context.Context, Turn) (Turn, error)
+	MoveTurn(context.Context, string, string, *string, string) (Turn, error)
+	ReorderTurns(context.Context, string, *string, []string, string) ([]Turn, error)
+	SetFinalTurn(context.Context, string, string, string) (Turn, error)
+	DeleteTurnSubtree(context.Context, string, string, string) ([]string, error)
 	CreateArtifact(context.Context, Artifact) error
 	GetArtifact(context.Context, string) (Artifact, error)
 	ListArtifacts(context.Context, string) ([]Artifact, error)
 	ListConversationArtifacts(context.Context, string) ([]Artifact, error)
 	SetArtifactStatus(context.Context, string, string) error
+	DeleteArtifact(context.Context, string) error
+	ListWorkspaceArtifacts(context.Context, string) ([]Artifact, error)
 	Close() error
+}
+
+func (s *Service) UpdateConversation(ctx context.Context, conversationID, title string) (Conversation, error) {
+	id := strings.TrimSpace(conversationID)
+	if id == "" {
+		return Conversation{}, apperror.New("conversation_required", "Conversation identity is required.")
+	}
+	normalized, err := normalizeTitle(title)
+	if err != nil {
+		return Conversation{}, err
+	}
+	result, err := s.repository.UpdateConversationTitle(ctx, id, normalized, formatTime(s.now().UTC()))
+	if errors.Is(err, errConversationNotFound) {
+		return Conversation{}, apperror.New("conversation_not_found", "Conversation not found.")
+	}
+	if err != nil {
+		return Conversation{}, apperror.Wrap("conversation_update_failed", "Could not update the conversation.", err)
+	}
+	return result, nil
 }
 
 type Service struct {
@@ -183,6 +209,186 @@ func (s *Service) GetTurn(ctx context.Context, turnID string) (Turn, error) {
 	return turn, nil
 }
 
+func (s *Service) MoveTurn(ctx context.Context, request MoveTurnRequest) (Turn, error) {
+	cid := strings.TrimSpace(request.ConversationID)
+	tid := strings.TrimSpace(request.TurnID)
+	if cid == "" || tid == "" {
+		return Turn{}, apperror.New("turn_required", "Conversation and turn identities are required.")
+	}
+	parent := request.ParentTurnID
+	if parent != nil {
+		v := strings.TrimSpace(*parent)
+		if v == "" {
+			parent = nil
+		} else {
+			parent = &v
+		}
+	}
+	turn, err := s.repository.MoveTurn(ctx, cid, tid, parent, formatTime(s.now().UTC()))
+	switch {
+	case errors.Is(err, errTurnNotFound):
+		return Turn{}, apperror.New("turn_not_found", "Turn not found in this conversation.")
+	case errors.Is(err, errParentTurnNotFound):
+		return Turn{}, apperror.New("turn_parent_not_found", "Parent turn not found in this conversation.")
+	case errors.Is(err, errTurnCycle):
+		return Turn{}, apperror.New("turn_cycle", "A turn cannot be moved below itself or one of its descendants.")
+	case err != nil:
+		return Turn{}, apperror.Wrap("turn_move_failed", "Could not move the conversation turn.", err)
+	}
+	return turn, nil
+}
+
+func (s *Service) ReorderTurns(ctx context.Context, request ReorderTurnsRequest) ([]Turn, error) {
+	cid := strings.TrimSpace(request.ConversationID)
+	if cid == "" {
+		return nil, apperror.New("conversation_required", "Conversation identity is required.")
+	}
+	ids := make([]string, len(request.TurnIDs))
+	for i, id := range request.TurnIDs {
+		ids[i] = strings.TrimSpace(id)
+		if ids[i] == "" {
+			return nil, apperror.New("turn_order_invalid", "Turn order must contain every sibling exactly once.")
+		}
+	}
+	parent := request.ParentTurnID
+	if parent != nil {
+		v := strings.TrimSpace(*parent)
+		if v == "" {
+			parent = nil
+		} else {
+			parent = &v
+		}
+	}
+	turns, err := s.repository.ReorderTurns(ctx, cid, parent, ids, formatTime(s.now().UTC()))
+	if errors.Is(err, errConversationNotFound) {
+		return nil, apperror.New("conversation_not_found", "Conversation not found.")
+	}
+	if errors.Is(err, errParentTurnNotFound) {
+		return nil, apperror.New("turn_parent_not_found", "Parent turn not found in this conversation.")
+	}
+	if errors.Is(err, errTurnOrderInvalid) {
+		return nil, apperror.New("turn_order_invalid", "Turn order must contain every sibling exactly once.")
+	}
+	if err != nil {
+		return nil, apperror.Wrap("turn_reorder_failed", "Could not reorder conversation turns.", err)
+	}
+	return turns, nil
+}
+
+func (s *Service) MarkFinalTurn(ctx context.Context, conversationID, turnID string) (Turn, error) {
+	turn, err := s.repository.SetFinalTurn(ctx, strings.TrimSpace(conversationID), strings.TrimSpace(turnID), formatTime(s.now().UTC()))
+	switch {
+	case errors.Is(err, errTurnNotFound):
+		return Turn{}, apperror.New("turn_not_found", "Turn not found in this conversation.")
+	case errors.Is(err, errTurnNotLeaf):
+		return Turn{}, apperror.New("turn_not_leaf", "Only a leaf turn can be marked final.")
+	case errors.Is(err, errTurnStateInvalid):
+		return Turn{}, apperror.New("turn_state_invalid", "Only a completed turn can be marked final.")
+	case err != nil:
+		return Turn{}, apperror.Wrap("turn_final_failed", "Could not mark the final turn.", err)
+	}
+	return turn, nil
+}
+
+func (s *Service) GetFinalTurn(ctx context.Context, conversationID string) (*Turn, error) {
+	c, err := s.GetConversation(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	if c.FinalTurnID == nil {
+		return nil, nil
+	}
+	turn, err := s.GetTurn(ctx, *c.FinalTurnID)
+	if err != nil {
+		return nil, err
+	}
+	return &turn, nil
+}
+
+func (s *Service) PrepareFinalRerun(ctx context.Context, conversationID string) (FinalRerun, error) {
+	owned, err := s.GetConversation(ctx, conversationID)
+	if err != nil {
+		return FinalRerun{}, err
+	}
+	if owned.FinalTurnID == nil {
+		return FinalRerun{}, apperror.New("final_turn_not_found", "Final turn not found.")
+	}
+	source, err := s.GetTurn(ctx, *owned.FinalTurnID)
+	if err != nil || source.ConversationID != owned.ID {
+		return FinalRerun{}, apperror.New("final_turn_not_found", "Final turn not found.")
+	}
+	code := strings.TrimSpace(source.CodeSnapshot)
+	if code == "" {
+		return FinalRerun{}, apperror.New("final_turn_code_missing", "Final turn has no stored code to rerun.")
+	}
+	metadata, _ := json.Marshal(map[string]string{"rerun_source_turn_id": source.ID})
+	child, err := s.CreateTurn(ctx, CreateTurnRequest{ConversationID: owned.ID, ParentTurnID: &source.ID, UserText: source.UserText, MetadataJSON: string(metadata)})
+	if err != nil {
+		return FinalRerun{}, err
+	}
+	return FinalRerun{Conversation: owned, SourceTurn: source, Turn: child, Code: code}, nil
+}
+
+func (s *Service) DeleteTurn(ctx context.Context, conversationID, turnID string) (DeleteTurnResult, error) {
+	c, err := s.GetConversation(ctx, conversationID)
+	if err != nil {
+		return DeleteTurnResult{}, err
+	}
+	turn, err := s.GetTurn(ctx, turnID)
+	if err != nil || turn.ConversationID != c.ID {
+		return DeleteTurnResult{}, apperror.New("turn_not_found", "Turn not found in this conversation.")
+	}
+	if turn.ParentTurnID == nil {
+		turns, listErr := s.ListTurns(ctx, c.ID)
+		if listErr != nil {
+			return DeleteTurnResult{}, listErr
+		}
+		ids := make([]string, 0, len(turns))
+		for _, item := range turns {
+			ids = append(ids, item.ID)
+		}
+		deleted, err := s.DeleteConversation(ctx, c.ID)
+		return DeleteTurnResult{ConversationID: c.ID, DeletedTurnIDs: ids, Deleted: deleted.Deleted}, err
+	}
+	turns, err := s.ListTurns(ctx, c.ID)
+	if err != nil {
+		return DeleteTurnResult{}, err
+	}
+	children := map[string][]string{}
+	for _, item := range turns {
+		if item.ParentTurnID != nil {
+			children[*item.ParentTurnID] = append(children[*item.ParentTurnID], item.ID)
+		}
+	}
+	subtree := map[string]bool{}
+	stack := []string{turn.ID}
+	for len(stack) > 0 {
+		id := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if subtree[id] {
+			continue
+		}
+		subtree[id] = true
+		stack = append(stack, children[id]...)
+	}
+	artifacts, err := s.repository.ListConversationArtifacts(ctx, c.ID)
+	if err != nil {
+		return DeleteTurnResult{}, apperror.Wrap("artifact_list_failed", "Could not load subtree artifacts.", err)
+	}
+	for _, a := range artifacts {
+		if subtree[a.TurnID] {
+			if err := s.heap.RemoveObject(a.WorkspaceID, a.RelativePath); err != nil {
+				return DeleteTurnResult{}, apperror.Wrap("artifact_delete_failed", "Could not remove a turn artifact.", err)
+			}
+		}
+	}
+	ids, err := s.repository.DeleteTurnSubtree(ctx, c.ID, turn.ID, formatTime(s.now().UTC()))
+	if err != nil {
+		return DeleteTurnResult{}, apperror.Wrap("turn_delete_failed", "Could not delete the conversation turn.", err)
+	}
+	return DeleteTurnResult{ConversationID: c.ID, DeletedTurnIDs: ids, Deleted: true}, nil
+}
+
 func (s *Service) CompleteTurn(ctx context.Context, request CompleteTurnRequest) (Turn, error) {
 	turnID := strings.TrimSpace(request.TurnID)
 	if turnID == "" {
@@ -300,6 +506,46 @@ func (s *Service) ListArtifacts(ctx context.Context, turnID string) ([]Artifact,
 	return artifacts, nil
 }
 
+func (s *Service) GetArtifact(ctx context.Context, artifactID string) (Artifact, error) {
+	artifact, err := s.repository.GetArtifact(ctx, strings.TrimSpace(artifactID))
+	if errors.Is(err, errArtifactNotFound) {
+		return Artifact{}, apperror.New("artifact_not_found", "Artifact not found.")
+	}
+	if err != nil {
+		return Artifact{}, apperror.Wrap("artifact_read_failed", "Could not load artifact metadata.", err)
+	}
+	return artifact, nil
+}
+
+func (s *Service) ListWorkspaceArtifacts(ctx context.Context, workspaceID string) ([]Artifact, error) {
+	id := strings.TrimSpace(workspaceID)
+	if id == "" {
+		return nil, apperror.New("workspace_required", "Workspace identity is required.")
+	}
+	artifacts, err := s.repository.ListWorkspaceArtifacts(ctx, id)
+	if err != nil {
+		return nil, apperror.Wrap("artifact_list_failed", "Could not load workspace artifacts.", err)
+	}
+	return artifacts, nil
+}
+
+func (s *Service) DeleteArtifact(ctx context.Context, artifactID string) error {
+	artifact, err := s.GetArtifact(ctx, artifactID)
+	if err != nil {
+		return err
+	}
+	if !validArtifactPointer(artifact) {
+		return apperror.New("artifact_path_invalid", "Artifact path is invalid.")
+	}
+	if err := s.heap.RemoveObject(artifact.WorkspaceID, artifact.RelativePath); err != nil {
+		return apperror.Wrap("artifact_delete_failed", "Could not remove the artifact payload.", err)
+	}
+	if err := s.repository.DeleteArtifact(ctx, artifact.ID); err != nil {
+		return apperror.Wrap("artifact_delete_failed", "Could not remove artifact metadata.", err)
+	}
+	return nil
+}
+
 func (s *Service) ArtifactPath(ctx context.Context, artifactID string) (string, error) {
 	artifact, err := s.repository.GetArtifact(ctx, strings.TrimSpace(artifactID))
 	if errors.Is(err, errArtifactNotFound) {
@@ -318,7 +564,10 @@ func (s *Service) ArtifactPath(ctx context.Context, artifactID string) (string, 
 	if err != nil {
 		return "", apperror.Wrap("artifact_path_invalid", "Artifact path is invalid.", err)
 	}
-	info, err := os.Stat(path)
+	info, err := os.Lstat(path)
+	if err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return "", apperror.New("artifact_path_invalid", "Artifact payload cannot be a symbolic link.")
+	}
 	if err != nil || !info.Mode().IsRegular() {
 		_ = s.repository.SetArtifactStatus(ctx, artifact.ID, ArtifactStatusMissing)
 		return "", apperror.New("artifact_payload_missing", "Artifact payload is missing from local storage.")
