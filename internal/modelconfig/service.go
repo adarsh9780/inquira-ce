@@ -43,17 +43,39 @@ func (s *Service) GetPreferences(ctx context.Context, providerHint string) (Pref
 func (s *Service) RuntimeConfiguration(ctx context.Context) (RuntimeConfiguration, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	return s.runtimeConfiguration(ctx, false)
+}
+
+func (s *Service) SchemaRuntimeConfiguration(ctx context.Context) (RuntimeConfiguration, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.runtimeConfiguration(ctx, true)
+}
+
+func (s *Service) runtimeConfiguration(ctx context.Context, preferLite bool) (RuntimeConfiguration, error) {
 	preferences, err := s.repository.Load(ctx)
 	if err != nil {
 		return RuntimeConfiguration{}, apperror.Wrap("settings_read_failed", "Could not load model settings.", err)
 	}
 	provider := normalizeProvider(preferences.LLMProvider)
-	model := strings.TrimSpace(preferences.SelectedCodingModel)
-	if model == "" {
-		model = strings.TrimSpace(preferences.SelectedModel)
+	catalog := preferences.Catalogs[provider]
+	model := ""
+	if preferLite {
+		model = strings.TrimSpace(preferences.SelectedLiteModel)
+		if model == "" {
+			model = strings.TrimSpace(preferences.SelectedModel)
+		}
+		if model == "" {
+			model = strings.TrimSpace(catalog.DefaultLiteModel)
+		}
+	} else {
+		model = strings.TrimSpace(preferences.SelectedCodingModel)
+		if model == "" {
+			model = strings.TrimSpace(preferences.SelectedModel)
+		}
 	}
 	if model == "" {
-		model = preferences.Catalogs[provider].DefaultMainModel
+		model = catalog.DefaultMainModel
 	}
 	if model == "" {
 		return RuntimeConfiguration{}, apperror.New("model_required", "Choose a model before starting an analysis.")
@@ -76,9 +98,13 @@ func (s *Service) RuntimeConfiguration(ctx context.Context) (RuntimeConfiguratio
 	if baseURL == "" && provider == "ollama" {
 		baseURL = "http://localhost:11434"
 	}
+	maxTokens := preferences.MaxTokens
+	if preferLite && maxTokens > 4096 {
+		maxTokens = 4096
+	}
 	return RuntimeConfiguration{
 		Provider: provider, Model: model, APIKey: apiKey, BaseURL: baseURL,
-		Temperature: preferences.Temperature, MaxTokens: preferences.MaxTokens, TopP: preferences.TopP,
+		Temperature: preferences.Temperature, MaxTokens: maxTokens, TopP: preferences.TopP,
 		FrequencyPenalty: preferences.FrequencyPenalty, PresencePenalty: preferences.PresencePenalty,
 		AllowDataSamples: preferences.AllowLLMDataSamples,
 	}, nil

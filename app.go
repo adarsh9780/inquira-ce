@@ -18,6 +18,7 @@ import (
 	"inquira-go/internal/modelconfig"
 	"inquira-go/internal/netclient"
 	"inquira-go/internal/runtimeprovision"
+	"inquira-go/internal/schemageneration"
 	workerruntime "inquira-go/internal/worker"
 	"inquira-go/internal/workspace"
 	dataworkerbundle "inquira-go/python/data_worker"
@@ -35,6 +36,7 @@ type App struct {
 	artifacts     *artifactbrowser.Service
 	analysis      *analysisruntime.Service
 	manual        *manualanalysis.Service
+	schemas       *schemageneration.Service
 	agent         *analysisagent.Service
 	worker        *workerruntime.PersistentTransport
 	catalog       *datacatalog.Service
@@ -116,6 +118,9 @@ func NewApp() *App {
 	app.catalog = datacatalog.NewService(
 		app.workspaces, app.connections, datacatalog.NewWorkerGateway(transport), filepath.Join(paths.DataDir, "workspaces"),
 	).WithSchemaRepository(catalogRepository)
+	app.schemas = schemageneration.NewService(
+		app.catalog, app.models, schemageneration.NewWorkerGateway(transport),
+	)
 	conversationRepository, err := conversation.OpenSQLite(paths.DatabasePath)
 	if err != nil {
 		_ = app.worker.Close()
@@ -243,6 +248,16 @@ func (a *App) catalogService() (*datacatalog.Service, error) {
 		return nil, apperror.New("catalog_unavailable", "Workspace analysis catalog is unavailable.")
 	}
 	return a.catalog, nil
+}
+
+func (a *App) schemaGenerationService() (*schemageneration.Service, error) {
+	if a.initErr != nil {
+		return nil, a.initErr
+	}
+	if a.schemas == nil {
+		return nil, apperror.New("schema_generation_unavailable", "AI schema generation is unavailable.")
+	}
+	return a.schemas, nil
 }
 
 func (a *App) workspaceService() (*workspace.Service, error) {
@@ -747,6 +762,14 @@ func (a *App) SaveWorkspaceDatasetSchema(request datacatalog.SaveSchemaRequest) 
 		return datacatalog.DatasetSchema{}, err
 	}
 	return catalogService.GetSchema(a.appContext(), request.WorkspaceID, request.TableName)
+}
+
+func (a *App) RegenerateWorkspaceDatasetSchema(request schemageneration.RegenerateRequest) (schemageneration.RegenerateResult, error) {
+	service, err := a.schemaGenerationService()
+	if err != nil {
+		return schemageneration.RegenerateResult{}, err
+	}
+	return service.Regenerate(a.appContext(), request)
 }
 
 func (a *App) ListWorkspaceColumns(workspaceID string) (datacatalog.WorkspaceColumnsResponse, error) {

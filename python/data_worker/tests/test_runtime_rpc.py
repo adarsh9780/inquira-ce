@@ -118,3 +118,26 @@ def test_runtime_rpc_exposes_artifact_inspection_and_rows(tmp_path: Path) -> Non
             await runtime.shutdown()
 
     asyncio.run(scenario())
+
+
+def test_runtime_rpc_exposes_schema_description_generation() -> None:
+    class FakeSchemaGenerator:
+        async def generate(self, params: dict) -> dict:
+            assert params["table_name"] == "sales"
+            return {"columns": [{"name": "amount", "description": "Booked revenue", "aliases": ["sales"]}]}
+
+    async def scenario() -> None:
+        runtime = WorkerRuntime()
+        runtime.schema_generator = FakeSchemaGenerator()
+        try:
+            response = await runtime.handle({
+                "id": "schema",
+                "method": "schema_describe",
+                "params": {"table_name": "sales"},
+            }, lambda _: None)
+            assert response["error"] is None
+            assert response["result"]["columns"][0]["description"] == "Booked revenue"
+        finally:
+            await runtime.shutdown()
+
+    asyncio.run(scenario())

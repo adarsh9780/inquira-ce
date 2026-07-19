@@ -285,6 +285,53 @@ func TestRuntimeConfigurationReadsSelectedModelAndKeyWithoutExposingItInPreferen
 	}
 }
 
+func TestSchemaRuntimeConfigurationUsesLiteModelWithMainModelFallback(t *testing.T) {
+	repository, err := OpenSQLite(filepath.Join(t.TempDir(), "inquira.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	secrets := &memorySecrets{values: map[string]string{"openai": "runtime-secret"}}
+	service := NewService(repository, secrets, roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return response(http.StatusOK, `{}`), nil
+	}))
+	defer service.Close()
+	provider, mainModel, liteModel := "openai", "gpt-main", "gpt-lite"
+	preferences, err := repository.Load(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	preferences.Catalogs[provider] = Catalog{
+		MainModels: []string{mainModel}, LiteModels: []string{liteModel},
+		DefaultMainModel: mainModel, DefaultLiteModel: liteModel,
+	}
+	if err := repository.Save(context.Background(), preferences); err != nil {
+		t.Fatal(err)
+	}
+	maxTokens := 10000
+	if _, err := service.UpdatePreferences(context.Background(), UpdateRequest{
+		LLMProvider: &provider, SelectedModel: &mainModel, SelectedLiteModel: &liteModel, LLMMaxTokens: &maxTokens,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	config, err := service.SchemaRuntimeConfiguration(context.Background())
+	if err != nil || config.Model != liteModel || config.APIKey != "runtime-secret" || config.MaxTokens != 4096 {
+		t.Fatalf("schema runtime configuration = %#v, %v", config, err)
+	}
+	preferences, err = repository.Load(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	preferences.SelectedLiteModel = ""
+	preferences.Catalogs["openai"] = Catalog{}
+	if err := repository.Save(context.Background(), preferences); err != nil {
+		t.Fatal(err)
+	}
+	config, err = service.SchemaRuntimeConfiguration(context.Background())
+	if err != nil || config.Model != mainModel {
+		t.Fatalf("schema runtime fallback = %#v, %v", config, err)
+	}
+}
+
 func response(status int, body string) *http.Response {
 	return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}
 }

@@ -1824,13 +1824,22 @@ async function confirmRegenerateDatasetSchema() {
   })
   try {
     isSchemaRegenerateSubmitting.value = true
-    await apiService.v1EnqueueDatasetSchemaRegeneration(workspaceId, tableName)
+    const schemaRegeneration = await apiService.v1EnqueueDatasetSchemaRegeneration(workspaceId, tableName)
     await loadWorkspaceDatasets()
-    appStore.updateBackgroundOperation(operationId, {
-      message: `Generating schema for ${tableName}...`,
-      progress: null,
-    })
-    toast.success('Schema regeneration queued', 'Schema generation will continue in the background.')
+    if (schemaRegeneration?.completed) {
+      appStore.finishBackgroundOperation(operationId, {
+        title: 'Schema regenerated',
+        message: `Schema updated for ${tableName}.`,
+      })
+      dispatchDatasetSchemaReady({ table_name: tableName, source_path: dataset?.source_path })
+      toast.success('Schema regenerated', `AI descriptions updated for ${tableName}.`)
+    } else {
+      appStore.updateBackgroundOperation(operationId, {
+        message: `Generating schema for ${tableName}...`,
+        progress: null,
+      })
+      toast.success('Schema regeneration queued', 'Schema generation will continue in the background.')
+    }
   } catch (error) {
     appStore.finishBackgroundOperation(operationId, {
       status: 'failed',

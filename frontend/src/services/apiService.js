@@ -1124,8 +1124,12 @@ export const apiService = {
 
   async v1RegenerateDatasetSchema(workspaceId, tableName, payload = {}) {
     const app = nativeWailsApp()
-    if (app?.GetWorkspaceDatasetSchema) {
-      throw new Error('AI schema regeneration has not been migrated to the native app yet. Column descriptions can be edited and saved manually.')
+    if (app?.RegenerateWorkspaceDatasetSchema) {
+      return app.RegenerateWorkspaceDatasetSchema({
+        workspace_id: String(workspaceId || ''),
+        table_name: String(tableName || ''),
+        ...(Object.prototype.hasOwnProperty.call(payload || {}, 'context') ? { context: String(payload?.context || '') } : {}),
+      })
     }
     return axios.post(
       `/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema/regenerate`,
@@ -1134,6 +1138,14 @@ export const apiService = {
   },
 
   async v1EnqueueDatasetSchemaRegeneration(workspaceId, tableName) {
+    const app = nativeWailsApp()
+    if (app?.RegenerateWorkspaceDatasetSchema) {
+      const schema = await app.RegenerateWorkspaceDatasetSchema({
+        workspace_id: String(workspaceId || ''),
+        table_name: String(tableName || ''),
+      })
+      return { queued: false, completed: true, schema }
+    }
     return v1Api.datasets.enqueueSchemaRegeneration(workspaceId, tableName)
   },
 

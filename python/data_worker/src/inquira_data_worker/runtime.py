@@ -11,12 +11,14 @@ from .artifacts import inspect_parquet, query_parquet
 from .errors import AdapterError
 from .kernel import WorkspaceKernelManager
 from .rpc import handle_request as handle_data_request
+from .schema_generation import SchemaGenerator
 
 
 class WorkerRuntime:
     def __init__(self, *, idle_seconds: int = 1800) -> None:
         self.kernels = WorkspaceKernelManager(idle_seconds=idle_seconds)
         self.agent = AnalysisAgent(kernels=self.kernels)
+        self.schema_generator = SchemaGenerator()
 
     async def handle(
         self, request: dict[str, Any], emit: Callable[[dict[str, Any]], Any]
@@ -59,6 +61,8 @@ class WorkerRuntime:
                         await emitted
 
                 response["result"] = await self.agent.analyze(params, forward_agent)
+            elif method == "schema_describe":
+                response["result"] = await self.schema_generator.generate(params)
             elif method == "artifact_inspect":
                 response["result"] = await asyncio.to_thread(
                     inspect_parquet, _artifact_path(params)
