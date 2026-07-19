@@ -86,6 +86,19 @@ type RuntimeConfiguration struct {
 	AllowDataSamples bool    `json:"allow_data_samples"`
 }
 
+// RuntimeOverrides contains workspace-scoped choices layered over application
+// model defaults. Credentials always remain application-scoped.
+type RuntimeOverrides struct {
+	Provider         *string
+	MainModel        *string
+	LiteModel        *string
+	CodingModel      *string
+	Temperature      *float64
+	MaxTokens        *int
+	TopP             *float64
+	AllowDataSamples *bool
+}
+
 type UpdateRequest struct {
 	LLMProvider               *string  `json:"llm_provider"`
 	SelectedModel             *string  `json:"selected_model"`

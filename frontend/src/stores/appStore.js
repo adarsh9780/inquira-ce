@@ -2481,10 +2481,6 @@ export const useAppStore = defineStore('app', () => {
       workspaceAIConfig.value = null
       return null
     }
-    if (workspaceService.isNative()) {
-      workspaceAIConfig.value = null
-      return null
-    }
     workspaceAIConfigLoading.value = true
     try {
       const config = await apiService.v1GetWorkspaceAIConfig(target)

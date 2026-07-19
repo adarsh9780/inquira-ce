@@ -368,6 +368,38 @@ func TestSchemaRuntimeConfigurationUsesLiteModelWithMainModelFallback(t *testing
 	}
 }
 
+func TestRuntimeConfigurationForAppliesWorkspaceProviderModelsAndGenerationOverrides(t *testing.T) {
+	repository, err := OpenSQLite(filepath.Join(t.TempDir(), "inquira.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	secrets := &memorySecrets{values: map[string]string{"anthropic": "workspace-secret"}}
+	service := NewService(repository, secrets, roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return response(http.StatusOK, `{}`), nil
+	}))
+	defer service.Close()
+
+	provider, mainModel, liteModel, codingModel := "anthropic", "claude-main", "claude-lite", "claude-code"
+	temperature, maxTokens, topP, allowSamples := 0.25, 16000, 0.8, true
+	overrides := RuntimeOverrides{
+		Provider: &provider, MainModel: &mainModel, LiteModel: &liteModel, CodingModel: &codingModel,
+		Temperature: &temperature, MaxTokens: &maxTokens, TopP: &topP, AllowDataSamples: &allowSamples,
+	}
+	config, err := service.RuntimeConfigurationFor(context.Background(), overrides, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Provider != provider || config.Model != mainModel || config.LiteModel != liteModel ||
+		config.CodingModel != codingModel || config.APIKey != "workspace-secret" || config.Temperature != temperature ||
+		config.MaxTokens != maxTokens || config.TopP != topP || !config.AllowDataSamples {
+		t.Fatalf("workspace runtime configuration = %#v", config)
+	}
+	schemaConfig, err := service.RuntimeConfigurationFor(context.Background(), overrides, true)
+	if err != nil || schemaConfig.Model != liteModel || schemaConfig.MaxTokens != 4096 {
+		t.Fatalf("workspace schema configuration = %#v, %v", schemaConfig, err)
+	}
+}
+
 func response(status int, body string) *http.Response {
 	return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}
 }

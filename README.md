@@ -1,8 +1,8 @@
 # Inquira Go
 
-This repository is the Go/Wails desktop foundation for Inquira. The first
-milestone keeps the existing Vue UI and establishes a versioned Python runtime
-boundary without moving ingestion or agent code yet.
+This repository is the Go/Wails desktop application for Inquira. It keeps the
+existing Vue UI, uses Go for native application services, and runs ingestion,
+Jupyter, and the LangGraph analysis agent through one bundled Python worker.
 
 ## First migrated product slice
 
@@ -10,7 +10,7 @@ Model connection is handled natively by Go when the UI runs inside Wails:
 
 - model preferences and cached provider catalogs are stored in a migrated
   SQLite database under the user's Inquira data directory;
-- OpenAI and OpenRouter API keys are verified before being stored in the OS
+- OpenAI, OpenRouter, and Anthropic API keys are verified before being stored in the OS
   keychain, and are never written to SQLite;
 - Ollama remains keyless and stores only its local base URL;
 - provider requests inherit standard `HTTP_PROXY`, `HTTPS_PROXY`, and
@@ -32,6 +32,12 @@ activates, renames, and deletes workspaces in the same migrated SQLite database.
 The first workspace becomes active automatically, names are case-insensitively
 unique, and deleting the active workspace selects a remaining workspace. The
 browser/Tauri build retains its Python HTTP fallback.
+
+Workspace AI configuration is native as well. Application credentials remain
+in the OS keychain, while each workspace can persist provider, main, lite, and
+coding model overrides, generation controls, and its explicit data-sample
+privacy choice in SQLite. Both schema generation and agent analysis resolve
+this effective workspace configuration before calling the Python worker.
 
 Local data now starts with refreshable connections rather than uploads. The
 first adapters support CSV, Parquet, and modern Excel (`.xlsx`) files through a shared discover,
@@ -74,6 +80,10 @@ and execution events by request ID. Dataframe and figure outputs are written to
 short-lived staging paths and then copied into the conversation heap through
 the same atomic artifact publication contract; Python never writes final heap
 pointers or application metadata.
+
+The same worker hosts the ported LangGraph agent, including tool calling,
+structured responses, retries, memory summarization, and the existing pandas,
+DuckDB, and Plotly analysis tools.
 
 ## Runtime modes
 

@@ -42,7 +42,7 @@ type catalogSource interface {
 }
 
 type modelSource interface {
-	RuntimeConfiguration(context.Context) (modelconfig.RuntimeConfiguration, error)
+	RuntimeConfiguration(context.Context, string) (modelconfig.RuntimeConfiguration, error)
 }
 
 type agentGateway interface {
@@ -118,7 +118,7 @@ func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func
 	if catalog.WorkspaceID != workspaceID || strings.TrimSpace(catalog.DatabasePath) == "" {
 		return AnalyzeResult{}, apperror.New("catalog_invalid_result", "The workspace analysis catalog is invalid.")
 	}
-	model, err := s.models.RuntimeConfiguration(ctx)
+	model, err := s.models.RuntimeConfiguration(ctx, workspaceID)
 	if err != nil {
 		return AnalyzeResult{}, err
 	}

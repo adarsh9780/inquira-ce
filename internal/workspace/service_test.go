@@ -4,11 +4,33 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"inquira-go/internal/apperror"
+	"inquira-go/internal/modelconfig"
 )
+
+type fakeWorkspaceModels struct {
+	preferences modelconfig.PreferencesResponse
+	requests    []modelconfig.RuntimeOverrides
+	preferLite  []bool
+}
+
+func (f *fakeWorkspaceModels) GetPreferences(context.Context, string) (modelconfig.PreferencesResponse, error) {
+	return f.preferences, nil
+}
+
+func (f *fakeWorkspaceModels) RuntimeConfigurationFor(_ context.Context, overrides modelconfig.RuntimeOverrides, preferLite bool) (modelconfig.RuntimeConfiguration, error) {
+	f.requests = append(f.requests, overrides)
+	f.preferLite = append(f.preferLite, preferLite)
+	model := "workspace-main"
+	if preferLite {
+		model = "workspace-lite"
+	}
+	return modelconfig.RuntimeConfiguration{Provider: "anthropic", Model: model, AllowDataSamples: overrides.AllowDataSamples != nil && *overrides.AllowDataSamples}, nil
+}
 
 func TestWorkspaceLifecyclePersistsAndMaintainsOneActiveWorkspace(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "nested", "inquira.db")
@@ -143,6 +165,120 @@ func TestDeletingLastWorkspaceLetsNextWorkspaceBecomeActive(t *testing.T) {
 	}
 	if !second.IsActive {
 		t.Fatal("workspace created after deleting the last workspace should be active")
+	}
+}
+
+func TestWorkspaceAIConfigurationPersistsResolvesAndResetsOverrides(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "inquira.db")
+	repository, err := OpenSQLite(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	models := &fakeWorkspaceModels{preferences: modelconfig.PreferencesResponse{
+		LLMProvider: "openai", SelectedModel: "gpt-main", SelectedLiteModel: "gpt-lite", SelectedCodingModel: "gpt-code",
+		LLMTemperature: 0.7, LLMMaxTokens: 8000, LLMTopP: 1,
+		AvailableProviders:      []string{"openai", "anthropic", "ollama"},
+		APIKeyPresentByProvider: map[string]bool{"openai": true, "anthropic": true},
+	}}
+	service := NewService(repository).WithModelSource(models)
+	created, err := service.Create(context.Background(), CreateRequest{Name: "Analysis"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	initial, err := service.GetAIConfig(context.Background(), created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if initial.Defaults.MainModel != "gpt-main" || initial.Effective.CodingModel != "gpt-code" ||
+		initial.Effective.Sources["main_model"] != "application" || initial.Effective.Sources["temperature"] != "application" ||
+		initial.Readiness.ConfigurationReviewed || initial.Readiness.Ready {
+		t.Fatalf("initial AI config = %#v", initial)
+	}
+
+	provider, mainModel, liteModel, codingModel := "anthropic", "claude-main", "claude-lite", "claude-code"
+	temperature, maxTokens, topP := 0.2, 12000, 0.85
+	updated, err := service.UpdateAIConfig(context.Background(), created.ID, AIConfigUpdateRequest{
+		LLMProviderOverride: &provider, MainModelOverride: &mainModel, LiteModelOverride: &liteModel,
+		CodingModelOverride: &codingModel, LLMTemperatureOverride: &temperature,
+		LLMMaxTokensOverride: &maxTokens, LLMTopPOverride: &topP, AllowLLMDataSamples: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Effective.Provider != provider || updated.Effective.MainModel != mainModel || updated.Effective.LiteModel != liteModel ||
+		updated.Effective.CodingModel != codingModel || !updated.Effective.AllowLLMDataSamples ||
+		updated.Effective.Sources["main_model"] != "workspace" || !updated.Readiness.Ready {
+		t.Fatalf("updated AI config = %#v", updated)
+	}
+	runtimeConfig, err := service.RuntimeConfiguration(context.Background(), created.ID)
+	if err != nil || runtimeConfig.Model != "workspace-main" || len(models.requests) != 1 || models.requests[0].CodingModel == nil || *models.requests[0].CodingModel != codingModel {
+		t.Fatalf("runtime config=%#v requests=%#v error=%v", runtimeConfig, models.requests, err)
+	}
+	schemaConfig, err := service.SchemaRuntimeConfiguration(context.Background(), created.ID)
+	if err != nil || schemaConfig.Model != "workspace-lite" || len(models.preferLite) != 2 || !models.preferLite[1] {
+		t.Fatalf("schema config=%#v preferLite=%#v error=%v", schemaConfig, models.preferLite, err)
+	}
+
+	if err := service.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := OpenSQLite(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service = NewService(reopened).WithModelSource(models)
+	defer service.Close()
+	persisted, err := service.GetAIConfig(context.Background(), created.ID)
+	if err != nil || persisted.Overrides.MainModel == nil || *persisted.Overrides.MainModel != mainModel || !persisted.Readiness.ConfigurationReviewed {
+		t.Fatalf("persisted AI config = %#v, %v", persisted, err)
+	}
+	reset, err := service.ResetAIConfig(context.Background(), created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reset.Overrides.Provider != nil || reset.Overrides.MainModel != nil || reset.Overrides.CodingModel != nil ||
+		!reset.Overrides.AllowLLMDataSamples || !reset.Readiness.ConfigurationReviewed || reset.Effective.MainModel != "gpt-main" {
+		t.Fatalf("reset AI config = %#v", reset)
+	}
+}
+
+func TestWorkspaceAIConfigurationValidatesInputAndOwnership(t *testing.T) {
+	repository, err := OpenSQLite(filepath.Join(t.TempDir(), "inquira.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	models := &fakeWorkspaceModels{preferences: modelconfig.PreferencesResponse{AvailableProviders: []string{"openai"}}}
+	service := NewService(repository).WithModelSource(models)
+	defer service.Close()
+	created, err := service.Create(context.Background(), CreateRequest{Name: "Analysis"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	unsupported := "unknown"
+	temperature := 3.0
+	negativeTemperature := -0.1
+	maxTokensTooLow, maxTokensTooHigh := 0, 131073
+	topPTooLow, topPTooHigh := -0.1, 1.1
+	longModel := strings.Repeat("m", 256)
+	for _, test := range []struct {
+		request AIConfigUpdateRequest
+		code    string
+	}{
+		{AIConfigUpdateRequest{LLMProviderOverride: &unsupported}, "workspace_ai_provider_invalid"},
+		{AIConfigUpdateRequest{LLMTemperatureOverride: &temperature}, "workspace_ai_temperature_invalid"},
+		{AIConfigUpdateRequest{LLMTemperatureOverride: &negativeTemperature}, "workspace_ai_temperature_invalid"},
+		{AIConfigUpdateRequest{LLMMaxTokensOverride: &maxTokensTooLow}, "workspace_ai_max_tokens_invalid"},
+		{AIConfigUpdateRequest{LLMMaxTokensOverride: &maxTokensTooHigh}, "workspace_ai_max_tokens_invalid"},
+		{AIConfigUpdateRequest{LLMTopPOverride: &topPTooLow}, "workspace_ai_top_p_invalid"},
+		{AIConfigUpdateRequest{LLMTopPOverride: &topPTooHigh}, "workspace_ai_top_p_invalid"},
+		{AIConfigUpdateRequest{MainModelOverride: &longModel}, "workspace_ai_model_invalid"},
+	} {
+		if _, err := service.UpdateAIConfig(context.Background(), created.ID, test.request); errorCode(err) != test.code {
+			t.Fatalf("request=%#v error=%v", test.request, err)
+		}
+	}
+	if _, err := service.GetAIConfig(context.Background(), "missing"); errorCode(err) != "workspace_not_found" {
+		t.Fatalf("missing workspace error = %v", err)
 	}
 }
 

@@ -20,7 +20,7 @@ type catalogStore interface {
 }
 
 type modelSource interface {
-	SchemaRuntimeConfiguration(context.Context) (modelconfig.RuntimeConfiguration, error)
+	SchemaRuntimeConfiguration(context.Context, string) (modelconfig.RuntimeConfiguration, error)
 }
 
 type Gateway interface {
@@ -66,7 +66,7 @@ func (s *Service) Regenerate(ctx context.Context, request RegenerateRequest) (Re
 	if request.Context != nil {
 		contextValue = strings.TrimSpace(*request.Context)
 	}
-	model, err := s.models.SchemaRuntimeConfiguration(ctx)
+	model, err := s.models.SchemaRuntimeConfiguration(ctx, workspaceID)
 	if err != nil {
 		return RegenerateResult{}, err
 	}

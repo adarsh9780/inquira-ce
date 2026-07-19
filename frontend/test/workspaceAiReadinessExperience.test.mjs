@@ -15,6 +15,11 @@ test('workspace AI API keeps defaults overrides effective values and readiness s
   assert.match(store, /fetchWorkspaceAIConfig/)
   assert.match(store, /saveWorkspaceAIConfig/)
   assert.match(store, /resetWorkspaceAIConfig/)
+  assert.doesNotMatch(store, /if \(workspaceService\.isNative\(\)\) \{\s*workspaceAIConfig\.value = null/)
+  assert.match(read('src/services/apiService.js'), /app\?\.GetWorkspaceAIConfig/)
+  assert.match(read('../app.go'), /func \(a \*App\) GetWorkspaceAIConfig/)
+  assert.match(read('../app.go'), /func \(a \*App\) UpdateWorkspaceAIConfig/)
+  assert.match(read('../app.go'), /func \(a \*App\) ResetWorkspaceAIConfig/)
 })
 
 test('workspace AI editor inherits application defaults and keeps privacy workspace scoped', () => {
@@ -26,6 +31,7 @@ test('workspace AI editor inherits application defaults and keeps privacy worksp
   assert.match(source, /Application credential/)
   assert.match(source, /Main model/)
   assert.match(source, /Lite model/)
+  assert.match(source, /Coding model/)
   assert.match(source, /This permission applies only to this workspace/)
   assert.match(source, /Advanced generation controls/)
   assert.doesNotMatch(source, /api_key/)

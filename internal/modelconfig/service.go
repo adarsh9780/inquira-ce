@@ -43,36 +43,68 @@ func (s *Service) GetPreferences(ctx context.Context, providerHint string) (Pref
 func (s *Service) RuntimeConfiguration(ctx context.Context) (RuntimeConfiguration, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.runtimeConfiguration(ctx, false)
+	return s.runtimeConfiguration(ctx, RuntimeOverrides{}, false)
 }
 
 func (s *Service) SchemaRuntimeConfiguration(ctx context.Context) (RuntimeConfiguration, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.runtimeConfiguration(ctx, true)
+	return s.runtimeConfiguration(ctx, RuntimeOverrides{}, true)
 }
 
-func (s *Service) runtimeConfiguration(ctx context.Context, preferLite bool) (RuntimeConfiguration, error) {
+func (s *Service) RuntimeConfigurationFor(ctx context.Context, overrides RuntimeOverrides, preferLite bool) (RuntimeConfiguration, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.runtimeConfiguration(ctx, overrides, preferLite)
+}
+
+func (s *Service) runtimeConfiguration(ctx context.Context, overrides RuntimeOverrides, preferLite bool) (RuntimeConfiguration, error) {
 	preferences, err := s.repository.Load(ctx)
 	if err != nil {
 		return RuntimeConfiguration{}, apperror.Wrap("settings_read_failed", "Could not load model settings.", err)
 	}
-	provider := normalizeProvider(preferences.LLMProvider)
+	defaultProvider := normalizeProvider(preferences.LLMProvider)
+	provider := defaultProvider
+	if overrides.Provider != nil && strings.TrimSpace(*overrides.Provider) != "" {
+		provider = normalizeProvider(*overrides.Provider)
+	}
 	catalog := preferences.Catalogs[provider]
-	mainModel := strings.TrimSpace(preferences.SelectedModel)
+	mainModel := ""
+	if provider == defaultProvider {
+		mainModel = strings.TrimSpace(preferences.SelectedModel)
+	}
 	if mainModel == "" {
 		mainModel = strings.TrimSpace(catalog.DefaultMainModel)
 	}
-	liteModel := strings.TrimSpace(preferences.SelectedLiteModel)
+	if overrides.MainModel != nil && strings.TrimSpace(*overrides.MainModel) != "" {
+		mainModel = strings.TrimSpace(*overrides.MainModel)
+	}
+	liteModel := ""
+	if provider == defaultProvider {
+		liteModel = strings.TrimSpace(preferences.SelectedLiteModel)
+		if liteModel == "" {
+			liteModel = mainModel
+		}
+	} else {
+		liteModel = strings.TrimSpace(catalog.DefaultLiteModel)
+	}
 	if liteModel == "" {
 		liteModel = mainModel
 	}
-	if liteModel == "" {
-		liteModel = strings.TrimSpace(catalog.DefaultLiteModel)
+	if overrides.LiteModel != nil && strings.TrimSpace(*overrides.LiteModel) != "" {
+		liteModel = strings.TrimSpace(*overrides.LiteModel)
 	}
-	codingModel := strings.TrimSpace(preferences.SelectedCodingModel)
-	if codingModel == "" {
+	codingModel := ""
+	if provider == defaultProvider {
+		codingModel = strings.TrimSpace(preferences.SelectedCodingModel)
+		if codingModel == "" {
+			codingModel = mainModel
+		}
+	} else {
 		codingModel = mainModel
+	}
+	if overrides.CodingModel != nil && strings.TrimSpace(*overrides.CodingModel) != "" {
+		codingModel = strings.TrimSpace(*overrides.CodingModel)
 	}
 	model := mainModel
 	if preferLite {
@@ -103,16 +135,31 @@ func (s *Service) runtimeConfiguration(ctx context.Context, preferLite bool) (Ru
 		baseURL = "http://localhost:11434"
 	}
 	maxTokens := preferences.MaxTokens
+	if overrides.MaxTokens != nil {
+		maxTokens = *overrides.MaxTokens
+	}
 	if preferLite && maxTokens > 4096 {
 		maxTokens = 4096
+	}
+	temperature := preferences.Temperature
+	if overrides.Temperature != nil {
+		temperature = *overrides.Temperature
+	}
+	topP := preferences.TopP
+	if overrides.TopP != nil {
+		topP = *overrides.TopP
+	}
+	allowDataSamples := preferences.AllowLLMDataSamples
+	if overrides.AllowDataSamples != nil {
+		allowDataSamples = *overrides.AllowDataSamples
 	}
 	return RuntimeConfiguration{
 		Provider: provider, Model: model, LiteModel: liteModel, CodingModel: codingModel,
 		APIKey: apiKey, BaseURL: baseURL,
-		Temperature: preferences.Temperature, MaxTokens: maxTokens, TopP: preferences.TopP,
+		Temperature: temperature, MaxTokens: maxTokens, TopP: topP,
 		TopK:             preferences.TopK,
 		FrequencyPenalty: preferences.FrequencyPenalty, PresencePenalty: preferences.PresencePenalty,
-		AllowDataSamples: preferences.AllowLLMDataSamples,
+		AllowDataSamples: allowDataSamples,
 	}, nil
 }
 

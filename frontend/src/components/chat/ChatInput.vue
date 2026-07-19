@@ -527,6 +527,7 @@ async function handleModelChange(model) {
     llm_provider_override: overrides.provider,
     main_model_override: model,
     lite_model_override: overrides.lite_model,
+    coding_model_override: overrides.coding_model,
     llm_temperature_override: overrides.temperature,
     llm_max_tokens_override: overrides.max_tokens,
     llm_top_p_override: overrides.top_p,

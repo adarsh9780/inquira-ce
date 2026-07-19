@@ -20,6 +20,7 @@ test('chat model selection updates only the active workspace main-model override
 
   assert.equal(source.includes('async function handleModelChange(model) {'), true)
   assert.equal(source.includes('main_model_override: model'), true)
+  assert.equal(source.includes('coding_model_override: overrides.coding_model'), true)
   assert.equal(source.includes('appStore.saveWorkspaceAIConfig'), true)
   assert.equal(source.includes('appStore.setSelectedModel(model)'), false)
 })

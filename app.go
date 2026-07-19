@@ -82,7 +82,7 @@ func NewApp() *App {
 		app.initErr = err
 		return app
 	}
-	app.workspaces = workspace.NewService(workspaceRepository)
+	app.workspaces = workspace.NewService(workspaceRepository).WithModelSource(app.models)
 	workerProject := filepath.Join(paths.RuntimeDir, "worker")
 	if err := dataworkerbundle.Extract(workerProject); err != nil {
 		_ = app.workspaces.Close()
@@ -119,7 +119,7 @@ func NewApp() *App {
 		app.workspaces, app.connections, datacatalog.NewWorkerGateway(transport), filepath.Join(paths.DataDir, "workspaces"),
 	).WithSchemaRepository(catalogRepository)
 	app.schemas = schemageneration.NewService(
-		app.catalog, app.models, schemageneration.NewWorkerGateway(transport),
+		app.catalog, app.workspaces, schemageneration.NewWorkerGateway(transport),
 	)
 	conversationRepository, err := conversation.OpenSQLite(paths.DatabasePath)
 	if err != nil {
@@ -151,7 +151,7 @@ func NewApp() *App {
 	)
 	app.manual = manualanalysis.NewService(app.conversations, app.catalog, app.analysis)
 	app.agent = analysisagent.NewService(
-		app.conversations, app.catalog, app.models, analysisagent.NewWorkerGateway(transport), app.analysis,
+		app.conversations, app.catalog, app.workspaces, analysisagent.NewWorkerGateway(transport), app.analysis,
 	)
 	return app
 }
@@ -394,6 +394,30 @@ func (a *App) GetWorkspaceSummary(workspaceID string) (workspace.Summary, error)
 		return workspace.Summary{}, err
 	}
 	return service.SummarizeWorkspace(a.appContext(), workspaceID)
+}
+
+func (a *App) GetWorkspaceAIConfig(workspaceID string) (workspace.AIConfigResponse, error) {
+	service, err := a.workspaceService()
+	if err != nil {
+		return workspace.AIConfigResponse{}, err
+	}
+	return service.GetAIConfig(a.appContext(), workspaceID)
+}
+
+func (a *App) UpdateWorkspaceAIConfig(workspaceID string, request workspace.AIConfigUpdateRequest) (workspace.AIConfigResponse, error) {
+	service, err := a.workspaceService()
+	if err != nil {
+		return workspace.AIConfigResponse{}, err
+	}
+	return service.UpdateAIConfig(a.appContext(), workspaceID, request)
+}
+
+func (a *App) ResetWorkspaceAIConfig(workspaceID string) (workspace.AIConfigResponse, error) {
+	service, err := a.workspaceService()
+	if err != nil {
+		return workspace.AIConfigResponse{}, err
+	}
+	return service.ResetAIConfig(a.appContext(), workspaceID)
 }
 
 func (a *App) DeleteWorkspace(workspaceID string) (workspace.DeletionResult, error) {

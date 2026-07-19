@@ -34,6 +34,11 @@
           <HeaderDropdown v-model="form.liteModel" :options="liteModelOptions" :searchable="true" aria-label="Workspace lite model" max-width-class="w-full" />
           <p class="mt-1 text-[11px] text-[var(--color-text-muted)]">Quick supporting tasks</p>
         </div>
+        <div class="md:col-span-2">
+          <label class="input-label">Coding model</label>
+          <HeaderDropdown v-model="form.codingModel" :options="codingModelOptions" :searchable="true" aria-label="Workspace coding model" max-width-class="w-full" />
+          <p class="mt-1 text-[11px] text-[var(--color-text-muted)]">Code generation and repair</p>
+        </div>
       </div>
 
       <label class="flex items-start gap-3 border-t border-[var(--color-border)] pt-3">
@@ -80,7 +85,7 @@ const saveStateLabel = ref('Changes apply to this workspace only.')
 const providerCatalog = ref(null)
 const localConfig = ref(null)
 const initialPayloadSignature = ref('')
-const form = reactive({ provider: '', mainModel: '', liteModel: '', allowDataSamples: false, temperature: null, maxTokens: null, topP: null })
+const form = reactive({ provider: '', mainModel: '', liteModel: '', codingModel: '', allowDataSamples: false, temperature: null, maxTokens: null, topP: null })
 
 const config = computed(() => localConfig.value)
 const hasOverrides = computed(() => Object.entries(config.value?.overrides || {}).some(([key, value]) => key !== 'allow_llm_data_samples' && value !== null && value !== ''))
@@ -89,10 +94,11 @@ const providerOptions = computed(() => (appStore.availableProviders || []).map((
 const modelOptions = (values) => (Array.isArray(values) ? values : []).map((value) => ({ value, label: value }))
 const mainModelOptions = computed(() => modelOptions(providerCatalog.value?.provider_available_main_models || appStore.providerMainModels))
 const liteModelOptions = computed(() => modelOptions(providerCatalog.value?.provider_available_lite_models || appStore.providerLiteModels))
+const codingModelOptions = computed(() => mainModelOptions.value)
 const effectiveSummary = computed(() => {
   const effective = config.value?.effective
   if (!effective) return 'Loading effective models…'
-  return `${effective.provider} · ${effective.main_model || 'Main model required'} · ${effective.lite_model || 'Lite model required'}`
+  return `${effective.provider} · ${effective.main_model || 'Main model required'} · ${effective.lite_model || 'Lite model required'} · ${effective.coding_model || 'Coding model required'}`
 })
 const credentialLabel = computed(() => config.value?.readiness?.credential_ready ? 'Using application credential' : 'Application credential required')
 const isDirty = computed(() => Boolean(config.value) && payloadSignature(buildPayload()) !== initialPayloadSignature.value)
@@ -116,6 +122,7 @@ function hydrate(value) {
   form.provider = overrides.provider || effective.provider || ''
   form.mainModel = overrides.main_model || effective.main_model || ''
   form.liteModel = overrides.lite_model || effective.lite_model || ''
+  form.codingModel = overrides.coding_model || effective.coding_model || ''
   form.allowDataSamples = Boolean(overrides.allow_llm_data_samples)
   form.temperature = overrides.temperature
   form.maxTokens = overrides.max_tokens
@@ -134,6 +141,7 @@ function buildPayload() {
     llm_provider_override: useDefaults.value ? null : form.provider,
     main_model_override: useDefaults.value ? null : form.mainModel,
     lite_model_override: useDefaults.value ? null : form.liteModel,
+    coding_model_override: useDefaults.value ? null : form.codingModel,
     llm_temperature_override: useDefaults.value ? null : (form.temperature === '' ? null : form.temperature),
     llm_max_tokens_override: useDefaults.value ? null : (form.maxTokens === '' ? null : form.maxTokens),
     llm_top_p_override: useDefaults.value ? null : (form.topP === '' ? null : form.topP),

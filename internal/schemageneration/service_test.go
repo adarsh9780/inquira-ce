@@ -30,13 +30,15 @@ func (f *fakeCatalog) SaveSchema(_ context.Context, request datacatalog.SaveSche
 }
 
 type fakeModels struct {
-	config modelconfig.RuntimeConfiguration
-	calls  int
-	err    error
+	config      modelconfig.RuntimeConfiguration
+	calls       int
+	err         error
+	workspaceID string
 }
 
-func (f *fakeModels) SchemaRuntimeConfiguration(context.Context) (modelconfig.RuntimeConfiguration, error) {
+func (f *fakeModels) SchemaRuntimeConfiguration(_ context.Context, workspaceID string) (modelconfig.RuntimeConfiguration, error) {
 	f.calls++
+	f.workspaceID = workspaceID
 	return f.config, f.err
 }
 
@@ -83,7 +85,7 @@ func TestRegenerateUsesLiteModelMergesByNormalizedNameAndPersistsOnce(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if models.calls != 1 || gateway.calls != 1 || catalog.saves != 1 || gateway.request.Model.Model != "gpt-lite" {
+	if models.calls != 1 || models.workspaceID != "workspace-1" || gateway.calls != 1 || catalog.saves != 1 || gateway.request.Model.Model != "gpt-lite" {
 		t.Fatalf("calls/models = %d/%d/%d request=%#v", models.calls, gateway.calls, catalog.saves, gateway.request)
 	}
 	if gateway.request.Context != "Finance reporting" || len(gateway.request.Columns) != 3 || gateway.request.Columns[1].Name != "gross_margin" {

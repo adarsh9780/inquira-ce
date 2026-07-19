@@ -27,11 +27,13 @@ func (f *fakeCatalogSource) Prepare(context.Context, string) (datacatalog.Catalo
 }
 
 type fakeModelSource struct {
-	config modelconfig.RuntimeConfiguration
-	err    error
+	config      modelconfig.RuntimeConfiguration
+	err         error
+	workspaceID string
 }
 
-func (f *fakeModelSource) RuntimeConfiguration(context.Context) (modelconfig.RuntimeConfiguration, error) {
+func (f *fakeModelSource) RuntimeConfiguration(_ context.Context, workspaceID string) (modelconfig.RuntimeConfiguration, error) {
+	f.workspaceID = workspaceID
 	return f.config, f.err
 }
 
@@ -152,6 +154,9 @@ func TestAnalyzeCreatesConversationExecutesAndPersistsTurn(t *testing.T) {
 	}
 	if gateway.request.Model.APIKey != "runtime-secret" || gateway.request.DatabasePath == "" || gateway.request.RunID != "run-1" {
 		t.Fatalf("worker request = %#v", gateway.request)
+	}
+	if service.models.(*fakeModelSource).workspaceID != workspaceID {
+		t.Fatalf("model configuration workspace = %q", service.models.(*fakeModelSource).workspaceID)
 	}
 	if gateway.request.ConversationID != result.Conversation.ID || gateway.request.TurnID != result.Turn.ID ||
 		gateway.request.CurrentCode != "result = previous" || len(gateway.request.Attachments) != 1 || gateway.request.Attachments[0].AttachmentID != "image-1" {

@@ -972,14 +972,20 @@ export const apiService = {
   },
 
   async v1GetWorkspaceAIConfig(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.GetWorkspaceAIConfig) return app.GetWorkspaceAIConfig(String(workspaceId || ''))
     return v1Api.workspaces.aiConfig(workspaceId)
   },
 
   async v1UpdateWorkspaceAIConfig(workspaceId, payload) {
+    const app = nativeWailsApp()
+    if (app?.UpdateWorkspaceAIConfig) return app.UpdateWorkspaceAIConfig(String(workspaceId || ''), payload)
     return v1Api.workspaces.updateAiConfig(workspaceId, payload)
   },
 
   async v1ResetWorkspaceAIConfig(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.ResetWorkspaceAIConfig) return app.ResetWorkspaceAIConfig(String(workspaceId || ''))
     return v1Api.workspaces.resetAiConfig(workspaceId)
   },
 

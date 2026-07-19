@@ -67,7 +67,21 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 			active_workspace_id TEXT NULL REFERENCES workspaces(id) ON DELETE SET NULL
 		)`,
 		`INSERT OR IGNORE INTO workspace_state(id, active_workspace_id) VALUES (1, NULL)`,
+		`CREATE TABLE IF NOT EXISTS workspace_ai_config (
+			workspace_id TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
+			provider_override TEXT NULL,
+			main_model_override TEXT NULL,
+			lite_model_override TEXT NULL,
+			coding_model_override TEXT NULL,
+			temperature_override REAL NULL,
+			max_tokens_override INTEGER NULL,
+			top_p_override REAL NULL,
+			allow_llm_data_samples INTEGER NOT NULL DEFAULT 0,
+			configuration_reviewed INTEGER NOT NULL DEFAULT 0,
+			updated_at TEXT NOT NULL
+		)`,
 		`INSERT OR IGNORE INTO schema_migrations(version) VALUES (3)`,
+		`INSERT OR IGNORE INTO schema_migrations(version) VALUES (8)`,
 	}
 	for _, statement := range statements {
 		if _, err := tx.ExecContext(ctx, statement); err != nil {
@@ -222,6 +236,74 @@ func (r *SQLiteRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+func (r *SQLiteRepository) GetAIConfig(ctx context.Context, workspaceID string) (aiConfigRecord, error) {
+	row := r.db.QueryRowContext(ctx, `SELECT w.id,
+		c.provider_override, c.main_model_override, c.lite_model_override, c.coding_model_override,
+		c.temperature_override, c.max_tokens_override, c.top_p_override,
+		COALESCE(c.allow_llm_data_samples, 0), COALESCE(c.configuration_reviewed, 0)
+		FROM workspaces w LEFT JOIN workspace_ai_config c ON c.workspace_id = w.id
+		WHERE w.id = ?`, workspaceID)
+	var record aiConfigRecord
+	var provider, mainModel, liteModel, codingModel sql.NullString
+	var temperature, topP sql.NullFloat64
+	var maxTokens sql.NullInt64
+	if err := row.Scan(
+		&record.WorkspaceID, &provider, &mainModel, &liteModel, &codingModel,
+		&temperature, &maxTokens, &topP, &record.AllowDataSamples, &record.ConfigurationReviewed,
+	); errors.Is(err, sql.ErrNoRows) {
+		return aiConfigRecord{}, errNotFound
+	} else if err != nil {
+		return aiConfigRecord{}, err
+	}
+	record.Provider = nullStringPointer(provider)
+	record.MainModel = nullStringPointer(mainModel)
+	record.LiteModel = nullStringPointer(liteModel)
+	record.CodingModel = nullStringPointer(codingModel)
+	record.Temperature = nullFloatPointer(temperature)
+	record.MaxTokens = nullIntPointer(maxTokens)
+	record.TopP = nullFloatPointer(topP)
+	return record, nil
+}
+
+func (r *SQLiteRepository) SaveAIConfig(ctx context.Context, record aiConfigRecord, updatedAt string) error {
+	_, err := r.db.ExecContext(ctx, `INSERT INTO workspace_ai_config(
+		workspace_id, provider_override, main_model_override, lite_model_override, coding_model_override,
+		temperature_override, max_tokens_override, top_p_override,
+		allow_llm_data_samples, configuration_reviewed, updated_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	ON CONFLICT(workspace_id) DO UPDATE SET
+		provider_override=excluded.provider_override,
+		main_model_override=excluded.main_model_override,
+		lite_model_override=excluded.lite_model_override,
+		coding_model_override=excluded.coding_model_override,
+		temperature_override=excluded.temperature_override,
+		max_tokens_override=excluded.max_tokens_override,
+		top_p_override=excluded.top_p_override,
+		allow_llm_data_samples=excluded.allow_llm_data_samples,
+		configuration_reviewed=excluded.configuration_reviewed,
+		updated_at=excluded.updated_at`,
+		record.WorkspaceID, record.Provider, record.MainModel, record.LiteModel, record.CodingModel,
+		record.Temperature, record.MaxTokens, record.TopP,
+		record.AllowDataSamples, record.ConfigurationReviewed, updatedAt,
+	)
+	return err
+}
+
+func (r *SQLiteRepository) ResetAIConfig(ctx context.Context, workspaceID, updatedAt string) error {
+	record, err := r.GetAIConfig(ctx, workspaceID)
+	if err != nil {
+		return err
+	}
+	record.Provider = nil
+	record.MainModel = nil
+	record.LiteModel = nil
+	record.CodingModel = nil
+	record.Temperature = nil
+	record.MaxTokens = nil
+	record.TopP = nil
+	return r.SaveAIConfig(ctx, record, updatedAt)
+}
+
 func (r *SQLiteRepository) Close() error { return r.db.Close() }
 
 type scanner interface {
@@ -234,6 +316,30 @@ func scanWorkspace(row scanner) (Workspace, error) {
 		return Workspace{}, err
 	}
 	return workspace, nil
+}
+
+func nullStringPointer(value sql.NullString) *string {
+	if !value.Valid {
+		return nil
+	}
+	result := value.String
+	return &result
+}
+
+func nullFloatPointer(value sql.NullFloat64) *float64 {
+	if !value.Valid {
+		return nil
+	}
+	result := value.Float64
+	return &result
+}
+
+func nullIntPointer(value sql.NullInt64) *int {
+	if !value.Valid {
+		return nil
+	}
+	result := int(value.Int64)
+	return &result
 }
 
 func formatTime(value time.Time) string { return value.UTC().Format(time.RFC3339Nano) }
