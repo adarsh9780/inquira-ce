@@ -6,7 +6,7 @@ import asyncio
 from pathlib import Path
 from typing import Any, Callable
 
-from .agent import AnalysisAgent
+from .langgraph_agent import LangGraphAnalysisAgent
 from .artifacts import inspect_parquet, query_parquet
 from .errors import AdapterError
 from .kernel import WorkspaceKernelManager
@@ -17,8 +17,9 @@ from .schema_generation import SchemaGenerator
 class WorkerRuntime:
     def __init__(self, *, idle_seconds: int = 1800) -> None:
         self.kernels = WorkspaceKernelManager(idle_seconds=idle_seconds)
-        self.agent = AnalysisAgent(kernels=self.kernels)
+        self.agent = LangGraphAnalysisAgent(kernels=self.kernels)
         self.schema_generator = SchemaGenerator()
+        self._agent_tasks: dict[str, asyncio.Task[Any]] = {}
 
     async def handle(
         self, request: dict[str, Any], emit: Callable[[dict[str, Any]], Any]
@@ -55,12 +56,40 @@ class WorkerRuntime:
                 response["result"] = await self.kernels.execute(**values, emit=forward)
             elif method == "agent_analyze":
 
+                workspace_id = _workspace_id(params)
+                current_task = asyncio.current_task()
+                active = self._agent_tasks.get(workspace_id)
+                if active is not None and not active.done():
+                    raise RuntimeRequestError(
+                        "agent_busy", "An analysis is already running for this workspace."
+                    )
+                if current_task is None:
+                    raise RuntimeRequestError(
+                        "worker_internal_error", "The agent task could not be registered."
+                    )
+                self._agent_tasks[workspace_id] = current_task
+
                 async def forward_agent(event: dict[str, Any]) -> None:
                     emitted = emit(event)
                     if hasattr(emitted, "__await__"):
                         await emitted
 
-                response["result"] = await self.agent.analyze(params, forward_agent)
+                try:
+                    response["result"] = await self.agent.analyze(params, forward_agent)
+                finally:
+                    if self._agent_tasks.get(workspace_id) is current_task:
+                        self._agent_tasks.pop(workspace_id, None)
+            elif method == "agent_cancel":
+                workspace_id = _workspace_id(params)
+                task = self._agent_tasks.get(workspace_id)
+                cancelled = task is not None and not task.done()
+                if cancelled:
+                    task.cancel()
+                    await self.kernels.interrupt(workspace_id)
+                response["result"] = {
+                    "workspace_id": workspace_id,
+                    "cancelled": cancelled,
+                }
             elif method == "schema_describe":
                 response["result"] = await self.schema_generator.generate(params)
             elif method == "artifact_inspect":
@@ -115,6 +144,11 @@ class WorkerRuntime:
                 raise RuntimeRequestError(
                     "method_not_found", f"RPC method {method} was not found."
                 )
+        except asyncio.CancelledError:
+            response["error"] = {
+                "code": "agent_cancelled",
+                "message": "The analysis was cancelled.",
+            }
         except RuntimeRequestError as exc:
             response["error"] = {"code": exc.code, "message": exc.message}
         except AdapterError as exc:
@@ -127,6 +161,12 @@ class WorkerRuntime:
         return response
 
     async def shutdown(self) -> None:
+        tasks = [task for task in self._agent_tasks.values() if not task.done()]
+        self._agent_tasks.clear()
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
         await self.kernels.shutdown()
 
 

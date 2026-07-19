@@ -111,7 +111,8 @@ function normalizeNativeAnalysis(raw) {
     result,
     result_kind: execution.result_kind || '',
     artifacts: publishedArtifacts,
-    metadata: {},
+    route: String(raw?.route || ''),
+    metadata: raw?.metadata && typeof raw.metadata === 'object' ? { ...raw.metadata } : {},
   }
 }
 
@@ -139,7 +140,9 @@ async function nativeAnalyze(payload, { signal = null, onEvent = null } = {}) {
     conversation_id: String(payload?.conversation_id || ''),
     parent_turn_id: payload?.selected_parent_turn_id ? String(payload.selected_parent_turn_id) : null,
     question: String(payload?.question || ''),
+    current_code: String(payload?.current_code || ''),
     timeout_seconds: 360,
+    attachments: Array.isArray(payload?.attachments) ? payload.attachments : [],
   }
   let unsubscribe = () => {}
   if (onEvent && window.runtime?.EventsOnMultiple) {

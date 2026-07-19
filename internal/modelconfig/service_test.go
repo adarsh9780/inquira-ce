@@ -137,6 +137,39 @@ func TestVerifyAndDeleteAPIKey(t *testing.T) {
 	}
 }
 
+func TestAnthropicConfigurationUsesNativeHeadersAndRuntime(t *testing.T) {
+	repository, err := OpenSQLite(filepath.Join(t.TempDir(), "inquira.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	secrets := &memorySecrets{values: map[string]string{}}
+	httpClient := roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.String() != "https://api.anthropic.com/v1/models" ||
+			request.Header.Get("x-api-key") != "anthropic-secret" || request.Header.Get("anthropic-version") != "2023-06-01" ||
+			request.Header.Get("Authorization") != "" {
+			t.Fatalf("unexpected Anthropic request: %s headers=%#v", request.URL, request.Header)
+		}
+		return response(http.StatusOK, `{"data":[{"id":"claude-sonnet-4-5"},{"id":"not-a-chat-model"}]}`), nil
+	})
+	service := NewService(repository, secrets, httpClient)
+	defer service.Close()
+
+	key := "anthropic-secret"
+	provider := "anthropic"
+	result, err := service.SaveConfiguration(context.Background(), SaveRequest{Provider: provider, APIKey: &key})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contains(result.AvailableProviders, provider) || !contains(result.ProviderModelCatalogs[provider].MainModels, "claude-sonnet-4-5") ||
+		contains(result.ProviderModelCatalogs[provider].MainModels, "not-a-chat-model") {
+		t.Fatalf("Anthropic preferences = %#v", result)
+	}
+	runtimeConfig, err := service.RuntimeConfiguration(context.Background())
+	if err != nil || runtimeConfig.Provider != provider || runtimeConfig.APIKey != key || runtimeConfig.BaseURL != "" {
+		t.Fatalf("Anthropic runtime = %#v, %v", runtimeConfig, err)
+	}
+}
+
 func TestUpdatePreferencesRejectsUnsafeValues(t *testing.T) {
 	repository, err := OpenSQLite(filepath.Join(t.TempDir(), "inquira.db"))
 	if err != nil {
@@ -264,15 +297,18 @@ func TestRuntimeConfigurationReadsSelectedModelAndKeyWithoutExposingItInPreferen
 	}))
 	defer service.Close()
 	provider := "openai"
-	model := "gpt-4.1"
-	if _, err := service.UpdatePreferences(context.Background(), UpdateRequest{LLMProvider: &provider, SelectedCodingModel: &model}); err != nil {
+	model, liteModel, codingModel := "gpt-4o", "gpt-4.1-mini", "gpt-4.1"
+	if _, err := service.UpdatePreferences(context.Background(), UpdateRequest{
+		LLMProvider: &provider, SelectedModel: &model, SelectedLiteModel: &liteModel, SelectedCodingModel: &codingModel,
+	}); err != nil {
 		t.Fatal(err)
 	}
 	runtimeConfig, err := service.RuntimeConfiguration(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if runtimeConfig.Provider != "openai" || runtimeConfig.Model != model || runtimeConfig.APIKey != "runtime-secret" {
+	if runtimeConfig.Provider != "openai" || runtimeConfig.Model != model || runtimeConfig.LiteModel != liteModel ||
+		runtimeConfig.CodingModel != codingModel || runtimeConfig.APIKey != "runtime-secret" {
 		t.Fatalf("runtime configuration = %#v", runtimeConfig)
 	}
 	preferences, err := service.GetPreferences(context.Background(), "openai")

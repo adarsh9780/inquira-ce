@@ -402,10 +402,18 @@ func (s *Service) CompleteTurn(ctx context.Context, request CompleteTurnRequest)
 	if err != nil {
 		return Turn{}, err
 	}
+	metadata := ""
+	if strings.TrimSpace(request.MetadataJSON) != "" {
+		metadata, err = normalizeJSONObject(request.MetadataJSON, "turn_metadata_invalid", "Turn metadata must be a JSON object.")
+		if err != nil {
+			return Turn{}, err
+		}
+	}
 	updated, err := s.repository.CompleteTurn(ctx, Turn{
 		ID: turnID, AssistantText: request.AssistantText, CodeSnapshot: request.CodeSnapshot,
 		ToolEventsJSON: toolEvents, ResultJSON: result, ResultKind: strings.TrimSpace(request.ResultKind),
-		UpdatedAt: formatTime(s.now().UTC()),
+		MetadataJSON: metadata,
+		UpdatedAt:    formatTime(s.now().UTC()),
 	})
 	return s.turnUpdateResult(updated, err)
 }
@@ -423,9 +431,16 @@ func (s *Service) FailTurn(ctx context.Context, request FailTurnRequest) (Turn, 
 	if message == "" {
 		return Turn{}, apperror.New("turn_error_required", "A failed turn must include an error message.")
 	}
+	metadata := ""
+	if strings.TrimSpace(request.MetadataJSON) != "" {
+		metadata, err = normalizeJSONObject(request.MetadataJSON, "turn_metadata_invalid", "Turn metadata must be a JSON object.")
+		if err != nil {
+			return Turn{}, err
+		}
+	}
 	updated, err := s.repository.FailTurn(ctx, Turn{
 		ID: turnID, AssistantText: request.AssistantText, CodeSnapshot: request.CodeSnapshot,
-		ToolEventsJSON: toolEvents, ErrorMessage: message, UpdatedAt: formatTime(s.now().UTC()),
+		ToolEventsJSON: toolEvents, ErrorMessage: message, MetadataJSON: metadata, UpdatedAt: formatTime(s.now().UTC()),
 	})
 	return s.turnUpdateResult(updated, err)
 }

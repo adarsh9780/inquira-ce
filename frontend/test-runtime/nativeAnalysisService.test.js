@@ -36,6 +36,8 @@ describe('native analysis bridge', () => {
             artifacts: [],
           },
           artifacts: [{ id: 'artifact-1', kind: 'dataframe', logical_name: 'result' }],
+          metadata: { token_usage: { total_tokens: 25 } },
+          route: 'analysis',
         }
       }),
     }
@@ -46,14 +48,16 @@ describe('native analysis bridge', () => {
     const events = []
     const result = await apiService.v1AnalyzeStream({
       workspace_id: 'workspace-1', conversation_id: 'conversation-1',
-      selected_parent_turn_id: 'parent-1', question: 'What are total sales?',
+      selected_parent_turn_id: 'parent-1', question: 'What are total sales?', current_code: 'result = previous',
+      attachments: [{ attachment_id: 'image-1', media_type: 'image/png', filename: 'chart.png', data_base64: 'aW1hZ2U=' }],
     }, { onEvent: (event) => events.push(event) })
 
     expect(created.id).toBe('conversation-1')
     expect(listed).toEqual({ conversations: [{ id: 'conversation-1', workspace_id: 'workspace-1' }] })
     expect(app.AnalyzeQuestion).toHaveBeenCalledWith({
       workspace_id: 'workspace-1', conversation_id: 'conversation-1',
-      parent_turn_id: 'parent-1', question: 'What are total sales?', timeout_seconds: 360,
+      parent_turn_id: 'parent-1', question: 'What are total sales?', current_code: 'result = previous', timeout_seconds: 360,
+      attachments: [{ attachment_id: 'image-1', media_type: 'image/png', filename: 'chart.png', data_base64: 'aW1hZ2U=' }],
     })
     expect(events).toEqual([{ event: 'agent_status', data: { stage: 'executing', message: 'Running analysis code…' } }])
     expect(result).toMatchObject({
@@ -61,6 +65,7 @@ describe('native analysis bridge', () => {
       explanation: 'Total sales are 42.', run_id: 'run-1',
       result: { columns: ['total'], data: [{ total: 42 }] },
       artifacts: [{ id: 'artifact-1', artifact_id: 'artifact-1' }],
+      metadata: { token_usage: { total_tokens: 25 } }, route: 'analysis',
     })
     expect(cancelEvents).toHaveBeenCalledOnce()
   })

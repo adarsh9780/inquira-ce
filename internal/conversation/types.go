@@ -110,6 +110,7 @@ type CompleteTurnRequest struct {
 	ToolEventsJSON string `json:"tool_events_json"`
 	ResultJSON     string `json:"result_json"`
 	ResultKind     string `json:"result_kind"`
+	MetadataJSON   string `json:"metadata_json,omitempty"`
 }
 
 type FailTurnRequest struct {
@@ -118,6 +119,7 @@ type FailTurnRequest struct {
 	CodeSnapshot   string `json:"code_snapshot"`
 	ToolEventsJSON string `json:"tool_events_json"`
 	ErrorMessage   string `json:"error_message"`
+	MetadataJSON   string `json:"metadata_json,omitempty"`
 }
 
 type PublishArtifactRequest struct {

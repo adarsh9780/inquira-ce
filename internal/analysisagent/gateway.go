@@ -9,6 +9,7 @@ import (
 )
 
 type runtimeTransport interface {
+	Call(context.Context, string, any, any) error
 	CallWithEvents(context.Context, string, any, any, func(worker.Event)) error
 }
 
@@ -16,6 +17,14 @@ type WorkerGateway struct{ transport runtimeTransport }
 
 func NewWorkerGateway(transport runtimeTransport) *WorkerGateway {
 	return &WorkerGateway{transport: transport}
+}
+
+func (g *WorkerGateway) Cancel(ctx context.Context, workspaceID string) (bool, error) {
+	var result struct {
+		Cancelled bool `json:"cancelled"`
+	}
+	err := g.transport.Call(ctx, "agent_cancel", map[string]any{"workspace_id": workspaceID}, &result)
+	return result.Cancelled, err
 }
 
 func (g *WorkerGateway) Analyze(

@@ -10,23 +10,36 @@ import (
 )
 
 type AnalyzeRequest struct {
-	WorkspaceID    string  `json:"workspace_id"`
-	ConversationID string  `json:"conversation_id,omitempty"`
-	ParentTurnID   *string `json:"parent_turn_id,omitempty"`
-	Question       string  `json:"question"`
-	TimeoutSeconds int     `json:"timeout_seconds"`
+	WorkspaceID    string            `json:"workspace_id"`
+	ConversationID string            `json:"conversation_id,omitempty"`
+	ParentTurnID   *string           `json:"parent_turn_id,omitempty"`
+	Question       string            `json:"question"`
+	CurrentCode    string            `json:"current_code,omitempty"`
+	TimeoutSeconds int               `json:"timeout_seconds"`
+	Attachments    []ImageAttachment `json:"attachments,omitempty"`
+}
+
+type ImageAttachment struct {
+	AttachmentID string `json:"attachment_id"`
+	MediaType    string `json:"media_type"`
+	Filename     string `json:"filename"`
+	DataBase64   string `json:"data_base64"`
 }
 
 type AgentWorkerRequest struct {
 	WorkspaceID       string                           `json:"workspace_id"`
+	ConversationID    string                           `json:"conversation_id,omitempty"`
+	TurnID            string                           `json:"turn_id,omitempty"`
 	DatabasePath      string                           `json:"database_path"`
 	Question          string                           `json:"question"`
+	CurrentCode       string                           `json:"current_code,omitempty"`
 	RunID             string                           `json:"run_id"`
 	ArtifactDirectory string                           `json:"artifact_dir"`
 	TimeoutSeconds    int                              `json:"timeout_seconds"`
 	Model             modelconfig.RuntimeConfiguration `json:"model"`
 	Context           ConversationContext              `json:"context"`
 	Schema            datacatalog.AnalysisSchema       `json:"schema"`
+	Attachments       []ImageAttachment                `json:"attachments,omitempty"`
 }
 
 type ConversationContext struct {
@@ -61,6 +74,8 @@ type AgentWorkerResult struct {
 	Code      string                              `json:"code"`
 	Execution analysisruntime.ExecuteWorkerResult `json:"execution"`
 	Error     string                              `json:"error"`
+	Route     string                              `json:"route"`
+	Metadata  map[string]any                      `json:"metadata"`
 }
 
 type AnalyzeResult struct {
@@ -71,4 +86,6 @@ type AnalyzeResult struct {
 	RunID        string                              `json:"run_id"`
 	Execution    analysisruntime.ExecuteWorkerResult `json:"execution"`
 	Artifacts    []conversation.Artifact             `json:"artifacts"`
+	Route        string                              `json:"route"`
+	Metadata     map[string]any                      `json:"metadata"`
 }

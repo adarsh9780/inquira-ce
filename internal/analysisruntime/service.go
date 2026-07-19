@@ -102,6 +102,7 @@ func (s *Service) Execute(ctx context.Context, request ExecuteRequest, emit func
 	result := ExecuteResult{
 		RunID: run.ID, Success: workerResult.Success, Stdout: workerResult.Stdout, Stderr: workerResult.Stderr,
 		Error: workerResult.Error, Result: workerResult.Result, ResultKind: workerResult.ResultKind,
+		ResultName: workerResult.ResultName, Variables: workerResult.Variables,
 		Artifacts: make([]conversation.Artifact, 0, len(workerResult.Artifacts)), TimedOut: workerResult.TimedOut,
 	}
 	if !workerResult.Success {

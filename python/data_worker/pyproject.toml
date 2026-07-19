@@ -6,16 +6,24 @@ dependencies = [
     "duckdb>=1.1,<2",
     "ipykernel>=6.30,<8",
     "jupyter-client>=8.6,<9",
+    "langchain>=1.0.1,<2",
+    "langchain-anthropic>=0.3,<2",
+    "langchain-ollama>=1.0,<2",
+    "langchain-openai>=1.0.1,<2",
+    "langgraph>=1.0,<2",
     "openpyxl>=3.1.5,<4",
     "pandas>=2.2,<4",
     "plotly>=6,<7",
+    "pydantic>=2.11,<3",
 ]
 
 [dependency-groups]
-dev = ["pytest>=8,<9"]
+dev = ["pytest>=8,<9", "pytest-asyncio>=1.3,<2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 
 [project.scripts]
 inquira-data-worker = "inquira_data_worker.__main__:main"

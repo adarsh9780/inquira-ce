@@ -68,6 +68,8 @@ class ExecutionOutput:
             "success": self.error is None,
             "stdout": stdout,
             "stderr": stderr,
+            "has_stdout": bool(stdout),
+            "has_stderr": bool(stderr),
             "error": self.error,
             "result": self.result,
             "result_kind": self.result_kind,

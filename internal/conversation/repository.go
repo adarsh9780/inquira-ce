@@ -550,9 +550,11 @@ func (r *SQLiteRepository) ListTurns(ctx context.Context, conversationID string)
 
 func (r *SQLiteRepository) CompleteTurn(ctx context.Context, turn Turn) (Turn, error) {
 	result, err := r.db.ExecContext(ctx, `UPDATE turns SET status = ?, result_kind = ?, assistant_text = ?,
-		tool_events_json = ?, code_snapshot = ?, result_json = ?, error_message = '', updated_at = ?
+		tool_events_json = ?, metadata_json = CASE WHEN ? = '' THEN metadata_json ELSE ? END,
+		code_snapshot = ?, result_json = ?, error_message = '', updated_at = ?
 		WHERE id = ? AND status IN (?, ?)`, TurnStatusCompleted, turn.ResultKind, turn.AssistantText,
-		turn.ToolEventsJSON, turn.CodeSnapshot, turn.ResultJSON, turn.UpdatedAt, turn.ID, TurnStatusQueued, TurnStatusRunning)
+		turn.ToolEventsJSON, turn.MetadataJSON, turn.MetadataJSON, turn.CodeSnapshot, turn.ResultJSON,
+		turn.UpdatedAt, turn.ID, TurnStatusQueued, TurnStatusRunning)
 	if err != nil {
 		return Turn{}, err
 	}
@@ -567,8 +569,9 @@ func (r *SQLiteRepository) CompleteTurn(ctx context.Context, turn Turn) (Turn, e
 
 func (r *SQLiteRepository) FailTurn(ctx context.Context, turn Turn) (Turn, error) {
 	result, err := r.db.ExecContext(ctx, `UPDATE turns SET status = ?, assistant_text = ?, tool_events_json = ?,
+		metadata_json = CASE WHEN ? = '' THEN metadata_json ELSE ? END,
 		code_snapshot = ?, error_message = ?, updated_at = ? WHERE id = ? AND status IN (?, ?)`,
-		TurnStatusFailed, turn.AssistantText, turn.ToolEventsJSON, turn.CodeSnapshot, turn.ErrorMessage,
+		TurnStatusFailed, turn.AssistantText, turn.ToolEventsJSON, turn.MetadataJSON, turn.MetadataJSON, turn.CodeSnapshot, turn.ErrorMessage,
 		turn.UpdatedAt, turn.ID, TurnStatusQueued, TurnStatusRunning)
 	if err != nil {
 		return Turn{}, err

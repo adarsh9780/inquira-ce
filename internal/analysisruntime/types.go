@@ -43,6 +43,8 @@ type ExecuteWorkerResult struct {
 	Error      string              `json:"error"`
 	Result     json.RawMessage     `json:"result"`
 	ResultKind string              `json:"result_kind"`
+	ResultName string              `json:"result_name"`
+	Variables  map[string]any      `json:"variables"`
 	Artifacts  []ArtifactCandidate `json:"artifacts"`
 	TimedOut   bool                `json:"timed_out"`
 }
@@ -60,6 +62,8 @@ type ExecuteResult struct {
 	Error      string                  `json:"error"`
 	Result     json.RawMessage         `json:"result"`
 	ResultKind string                  `json:"result_kind"`
+	ResultName string                  `json:"result_name"`
+	Variables  map[string]any          `json:"variables"`
 	Artifacts  []conversation.Artifact `json:"artifacts"`
 	TimedOut   bool                    `json:"timed_out"`
 }

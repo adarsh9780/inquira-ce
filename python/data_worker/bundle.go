@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 )
 
-//go:embed pyproject.toml uv.lock all:src/inquira_data_worker/*.py all:src/inquira_data_worker/adapters/*.py
+//go:embed pyproject.toml uv.lock all:src/inquira_data_worker
 var projectFiles embed.FS
 
 // Extract writes the version of the worker bundled with this executable.

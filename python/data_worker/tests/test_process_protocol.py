@@ -17,14 +17,51 @@ class ModelHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         payload = json.loads(self.rfile.read(length))
         self.requests.append(payload)
-        messages = payload["messages"]
-        is_answer = "Executed code:" in messages[-1]["content"]
-        content = (
-            json.dumps({"answer": "Total sales are 30."})
-            if is_answer
-            else json.dumps({"code": "result = conn.execute('SELECT SUM(amount) AS total FROM sales').df()"})
-        )
-        encoded = json.dumps({"choices": [{"message": {"content": content}}]}).encode()
+        response_format = payload.get("response_format") or {}
+        schema = response_format.get("json_schema") or {}
+        schema_name = str(schema.get("name") or "")
+        if schema_name == "ContextEnrichmentPlan":
+            value = {
+                "enough_context": True,
+                "missing_context": [],
+                "notes": "The sales table and amount column are available.",
+                "progress_message": "I found the fields needed for the calculation.",
+                "tools": [],
+            }
+        elif schema_name == "AnalysisOutput":
+            value = {
+                "code": "result = conn.sql('SELECT SUM(amount) AS total FROM sales').df()",
+                "explanation": "Sum the sales amount.",
+                "progress_message": "I prepared the total-sales calculation.",
+                "output_contract": [{"name": "result", "kind": "dataframe", "description": "Total sales"}],
+                "search_schema_queries": [],
+                "selected_tables": ["sales"],
+                "join_keys": [],
+                "joins_used": False,
+            }
+        elif schema_name == "ResultExplanation":
+            value = {
+                "result_explanation": "Total sales are 30.",
+                "code_explanation": "The query summed the amount column.",
+                "progress_message": "I summarized the calculated total.",
+            }
+        elif schema_name == "RouteDecision":
+            value = {
+                "route": "analysis",
+                "reasoning": "The question asks for a calculation against sales data.",
+                "progress_message": "I will analyze the sales table.",
+            }
+        else:
+            value = {"answer": "Total sales are 30.", "progress_message": "I answered the question."}
+        content = json.dumps(value)
+        encoded = json.dumps({
+            "id": "chatcmpl-test",
+            "object": "chat.completion",
+            "created": 0,
+            "model": "gpt-test",
+            "choices": [{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": content}}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        }).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(encoded)))
@@ -108,10 +145,17 @@ def test_json_lines_process_runs_agent_from_model_to_duckdb_result(tmp_path: Pat
             "workspace_id": "workspace-1", "database_path": str(catalog),
             "question": "What are total sales?", "run_id": "agent-1",
             "artifact_dir": str(tmp_path / "artifacts"), "timeout_seconds": 15,
-            "model": {
+                "model": {
                 "provider": "openai", "model": "gpt-test", "api_key": "test-secret",
-                "base_url": f"http://127.0.0.1:{server.server_port}/v1",
-            },
+                    "base_url": f"http://127.0.0.1:{server.server_port}/v1",
+                },
+                "schema": {
+                    "context": "Sales reporting",
+                    "tables": [{
+                        "name": "sales",
+                        "columns": [{"name": "amount", "dtype": "BIGINT", "description": "Sale amount", "aliases": []}],
+                    }],
+                },
         },
     }
     events: list[dict] = []
@@ -131,8 +175,11 @@ def test_json_lines_process_runs_agent_from_model_to_duckdb_result(tmp_path: Pat
         assert result["success"] is True
         assert result["answer"] == "Total sales are 30."
         assert result["execution"]["result"]["rows"] == [{"total": 30.0}]
-        assert [request["messages"][-1]["content"] for request in ModelHandler.requests][0].find("sales") >= 0
-        assert any(event["type"] == "agent_status" and event["data"]["stage"] == "executing" for event in events)
+        assert "sales" in json.dumps(ModelHandler.requests)
+        assert any(
+            event["type"] == "agent_status" and event["data"].get("step") == "executing_code"
+            for event in events
+        )
     finally:
         process.stdin.close()
         process.wait(timeout=20)

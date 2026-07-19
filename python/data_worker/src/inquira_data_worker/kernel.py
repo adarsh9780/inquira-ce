@@ -22,6 +22,7 @@ from .jupyter_messages import ExecutionOutput
 class KernelSession:
     workspace_id: str
     database_path: str
+    database_signature: tuple[int, int, int, int]
     manager: AsyncKernelManager
     client: Any
     status: str = "ready"
@@ -48,6 +49,7 @@ class WorkspaceKernelManager:
         run_id: str,
         artifact_dir: str,
         timeout_seconds: int,
+        output_contract: list[dict[str, str]] | None = None,
         emit: Callable[[dict[str, Any]], Any] | None = None,
     ) -> dict[str, Any]:
         session = await self._get_or_start(workspace_id, database_path, emit)
@@ -58,29 +60,51 @@ class WorkspaceKernelManager:
             try:
                 await self._execute_request(
                     session,
-                    f"set_active_run({run_id!r}, {str(Path(artifact_dir).resolve())!r})",
+                    f"set_active_run({run_id!r}, artifact_dir={str(Path(artifact_dir).resolve())!r})",
                 )
                 primary = await asyncio.wait_for(
                     self._execute_request(session, code, emit=emit),
                     timeout=max(1, int(timeout_seconds)),
                 )
                 artifacts: list[dict[str, Any]] = []
+                result_name: str | None = None
                 if primary.error is None:
                     candidate = _capture_candidate(code)
                     if candidate is not None:
                         expression, logical_name = candidate
+                        result_name = logical_name
+                        capture_function = (
+                            "_inquira_emit_preview"
+                            if output_contract is not None
+                            else "_inquira_emit_capture"
+                        )
                         captured = await self._execute_request(
                             session,
-                            f"_inquira_emit_capture({expression}, logical_name={logical_name!r})",
+                            f"{capture_function}({expression}, logical_name={logical_name!r})",
                         )
                         if captured.result_kind in {"dataframe", "figure", "scalar", "text"}:
                             primary.result = captured.result
                             primary.result_kind = captured.result_kind
+                    if output_contract is not None:
+                        from .agent_v2.services.output_capture import (
+                            build_auto_capture_result_code,
+                            infer_capture_candidate_names,
+                        )
+
+                        capture_code = build_auto_capture_result_code(
+                            output_contract,
+                            fallback_candidates=infer_capture_candidate_names(code),
+                        )
+                        capture_output = await self._execute_request(session, capture_code)
+                        if capture_output.stderr_parts:
+                            primary.stderr_parts.extend(capture_output.stderr_parts)
                     exports = await self._execute_request(session, f"_inquira_emit_exports({run_id!r})")
                     if exports.result_kind == "exports" and isinstance(exports.result, list):
                         artifacts = [item for item in exports.result if isinstance(item, dict)]
                 response = primary.response()
                 response["artifacts"] = artifacts
+                response["result_name"] = result_name
+                response["variables"] = {"dataframes": {}, "figures": {}, "scalars": {}}
                 response["timed_out"] = False
                 return response
             except asyncio.TimeoutError:
@@ -92,9 +116,14 @@ class WorkspaceKernelManager:
                     "error": f"Execution timed out after {timeout_seconds} seconds.",
                     "result": None,
                     "result_kind": "error",
+                    "result_name": None,
+                    "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
                     "artifacts": [],
                     "timed_out": True,
                 }
+            except asyncio.CancelledError:
+                await self._interrupt_session(session)
+                raise
             finally:
                 session.status = "ready"
                 session.last_used = time.monotonic()
@@ -148,7 +177,12 @@ class WorkspaceKernelManager:
     ) -> KernelSession:
         async with self._sessions_lock:
             session = self._sessions.get(workspace_id)
-            if session is not None and session.database_path == database_path:
+            signature = _database_signature(database_path)
+            if (
+                session is not None
+                and session.database_path == database_path
+                and session.database_signature == signature
+            ):
                 return session
             if session is not None:
                 await self._shutdown_session(session)
@@ -177,7 +211,13 @@ class WorkspaceKernelManager:
             client = manager.client()
             client.start_channels()
             await client.wait_for_ready(timeout=20)
-            session = KernelSession(workspace_id, str(database), manager, client)
+            session = KernelSession(
+                workspace_id,
+                str(database),
+                _database_signature(str(database)),
+                manager,
+                client,
+            )
             await self._bootstrap(session)
             await _emit(emit, {"type": "kernel_status", "status": "ready", "workspace_id": workspace_id})
             return session
@@ -283,3 +323,8 @@ async def _await_maybe(value: Any) -> Any:
     if inspect.isawaitable(value):
         return await value
     return value
+
+
+def _database_signature(database_path: str) -> tuple[int, int, int, int]:
+    stat = Path(database_path).expanduser().resolve().stat()
+    return (int(stat.st_dev), int(stat.st_ino), int(stat.st_size), int(stat.st_mtime_ns))

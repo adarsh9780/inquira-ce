@@ -2,6 +2,7 @@ package analysisagent
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"strings"
 	"unicode/utf8"
@@ -14,13 +15,16 @@ import (
 )
 
 const (
-	maxTimeoutSeconds = 3600
-	maxContextTurns   = 12
-	maxQuestionRunes  = 4000
-	maxAnswerRunes    = 8000
-	maxCodeRunes      = 12000
-	maxErrorRunes     = 4000
-	maxResultBytes    = 32768
+	maxTimeoutSeconds   = 3600
+	maxContextTurns     = 12
+	maxQuestionRunes    = 4000
+	maxAnswerRunes      = 8000
+	maxCodeRunes        = 12000
+	maxErrorRunes       = 4000
+	maxResultBytes      = 32768
+	maxImageAttachments = 5
+	maxImageBytes       = 10 << 20
+	maxAllImageBytes    = 20 << 20
 )
 
 type conversationStore interface {
@@ -43,6 +47,7 @@ type modelSource interface {
 
 type agentGateway interface {
 	Analyze(context.Context, AgentWorkerRequest, func(analysisruntime.WorkerEvent)) (AgentWorkerResult, error)
+	Cancel(context.Context, string) (bool, error)
 }
 
 type runStore interface {
@@ -63,9 +68,22 @@ func NewService(conversations conversationStore, catalogs catalogSource, models 
 	return &Service{conversations: conversations, catalogs: catalogs, models: models, agent: agent, runs: runs}
 }
 
+func (s *Service) Cancel(ctx context.Context, workspaceID string) (bool, error) {
+	workspaceID = strings.TrimSpace(workspaceID)
+	if workspaceID == "" {
+		return false, apperror.New("workspace_required", "Workspace identity is required.")
+	}
+	cancelled, err := s.agent.Cancel(ctx, workspaceID)
+	if err != nil {
+		return false, apperror.Wrap("agent_cancel_failed", "Could not cancel the running analysis.", err)
+	}
+	return cancelled, nil
+}
+
 func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func(analysisruntime.WorkerEvent)) (AnalyzeResult, error) {
 	workspaceID := strings.TrimSpace(request.WorkspaceID)
 	question := strings.TrimSpace(request.Question)
+	currentCode := truncateRunes(request.CurrentCode, maxCodeRunes)
 	if workspaceID == "" {
 		return AnalyzeResult{}, apperror.New("workspace_required", "Choose a workspace before asking a question.")
 	}
@@ -74,6 +92,10 @@ func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func
 	}
 	if request.TimeoutSeconds < 1 || request.TimeoutSeconds > maxTimeoutSeconds {
 		return AnalyzeResult{}, apperror.New("agent_timeout_invalid", "Analysis timeout must be between 1 and 3600 seconds.")
+	}
+	attachments, err := normalizeImageAttachments(request.Attachments)
+	if err != nil {
+		return AnalyzeResult{}, err
 	}
 
 	var ownedConversation conversation.Conversation
@@ -100,6 +122,9 @@ func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func
 	if err != nil {
 		return AnalyzeResult{}, err
 	}
+	if len(attachments) > 0 && !modelSupportsImages(model.Provider, model.Model) {
+		return AnalyzeResult{}, apperror.New("model_images_unsupported", "The selected model does not support image attachments.")
+	}
 	if conversationID == "" {
 		if request.ParentTurnID != nil {
 			return AnalyzeResult{}, apperror.New("turn_parent_not_found", "Parent turn not found in this conversation.")
@@ -115,7 +140,7 @@ func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func
 	if err != nil {
 		return AnalyzeResult{}, err
 	}
-	metadata := contextMetadata(conversationContext, model)
+	metadata := contextMetadata(conversationContext, model, attachments)
 	turn, err := s.conversations.CreateTurn(ctx, conversation.CreateTurnRequest{
 		ConversationID: ownedConversation.ID, ParentTurnID: request.ParentTurnID, UserText: question, MetadataJSON: metadata,
 	})
@@ -135,9 +160,11 @@ func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func
 		}
 	}
 	workerResult, err := s.agent.Analyze(ctx, AgentWorkerRequest{
-		WorkspaceID: workspaceID, DatabasePath: catalog.DatabasePath, Question: question,
-		RunID: run.ID, ArtifactDirectory: run.StagingDirectory, TimeoutSeconds: request.TimeoutSeconds,
-		Model: model, Context: conversationContext, Schema: catalog.AnalysisSchema,
+		WorkspaceID: workspaceID, ConversationID: ownedConversation.ID, TurnID: turn.ID,
+		DatabasePath: catalog.DatabasePath, Question: question,
+		CurrentCode: currentCode,
+		RunID:       run.ID, ArtifactDirectory: run.StagingDirectory, TimeoutSeconds: request.TimeoutSeconds,
+		Model: model, Context: conversationContext, Schema: catalog.AnalysisSchema, Attachments: attachments,
 	}, forward)
 	if err != nil {
 		persistContext := ctx
@@ -158,11 +185,12 @@ func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func
 		_, persistErr := s.conversations.FailTurn(ctx, conversation.FailTurnRequest{
 			TurnID: turn.ID, AssistantText: workerResult.Answer, CodeSnapshot: workerResult.Code,
 			ErrorMessage: message, ToolEventsJSON: eventsJSON(events),
+			MetadataJSON: mergeMetadata(metadata, workerResult.Metadata),
 		})
 		if persistErr != nil {
 			return AnalyzeResult{}, persistErr
 		}
-		return AnalyzeResult{Conversation: ownedConversation, Turn: turn, Answer: workerResult.Answer, Code: workerResult.Code, RunID: run.ID, Execution: workerResult.Execution}, nil
+		return AnalyzeResult{Conversation: ownedConversation, Turn: turn, Answer: workerResult.Answer, Code: workerResult.Code, RunID: run.ID, Execution: workerResult.Execution, Route: workerResult.Route, Metadata: workerResult.Metadata}, nil
 	}
 	artifacts, err := s.runs.PublishCandidates(ctx, ownedConversation, turn, run, workerResult.Execution.Artifacts)
 	if err != nil {
@@ -175,6 +203,7 @@ func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func
 	completed, err := s.conversations.CompleteTurn(ctx, conversation.CompleteTurnRequest{
 		TurnID: turn.ID, AssistantText: workerResult.Answer, CodeSnapshot: workerResult.Code,
 		ToolEventsJSON: eventsJSON(events), ResultJSON: resultJSON, ResultKind: workerResult.Execution.ResultKind,
+		MetadataJSON: mergeMetadata(metadata, workerResult.Metadata),
 	})
 	if err != nil {
 		return AnalyzeResult{}, err
@@ -182,6 +211,7 @@ func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func
 	return AnalyzeResult{
 		Conversation: ownedConversation, Turn: completed, Answer: workerResult.Answer, Code: workerResult.Code,
 		RunID: run.ID, Execution: workerResult.Execution, Artifacts: artifacts,
+		Route: workerResult.Route, Metadata: workerResult.Metadata,
 	}, nil
 }
 
@@ -286,15 +316,19 @@ func historicalResult(turn conversation.Turn, allowDataSamples bool) json.RawMes
 	}
 }
 
-func contextMetadata(history ConversationContext, model modelconfig.RuntimeConfiguration) string {
+func contextMetadata(history ConversationContext, model modelconfig.RuntimeConfiguration, attachments []ImageAttachment) string {
 	turnIDs := make([]string, 0, len(history.Turns))
 	for _, turn := range history.Turns {
 		turnIDs = append(turnIDs, turn.TurnID)
 	}
-	encoded, err := json.Marshal(map[string]any{
+	metadata := map[string]any{
 		"context_turn_ids": turnIDs,
 		"model":            map[string]string{"provider": model.Provider, "id": model.Model},
-	})
+	}
+	if len(attachments) > 0 {
+		metadata["user_attachments"] = attachments
+	}
+	encoded, err := json.Marshal(metadata)
 	if err != nil {
 		return "{}"
 	}
@@ -332,4 +366,72 @@ func eventsJSON(events []analysisruntime.WorkerEvent) string {
 		return "[]"
 	}
 	return string(encoded)
+}
+
+func normalizeImageAttachments(raw []ImageAttachment) ([]ImageAttachment, error) {
+	if len(raw) > maxImageAttachments {
+		return nil, apperror.New("agent_attachments_invalid", "Attach no more than five images to one question.")
+	}
+	allowed := map[string]bool{
+		"image/png": true, "image/jpeg": true, "image/webp": true, "image/gif": true,
+	}
+	result := make([]ImageAttachment, 0, len(raw))
+	total := 0
+	for _, item := range raw {
+		item.AttachmentID = strings.TrimSpace(item.AttachmentID)
+		item.MediaType = strings.ToLower(strings.TrimSpace(item.MediaType))
+		item.Filename = strings.TrimSpace(item.Filename)
+		item.DataBase64 = strings.TrimSpace(item.DataBase64)
+		if item.AttachmentID == "" || item.Filename == "" || !allowed[item.MediaType] || item.DataBase64 == "" || len(item.Filename) > 255 {
+			return nil, apperror.New("agent_attachments_invalid", "Each attachment must be a supported PNG, JPEG, WebP, or GIF image.")
+		}
+		decoded, err := base64.StdEncoding.DecodeString(item.DataBase64)
+		if err != nil || len(decoded) == 0 || len(decoded) > maxImageBytes {
+			return nil, apperror.New("agent_attachments_invalid", "An image attachment is invalid or larger than 10 MB.")
+		}
+		total += len(decoded)
+		if total > maxAllImageBytes {
+			return nil, apperror.New("agent_attachments_invalid", "Image attachments may use at most 20 MB in total.")
+		}
+		result = append(result, item)
+	}
+	return result, nil
+}
+
+func mergeMetadata(base string, incoming map[string]any) string {
+	merged := map[string]any{}
+	_ = json.Unmarshal([]byte(base), &merged)
+	for key, value := range incoming {
+		normalized := strings.ToLower(strings.TrimSpace(key))
+		if normalized == "api_key" || normalized == "authorization" || normalized == "credential" || normalized == "secret" {
+			continue
+		}
+		merged[key] = value
+	}
+	encoded, err := json.Marshal(merged)
+	if err != nil || len(encoded) > 64<<10 {
+		return base
+	}
+	return string(encoded)
+}
+
+func modelSupportsImages(provider, model string) bool {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	model = strings.ToLower(strings.TrimSpace(model))
+	if model == "" {
+		return false
+	}
+	if provider == "anthropic" {
+		return strings.Contains(model, "claude-3") || strings.Contains(model, "claude-sonnet-4")
+	}
+	markers := []string{"gpt-4o", "gpt-4.1", "gemini", "claude-3", "claude-sonnet-4", "qwen-vl", "llava", "pixtral", "vision"}
+	if provider == "ollama" {
+		markers = []string{"llava", "vision", "moondream", "minicpm-v"}
+	}
+	for _, marker := range markers {
+		if strings.Contains(model, marker) {
+			return true
+		}
+	}
+	return false
 }

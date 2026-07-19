@@ -36,10 +36,18 @@ func (f *fakeModelSource) RuntimeConfiguration(context.Context) (modelconfig.Run
 }
 
 type fakeAgentGateway struct {
-	request AgentWorkerRequest
-	result  AgentWorkerResult
-	err     error
-	events  []analysisruntime.WorkerEvent
+	request         AgentWorkerRequest
+	result          AgentWorkerResult
+	err             error
+	events          []analysisruntime.WorkerEvent
+	cancelWorkspace string
+	cancelled       bool
+	cancelErr       error
+}
+
+func (f *fakeAgentGateway) Cancel(_ context.Context, workspaceID string) (bool, error) {
+	f.cancelWorkspace = workspaceID
+	return f.cancelled, f.cancelErr
 }
 
 func (f *fakeAgentGateway) Analyze(_ context.Context, request AgentWorkerRequest, emit func(analysisruntime.WorkerEvent)) (AgentWorkerResult, error) {
@@ -107,7 +115,7 @@ func newAgentService(t *testing.T, gateway *fakeAgentGateway) (*Service, *conver
 				Name: "sales", Columns: []datacatalog.SchemaColumn{{Name: "amount", DataType: "DOUBLE", Description: "Booked revenue", Aliases: []string{"sales"}}},
 			}}},
 		}},
-		&fakeModelSource{config: modelconfig.RuntimeConfiguration{Provider: "openai", Model: "gpt-test", APIKey: "runtime-secret"}},
+		&fakeModelSource{config: modelconfig.RuntimeConfiguration{Provider: "openai", Model: "gpt-4o", APIKey: "runtime-secret"}},
 		gateway,
 		runs,
 	)
@@ -119,6 +127,9 @@ func TestAnalyzeCreatesConversationExecutesAndPersistsTurn(t *testing.T) {
 	gateway := &fakeAgentGateway{
 		result: AgentWorkerResult{
 			Success: true, Answer: "Total sales are 42.", Code: "result = conn.sql('select 42').df()",
+			Route: "analysis", Metadata: map[string]any{
+				"token_usage": map[string]any{"input_tokens": 20, "output_tokens": 5, "total_tokens": 25},
+			},
 			Execution: analysisruntime.ExecuteWorkerResult{
 				Success: true, Result: executionResult, ResultKind: "dataframe",
 				Artifacts: []analysisruntime.ArtifactCandidate{{Kind: "dataframe", SourcePath: "/staging/data.parquet"}},
@@ -128,16 +139,23 @@ func TestAnalyzeCreatesConversationExecutesAndPersistsTurn(t *testing.T) {
 	}
 	service, conversations, workspaceID, runs := newAgentService(t, gateway)
 	result, err := service.Analyze(context.Background(), AnalyzeRequest{
-		WorkspaceID: workspaceID, Question: "What are total sales?", TimeoutSeconds: 30,
+		WorkspaceID: workspaceID, Question: "What are total sales?", CurrentCode: "result = previous", TimeoutSeconds: 30,
+		Attachments: []ImageAttachment{{
+			AttachmentID: "image-1", MediaType: "image/png", Filename: "chart.png", DataBase64: "aW1hZ2U=",
+		}},
 	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Conversation.ID == "" || result.Turn.ID == "" || result.Answer != gateway.result.Answer || !result.Execution.Success {
+	if result.Conversation.ID == "" || result.Turn.ID == "" || result.Answer != gateway.result.Answer || !result.Execution.Success || result.Route != "analysis" {
 		t.Fatalf("result = %#v", result)
 	}
 	if gateway.request.Model.APIKey != "runtime-secret" || gateway.request.DatabasePath == "" || gateway.request.RunID != "run-1" {
 		t.Fatalf("worker request = %#v", gateway.request)
+	}
+	if gateway.request.ConversationID != result.Conversation.ID || gateway.request.TurnID != result.Turn.ID ||
+		gateway.request.CurrentCode != "result = previous" || len(gateway.request.Attachments) != 1 || gateway.request.Attachments[0].AttachmentID != "image-1" {
+		t.Fatalf("worker identity/attachments = %#v", gateway.request)
 	}
 	if gateway.request.Schema.Context != "Revenue reporting" || gateway.request.Schema.Tables[0].Columns[0].Description != "Booked revenue" {
 		t.Fatalf("semantic schema = %#v", gateway.request.Schema)
@@ -151,8 +169,55 @@ func TestAnalyzeCreatesConversationExecutesAndPersistsTurn(t *testing.T) {
 	}
 	encoded, _ := json.Marshal(turn)
 	if turn.Status != conversation.TurnStatusCompleted || turn.AssistantText != gateway.result.Answer || turn.CodeSnapshot != gateway.result.Code ||
-		turn.ResultJSON != string(executionResult) || strings.Contains(string(encoded), "runtime-secret") {
+		turn.ResultJSON != string(executionResult) || !strings.Contains(turn.MetadataJSON, `"total_tokens":25`) ||
+		!strings.Contains(turn.MetadataJSON, `"user_attachments"`) || !strings.Contains(turn.MetadataJSON, `"attachment_id":"image-1"`) ||
+		strings.Contains(string(encoded), "runtime-secret") {
 		t.Fatalf("persisted turn = %s", encoded)
+	}
+}
+
+func TestAnalyzeRejectsInvalidImageAttachments(t *testing.T) {
+	service, _, workspaceID, _ := newAgentService(t, &fakeAgentGateway{})
+	tests := []AnalyzeRequest{
+		{WorkspaceID: workspaceID, Question: "Q", TimeoutSeconds: 30, Attachments: []ImageAttachment{{AttachmentID: "x", MediaType: "text/plain", Filename: "x.txt", DataBase64: "eA=="}}},
+		{WorkspaceID: workspaceID, Question: "Q", TimeoutSeconds: 30, Attachments: []ImageAttachment{{AttachmentID: "x", MediaType: "image/png", Filename: "x.png", DataBase64: "not-base64"}}},
+	}
+	for _, request := range tests {
+		if _, err := service.Analyze(context.Background(), request, nil); appErrorCode(err) != "agent_attachments_invalid" {
+			t.Fatalf("error = %v", err)
+		}
+	}
+}
+
+func TestAnalyzeRejectsImagesForTextOnlyModel(t *testing.T) {
+	service, _, workspaceID, _ := newAgentService(t, &fakeAgentGateway{})
+	service.models = &fakeModelSource{config: modelconfig.RuntimeConfiguration{
+		Provider: "ollama", Model: "qwen2.5-coder:7b",
+	}}
+	_, err := service.Analyze(context.Background(), AnalyzeRequest{
+		WorkspaceID: workspaceID, Question: "Read this image", TimeoutSeconds: 30,
+		Attachments: []ImageAttachment{{
+			AttachmentID: "image-1", MediaType: "image/png", Filename: "chart.png", DataBase64: "aW1hZ2U=",
+		}},
+	}, nil)
+	if appErrorCode(err) != "model_images_unsupported" {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestCancelValidatesWorkspaceAndDelegatesToWorker(t *testing.T) {
+	gateway := &fakeAgentGateway{cancelled: true}
+	service, _, _, _ := newAgentService(t, gateway)
+	cancelled, err := service.Cancel(context.Background(), " workspace-1 ")
+	if err != nil || !cancelled || gateway.cancelWorkspace != "workspace-1" {
+		t.Fatalf("cancelled=%v workspace=%q error=%v", cancelled, gateway.cancelWorkspace, err)
+	}
+	if _, err := service.Cancel(context.Background(), " "); appErrorCode(err) != "workspace_required" {
+		t.Fatalf("blank workspace error = %v", err)
+	}
+	gateway.cancelErr = errors.New("worker unavailable")
+	if _, err := service.Cancel(context.Background(), "workspace-1"); appErrorCode(err) != "agent_cancel_failed" {
+		t.Fatalf("worker error = %v", err)
 	}
 }
 

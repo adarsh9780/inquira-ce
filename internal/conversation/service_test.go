@@ -67,11 +67,12 @@ func TestConversationAndTurnContentLivesOnlyInSQLite(t *testing.T) {
 		ToolEventsJSON: `[{"name":"python"}]`,
 		ResultJSON:     `{"region":"West","growth":0.21}`,
 		ResultKind:     "scalar",
+		MetadataJSON:   `{"model":"test-model","token_usage":{"total_tokens":25}}`,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if completed.Status != TurnStatusCompleted || completed.Sequence != 1 {
+	if completed.Status != TurnStatusCompleted || completed.Sequence != 1 || !strings.Contains(completed.MetadataJSON, `"total_tokens":25`) {
 		t.Fatalf("completed turn = %#v", completed)
 	}
 

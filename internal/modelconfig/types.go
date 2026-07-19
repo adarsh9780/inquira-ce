@@ -73,11 +73,14 @@ type PreferencesResponse struct {
 type RuntimeConfiguration struct {
 	Provider         string  `json:"provider"`
 	Model            string  `json:"model"`
+	LiteModel        string  `json:"lite_model,omitempty"`
+	CodingModel      string  `json:"coding_model,omitempty"`
 	APIKey           string  `json:"api_key,omitempty"`
 	BaseURL          string  `json:"base_url"`
 	Temperature      float64 `json:"temperature"`
 	MaxTokens        int     `json:"max_tokens"`
 	TopP             float64 `json:"top_p"`
+	TopK             int     `json:"top_k"`
 	FrequencyPenalty float64 `json:"frequency_penalty"`
 	PresencePenalty  float64 `json:"presence_penalty"`
 	AllowDataSamples bool    `json:"allow_data_samples"`

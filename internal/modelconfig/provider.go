@@ -31,7 +31,17 @@ func (c providerClient) verify(ctx context.Context, provider, key string) Verify
 	if err != nil {
 		return VerifyResponse{Error: "network_error"}
 	}
-	request.Header.Set("Authorization", "Bearer "+strings.TrimSpace(key))
+	if provider == "anthropic" {
+		endpoint = "https://api.anthropic.com/v1/models"
+		request, err = http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+		if err != nil {
+			return VerifyResponse{Error: "network_error"}
+		}
+		request.Header.Set("x-api-key", strings.TrimSpace(key))
+		request.Header.Set("anthropic-version", "2023-06-01")
+	} else {
+		request.Header.Set("Authorization", "Bearer "+strings.TrimSpace(key))
+	}
 	response, err := c.http.Do(request)
 	if err != nil {
 		return VerifyResponse{Error: "network_error"}
@@ -76,7 +86,15 @@ func (c providerClient) refresh(ctx context.Context, provider, key, baseURL stri
 	if provider == "openai" {
 		endpoint = "https://api.openai.com/v1/models"
 	}
-	payload, status, err := c.getWithStatus(ctx, endpoint, "Authorization", "Bearer "+strings.TrimSpace(key))
+	headers := map[string]string{"Authorization": "Bearer " + strings.TrimSpace(key)}
+	if provider == "anthropic" {
+		endpoint = "https://api.anthropic.com/v1/models"
+		headers = map[string]string{
+			"x-api-key":         strings.TrimSpace(key),
+			"anthropic-version": "2023-06-01",
+		}
+	}
+	payload, status, err := c.getWithHeaders(ctx, endpoint, headers)
 	if err != nil {
 		return Catalog{}, "", "refresh_failed", err
 	}
@@ -92,6 +110,8 @@ func (c providerClient) refresh(ctx context.Context, provider, key, baseURL stri
 	models := extractDataModels(payload)
 	if provider == "openai" {
 		models = filterOpenAIChatModels(models)
+	} else if provider == "anthropic" {
+		models = filterAnthropicChatModels(models)
 	}
 	if len(models) == 0 {
 		return Catalog{}, "", "refresh_failed", fmt.Errorf("provider returned no compatible models")
@@ -117,11 +137,19 @@ func (c providerClient) get(ctx context.Context, endpoint, header, value string)
 }
 
 func (c providerClient) getWithStatus(ctx context.Context, endpoint, header, value string) (map[string]any, int, error) {
+	headers := map[string]string{}
+	if header != "" {
+		headers[header] = value
+	}
+	return c.getWithHeaders(ctx, endpoint, headers)
+}
+
+func (c providerClient) getWithHeaders(ctx context.Context, endpoint string, headers map[string]string) (map[string]any, int, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, 0, fmt.Errorf("create provider request: %w", err)
 	}
-	if header != "" {
+	for header, value := range headers {
 		request.Header.Set(header, value)
 	}
 	response, err := c.http.Do(request)
@@ -181,6 +209,16 @@ func filterOpenAIChatModels(models []string) []string {
 			continue
 		}
 		if strings.HasPrefix(lower, "gpt") || strings.HasPrefix(lower, "o1") || strings.HasPrefix(lower, "o3") || strings.HasPrefix(lower, "o4") || strings.HasPrefix(lower, "chatgpt") {
+			result = append(result, model)
+		}
+	}
+	return unique(result)
+}
+
+func filterAnthropicChatModels(models []string) []string {
+	result := make([]string, 0, len(models))
+	for _, model := range models {
+		if strings.HasPrefix(strings.ToLower(model), "claude") {
 			result = append(result, model)
 		}
 	}

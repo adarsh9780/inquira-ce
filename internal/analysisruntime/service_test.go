@@ -98,8 +98,9 @@ func newExecutionService(t *testing.T, gateway KernelGateway) (*Service, *conver
 func TestExecutionPublishesWorkerArtifactsAndPersistsTurn(t *testing.T) {
 	gateway := &fakeKernelGateway{
 		result: ExecuteWorkerResult{
-			Success: true, Stdout: "done", ResultKind: "dataframe",
-			Result: json.RawMessage(`{"columns":["total"],"rows":[{"total":42}]}`),
+			Success: true, Stdout: "done", ResultKind: "dataframe", ResultName: "totals",
+			Variables: map[string]any{"dataframes": map[string]any{}},
+			Result:    json.RawMessage(`{"columns":["total"],"rows":[{"total":42}]}`),
 			Artifacts: []ArtifactCandidate{{
 				Kind: "dataframe", LogicalName: "totals", DisplayName: "Totals",
 				PayloadFormat: "parquet", MediaType: "application/vnd.apache.parquet",
@@ -117,7 +118,7 @@ func TestExecutionPublishesWorkerArtifactsAndPersistsTurn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !result.Success || result.ResultKind != "dataframe" || len(result.Artifacts) != 1 {
+	if !result.Success || result.ResultKind != "dataframe" || result.ResultName != "totals" || result.Variables == nil || len(result.Artifacts) != 1 {
 		t.Fatalf("execution = %#v", result)
 	}
 	if gateway.request.WorkspaceID != createdConversation.WorkspaceID || gateway.request.DatabasePath != catalog || gateway.request.RunID == "" {

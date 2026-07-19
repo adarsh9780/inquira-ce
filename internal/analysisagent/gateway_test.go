@@ -14,6 +14,17 @@ type fakeTransport struct {
 	request AgentWorkerRequest
 }
 
+func (f *fakeTransport) Call(_ context.Context, method string, params, result any) error {
+	f.method = method
+	workspaceID := params.(map[string]any)["workspace_id"]
+	*(result.(*struct {
+		Cancelled bool `json:"cancelled"`
+	})) = struct {
+		Cancelled bool `json:"cancelled"`
+	}{Cancelled: workspaceID == "workspace-1"}
+	return nil
+}
+
 func (f *fakeTransport) CallWithEvents(_ context.Context, method string, params, result any, emit func(worker.Event)) error {
 	f.method = method
 	f.request = params.(AgentWorkerRequest)
@@ -41,5 +52,13 @@ func TestWorkerGatewayUsesAgentRPCAndForwardsStructuredEvents(t *testing.T) {
 	data, ok := events[0].Data.(map[string]any)
 	if !ok || data["stage"] != "executing" {
 		t.Fatalf("event data = %#v", events[0].Data)
+	}
+}
+
+func TestWorkerGatewayCancelsWorkspaceAgent(t *testing.T) {
+	transport := &fakeTransport{}
+	cancelled, err := NewWorkerGateway(transport).Cancel(context.Background(), "workspace-1")
+	if err != nil || !cancelled || transport.method != "agent_cancel" {
+		t.Fatalf("cancelled=%v method=%q error=%v", cancelled, transport.method, err)
 	}
 }

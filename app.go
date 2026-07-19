@@ -701,7 +701,12 @@ func (a *App) InterruptWorkspaceKernel(workspaceID string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return service.Interrupt(a.appContext(), workspaceID)
+	agentCancelled := false
+	if a.agent != nil {
+		agentCancelled, _ = a.agent.Cancel(a.appContext(), workspaceID)
+	}
+	kernelInterrupted, err := service.Interrupt(a.appContext(), workspaceID)
+	return agentCancelled || kernelInterrupted, err
 }
 
 func (a *App) PrepareWorkspaceCatalog(workspaceID string) (datacatalog.Catalog, error) {

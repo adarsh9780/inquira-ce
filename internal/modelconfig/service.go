@@ -59,20 +59,24 @@ func (s *Service) runtimeConfiguration(ctx context.Context, preferLite bool) (Ru
 	}
 	provider := normalizeProvider(preferences.LLMProvider)
 	catalog := preferences.Catalogs[provider]
-	model := ""
+	mainModel := strings.TrimSpace(preferences.SelectedModel)
+	if mainModel == "" {
+		mainModel = strings.TrimSpace(catalog.DefaultMainModel)
+	}
+	liteModel := strings.TrimSpace(preferences.SelectedLiteModel)
+	if liteModel == "" {
+		liteModel = mainModel
+	}
+	if liteModel == "" {
+		liteModel = strings.TrimSpace(catalog.DefaultLiteModel)
+	}
+	codingModel := strings.TrimSpace(preferences.SelectedCodingModel)
+	if codingModel == "" {
+		codingModel = mainModel
+	}
+	model := mainModel
 	if preferLite {
-		model = strings.TrimSpace(preferences.SelectedLiteModel)
-		if model == "" {
-			model = strings.TrimSpace(preferences.SelectedModel)
-		}
-		if model == "" {
-			model = strings.TrimSpace(catalog.DefaultLiteModel)
-		}
-	} else {
-		model = strings.TrimSpace(preferences.SelectedCodingModel)
-		if model == "" {
-			model = strings.TrimSpace(preferences.SelectedModel)
-		}
+		model = liteModel
 	}
 	if model == "" {
 		model = catalog.DefaultMainModel
@@ -103,8 +107,10 @@ func (s *Service) runtimeConfiguration(ctx context.Context, preferLite bool) (Ru
 		maxTokens = 4096
 	}
 	return RuntimeConfiguration{
-		Provider: provider, Model: model, APIKey: apiKey, BaseURL: baseURL,
+		Provider: provider, Model: model, LiteModel: liteModel, CodingModel: codingModel,
+		APIKey: apiKey, BaseURL: baseURL,
 		Temperature: preferences.Temperature, MaxTokens: maxTokens, TopP: preferences.TopP,
+		TopK:             preferences.TopK,
 		FrequencyPenalty: preferences.FrequencyPenalty, PresencePenalty: preferences.PresencePenalty,
 		AllowDataSamples: preferences.AllowLLMDataSamples,
 	}, nil

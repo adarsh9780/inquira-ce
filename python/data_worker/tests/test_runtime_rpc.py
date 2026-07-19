@@ -141,3 +141,51 @@ def test_runtime_rpc_exposes_schema_description_generation() -> None:
             await runtime.shutdown()
 
     asyncio.run(scenario())
+
+
+def test_runtime_rpc_cancels_an_active_agent_request_and_interrupts_its_workspace() -> None:
+    class SlowAgent:
+        def __init__(self) -> None:
+            self.started = asyncio.Event()
+
+        async def analyze(self, params: dict, emit) -> dict:
+            _ = params, emit
+            self.started.set()
+            await asyncio.Event().wait()
+            raise AssertionError("cancelled analysis continued")
+
+    class InterruptingKernels:
+        def __init__(self) -> None:
+            self.interrupted: list[str] = []
+
+        async def interrupt(self, workspace_id: str) -> bool:
+            self.interrupted.append(workspace_id)
+            return True
+
+        async def shutdown(self) -> None:
+            return None
+
+    async def scenario() -> None:
+        runtime = WorkerRuntime()
+        runtime.agent = SlowAgent()
+        runtime.kernels = InterruptingKernels()
+        analysis = asyncio.create_task(runtime.handle({
+            "id": "analysis",
+            "method": "agent_analyze",
+            "params": {"workspace_id": "workspace-1"},
+        }, lambda _: None))
+        await runtime.agent.started.wait()
+
+        cancelled = await runtime.handle({
+            "id": "cancel",
+            "method": "agent_cancel",
+            "params": {"workspace_id": "workspace-1"},
+        }, lambda _: None)
+        response = await analysis
+
+        assert cancelled["error"] is None
+        assert cancelled["result"] == {"workspace_id": "workspace-1", "cancelled": True}
+        assert response["error"]["code"] == "agent_cancelled"
+        assert runtime.kernels.interrupted == ["workspace-1"]
+
+    asyncio.run(scenario())

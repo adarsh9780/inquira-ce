@@ -23,8 +23,14 @@ def install(namespace: dict[str, Any], *, workspace_id: str, database_path: str)
     namespace["_inquira_runs"] = {}
     namespace["_inquira_active_run"] = None
 
-    def set_active_run(run_id: str, artifact_dir: str) -> str:
-        target = Path(artifact_dir).expanduser().resolve()
+    def set_active_run(
+        run_id: str,
+        conversation_id: str | None = None,
+        turn_id: str | None = None,
+        artifact_dir: str | None = None,
+    ) -> str:
+        _ = conversation_id, turn_id
+        target = Path(artifact_dir or ".").expanduser().resolve()
         target.mkdir(parents=True, exist_ok=True)
         namespace["_inquira_active_run"] = str(run_id)
         namespace["_inquira_runs"][str(run_id)] = {"artifact_dir": target, "exports": []}
@@ -96,6 +102,19 @@ def install(namespace: dict[str, Any], *, workspace_id: str, database_path: str)
         }
         return record(descriptor, run_id)
 
+    def export_scalar(value: Any, logical_name: str = "scalar", run_id: str | None = None, display_name: str | None = None, meta: Any = None) -> dict[str, Any]:
+        path = target_path("scalar", "json", run_id)
+        path.write_text(json.dumps({"value": _json_safe(value), "meta": _json_safe(meta)}, default=str), encoding="utf-8")
+        descriptor = {
+            "kind": "scalar",
+            "logical_name": str(logical_name),
+            "display_name": str(display_name or logical_name),
+            "payload_format": "json",
+            "media_type": "application/json",
+            "source_path": str(path),
+        }
+        return record(descriptor, run_id)
+
     def emit_capture(value: Any, logical_name: str = "result") -> None:
         frame = dataframe_value(value)
         if frame is not None:
@@ -114,6 +133,23 @@ def install(namespace: dict[str, Any], *, workspace_id: str, database_path: str)
             return
         display({"application/json": {"kind": "scalar", "value": _json_safe(value)}}, raw=True)
 
+    def emit_preview(value: Any, logical_name: str = "result") -> None:
+        _ = logical_name
+        frame = dataframe_value(value)
+        if frame is not None:
+            preview = frame.head(1000)
+            payload = {
+                "columns": [str(column) for column in preview.columns],
+                "rows": json.loads(preview.to_json(orient="records", date_format="iso")),
+            }
+            display({"application/json": {"kind": "dataframe", "value": payload}}, raw=True)
+            return
+        if hasattr(value, "to_plotly_json") or (isinstance(value, dict) and "data" in value and "layout" in value):
+            figure = value.to_plotly_json() if hasattr(value, "to_plotly_json") else value
+            display({"application/json": {"kind": "figure", "value": _json_safe(figure)}}, raw=True)
+            return
+        display({"application/json": {"kind": "scalar", "value": _json_safe(value)}}, raw=True)
+
     def emit_exports(run_id: str) -> None:
         exports = list(active_run(run_id)["exports"])
         display({"application/json": {"kind": "exports", "value": exports}}, raw=True)
@@ -121,7 +157,9 @@ def install(namespace: dict[str, Any], *, workspace_id: str, database_path: str)
     namespace["set_active_run"] = set_active_run
     namespace["export_dataframe"] = export_dataframe
     namespace["export_figure"] = export_figure
+    namespace["export_scalar"] = export_scalar
     namespace["_inquira_emit_capture"] = emit_capture
+    namespace["_inquira_emit_preview"] = emit_preview
     namespace["_inquira_emit_exports"] = emit_exports
 
 
