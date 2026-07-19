@@ -40,6 +40,50 @@ func (s *Service) GetPreferences(ctx context.Context, providerHint string) (Pref
 	return s.response(preferences, provider)
 }
 
+func (s *Service) RuntimeConfiguration(ctx context.Context) (RuntimeConfiguration, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	preferences, err := s.repository.Load(ctx)
+	if err != nil {
+		return RuntimeConfiguration{}, apperror.Wrap("settings_read_failed", "Could not load model settings.", err)
+	}
+	provider := normalizeProvider(preferences.LLMProvider)
+	model := strings.TrimSpace(preferences.SelectedCodingModel)
+	if model == "" {
+		model = strings.TrimSpace(preferences.SelectedModel)
+	}
+	if model == "" {
+		model = preferences.Catalogs[provider].DefaultMainModel
+	}
+	if model == "" {
+		return RuntimeConfiguration{}, apperror.New("model_required", "Choose a model before starting an analysis.")
+	}
+	apiKey := ""
+	if provider != "ollama" {
+		apiKey, err = s.secrets.Get(provider)
+		if err != nil {
+			return RuntimeConfiguration{}, apperror.Wrap("keychain_read_failed", "Could not read the saved API key.", err)
+		}
+		if strings.TrimSpace(apiKey) == "" {
+			return RuntimeConfiguration{}, apperror.New("missing_key", "Connect a model provider before starting an analysis.")
+		}
+	}
+	baseURL := map[string]string{
+		"openai":     "https://api.openai.com/v1",
+		"openrouter": "https://openrouter.ai/api/v1",
+		"ollama":     strings.TrimRight(strings.TrimSpace(preferences.OllamaBaseURL), "/"),
+	}[provider]
+	if baseURL == "" && provider == "ollama" {
+		baseURL = "http://localhost:11434"
+	}
+	return RuntimeConfiguration{
+		Provider: provider, Model: model, APIKey: apiKey, BaseURL: baseURL,
+		Temperature: preferences.Temperature, MaxTokens: preferences.MaxTokens, TopP: preferences.TopP,
+		FrequencyPenalty: preferences.FrequencyPenalty, PresencePenalty: preferences.PresencePenalty,
+		AllowDataSamples: preferences.AllowLLMDataSamples,
+	}, nil
+}
+
 func (s *Service) GetOnboardingStatus(ctx context.Context) (OnboardingStatus, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

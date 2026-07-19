@@ -67,6 +67,22 @@ type PreferencesResponse struct {
 	Error                          string             `json:"error,omitempty"`
 }
 
+// RuntimeConfiguration contains the provider settings needed by the local
+// Python worker for one model request. It must never be returned by a Wails
+// binding or persisted because it includes the provider credential.
+type RuntimeConfiguration struct {
+	Provider         string  `json:"provider"`
+	Model            string  `json:"model"`
+	APIKey           string  `json:"api_key,omitempty"`
+	BaseURL          string  `json:"base_url"`
+	Temperature      float64 `json:"temperature"`
+	MaxTokens        int     `json:"max_tokens"`
+	TopP             float64 `json:"top_p"`
+	FrequencyPenalty float64 `json:"frequency_penalty"`
+	PresencePenalty  float64 `json:"presence_penalty"`
+	AllowDataSamples bool    `json:"allow_data_samples"`
+}
+
 type UpdateRequest struct {
 	LLMProvider               *string  `json:"llm_provider"`
 	SelectedModel             *string  `json:"selected_model"`

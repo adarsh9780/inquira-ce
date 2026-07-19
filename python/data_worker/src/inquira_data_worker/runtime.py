@@ -6,6 +6,7 @@ import asyncio
 from pathlib import Path
 from typing import Any, Callable
 
+from .agent import AnalysisAgent
 from .kernel import WorkspaceKernelManager
 from .rpc import handle_request as handle_data_request
 
@@ -13,6 +14,7 @@ from .rpc import handle_request as handle_data_request
 class WorkerRuntime:
     def __init__(self, *, idle_seconds: int = 1800) -> None:
         self.kernels = WorkspaceKernelManager(idle_seconds=idle_seconds)
+        self.agent = AnalysisAgent(kernels=self.kernels)
 
     async def handle(self, request: dict[str, Any], emit: Callable[[dict[str, Any]], Any]) -> dict[str, Any]:
         request_id = request.get("id") if isinstance(request, dict) else None
@@ -37,6 +39,13 @@ class WorkerRuntime:
                         await emitted
 
                 response["result"] = await self.kernels.execute(**values, emit=forward)
+            elif method == "agent_analyze":
+                async def forward_agent(event: dict[str, Any]) -> None:
+                    emitted = emit(event)
+                    if hasattr(emitted, "__await__"):
+                        await emitted
+
+                response["result"] = await self.agent.analyze(params, forward_agent)
             elif method == "kernel_status":
                 workspace_id = _workspace_id(params)
                 response["result"] = {"workspace_id": workspace_id, "status": await self.kernels.status(workspace_id)}
