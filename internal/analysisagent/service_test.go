@@ -315,6 +315,39 @@ func TestAnalyzeIncludesHistoricalResultSamplesOnlyWhenEnabled(t *testing.T) {
 	}
 }
 
+func TestConversationContextKeepsTheMostRecentTwelveAncestors(t *testing.T) {
+	service, conversations, workspaceID, _ := newAgentService(t, &fakeAgentGateway{})
+	created, err := conversations.CreateConversation(context.Background(), conversation.CreateConversationRequest{WorkspaceID: workspaceID, Title: "Long branch"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	turnIDs := make([]string, 0, 14)
+	var parent *string
+	for index := 0; index < 14; index++ {
+		turn, err := conversations.CreateTurn(context.Background(), conversation.CreateTurnRequest{
+			ConversationID: created.ID, ParentTurnID: parent, UserText: "Question",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		turn, err = conversations.CompleteTurn(context.Background(), conversation.CompleteTurnRequest{
+			TurnID: turn.ID, AssistantText: "Answer", ResultKind: "scalar", ResultJSON: `1`,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		turnIDs = append(turnIDs, turn.ID)
+		parent = &turn.ID
+	}
+	history, err := service.conversationContext(context.Background(), created.ID, parent, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history.Turns) != maxContextTurns || history.Turns[0].TurnID != turnIDs[2] || history.Turns[len(history.Turns)-1].TurnID != turnIDs[13] {
+		t.Fatalf("bounded history = %#v", history.Turns)
+	}
+}
+
 func appErrorCode(err error) string {
 	var appError *apperror.Error
 	if errors.As(err, &appError) {

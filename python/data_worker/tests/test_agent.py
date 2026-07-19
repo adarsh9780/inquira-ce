@@ -117,7 +117,7 @@ def test_agent_uses_structured_conversation_context_as_untrusted_history(tmp_pat
                 "turn_id": "turn-1", "user_text": "Which region leads?",
                 "assistant_text": "West leads.", "code": "result = regional_sales",
                 "result_kind": "dataframe", "result": {"columns": ["region", "sales"]},
-                "artifacts": [{"kind": "dataframe", "logical_name": "regional_sales", "display_name": "Regional sales", "payload_format": "parquet"}],
+                "artifacts": [{"kind": "dataframe", "logical_name": "regional_sales", "display_name": "Regional sales", "payload_format": "parquet", "source_path": "/private/history.parquet"}],
             }]},
         }, lambda _: None)
         generation_prompt = model.prompts[0][1]["content"]
@@ -125,7 +125,9 @@ def test_agent_uses_structured_conversation_context_as_untrusted_history(tmp_pat
         assert "Which region leads?" in generation_prompt
         assert "West leads." in generation_prompt
         assert "regional_sales" in generation_prompt
+        assert "/private/history.parquet" not in generation_prompt
         assert "untrusted" in model.prompts[0][0]["content"].lower()
+        assert "self-contained" in model.prompts[0][0]["content"].lower()
         assert "Which region leads?" in answer_prompt
 
     asyncio.run(scenario())
