@@ -52,9 +52,10 @@ func (g *WorkerGateway) Materialize(ctx context.Context, request MaterializeRequ
 
 func adapterParams(request AdapterRequest) map[string]any {
 	return map[string]any{
-		"adapter_kind": request.AdapterKind,
-		"source_path":  request.SourcePath,
-		"options":      request.Options,
+		"adapter_kind":     request.AdapterKind,
+		"source_path":      request.SourcePath,
+		"source_object_id": request.SourceObjectID,
+		"options":          request.Options,
 	}
 }
 

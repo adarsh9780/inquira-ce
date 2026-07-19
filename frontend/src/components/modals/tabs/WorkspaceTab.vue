@@ -215,7 +215,7 @@
               <div class="flex items-start justify-between gap-4">
                 <div>
                   <h4 class="section-label">Connections</h4>
-                  <p class="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">Create refreshable local snapshots from CSV and Parquet files.</p>
+                  <p class="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">Create refreshable local snapshots from CSV, Parquet, and Excel files.</p>
                 </div>
                 <button type="button" class="btn-primary px-3 py-1.5 text-xs" :disabled="connectionActionLoading || !isWorkspaceActive || !nativeRuntimeStatus.ready" @click="chooseConnectionFile">
                   Add connection
@@ -228,7 +228,7 @@
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
                     <p class="truncate text-xs font-semibold text-[var(--color-text-main)]">{{ pendingConnection.source_path }}</p>
-                    <p class="mt-1 text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">{{ pendingConnection.adapter_kind === 'csv' ? 'CSV' : 'Parquet' }} · {{ pendingConnection.columns.length }} columns</p>
+                    <p class="mt-1 text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">{{ adapterKindLabel(pendingConnection.adapter_kind) }} · {{ pendingConnection.objects.length }} {{ pendingConnection.adapter_kind === 'excel' ? 'sheets' : 'table' }}</p>
                   </div>
                   <button type="button" class="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]" :disabled="connectionActionLoading" @click="cancelPendingConnection">Cancel</button>
                 </div>
@@ -236,6 +236,28 @@
                   <span class="input-label">Connection name</span>
                   <input v-model="pendingConnection.name" class="input-base input-outlined" maxlength="120" :disabled="connectionActionLoading" />
                 </label>
+                <div v-if="pendingConnection.adapter_kind === 'excel'" class="space-y-2">
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="input-label">Select sheets</span>
+                    <label class="flex items-center gap-2 text-[10px] text-[var(--color-text-muted)]">
+                      Formula values
+                      <select v-model="pendingConnection.formula_mode" class="rounded border border-[var(--color-border)] bg-[var(--color-base)] px-2 py-1" :disabled="connectionActionLoading" @change="previewPendingSheet(pendingConnection.active_object_id)">
+                        <option value="cached">Last saved values</option>
+                        <option value="formula">Formula text</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="grid gap-2 sm:grid-cols-2">
+                    <label v-for="object in pendingConnection.objects" :key="object.id" class="flex items-start gap-2 rounded-lg border p-2" :class="object.id === pendingConnection.active_object_id ? 'border-[var(--color-accent)]' : 'border-[var(--color-border)]'">
+                      <input v-model="pendingConnection.selected_object_ids" type="checkbox" :value="object.id" :disabled="connectionActionLoading || object.metadata?.selectable === false" />
+                      <span class="min-w-0 flex-1">
+                        <span class="block truncate text-xs font-medium text-[var(--color-text-main)]">{{ object.name }}</span>
+                        <span class="block text-[10px] text-[var(--color-text-muted)]">{{ object.metadata?.visibility || 'visible' }} · {{ Number(object.metadata?.row_count || 0).toLocaleString() }} rows · {{ Number(object.metadata?.column_count || 0) }} columns</span>
+                      </span>
+                      <button v-if="object.metadata?.selectable !== false" type="button" class="text-[10px] font-medium text-[var(--color-accent)] hover:underline" :disabled="connectionActionLoading" @click.prevent="previewPendingSheet(object.id)">Preview</button>
+                    </label>
+                  </div>
+                </div>
                 <div class="flex flex-wrap gap-1.5">
                   <span v-for="column in pendingConnection.columns" :key="column.name" class="rounded-full bg-[var(--color-base-soft)] px-2 py-1 text-[10px] text-[var(--color-text-muted)]">
                     {{ column.name }} · {{ column.data_type }}
@@ -250,7 +272,7 @@
                   </div>
                 </div>
                 <div class="flex justify-end">
-                  <button type="button" class="btn-primary px-4 py-1.5 text-xs" :disabled="connectionActionLoading || !pendingConnection.name.trim()" @click="createPendingConnection">
+                  <button type="button" class="btn-primary px-4 py-1.5 text-xs" :disabled="connectionActionLoading || !pendingConnection.name.trim() || !pendingConnection.selected_object_ids.length" @click="createPendingConnection">
                     {{ connectionActionLoading ? 'Creating snapshot…' : 'Create connection' }}
                   </button>
                 </div>
@@ -263,7 +285,7 @@
                   <div class="min-w-0">
                     <div class="flex items-center gap-2">
                       <p class="truncate text-xs font-semibold text-[var(--color-text-main)]">{{ item.name }}</p>
-                      <span class="rounded-full px-2 py-0.5 text-[9px]" :class="item.status === 'error' ? 'bg-[var(--color-danger-bg)] text-[var(--color-danger-text)]' : 'bg-[var(--color-success-bg)] text-[var(--color-success)]'">{{ item.status }}</span>
+                      <span class="rounded-full px-2 py-0.5 text-[9px]" :class="['error', 'needs_attention'].includes(item.status) ? 'bg-[var(--color-danger-bg)] text-[var(--color-danger-text)]' : 'bg-[var(--color-success-bg)] text-[var(--color-success)]'">{{ item.status === 'needs_attention' ? 'needs attention' : item.status }}</span>
                     </div>
                     <p class="mt-1 truncate text-[10px] text-[var(--color-text-muted)]">{{ item.source_path }}</p>
                     <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">{{ connectionOutputSummary(item) }}</p>
@@ -278,7 +300,7 @@
             </section>
             <div v-else-if="!pendingConnection && !connectionActionLoading" class="rounded-lg border border-dashed border-[var(--color-border)] py-8 text-center">
               <p class="text-xs font-medium text-[var(--color-text-main)]">No connections yet</p>
-              <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">Start with a local CSV or Parquet file.</p>
+              <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">Start with a local CSV, Parquet, or Excel file.</p>
             </div>
           </div>
 
@@ -730,7 +752,7 @@ async function provisionDataRuntime() {
     runtimeConfig.value.httpProxy = ''
     runtimeConfig.value.httpsProxy = ''
     runtimeConfig.value.noProxy = ''
-    toast.success('Data runtime ready', 'CSV and Parquet connections can now be created.')
+    toast.success('Data runtime ready', 'CSV, Parquet, and Excel connections can now be created.')
   } catch (error) {
     connectionError.value = extractApiErrorMessage(error, 'Could not set up the data runtime.')
   } finally {
@@ -761,21 +783,52 @@ async function chooseConnectionFile() {
     const sourcePath = String(selection?.source_path || '').trim()
     const adapterKind = String(selection?.adapter_kind || '').trim().toLowerCase()
     if (!sourcePath || !adapterKind) return
-    const [discovery, preview] = await Promise.all([
-      connectionService.discover(adapterKind, sourcePath),
-      connectionService.preview(adapterKind, sourcePath, 25),
-    ])
-    const sourceObject = discovery?.objects?.[0] || {}
+    const discovery = await connectionService.discover(adapterKind, sourcePath)
+    const objects = Array.isArray(discovery?.objects) ? discovery.objects : []
+    const selectableObjects = objects.filter((object) => object?.metadata?.selectable !== false)
+    const sourceObject = selectableObjects[0] || objects[0] || {}
+    const sourceObjectId = adapterKind === 'excel' ? String(sourceObject?.id || '') : ''
+    const options = adapterKind === 'excel' ? { formula_mode: 'cached' } : {}
+    const preview = sourceObjectId || adapterKind !== 'excel'
+      ? await connectionService.preview(adapterKind, sourcePath, sourceObjectId, 25, options)
+      : { columns: [], rows: [] }
     pendingConnection.value = {
       source_path: sourcePath,
       adapter_kind: adapterKind,
       name: String(sourceObject?.name || formatFilename(sourcePath) || 'Local connection').trim(),
-      selected_object_ids: [String(sourceObject?.id || 'file')],
+      objects,
+      selected_object_ids: sourceObject?.metadata?.selectable === false ? [] : [String(sourceObject?.id || 'file')],
+      active_object_id: String(sourceObject?.id || ''),
+      formula_mode: 'cached',
       columns: Array.isArray(preview?.columns) ? preview.columns : (sourceObject?.columns || []),
       preview_rows: Array.isArray(preview?.rows) ? preview.rows : [],
     }
   } catch (error) {
     connectionError.value = extractApiErrorMessage(error, 'Could not inspect the selected file.')
+  } finally {
+    connectionActionLoading.value = false
+  }
+}
+
+async function previewPendingSheet(source_object_id) {
+  const pending = pendingConnection.value
+  if (!pending || !source_object_id || connectionActionLoading.value) return
+  connectionError.value = ''
+  connectionActionLoading.value = true
+  try {
+    const options = pending.adapter_kind === 'excel' ? { formula_mode: pending.formula_mode } : {}
+    const preview = await connectionService.preview(
+      pending.adapter_kind,
+      pending.source_path,
+      source_object_id,
+      25,
+      options,
+    )
+    pending.active_object_id = source_object_id
+    pending.columns = Array.isArray(preview?.columns) ? preview.columns : []
+    pending.preview_rows = Array.isArray(preview?.rows) ? preview.rows : []
+  } catch (error) {
+    connectionError.value = extractApiErrorMessage(error, 'Could not preview the selected sheet.')
   } finally {
     connectionActionLoading.value = false
   }
@@ -800,7 +853,7 @@ async function createPendingConnection() {
       adapter_kind: pending.adapter_kind,
       source_path: pending.source_path,
       selected_object_ids: pending.selected_object_ids,
-      options: {},
+      options: pending.adapter_kind === 'excel' ? { formula_mode: pending.formula_mode } : {},
     })
     pendingConnection.value = null
     await loadNativeConnections()
@@ -848,7 +901,13 @@ async function deleteNativeConnection(connectionId) {
 function connectionOutputSummary(connection) {
   const outputs = Array.isArray(connection?.outputs) ? connection.outputs : []
   const rows = outputs.reduce((total, output) => total + Number(output?.row_count || 0), 0)
-  return `${connection?.adapter_kind === 'csv' ? 'CSV' : 'Parquet'} · ${outputs.length} table${outputs.length === 1 ? '' : 's'} · ${rows.toLocaleString()} rows`
+  return `${adapterKindLabel(connection?.adapter_kind)} · ${outputs.length} table${outputs.length === 1 ? '' : 's'} · ${rows.toLocaleString()} rows`
+}
+
+function adapterKindLabel(kind) {
+  if (kind === 'csv') return 'CSV'
+  if (kind === 'excel') return 'Excel'
+  return 'Parquet'
 }
 
 onUnmounted(() => {

@@ -25,6 +25,7 @@ type repository interface {
 	ReplaceSnapshot(context.Context, Connection) error
 	MarkRefreshing(context.Context, string, string) error
 	MarkReady(context.Context, string, string) error
+	MarkNeedsAttention(context.Context, string, string, string) error
 	MarkError(context.Context, string, string, string) error
 	Delete(context.Context, string) error
 	Close() error
@@ -65,7 +66,8 @@ func (s *Service) Preview(ctx context.Context, request PreviewRequest) (Preview,
 		return Preview{}, err
 	}
 	preview, err := s.gateway.Preview(ctx, AdapterRequest{
-		AdapterKind: request.AdapterKind, SourcePath: sourcePath, Options: request.Options,
+		AdapterKind: request.AdapterKind, SourcePath: sourcePath,
+		SourceObjectID: strings.TrimSpace(request.SourceObjectID), Options: request.Options,
 	}, request.Limit)
 	if err != nil {
 		return Preview{}, apperror.Wrap("connection_preview_failed", "Could not preview the selected source.", err)
@@ -161,6 +163,11 @@ func (s *Service) Refresh(ctx context.Context, connectionID string) (Connection,
 			return Connection{}, apperror.Wrap("connection_refresh_failed", "Could not finish the refresh.", err)
 		}
 		return s.Get(ctx, id)
+	}
+	if missing := missingSelectedObjects(discovery.Objects, connection.SelectedObjectIDs); len(missing) > 0 {
+		message := "A selected source object no longer exists. Recreate the connection to choose its replacement."
+		_ = s.repository.MarkNeedsAttention(ctx, id, message, attemptedAt)
+		return Connection{}, apperror.New("connection_needs_attention", message)
 	}
 	snapshotID := uuid.NewString()
 	staging, final := s.snapshotPaths(connection.WorkspaceID, connection.ID, snapshotID)
@@ -331,7 +338,7 @@ func validateName(value string) (string, string, error) {
 
 func validateSource(kind AdapterKind, value string) (string, error) {
 	if !supportedAdapter(kind) {
-		return "", apperror.New("adapter_not_supported", "Only CSV and Parquet connections are supported right now.")
+		return "", apperror.New("adapter_not_supported", "Only CSV, Parquet, and XLSX connections are supported right now.")
 	}
 	path := strings.TrimSpace(value)
 	if path == "" {
@@ -359,6 +366,20 @@ func validateSource(kind AdapterKind, value string) (string, error) {
 		return "", apperror.Wrap("source_invalid", "Could not resolve the source file.", err)
 	}
 	return resolved, nil
+}
+
+func missingSelectedObjects(objects []SourceObject, selected []string) []string {
+	available := make(map[string]bool, len(objects))
+	for _, object := range objects {
+		available[strings.TrimSpace(object.ID)] = true
+	}
+	missing := make([]string, 0)
+	for _, id := range selected {
+		if !available[id] {
+			missing = append(missing, id)
+		}
+	}
+	return missing
 }
 
 func validateSelection(values []string) ([]string, error) {

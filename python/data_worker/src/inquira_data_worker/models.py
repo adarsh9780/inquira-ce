@@ -19,11 +19,13 @@ class SourceObject:
     name: str
     kind: str
     columns: list[Column] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class AdapterRequest:
     source_path: str
+    source_object_id: str = ""
     options: dict[str, Any] = field(default_factory=dict)
 
 

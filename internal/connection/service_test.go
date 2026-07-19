@@ -27,10 +27,14 @@ type fakeGateway struct {
 	materializeContinue chan struct{}
 }
 
-func (f *fakeGateway) Discover(context.Context, AdapterRequest) (Discovery, error) {
+func (f *fakeGateway) Discover(_ context.Context, request AdapterRequest) (Discovery, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.discovery, f.discoverErr
+	result := f.discovery
+	if result.Objects == nil && (request.AdapterKind == AdapterCSV || request.AdapterKind == AdapterParquet) {
+		result.Objects = []SourceObject{{ID: "file", Name: "file", Kind: "table"}}
+	}
+	return result, f.discoverErr
 }
 
 func (f *fakeGateway) Preview(_ context.Context, request AdapterRequest, _ int) (Preview, error) {

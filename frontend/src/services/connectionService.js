@@ -42,13 +42,14 @@ export const connectionService = {
     return nativeOnly()
   },
 
-  preview(adapterKind, sourcePath, limit = 25, options = {}) {
+  preview(adapterKind, sourcePath, sourceObjectId = '', limit = 25, options = {}) {
     if (this.isNative()) {
       const request = {
         adapter_kind: String(adapterKind || ''),
         source_path: String(sourcePath || ''),
         limit: Number(limit || 25),
       }
+      if (sourceObjectId) request.source_object_id = String(sourceObjectId)
       if (options && Object.keys(options).length) request.options = options
       return callWails('PreviewLocalConnection', request)
     }

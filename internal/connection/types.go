@@ -14,9 +14,10 @@ const (
 type Status string
 
 const (
-	StatusReady      Status = "ready"
-	StatusRefreshing Status = "refreshing"
-	StatusError      Status = "error"
+	StatusReady          Status = "ready"
+	StatusRefreshing     Status = "refreshing"
+	StatusNeedsAttention Status = "needs_attention"
+	StatusError          Status = "error"
 )
 
 type Column struct {
@@ -26,16 +27,18 @@ type Column struct {
 }
 
 type SourceObject struct {
-	ID      string   `json:"id"`
-	Name    string   `json:"name"`
-	Kind    string   `json:"kind"`
-	Columns []Column `json:"columns"`
+	ID       string         `json:"id"`
+	Name     string         `json:"name"`
+	Kind     string         `json:"kind"`
+	Columns  []Column       `json:"columns"`
+	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
 type AdapterRequest struct {
-	AdapterKind AdapterKind    `json:"adapter_kind"`
-	SourcePath  string         `json:"source_path"`
-	Options     map[string]any `json:"options,omitempty"`
+	AdapterKind    AdapterKind    `json:"adapter_kind"`
+	SourcePath     string         `json:"source_path"`
+	SourceObjectID string         `json:"source_object_id,omitempty"`
+	Options        map[string]any `json:"options,omitempty"`
 }
 
 type Discovery struct {
@@ -130,10 +133,11 @@ type DiscoverRequest struct {
 }
 
 type PreviewRequest struct {
-	AdapterKind AdapterKind    `json:"adapter_kind"`
-	SourcePath  string         `json:"source_path"`
-	Limit       int            `json:"limit"`
-	Options     map[string]any `json:"options,omitempty"`
+	AdapterKind    AdapterKind    `json:"adapter_kind"`
+	SourcePath     string         `json:"source_path"`
+	SourceObjectID string         `json:"source_object_id,omitempty"`
+	Limit          int            `json:"limit"`
+	Options        map[string]any `json:"options,omitempty"`
 }
 
 type DeleteResult struct {

@@ -232,3 +232,32 @@ def test_excel_fingerprint_changes_when_any_sheet_changes(tmp_path: Path) -> Non
     workbook.save(path)
     workbook.close()
     assert adapter.discover(AdapterRequest(source_path=str(path))).fingerprint != first
+
+
+def test_excel_materialization_rejects_a_workbook_changed_during_inspection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import inquira_data_worker.adapters.excel as excel_module
+
+    path = tmp_path / "changing.xlsx"
+    write_workbook(path)
+    original = excel_module._analyse_sheet
+    changed = False
+
+    def analyse_and_change(sheet):
+        nonlocal changed
+        result = original(sheet)
+        if not changed:
+            with path.open("ab") as handle:
+                handle.write(b"changed-during-inspection")
+            changed = True
+        return result
+
+    monkeypatch.setattr(excel_module, "_analyse_sheet", analyse_and_change)
+    with pytest.raises(AdapterError, match="changed"):
+        get_adapter("excel").materialize(MaterializeRequest(
+            source_path=str(path),
+            target_dir=str(tmp_path / "changed-output"),
+            selected_object_ids=[sheet_id("Sales 2026")],
+        ))

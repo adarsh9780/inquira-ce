@@ -34,11 +34,14 @@ unique, and deleting the active workspace selects a remaining workspace. The
 browser/Tauri build retains its Python HTTP fallback.
 
 Local data now starts with refreshable connections rather than uploads. The
-first adapters support CSV and Parquet files through a shared discover,
+first adapters support CSV, Parquet, and modern Excel (`.xlsx`) files through a shared discover,
 preview, materialize, refresh, and status contract. Go owns connection metadata
 and atomic snapshot publication; the bundled Python worker uses DuckDB to write
 canonical Parquet snapshots without an application row or memory cap. Preview
-limits do not limit materialization.
+limits do not limit materialization. Excel discovery exposes every sheet and
+its visibility, dimensions, and inferred schema. Users explicitly select one
+or more sheets, and each selection becomes its own Parquet output. Cached
+formula values are the default, with formula text available as an option.
 
 A fresh installation asks the user to configure the data runtime before any
 download. Managed Python, a company-provided Python executable, and internal
@@ -46,10 +49,11 @@ Python/package mirrors are supported. Proxy, bypass, index, and system
 certificate settings are passed only to that setup run and are not saved by
 Inquira.
 
-Excel and SQLite adapters are intentionally next: both will use discovery plus
-explicit sheet/table selection and may produce multiple outputs from one
-connection. Conversations, analysis runtimes, and workspace-specific AI
-overrides remain outside the current migration slice.
+Legacy `.xls` files are not accepted because the streaming reader supports the
+modern Office Open XML format only. SQLite is the next planned adapter and will
+reuse the same discovery, explicit table selection, and multi-output contract.
+Conversations, analysis runtimes, and workspace-specific AI overrides remain
+outside the current migration slice.
 
 ## Runtime modes
 

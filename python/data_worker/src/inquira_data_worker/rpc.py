@@ -37,7 +37,11 @@ def handle_request(request: dict[str, Any]) -> dict[str, Any]:
             limit = params.get("limit", 100)
             if not isinstance(limit, int):
                 raise AdapterError("invalid_params", "Preview limit must be an integer.")
-            value = adapter.preview(AdapterRequest(source_path=source_path, options=params.get("options") or {}), limit)
+            value = adapter.preview(AdapterRequest(
+                source_path=source_path,
+                source_object_id=str(params.get("source_object_id") or ""),
+                options=params.get("options") or {},
+            ), limit)
         else:
             selected = params.get("selected_object_ids")
             target_dir = params.get("target_dir")

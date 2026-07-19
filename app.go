@@ -316,9 +316,10 @@ func (a *App) ChooseLocalConnectionFile() (LocalConnectionFileSelection, error) 
 	path, err := runtime.OpenFileDialog(a.appContext(), runtime.OpenDialogOptions{
 		Title: "Choose a local data source",
 		Filters: []runtime.FileFilter{
-			{DisplayName: "CSV or Parquet", Pattern: "*.csv;*.CSV;*.parquet;*.PARQUET"},
+			{DisplayName: "CSV, Parquet, or Excel", Pattern: "*.csv;*.CSV;*.parquet;*.PARQUET;*.xlsx;*.XLSX"},
 			{DisplayName: "CSV", Pattern: "*.csv;*.CSV"},
 			{DisplayName: "Parquet", Pattern: "*.parquet;*.PARQUET"},
+			{DisplayName: "Excel workbook", Pattern: "*.xlsx;*.XLSX"},
 		},
 	})
 	if err != nil || path == "" {

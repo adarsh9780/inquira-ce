@@ -225,6 +225,17 @@ func (r *SQLiteRepository) MarkRefreshing(ctx context.Context, id, timestamp str
 	return err
 }
 
+func (r *SQLiteRepository) MarkNeedsAttention(ctx context.Context, id, message, timestamp string) error {
+	result, err := r.db.ExecContext(ctx, `UPDATE connections SET status = ?, error_message = ?,
+		updated_at = ?, last_refresh_attempt_at = ? WHERE id = ?`, StatusNeedsAttention, message, timestamp, timestamp, id)
+	if err == nil {
+		if affected, _ := result.RowsAffected(); affected == 0 {
+			return errNotFound
+		}
+	}
+	return err
+}
+
 func (r *SQLiteRepository) MarkError(ctx context.Context, id, message, timestamp string) error {
 	result, err := r.db.ExecContext(ctx, `UPDATE connections SET status = ?, error_message = ?,
 		updated_at = ?, last_refresh_attempt_at = ? WHERE id = ?`, StatusError, message, timestamp, timestamp, id)
