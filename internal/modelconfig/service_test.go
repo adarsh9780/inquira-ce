@@ -2,6 +2,7 @@ package modelconfig
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -249,6 +250,38 @@ func TestRefreshErrorDoesNotExposeTransportDetails(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "very-sensitive") {
 		t.Fatalf("transport details leaked across UI boundary: %v", err)
+	}
+}
+
+func TestRuntimeConfigurationReadsSelectedModelAndKeyWithoutExposingItInPreferences(t *testing.T) {
+	repository, err := OpenSQLite(filepath.Join(t.TempDir(), "inquira.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	secrets := &memorySecrets{values: map[string]string{"openai": "runtime-secret"}}
+	service := NewService(repository, secrets, roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return response(http.StatusOK, `{}`), nil
+	}))
+	defer service.Close()
+	provider := "openai"
+	model := "gpt-4.1"
+	if _, err := service.UpdatePreferences(context.Background(), UpdateRequest{LLMProvider: &provider, SelectedCodingModel: &model}); err != nil {
+		t.Fatal(err)
+	}
+	runtimeConfig, err := service.RuntimeConfiguration(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtimeConfig.Provider != "openai" || runtimeConfig.Model != model || runtimeConfig.APIKey != "runtime-secret" {
+		t.Fatalf("runtime configuration = %#v", runtimeConfig)
+	}
+	preferences, err := service.GetPreferences(context.Background(), "openai")
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, _ := json.Marshal(preferences)
+	if strings.Contains(string(encoded), "runtime-secret") {
+		t.Fatalf("preferences leaked runtime key: %s", encoded)
 	}
 }
 
