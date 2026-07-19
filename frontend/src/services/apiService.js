@@ -115,6 +115,22 @@ function normalizeNativeAnalysis(raw) {
   }
 }
 
+function normalizeNativeManualExecution(raw) {
+  const execution = raw?.execution && typeof raw.execution === 'object' ? { ...raw.execution } : {}
+  execution.artifacts = (Array.isArray(execution.artifacts) ? execution.artifacts : []).map((artifact) => ({
+    ...artifact,
+    artifact_id: String(artifact?.artifact_id || artifact?.id || ''),
+  }))
+  if (String(execution.result_kind || '').toLowerCase() === 'dataframe' && execution.result && Array.isArray(execution.result.rows)) {
+    execution.result = { ...execution.result, data: execution.result.rows }
+  }
+  return {
+    ...normalizeExecutionResponse(execution),
+    conversation_id: String(raw?.conversation?.id || ''),
+    turn_id: String(raw?.turn?.id || ''),
+  }
+}
+
 async function nativeAnalyze(payload, { signal = null, onEvent = null } = {}) {
   const app = nativeWailsApp()
   if (!app || typeof app.AnalyzeQuestion !== 'function') return null
@@ -565,6 +581,19 @@ export const apiService = {
     const persistToTurn = options?.persistToTurn !== false
     const resultMode = options?.resultMode === 'jupyter' ? 'jupyter' : 'auto'
     console.debug('🚀 [API] Executing code...', { timeout, persistToTurn, resultMode })
+    const app = nativeWailsApp()
+    if (app?.RunManualCode) {
+      const conversationId = String(appStore.activeConversationId || '')
+      const parentTurnId = conversationId ? String(appStore.activeTurnId || '') : ''
+      const raw = await app.RunManualCode({
+        workspace_id: String(activeWorkspaceId),
+        conversation_id: conversationId,
+        parent_turn_id: parentTurnId || null,
+        code: String(code || ''),
+        timeout_seconds: Number(timeout || 60),
+      })
+      return normalizeNativeManualExecution(raw)
+    }
     const response = await authorizedFetch(
       `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${activeWorkspaceId}/execute`,
       {
@@ -916,18 +945,26 @@ export const apiService = {
 
   // V1 Workspace APIs
   async v1ListWorkspaces() {
+    const app = nativeWailsApp()
+    if (app?.ListWorkspaces) return app.ListWorkspaces()
     return v1Api.workspaces.list()
   },
 
   async v1CreateWorkspace(name, schemaContext = '') {
+    const app = nativeWailsApp()
+    if (app?.CreateWorkspace) return app.CreateWorkspace({ name: String(name || ''), schema_context: String(schemaContext || '') })
     return v1Api.workspaces.create(name, schemaContext)
   },
 
   async v1ActivateWorkspace(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.ActivateWorkspace) return app.ActivateWorkspace(String(workspaceId || ''))
     return v1Api.workspaces.activate(workspaceId)
   },
 
   async v1GetWorkspaceSummary(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.GetWorkspaceSummary) return app.GetWorkspaceSummary(String(workspaceId || ''))
     return v1Api.workspaces.summary(workspaceId)
   },
 
@@ -944,6 +981,19 @@ export const apiService = {
   },
 
   async v1RenameWorkspace(workspaceId, name, schemaContext = undefined) {
+    const app = nativeWailsApp()
+    if (app?.UpdateWorkspace) {
+      let resolvedName = String(name || '').trim()
+      if (!resolvedName && app.GetWorkspaceSummary) {
+        const summary = await app.GetWorkspaceSummary(String(workspaceId || ''))
+        resolvedName = String(summary?.name || '').trim()
+      }
+      return app.UpdateWorkspace({
+        workspace_id: String(workspaceId || ''),
+        name: resolvedName,
+        ...(schemaContext === undefined ? {} : { schema_context: String(schemaContext || '') }),
+      })
+    }
     return v1Api.workspaces.rename(workspaceId, name, schemaContext)
   },
 
@@ -952,6 +1002,8 @@ export const apiService = {
   },
 
   async v1DeleteWorkspace(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.DeleteWorkspace) return app.DeleteWorkspace(String(workspaceId || ''))
     return v1Api.workspaces.remove(workspaceId)
   },
 
@@ -964,6 +1016,8 @@ export const apiService = {
   },
 
   async v1ListDatasets(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.ListWorkspaceDatasets) return app.ListWorkspaceDatasets(String(workspaceId || ''))
     return v1Api.datasets.list(workspaceId)
   },
 
@@ -1010,10 +1064,14 @@ export const apiService = {
   },
 
   async v1GetWorkspacePaths(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.GetWorkspacePaths) return app.GetWorkspacePaths(String(workspaceId || ''))
     return axios.get(`/api/v1/workspaces/${workspaceId}/paths`)
   },
 
-  async v1AddDataset(workspaceId, sourcePath) {
+  async v1AddDataset(workspaceId, sourcePath, tableName = '') {
+    const app = nativeWailsApp()
+    if (app?.SelectWorkspaceDataset) return app.SelectWorkspaceDataset(String(workspaceId || ''), String(sourcePath || ''), String(tableName || ''))
     return v1Api.datasets.add(workspaceId, sourcePath)
   },
 
@@ -1046,14 +1104,29 @@ export const apiService = {
   },
 
   async v1GetDatasetSchema(workspaceId, tableName) {
+    const app = nativeWailsApp()
+    if (app?.GetWorkspaceDatasetSchema) return app.GetWorkspaceDatasetSchema(String(workspaceId || ''), String(tableName || ''))
     return axios.get(`/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema`)
   },
 
   async v1SaveDatasetSchema(workspaceId, tableName, payload) {
+    const app = nativeWailsApp()
+    if (app?.SaveWorkspaceDatasetSchema) {
+      return app.SaveWorkspaceDatasetSchema({
+        workspace_id: String(workspaceId || ''),
+        table_name: String(tableName || ''),
+        ...(Object.prototype.hasOwnProperty.call(payload || {}, 'context') ? { context: String(payload?.context || '') } : {}),
+        columns: Array.isArray(payload?.columns) ? payload.columns : [],
+      })
+    }
     return axios.post(`/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema`, payload)
   },
 
   async v1RegenerateDatasetSchema(workspaceId, tableName, payload = {}) {
+    const app = nativeWailsApp()
+    if (app?.GetWorkspaceDatasetSchema) {
+      throw new Error('AI schema regeneration has not been migrated to the native app yet. Column descriptions can be edited and saved manually.')
+    }
     return axios.post(
       `/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema/regenerate`,
       payload
@@ -1226,6 +1299,8 @@ export const apiService = {
   },
 
   async v1GetWorkspaceColumns(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.ListWorkspaceColumns) return app.ListWorkspaceColumns(String(workspaceId || ''))
     return v1Api.runtime.workspaceColumns(workspaceId)
   },
 
@@ -1238,34 +1313,71 @@ export const apiService = {
   },
 
   async v1BootstrapWorkspaceRuntime(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.PrepareWorkspaceCatalog) {
+      await app.PrepareWorkspaceCatalog(String(workspaceId || ''))
+      return { reset: true, status: 'ready' }
+    }
     return v1Api.runtime.bootstrapWorkspaceRuntime(workspaceId)
   },
 
   async v1RetryWorkspaceRuntime(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.ResetWorkspaceKernel && app?.PrepareWorkspaceCatalog) {
+      await app.ResetWorkspaceKernel(String(workspaceId || ''))
+      await app.PrepareWorkspaceCatalog(String(workspaceId || ''))
+      return { reset: true, status: 'ready' }
+    }
     return v1Api.runtime.retryWorkspaceRuntime(workspaceId)
   },
 
   async v1HardResetWorkspaceRuntime(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.ResetWorkspaceKernel && app?.PrepareWorkspaceCatalog) {
+      await app.ResetWorkspaceKernel(String(workspaceId || ''))
+      await app.PrepareWorkspaceCatalog(String(workspaceId || ''))
+      return { reset: true, status: 'ready' }
+    }
     return v1Api.runtime.hardResetWorkspaceRuntime(workspaceId)
   },
 
   async v1GetWorkspaceResourceRecommendation() {
+    const app = nativeWailsApp()
+    if (app?.RuntimeStatus) return { enabled: false, candidates: [] }
     return v1Api.runtime.workspaceResourceRecommendation()
   },
 
   async v1GetWorkspaceRuntimeStatus(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.RuntimeStatus && app?.GetWorkspaceKernelStatus) {
+      const provision = await app.RuntimeStatus()
+      if (!provision?.ready && !provision?.Ready) return { status: 'error' }
+      const kernel = await app.GetWorkspaceKernelStatus(String(workspaceId || ''))
+      const status = String(kernel?.status || '').toLowerCase()
+      return { status: ['running', 'busy'].includes(status) ? 'busy' : 'ready' }
+    }
     return v1Api.runtime.workspaceRuntimeStatus(workspaceId)
   },
 
   async v1InterruptWorkspaceRuntime(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.InterruptWorkspaceKernel) return { interrupted: await app.InterruptWorkspaceKernel(String(workspaceId || '')) }
     return v1Api.runtime.workspaceRuntimeInterrupt(workspaceId)
   },
 
   async v1ResetWorkspaceRuntime(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.ResetWorkspaceKernel) return { reset: await app.ResetWorkspaceKernel(String(workspaceId || '')) }
     return v1Api.runtime.workspaceRuntimeReset(workspaceId)
   },
 
   async v1RestartWorkspaceRuntime(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.ResetWorkspaceKernel && app?.PrepareWorkspaceCatalog) {
+      await app.ResetWorkspaceKernel(String(workspaceId || ''))
+      await app.PrepareWorkspaceCatalog(String(workspaceId || ''))
+      return { reset: true, status: 'ready' }
+    }
     return v1Api.runtime.workspaceRuntimeRestart(workspaceId)
   },
 

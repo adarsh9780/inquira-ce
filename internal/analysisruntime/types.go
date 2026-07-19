@@ -53,6 +53,7 @@ type WorkerEvent struct {
 }
 
 type ExecuteResult struct {
+	RunID      string                  `json:"run_id"`
 	Success    bool                    `json:"success"`
 	Stdout     string                  `json:"stdout"`
 	Stderr     string                  `json:"stderr"`

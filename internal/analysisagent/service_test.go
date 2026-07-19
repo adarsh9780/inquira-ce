@@ -101,7 +101,12 @@ func newAgentService(t *testing.T, gateway *fakeAgentGateway) (*Service, *conver
 	runs := &fakeRuns{directory: filepath.Join(root, "staging"), artifacts: []conversation.Artifact{{ID: "artifact-1"}}}
 	service := NewService(
 		conversations,
-		&fakeCatalogSource{catalog: datacatalog.Catalog{WorkspaceID: createdWorkspace.ID, DatabasePath: catalogPath}},
+		&fakeCatalogSource{catalog: datacatalog.Catalog{
+			WorkspaceID: createdWorkspace.ID, DatabasePath: catalogPath,
+			AnalysisSchema: datacatalog.AnalysisSchema{Context: "Revenue reporting", Tables: []datacatalog.AnalysisTable{{
+				Name: "sales", Columns: []datacatalog.SchemaColumn{{Name: "amount", DataType: "DOUBLE", Description: "Booked revenue", Aliases: []string{"sales"}}},
+			}}},
+		}},
 		&fakeModelSource{config: modelconfig.RuntimeConfiguration{Provider: "openai", Model: "gpt-test", APIKey: "runtime-secret"}},
 		gateway,
 		runs,
@@ -133,6 +138,9 @@ func TestAnalyzeCreatesConversationExecutesAndPersistsTurn(t *testing.T) {
 	}
 	if gateway.request.Model.APIKey != "runtime-secret" || gateway.request.DatabasePath == "" || gateway.request.RunID != "run-1" {
 		t.Fatalf("worker request = %#v", gateway.request)
+	}
+	if gateway.request.Schema.Context != "Revenue reporting" || gateway.request.Schema.Tables[0].Columns[0].Description != "Booked revenue" {
+		t.Fatalf("semantic schema = %#v", gateway.request.Schema)
 	}
 	if !runs.cleaned || len(runs.candidates) != 1 || len(result.Artifacts) != 1 {
 		t.Fatalf("run state: cleaned=%v candidates=%#v result=%#v", runs.cleaned, runs.candidates, result.Artifacts)

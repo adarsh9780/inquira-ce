@@ -197,7 +197,7 @@ async function selectDataset(ds) {
     let selectedTableName = (ds.table_name || inferTableNameFromDataPath(ds.file_path || '')).trim()
 
     if (appStore.activeWorkspaceId && ds.file_path && !String(ds.file_path).startsWith('browser://')) {
-      const syncedDataset = await apiService.v1AddDataset(appStore.activeWorkspaceId, ds.file_path)
+      const syncedDataset = await apiService.v1AddDataset(appStore.activeWorkspaceId, ds.file_path, ds.table_name)
       selectedPath = syncedDataset?.source_path || selectedPath
       selectedTableName = (syncedDataset?.table_name || selectedTableName).trim()
     }

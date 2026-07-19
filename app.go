@@ -14,6 +14,7 @@ import (
 	"inquira-go/internal/connection"
 	"inquira-go/internal/conversation"
 	"inquira-go/internal/datacatalog"
+	"inquira-go/internal/manualanalysis"
 	"inquira-go/internal/modelconfig"
 	"inquira-go/internal/netclient"
 	"inquira-go/internal/runtimeprovision"
@@ -33,6 +34,7 @@ type App struct {
 	conversations *conversation.Service
 	artifacts     *artifactbrowser.Service
 	analysis      *analysisruntime.Service
+	manual        *manualanalysis.Service
 	agent         *analysisagent.Service
 	worker        *workerruntime.PersistentTransport
 	catalog       *datacatalog.Service
@@ -102,12 +104,22 @@ func NewApp() *App {
 	app.connections = connection.NewService(
 		connectionRepository, connection.NewWorkerGateway(transport), filepath.Join(paths.DataDir, "snapshots"),
 	)
+	catalogRepository, err := datacatalog.OpenSQLite(paths.DatabasePath)
+	if err != nil {
+		_ = app.worker.Close()
+		_ = app.connections.Close()
+		_ = app.workspaces.Close()
+		_ = app.models.Close()
+		app.initErr = err
+		return app
+	}
 	app.catalog = datacatalog.NewService(
 		app.workspaces, app.connections, datacatalog.NewWorkerGateway(transport), filepath.Join(paths.DataDir, "workspaces"),
-	)
+	).WithSchemaRepository(catalogRepository)
 	conversationRepository, err := conversation.OpenSQLite(paths.DatabasePath)
 	if err != nil {
 		_ = app.worker.Close()
+		_ = app.catalog.Close()
 		_ = app.connections.Close()
 		_ = app.workspaces.Close()
 		_ = app.models.Close()
@@ -121,6 +133,7 @@ func NewApp() *App {
 	if _, err := app.conversations.ReconcileAll(context.Background()); err != nil {
 		_ = app.worker.Close()
 		_ = app.conversations.Close()
+		_ = app.catalog.Close()
 		_ = app.connections.Close()
 		_ = app.workspaces.Close()
 		_ = app.models.Close()
@@ -131,6 +144,7 @@ func NewApp() *App {
 		app.conversations, analysisruntime.NewWorkerGateway(transport),
 		filepath.Join(paths.DataDir, "workspaces"), filepath.Join(paths.DataDir, "execution-staging"),
 	)
+	app.manual = manualanalysis.NewService(app.conversations, app.catalog, app.analysis)
 	app.agent = analysisagent.NewService(
 		app.conversations, app.catalog, app.models, analysisagent.NewWorkerGateway(transport), app.analysis,
 	)
@@ -149,6 +163,9 @@ func (a *App) shutdown(context.Context) {
 	}
 	if a.conversations != nil {
 		_ = a.conversations.Close()
+	}
+	if a.catalog != nil {
+		_ = a.catalog.Close()
 	}
 	if a.connections != nil {
 		_ = a.connections.Close()
@@ -169,6 +186,16 @@ func (a *App) analysisService() (*analysisruntime.Service, error) {
 		return nil, apperror.New("analysis_unavailable", "Python analysis is unavailable.")
 	}
 	return a.analysis, nil
+}
+
+func (a *App) manualAnalysisService() (*manualanalysis.Service, error) {
+	if a.initErr != nil {
+		return nil, a.initErr
+	}
+	if a.manual == nil {
+		return nil, apperror.New("manual_analysis_unavailable", "Manual Python analysis is unavailable.")
+	}
+	return a.manual, nil
 }
 
 func (a *App) agentService() (*analysisagent.Service, error) {
@@ -347,11 +374,11 @@ func (a *App) UpdateWorkspace(request workspace.UpdateRequest) (workspace.Worksp
 }
 
 func (a *App) GetWorkspaceSummary(workspaceID string) (workspace.Summary, error) {
-	service, err := a.workspaceService()
+	service, err := a.catalogService()
 	if err != nil {
 		return workspace.Summary{}, err
 	}
-	return service.Summary(a.appContext(), workspaceID)
+	return service.SummarizeWorkspace(a.appContext(), workspaceID)
 }
 
 func (a *App) DeleteWorkspace(workspaceID string) (workspace.DeletionResult, error) {
@@ -618,6 +645,16 @@ func (a *App) ExecuteConversationCode(request analysisruntime.ExecuteRequest) (a
 	})
 }
 
+func (a *App) RunManualCode(request manualanalysis.RunRequest) (manualanalysis.RunResult, error) {
+	service, err := a.manualAnalysisService()
+	if err != nil {
+		return manualanalysis.RunResult{}, err
+	}
+	return service.Run(a.appContext(), request, func(event analysisruntime.WorkerEvent) {
+		runtime.EventsEmit(a.appContext(), "analysis-runtime-event", event)
+	})
+}
+
 func (a *App) AnalyzeQuestion(request analysisagent.AnalyzeRequest) (analysisagent.AnalyzeResult, error) {
 	service, err := a.agentService()
 	if err != nil {
@@ -658,6 +695,89 @@ func (a *App) PrepareWorkspaceCatalog(workspaceID string) (datacatalog.Catalog, 
 		return datacatalog.Catalog{}, err
 	}
 	return service.Prepare(a.appContext(), workspaceID)
+}
+
+func (a *App) ListWorkspaceDatasets(workspaceID string) (datacatalog.DatasetListResponse, error) {
+	service, err := a.catalogService()
+	if err != nil {
+		return datacatalog.DatasetListResponse{}, err
+	}
+	return service.ListDatasets(a.appContext(), workspaceID)
+}
+
+func (a *App) SelectWorkspaceDataset(workspaceID, sourcePath, tableName string) (datacatalog.Dataset, error) {
+	service, err := a.catalogService()
+	if err != nil {
+		return datacatalog.Dataset{}, err
+	}
+	return service.FindDataset(a.appContext(), workspaceID, sourcePath, tableName)
+}
+
+func (a *App) GetWorkspaceDatasetSchema(workspaceID, tableName string) (datacatalog.DatasetSchema, error) {
+	service, err := a.catalogService()
+	if err != nil {
+		return datacatalog.DatasetSchema{}, err
+	}
+	return service.GetSchema(a.appContext(), workspaceID, tableName)
+}
+
+func (a *App) SaveWorkspaceDatasetSchema(request datacatalog.SaveSchemaRequest) (datacatalog.DatasetSchema, error) {
+	catalogService, err := a.catalogService()
+	if err != nil {
+		return datacatalog.DatasetSchema{}, err
+	}
+	saved, err := catalogService.SaveSchema(a.appContext(), request)
+	if err != nil {
+		return datacatalog.DatasetSchema{}, err
+	}
+	if request.Context == nil {
+		return saved, nil
+	}
+	workspaceService, err := a.workspaceService()
+	if err != nil {
+		return datacatalog.DatasetSchema{}, err
+	}
+	summary, err := workspaceService.Summary(a.appContext(), request.WorkspaceID)
+	if err != nil {
+		return datacatalog.DatasetSchema{}, err
+	}
+	if _, err := workspaceService.Update(a.appContext(), workspace.UpdateRequest{
+		WorkspaceID: request.WorkspaceID, Name: summary.Name, SchemaContext: request.Context,
+	}); err != nil {
+		return datacatalog.DatasetSchema{}, err
+	}
+	return catalogService.GetSchema(a.appContext(), request.WorkspaceID, request.TableName)
+}
+
+func (a *App) ListWorkspaceColumns(workspaceID string) (datacatalog.WorkspaceColumnsResponse, error) {
+	service, err := a.catalogService()
+	if err != nil {
+		return datacatalog.WorkspaceColumnsResponse{}, err
+	}
+	return service.ListColumns(a.appContext(), workspaceID)
+}
+
+type WorkspacePaths struct {
+	WorkspaceDirectory string `json:"workspace_dir"`
+	DuckDBPath         string `json:"duckdb_path"`
+	TerminalEnabled    bool   `json:"terminal_enabled"`
+}
+
+func (a *App) GetWorkspacePaths(workspaceID string) (WorkspacePaths, error) {
+	service, err := a.workspaceService()
+	if err != nil {
+		return WorkspacePaths{}, err
+	}
+	summary, err := service.Summary(a.appContext(), workspaceID)
+	if err != nil {
+		return WorkspacePaths{}, err
+	}
+	directory := filepath.Join(a.paths.DataDir, "workspaces", summary.ID)
+	return WorkspacePaths{
+		WorkspaceDirectory: directory,
+		DuckDBPath:         filepath.Join(directory, "workspace.duckdb"),
+		TerminalEnabled:    false,
+	}, nil
 }
 
 func (a *App) ListConnections(workspaceID string) (connection.ListResponse, error) {

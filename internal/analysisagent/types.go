@@ -5,6 +5,7 @@ import (
 
 	"inquira-go/internal/analysisruntime"
 	"inquira-go/internal/conversation"
+	"inquira-go/internal/datacatalog"
 	"inquira-go/internal/modelconfig"
 )
 
@@ -25,6 +26,7 @@ type AgentWorkerRequest struct {
 	TimeoutSeconds    int                              `json:"timeout_seconds"`
 	Model             modelconfig.RuntimeConfiguration `json:"model"`
 	Context           ConversationContext              `json:"context"`
+	Schema            datacatalog.AnalysisSchema       `json:"schema"`
 }
 
 type ConversationContext struct {

@@ -137,7 +137,7 @@ func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func
 	workerResult, err := s.agent.Analyze(ctx, AgentWorkerRequest{
 		WorkspaceID: workspaceID, DatabasePath: catalog.DatabasePath, Question: question,
 		RunID: run.ID, ArtifactDirectory: run.StagingDirectory, TimeoutSeconds: request.TimeoutSeconds,
-		Model: model, Context: conversationContext,
+		Model: model, Context: conversationContext, Schema: catalog.AnalysisSchema,
 	}, forward)
 	if err != nil {
 		persistContext := ctx

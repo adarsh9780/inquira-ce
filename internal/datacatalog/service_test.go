@@ -3,8 +3,10 @@ package datacatalog
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -48,6 +50,24 @@ type fakeCatalogGateway struct {
 	started     chan struct{}
 	continueRun chan struct{}
 }
+
+type fakeSchemaRepository struct {
+	items map[string][]ColumnOverride
+}
+
+func (f *fakeSchemaRepository) List(_ context.Context, workspaceID, tableName string) ([]ColumnOverride, error) {
+	return append([]ColumnOverride(nil), f.items[workspaceID+"/"+tableName]...), nil
+}
+
+func (f *fakeSchemaRepository) Replace(_ context.Context, workspaceID, tableName string, items []ColumnOverride) error {
+	if f.items == nil {
+		f.items = map[string][]ColumnOverride{}
+	}
+	f.items[workspaceID+"/"+tableName] = append([]ColumnOverride(nil), items...)
+	return nil
+}
+
+func (f *fakeSchemaRepository) Close() error { return nil }
 
 func (f *fakeCatalogGateway) Build(_ context.Context, request BuildRequest) (BuildResult, error) {
 	f.mu.Lock()
@@ -203,5 +223,63 @@ func TestPrepareSerializesBuildsForTheSameWorkspace(t *testing.T) {
 	continueRun <- struct{}{}
 	if err := <-results; err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestNativeDatasetAndSchemaContractsHideSnapshotPointersAndPersistOverrides(t *testing.T) {
+	connections := connection.ListResponse{Connections: []connection.Connection{{
+		ID: "connection-1", WorkspaceID: "workspace-1", Name: "Sales", AdapterKind: connection.AdapterCSV,
+		SourcePath: "/user/sales.csv", Status: connection.StatusReady, CreatedAt: "created", UpdatedAt: "updated",
+		Outputs: []connection.Output{{SourceObjectID: "file", Name: "sales", SnapshotPath: snapshot(t, "sales"), RowCount: 3, Columns: []connection.Column{{Name: "region", DataType: "VARCHAR", Nullable: true}, {Name: "amount", DataType: "DOUBLE"}}}},
+	}}}
+	repository := &fakeSchemaRepository{}
+	service := NewService(fakeWorkspaces{summary: workspace.Summary{ID: "workspace-1", SchemaContext: "Business context"}}, fakeConnections{response: connections}, &fakeCatalogGateway{}, t.TempDir()).WithSchemaRepository(repository)
+
+	listed, err := service.ListDatasets(context.Background(), "workspace-1")
+	if err != nil || len(listed.Datasets) != 1 {
+		t.Fatalf("ListDatasets() = %#v, %v", listed, err)
+	}
+	dataset := listed.Datasets[0]
+	if dataset.TableName != "sales" || dataset.SourcePath != "/user/sales.csv" || dataset.FileType != "csv" || dataset.RowCount != 3 {
+		t.Fatalf("dataset = %#v", dataset)
+	}
+	encoded := fmt.Sprintf("%#v", dataset)
+	if strings.Contains(encoded, "snapshots") || strings.Contains(encoded, ".parquet") {
+		t.Fatalf("dataset leaked snapshot path: %s", encoded)
+	}
+	summary, err := service.SummarizeWorkspace(context.Background(), "workspace-1")
+	if err != nil || summary.TableCount != 1 || len(summary.TableNames) != 1 || summary.TableNames[0] != "sales" {
+		t.Fatalf("SummarizeWorkspace() = %#v, %v", summary, err)
+	}
+
+	saved, err := service.SaveSchema(context.Background(), SaveSchemaRequest{WorkspaceID: "workspace-1", TableName: "sales", Columns: []SchemaColumn{{Name: "region", Description: "Sales territory", Aliases: []string{"area"}}, {Name: "amount", Description: "Booked revenue"}}})
+	if err != nil || saved.Context != "Business context" || saved.Columns[0].DataType != "VARCHAR" || saved.Columns[0].Description != "Sales territory" || len(saved.Columns[0].Aliases) != 1 {
+		t.Fatalf("SaveSchema() = %#v, %v", saved, err)
+	}
+	loaded, err := service.GetSchema(context.Background(), "workspace-1", "sales")
+	if err != nil || loaded.Columns[1].Description != "Booked revenue" {
+		t.Fatalf("GetSchema() = %#v, %v", loaded, err)
+	}
+	if _, err := service.SaveSchema(context.Background(), SaveSchemaRequest{WorkspaceID: "workspace-1", TableName: "sales", Columns: []SchemaColumn{{Name: "unknown"}}}); errorCode(err) != "schema_columns_invalid" {
+		t.Fatalf("unknown column error = %v", err)
+	}
+}
+
+func TestFindDatasetRequiresTableNameWhenAWorkbookHasMultipleSelectedSheets(t *testing.T) {
+	path := "/user/report.xlsx"
+	connections := connection.ListResponse{Connections: []connection.Connection{{
+		ID: "workbook", WorkspaceID: "workspace-1", Name: "Report", AdapterKind: connection.AdapterExcel,
+		SourcePath: path, Status: connection.StatusReady, Outputs: []connection.Output{
+			{SourceObjectID: "sheet:North", Name: "North", SnapshotPath: snapshot(t, "north")},
+			{SourceObjectID: "sheet:South", Name: "South", SnapshotPath: snapshot(t, "south")},
+		},
+	}}}
+	service := NewService(fakeWorkspaces{summary: workspace.Summary{ID: "workspace-1"}}, fakeConnections{response: connections}, &fakeCatalogGateway{}, t.TempDir())
+	if _, err := service.FindDataset(context.Background(), "workspace-1", path, ""); errorCode(err) != "dataset_selection_ambiguous" {
+		t.Fatalf("ambiguous workbook error = %v", err)
+	}
+	selected, err := service.FindDataset(context.Background(), "workspace-1", path, "report_south")
+	if err != nil || selected.TableName != "report_south" {
+		t.Fatalf("selected dataset = %#v, %v", selected, err)
 	}
 }

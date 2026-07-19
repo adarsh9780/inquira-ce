@@ -55,12 +55,18 @@ def test_agent_generates_executes_and_explains_against_catalog_schema(tmp_path: 
             "question": "What are total sales?", "run_id": "run-1",
             "artifact_dir": str(tmp_path / "artifacts"), "timeout_seconds": 30,
             "model": {"provider": "openai", "model": "gpt-test", "api_key": "secret"},
+            "schema": {"context": "Finance reporting", "tables": [{"name": "sales", "columns": [{
+                "name": "amount", "dtype": "INTEGER", "description": "Booked revenue", "aliases": ["sales value"]
+            }]}]},
         }, events.append)
         assert result["success"] is True
         assert result["answer"] == "Total sales are 42."
         assert result["code"] == kernels.codes[0]
         assert "sales" in model.prompts[0][1]["content"]
         assert "amount" in model.prompts[0][1]["content"]
+        assert "Finance reporting" in model.prompts[0][1]["content"]
+        assert "Booked revenue" in model.prompts[0][1]["content"]
+        assert "sales value" in model.prompts[0][1]["content"]
         assert any(event["type"] == "agent_status" and event["stage"] == "executing" for event in events)
 
     asyncio.run(scenario())

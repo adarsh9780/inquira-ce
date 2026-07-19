@@ -100,7 +100,7 @@ func (s *Service) Execute(ctx context.Context, request ExecuteRequest, emit func
 		return ExecuteResult{}, apperror.Wrap("execution_failed", message, err)
 	}
 	result := ExecuteResult{
-		Success: workerResult.Success, Stdout: workerResult.Stdout, Stderr: workerResult.Stderr,
+		RunID: run.ID, Success: workerResult.Success, Stdout: workerResult.Stdout, Stderr: workerResult.Stderr,
 		Error: workerResult.Error, Result: workerResult.Result, ResultKind: workerResult.ResultKind,
 		Artifacts: make([]conversation.Artifact, 0, len(workerResult.Artifacts)), TimedOut: workerResult.TimedOut,
 	}
