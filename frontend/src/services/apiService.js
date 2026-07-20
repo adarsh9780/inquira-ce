@@ -1031,18 +1031,32 @@ export const apiService = {
   },
 
   async v1GetPreferences(provider = null) {
+    const app = nativeWailsApp()
+    if (app?.GetModelPreferences) return app.GetModelPreferences(String(provider || ''))
     return v1Api.preferences.get(provider)
   },
 
   async v1UpdatePreferences(payload) {
+    const app = nativeWailsApp()
+    if (app?.UpdateModelPreferences) return app.UpdateModelPreferences(payload || {})
     return v1Api.preferences.update(payload)
   },
 
   async v1RefreshProviderModels(payload) {
+    const app = nativeWailsApp()
+    if (app?.RefreshProviderModels) return app.RefreshProviderModels(payload || {})
     return v1Api.preferences.refreshModels(payload)
   },
 
   async v1SearchProviderModels(provider, query, limit = 25) {
+    const app = nativeWailsApp()
+    if (app?.SearchProviderModels) {
+      return app.SearchProviderModels(
+        String(provider || ''),
+        String(query || ''),
+        Number(limit || 25),
+      )
+    }
     return v1Api.preferences.searchModels({
       provider,
       query,
@@ -1051,20 +1065,25 @@ export const apiService = {
   },
 
   async v1VerifyApiKey(provider, apiKey) {
+    const app = nativeWailsApp()
+    if (app?.VerifyProviderAPIKey) {
+      return app.VerifyProviderAPIKey(String(provider || ''), String(apiKey || ''))
+    }
     return v1Api.preferences.verifyKey(provider, apiKey)
   },
 
   async v1SetApiKey(apiKeyOrPayload, provider = 'openrouter') {
-    if (apiKeyOrPayload && typeof apiKeyOrPayload === 'object' && !Array.isArray(apiKeyOrPayload)) {
-      return v1Api.preferences.setApiKey(apiKeyOrPayload)
-    }
-    return v1Api.preferences.setApiKey({
-      api_key: apiKeyOrPayload,
-      provider,
-    })
+    const payload = apiKeyOrPayload && typeof apiKeyOrPayload === 'object' && !Array.isArray(apiKeyOrPayload)
+      ? apiKeyOrPayload
+      : { api_key: apiKeyOrPayload, provider }
+    const app = nativeWailsApp()
+    if (app?.SaveProviderConfiguration) return app.SaveProviderConfiguration(payload)
+    return v1Api.preferences.setApiKey(payload)
   },
 
   async v1DeleteApiKey(provider = 'openrouter') {
+    const app = nativeWailsApp()
+    if (app?.DeleteProviderAPIKey) return app.DeleteProviderAPIKey(String(provider || 'openrouter'))
     return v1Api.preferences.deleteApiKey(provider)
   },
 

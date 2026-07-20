@@ -304,7 +304,7 @@
             </div>
           </div>
 
-          <div v-if="!isNativeWorkspaceMetadata && activeWorkspaceSection === 'ai'" role="tabpanel" aria-label="Workspace AI settings">
+          <div v-if="activeWorkspaceSection === 'ai'" role="tabpanel" aria-label="Workspace AI settings">
             <WorkspaceAIConfigSection v-if="activeWorkspace?.id" :workspace-id="activeWorkspace.id" />
           </div>
 
@@ -443,7 +443,11 @@ const appStore = useAppStore()
 useWorkspaceDatasets()
 const isNativeWorkspaceMetadata = workspaceService.isNative()
 const workspaceSections = isNativeWorkspaceMetadata
-  ? [{ id: 'general', label: 'General' }, { id: 'connections', label: 'Connections' }]
+  ? [
+      { id: 'general', label: 'General' },
+      { id: 'connections', label: 'Connections' },
+      { id: 'ai', label: 'AI' },
+    ]
   : [
       { id: 'general', label: 'General' },
       { id: 'data', label: 'Data' },
