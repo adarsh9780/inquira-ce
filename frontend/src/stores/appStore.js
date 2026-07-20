@@ -198,11 +198,11 @@ export const useAppStore = defineStore('app', () => {
   })
   const workspaceReadiness = computed(() => {
     if (!hasWorkspace.value) return { state: 'no_workspace', ready: false }
-    const tableCount = Number(activeWorkspaceSummary.value?.table_count || 0)
-    if (tableCount < 1 && !hasDataFile.value) return { state: 'no_data', ready: false }
     const aiReadiness = workspaceAIConfig.value?.readiness
     if (aiReadiness && !aiReadiness.credential_ready) return { state: 'model_connection_required', ready: false }
     if (aiReadiness && (!aiReadiness.model_ready || !aiReadiness.configuration_reviewed)) return { state: 'workspace_configuration_required', ready: false }
+    const tableCount = Number(activeWorkspaceSummary.value?.table_count || 0)
+    if (tableCount < 1 && !hasDataFile.value) return { state: 'no_data', ready: false }
     return { state: 'ready', ready: true }
   })
   const activeWorkspaceRuntimeStatus = computed(() => getWorkspaceRuntimeStatus())
