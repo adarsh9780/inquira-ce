@@ -10,7 +10,10 @@ describe('runtimeProvisionService Wails bridge', () => {
   it('reads status and provisions only after explicit configuration', async () => {
     const app = {
       RuntimeStatus: vi.fn().mockResolvedValue({ ready: false }),
+      RuntimePlan: vi.fn().mockResolvedValue({ steps: [] }),
       ProvisionRuntime: vi.fn().mockResolvedValue({ pythonExecutable: '/runtime/python' }),
+      ChoosePythonExecutable: vi.fn().mockResolvedValue('/company/python'),
+      ChooseCertificateBundle: vi.fn().mockResolvedValue('/company/ca.pem'),
     }
     window.go = { main: { App: app } }
     const config = {
@@ -21,8 +24,14 @@ describe('runtimeProvisionService Wails bridge', () => {
       useSystemCertificates: true,
     }
     await runtimeProvisionService.status()
+    await runtimeProvisionService.plan(config)
     await runtimeProvisionService.provision(config)
+    await runtimeProvisionService.choosePythonExecutable()
+    await runtimeProvisionService.chooseCertificateBundle()
     expect(app.RuntimeStatus).toHaveBeenCalledOnce()
+    expect(app.RuntimePlan).toHaveBeenCalledWith(config)
     expect(app.ProvisionRuntime).toHaveBeenCalledWith(config)
+    expect(app.ChoosePythonExecutable).toHaveBeenCalledOnce()
+    expect(app.ChooseCertificateBundle).toHaveBeenCalledOnce()
   })
 })

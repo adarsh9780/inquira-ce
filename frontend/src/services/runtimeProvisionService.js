@@ -21,9 +21,24 @@ export const runtimeProvisionService = {
     return Promise.resolve({ ready: true })
   },
 
+  plan(config) {
+    if (this.isNative()) return callWails('RuntimePlan', config || {})
+    return Promise.reject(new Error('Runtime planning is available in the Wails application.'))
+  },
+
   provision(config) {
     if (this.isNative()) return callWails('ProvisionRuntime', config || {})
     return Promise.reject(new Error('Runtime provisioning is available in the Wails application.'))
+  },
+
+  choosePythonExecutable() {
+    if (this.isNative()) return callWails('ChoosePythonExecutable')
+    return Promise.reject(new Error('Python selection is available in the Wails application.'))
+  },
+
+  chooseCertificateBundle() {
+    if (this.isNative()) return callWails('ChooseCertificateBundle')
+    return Promise.reject(new Error('Certificate selection is available in the Wails application.'))
   },
 }
 

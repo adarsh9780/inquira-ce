@@ -160,10 +160,19 @@
           </div>
 
           <div v-if="isNativeWorkspaceMetadata && activeWorkspaceSection === 'connections'" class="space-y-3" role="tabpanel" aria-label="Workspace connections">
-            <section v-if="!nativeRuntimeStatus.ready" class="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] p-4">
-              <h4 class="section-label">Data runtime setup</h4>
-              <p class="mt-1 text-xs leading-5 text-[var(--color-warning-text)]">Choose how Inquira should obtain Python and DuckDB. Nothing is downloaded until you start setup.</p>
-              <div class="mt-3 grid gap-3 sm:grid-cols-2">
+            <section class="rounded-lg border p-4" :class="nativeRuntimeStatus.ready ? 'border-[var(--color-border)] bg-[var(--color-base-soft)]' : 'border-[var(--color-warning-border)] bg-[var(--color-warning-bg)]'">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h4 class="section-label">Data runtime setup</h4>
+                  <p class="mt-1 text-xs leading-5" :class="nativeRuntimeStatus.ready ? 'text-[var(--color-text-muted)]' : 'text-[var(--color-warning-text)]'">
+                    {{ nativeRuntimeStatus.ready ? runtimeConfigurationSummary : 'Choose how Inquira should obtain Python and DuckDB. Nothing is downloaded until you start setup.' }}
+                  </p>
+                </div>
+                <button v-if="nativeRuntimeStatus.ready && !runtimeConfigurationOpen" type="button" class="btn-secondary shrink-0 px-3 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="startRuntimeReconfiguration">Change runtime</button>
+              </div>
+              <p v-if="runtimeProvisionError" class="mt-3 rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-xs text-[var(--color-danger-text)]" role="alert">{{ runtimeProvisionError }}</p>
+              <div v-if="runtimeConfigurationOpen || !nativeRuntimeStatus.ready" class="mt-3">
+                <div class="grid gap-3 sm:grid-cols-2">
                 <label class="block sm:col-span-2">
                   <span class="input-label">Runtime source</span>
                   <select v-model="runtimeConfig.mode" class="input-base input-outlined" :disabled="runtimeProvisioning">
@@ -178,23 +187,26 @@
                 </label>
                 <label v-if="runtimeConfig.mode === 'external-python'" class="block sm:col-span-2">
                   <span class="input-label">Python executable path</span>
-                  <input v-model="runtimeConfig.pythonExecutable" class="input-base input-outlined font-mono text-xs" placeholder="/company/tools/python3.12" :disabled="runtimeProvisioning" />
+                  <div class="flex gap-2">
+                    <input v-model="runtimeConfig.pythonExecutable" class="input-base input-outlined min-w-0 flex-1 font-mono text-xs" placeholder="/company/tools/python3.12" :disabled="runtimeProvisioning" />
+                    <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="choosePythonExecutable">Browse</button>
+                  </div>
                 </label>
                 <label v-if="runtimeConfig.mode === 'internal-mirror'" class="block sm:col-span-2">
                   <span class="input-label">Python download mirror</span>
-                  <input v-model="runtimeConfig.pythonInstallMirror" class="input-base input-outlined" placeholder="https://packages.company/python" :disabled="runtimeProvisioning" />
+                  <input type="password" v-model="runtimeConfig.pythonInstallMirror" class="input-base input-outlined" placeholder="https://packages.company/python" autocomplete="off" spellcheck="false" :disabled="runtimeProvisioning" />
                 </label>
                 <label class="block sm:col-span-2">
                   <span class="input-label">Package index</span>
-                  <input v-model="runtimeConfig.defaultIndex" class="input-base input-outlined" placeholder="https://packages.company/simple (optional for managed Python)" :disabled="runtimeProvisioning" />
+                  <input type="password" v-model="runtimeConfig.defaultIndex" class="input-base input-outlined" placeholder="https://packages.company/simple (optional for managed Python)" autocomplete="off" spellcheck="false" :disabled="runtimeProvisioning" />
                 </label>
                 <label class="block">
                   <span class="input-label">HTTP proxy</span>
-                  <input v-model="runtimeConfig.httpProxy" class="input-base input-outlined" placeholder="http://proxy.company:8080" :disabled="runtimeProvisioning" />
+                  <input type="password" v-model="runtimeConfig.httpProxy" class="input-base input-outlined" placeholder="http://proxy.company:8080" autocomplete="off" spellcheck="false" :disabled="runtimeProvisioning" />
                 </label>
                 <label class="block">
                   <span class="input-label">HTTPS proxy</span>
-                  <input v-model="runtimeConfig.httpsProxy" class="input-base input-outlined" placeholder="https://proxy.company:8443" :disabled="runtimeProvisioning" />
+                  <input type="password" v-model="runtimeConfig.httpsProxy" class="input-base input-outlined" placeholder="https://proxy.company:8443" autocomplete="off" spellcheck="false" :disabled="runtimeProvisioning" />
                 </label>
                 <label class="block sm:col-span-2">
                   <span class="input-label">Proxy bypass list</span>
@@ -204,10 +216,21 @@
                   <input v-model="runtimeConfig.useSystemCertificates" type="checkbox" :disabled="runtimeProvisioning" />
                   Use operating-system certificates
                 </label>
+                <label class="block sm:col-span-2">
+                  <span class="input-label">Custom CA bundle</span>
+                  <div class="flex gap-2">
+                    <input v-model="runtimeConfig.certificateBundle" class="input-base input-outlined min-w-0 flex-1 font-mono text-xs" placeholder="/company/certificates/ca-bundle.pem (optional)" :disabled="runtimeProvisioning" />
+                    <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="chooseCertificateBundle">Browse</button>
+                  </div>
+                </label>
               </div>
               <div class="mt-4 flex items-center justify-between gap-3">
-                <p class="text-[10px] text-[var(--color-text-muted)]">Proxy and mirror credentials are used for this setup run and are not saved by Inquira.</p>
-                <button type="button" class="btn-primary shrink-0 px-4 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="provisionDataRuntime">{{ runtimeProvisioning ? 'Setting up…' : 'Set up runtime' }}</button>
+                <p class="text-[10px] text-[var(--color-text-muted)]">Proxy, mirror, and index values are cleared after every setup attempt and are never saved by Inquira. {{ runtimePlanSummary }}</p>
+                <div class="flex shrink-0 items-center gap-2">
+                  <button v-if="nativeRuntimeStatus.ready" type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="cancelRuntimeReconfiguration">Cancel</button>
+                  <button type="button" class="btn-primary px-4 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="provisionDataRuntime">{{ runtimeProvisioning ? 'Validating and setting up…' : 'Set up runtime' }}</button>
+                </div>
+              </div>
               </div>
             </section>
 
@@ -461,6 +484,9 @@ const connectionError = ref('')
 const refreshingConnectionIds = ref(new Set())
 const nativeRuntimeStatus = ref({ ready: false })
 const runtimeProvisioning = ref(false)
+const runtimeProvisionError = ref('')
+const runtimeConfigurationOpen = ref(false)
+const runtimePlanSummary = ref('')
 const runtimeConfig = ref({
   mode: 'managed',
   pythonVersion: '3.12',
@@ -468,6 +494,7 @@ const runtimeConfig = ref({
   pythonInstallMirror: '',
   defaultIndex: '',
   useSystemCertificates: false,
+  certificateBundle: '',
   httpProxy: '',
   httpsProxy: '',
   noProxy: '',
@@ -740,26 +767,85 @@ async function loadNativeRuntimeStatus() {
   if (!isNativeWorkspaceMetadata) return
   try {
     nativeRuntimeStatus.value = await runtimeProvisionService.status()
+    applySavedRuntimeConfiguration(nativeRuntimeStatus.value?.configuration)
+    if (!nativeRuntimeStatus.value?.ready) runtimeConfigurationOpen.value = true
   } catch (error) {
-    connectionError.value = extractApiErrorMessage(error, 'Could not read data runtime status.')
+    runtimeProvisionError.value = extractApiErrorMessage(error, 'Could not read data runtime status.')
+  }
+}
+
+const runtimeConfigurationSummary = computed(() => {
+  const configuration = nativeRuntimeStatus.value?.configuration
+  if (!configuration) return `Runtime ready at ${nativeRuntimeStatus.value?.pythonExecutable || 'the managed environment'}.`
+  if (configuration.mode === 'external-python') return `Runtime ready using company Python at ${configuration.pythonExecutable}.`
+  if (configuration.mode === 'internal-mirror') return `Runtime ready using Python ${configuration.pythonVersion} from an internal mirror.`
+  return `Runtime ready using managed Python ${configuration.pythonVersion || '3.12'}.`
+})
+
+function applySavedRuntimeConfiguration(configuration) {
+  if (!configuration || typeof configuration !== 'object') return
+  runtimeConfig.value.mode = configuration.mode || 'managed'
+  runtimeConfig.value.pythonVersion = configuration.pythonVersion || '3.12'
+  runtimeConfig.value.pythonExecutable = configuration.pythonExecutable || ''
+  runtimeConfig.value.useSystemCertificates = Boolean(configuration.useSystemCertificates)
+  runtimeConfig.value.certificateBundle = configuration.certificateBundle || ''
+}
+
+function clearTransientRuntimeConfig() {
+  runtimeConfig.value.pythonInstallMirror = ''
+  runtimeConfig.value.defaultIndex = ''
+  runtimeConfig.value.httpProxy = ''
+  runtimeConfig.value.httpsProxy = ''
+  runtimeConfig.value.noProxy = ''
+}
+
+function startRuntimeReconfiguration() {
+  runtimePlanSummary.value = ''
+  runtimeProvisionError.value = ''
+  runtimeConfigurationOpen.value = true
+}
+
+function cancelRuntimeReconfiguration() {
+  clearTransientRuntimeConfig()
+  applySavedRuntimeConfiguration(nativeRuntimeStatus.value?.configuration)
+  runtimePlanSummary.value = ''
+  runtimeProvisionError.value = ''
+  runtimeConfigurationOpen.value = false
+}
+
+async function choosePythonExecutable() {
+  try {
+    const selected = await runtimeProvisionService.choosePythonExecutable()
+    if (selected) runtimeConfig.value.pythonExecutable = String(selected)
+  } catch (error) {
+    runtimeProvisionError.value = extractApiErrorMessage(error, 'Could not choose a Python executable.')
+  }
+}
+
+async function chooseCertificateBundle() {
+  try {
+    const selected = await runtimeProvisionService.chooseCertificateBundle()
+    if (selected) runtimeConfig.value.certificateBundle = String(selected)
+  } catch (error) {
+    runtimeProvisionError.value = extractApiErrorMessage(error, 'Could not choose a certificate bundle.')
   }
 }
 
 async function provisionDataRuntime() {
   runtimeProvisioning.value = true
-  connectionError.value = ''
+  runtimeProvisionError.value = ''
   try {
+    const plan = await runtimeProvisionService.plan({ ...runtimeConfig.value })
+    runtimePlanSummary.value = `${Number(plan?.steps?.length || 0)} setup steps validated.`
     await runtimeProvisionService.provision({ ...runtimeConfig.value })
     await loadNativeRuntimeStatus()
     if (!nativeRuntimeStatus.value?.ready) throw new Error('The data runtime did not become ready.')
-    runtimeConfig.value.defaultIndex = ''
-    runtimeConfig.value.httpProxy = ''
-    runtimeConfig.value.httpsProxy = ''
-    runtimeConfig.value.noProxy = ''
+    runtimeConfigurationOpen.value = false
     toast.success('Data runtime ready', 'CSV, Parquet, and Excel connections can now be created.')
   } catch (error) {
-    connectionError.value = extractApiErrorMessage(error, 'Could not set up the data runtime.')
+    runtimeProvisionError.value = extractApiErrorMessage(error, 'Could not set up the data runtime.')
   } finally {
+    clearTransientRuntimeConfig()
     runtimeProvisioning.value = false
   }
 }

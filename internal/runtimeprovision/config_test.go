@@ -99,7 +99,7 @@ func TestPlansKeepExternalModeOfflineAndMirrorModePrivate(t *testing.T) {
 
 	external := DefaultConfig()
 	external.Mode = ModeExternalPython
-	external.PythonExecutable = "/company/python"
+	external.PythonExecutable = testPythonExecutable(t)
 	externalPlan, err := provisioner.Plan(external)
 	if err != nil {
 		t.Fatal(err)
@@ -137,7 +137,7 @@ func TestEveryRuntimePlanInstallsTheBundledDataWorkerIntoTheEnvironment(t *testi
 	configs := []Config{DefaultConfig()}
 	external := DefaultConfig()
 	external.Mode = ModeExternalPython
-	external.PythonExecutable = "/company/python"
+	external.PythonExecutable = testPythonExecutable(t)
 	external.DefaultIndex = "https://packages.example/simple"
 	configs = append(configs, external)
 	mirror := DefaultConfig()
@@ -162,4 +162,13 @@ func TestEveryRuntimePlanInstallsTheBundledDataWorkerIntoTheEnvironment(t *testi
 			t.Fatalf("%s private index not applied", config.Mode)
 		}
 	}
+}
+
+func testPythonExecutable(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), executableName("python"))
+	if err := os.WriteFile(path, []byte("python"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
