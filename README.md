@@ -95,8 +95,16 @@ The embedded UV runtime supports three provisioning policies:
 3. `internal-mirror`: UV installs Python and packages from organization-owned
    mirrors and can use the operating system certificate store.
 
-Secrets for authenticated indexes are intentionally not part of the persisted
-runtime configuration.
+External interpreters must be an executable Python 3.12 file. Runtime setup can
+also use HTTP/HTTPS proxies, the operating system certificate store, or a custom
+PEM CA bundle. Mirror, package-index, and proxy URLs are validated before setup;
+credential-bearing values are redacted from plan previews and errors.
+
+After successful setup, Inquira remembers only the non-secret source choice,
+Python version or executable path, and certificate preference. Proxy, mirror,
+index, and bypass values are cleared after every attempt and are never written
+to the runtime configuration. A ready runtime can be reviewed and replaced from
+Workspace → Connections → Data runtime setup.
 
 ## Build
 

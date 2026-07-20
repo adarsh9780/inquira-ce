@@ -4,13 +4,17 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
+	"sync/atomic"
 )
 
 type Step struct {
@@ -26,13 +30,16 @@ type Plan struct {
 }
 
 type Status struct {
-	RuntimeRoot      string     `json:"runtimeRoot"`
-	BundleAvailable  bool       `json:"bundleAvailable"`
-	Bundle           BundleInfo `json:"bundle"`
-	BundleError      string     `json:"bundleError,omitempty"`
-	SupportedModes   []Mode     `json:"supportedModes"`
-	Ready            bool       `json:"ready"`
-	PythonExecutable string     `json:"pythonExecutable"`
+	RuntimeRoot        string       `json:"runtimeRoot"`
+	BundleAvailable    bool         `json:"bundleAvailable"`
+	Bundle             BundleInfo   `json:"bundle"`
+	BundleError        string       `json:"bundleError,omitempty"`
+	SupportedModes     []Mode       `json:"supportedModes"`
+	Ready              bool         `json:"ready"`
+	Provisioning       bool         `json:"provisioning"`
+	PythonExecutable   string       `json:"pythonExecutable"`
+	Configuration      *SavedConfig `json:"configuration,omitempty"`
+	ConfigurationError string       `json:"configurationError,omitempty"`
 }
 
 type Diagnostics struct {
@@ -50,8 +57,9 @@ type Result struct {
 type commandRunner func(context.Context, map[string]string, Step) error
 
 type Provisioner struct {
-	runtimeRoot string
-	runner      commandRunner
+	runtimeRoot  string
+	runner       commandRunner
+	provisioning atomic.Bool
 }
 
 func NewProvisioner(runtimeRoot string) *Provisioner {
@@ -65,6 +73,13 @@ func (p *Provisioner) Status() Status {
 		Bundle:           info,
 		SupportedModes:   SupportedModes(),
 		PythonExecutable: p.PythonExecutable(),
+		Provisioning:     p.provisioning.Load(),
+	}
+	configuration, configurationErr := p.loadConfiguration()
+	if configurationErr != nil {
+		status.ConfigurationError = configurationErr.Error()
+	} else {
+		status.Configuration = configuration
 	}
 	status.Ready = p.runtimeReady()
 	if err != nil {
@@ -108,12 +123,17 @@ func (p *Provisioner) Plan(config Config) (Plan, error) {
 	environment := map[string]string{
 		"UV_PYTHON_INSTALL_DIR":  pythonDir,
 		"UV_PROJECT_ENVIRONMENT": environmentDir,
+		"UV_NO_CONFIG":           "true",
+		"UV_NO_ENV_FILE":         "true",
 	}
 	if strings.TrimSpace(config.DefaultIndex) != "" {
 		environment["UV_DEFAULT_INDEX"] = strings.TrimSpace(config.DefaultIndex)
 	}
 	if config.UseSystemCerts {
 		environment["UV_SYSTEM_CERTS"] = "true"
+	}
+	if strings.TrimSpace(config.CertificateBundle) != "" {
+		environment["SSL_CERT_FILE"] = strings.TrimSpace(config.CertificateBundle)
 	}
 	if strings.TrimSpace(config.HTTPProxy) != "" {
 		environment["HTTP_PROXY"] = strings.TrimSpace(config.HTTPProxy)
@@ -135,7 +155,7 @@ func (p *Provisioner) Plan(config Config) (Plan, error) {
 	case ModeExternalPython:
 		environment["UV_NO_MANAGED_PYTHON"] = "true"
 		plan.Steps = []Step{
-			{Name: "validate-external-python", Executable: config.PythonExecutable, Arguments: []string{"--version"}},
+			{Name: "validate-external-python", Executable: config.PythonExecutable, Arguments: []string{"-c", "import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 12) else 'Inquira requires Python 3.12')"}},
 			{Name: "create-data-environment", Executable: uvPath, Arguments: []string{"venv", environmentDir, "--python", config.PythonExecutable, "--no-python-downloads"}},
 		}
 	case ModeInternalMirror:
@@ -155,12 +175,31 @@ func (p *Provisioner) Plan(config Config) (Plan, error) {
 	return plan, nil
 }
 
+// PlanPreview validates a setup request and returns a display-safe plan. It
+// never exposes credentials embedded in proxy, mirror, or index URLs.
+func (p *Provisioner) PlanPreview(config Config) (Plan, error) {
+	plan, err := p.Plan(config)
+	if err != nil {
+		return Plan{}, err
+	}
+	for _, key := range []string{"HTTP_PROXY", "HTTPS_PROXY", "UV_DEFAULT_INDEX", "UV_PYTHON_INSTALL_MIRROR"} {
+		if value := plan.Environment[key]; value != "" {
+			plan.Environment[key] = displaySafeURL(value)
+		}
+	}
+	return plan, nil
+}
+
 func (p *Provisioner) Provision(ctx context.Context, config Config) (Result, error) {
-	uvPath, _, err := extractBundle(bundledAssets, filepath.Join(p.runtimeRoot, "tools"))
+	if !p.provisioning.CompareAndSwap(false, true) {
+		return Result{}, fmt.Errorf("runtime provisioning is already in progress")
+	}
+	defer p.provisioning.Store(false)
+	plan, err := p.Plan(config)
 	if err != nil {
 		return Result{}, err
 	}
-	plan, err := p.Plan(config)
+	uvPath, _, err := extractBundle(bundledAssets, filepath.Join(p.runtimeRoot, "tools"))
 	if err != nil {
 		return Result{}, err
 	}
@@ -170,10 +209,14 @@ func (p *Provisioner) Provision(ctx context.Context, config Config) (Result, err
 			plan.Steps[index].Executable = uvPath
 		}
 		if err := p.runner(ctx, plan.Environment, plan.Steps[index]); err != nil {
-			return Result{}, fmt.Errorf("%s: %w", plan.Steps[index].Name, err)
+			return Result{}, redactProvisionError(fmt.Errorf("%s: %w", plan.Steps[index].Name, err), config)
 		}
 	}
 	if err := p.markWorkerReady(); err != nil {
+		return Result{}, err
+	}
+	if err := p.saveConfiguration(config); err != nil {
+		_ = os.Remove(p.workerMarkerPath())
 		return Result{}, err
 	}
 
@@ -182,6 +225,89 @@ func (p *Provisioner) Provision(ctx context.Context, config Config) (Result, err
 		PythonExecutable: environmentPython(filepath.Join(p.runtimeRoot, "environments", "data-worker")),
 		UVExecutable:     uvPath,
 	}, nil
+}
+
+func redactProvisionError(err error, config Config) error {
+	if err == nil {
+		return nil
+	}
+	message := err.Error()
+	for _, value := range []string{config.PythonInstallMirror, config.DefaultIndex, config.HTTPProxy, config.HTTPSProxy} {
+		normalized := strings.TrimSpace(value)
+		if normalized == "" {
+			continue
+		}
+		message = strings.ReplaceAll(message, normalized, displaySafeURL(normalized))
+		parsed, parseErr := url.Parse(normalized)
+		if parseErr == nil && parsed.User != nil {
+			if username := parsed.User.Username(); username != "" {
+				message = strings.ReplaceAll(message, username, "[redacted]")
+			}
+			if password, exists := parsed.User.Password(); exists && password != "" {
+				message = strings.ReplaceAll(message, password, "[redacted]")
+			}
+		}
+		if parseErr == nil {
+			for _, values := range parsed.Query() {
+				for _, secret := range values {
+					if secret != "" {
+						message = strings.ReplaceAll(message, secret, "[redacted]")
+					}
+				}
+			}
+		}
+	}
+	return errors.New(message)
+}
+
+func displaySafeURL(value string) string {
+	normalized := strings.TrimSpace(value)
+	parsed, err := url.Parse(normalized)
+	if err != nil {
+		return "[credentials-redacted]"
+	}
+	if parsed.User == nil && parsed.RawQuery == "" {
+		return normalized
+	}
+	result := parsed.Scheme + "://credentials-redacted@" + parsed.Host + parsed.EscapedPath()
+	return result
+}
+
+func (p *Provisioner) saveConfiguration(config Config) error {
+	content, err := json.MarshalIndent(savedConfigFrom(config), "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode runtime configuration: %w", err)
+	}
+	if err := os.MkdirAll(p.runtimeRoot, 0o700); err != nil {
+		return fmt.Errorf("create runtime directory: %w", err)
+	}
+	temporary := p.configurationPath() + ".tmp"
+	if err := os.WriteFile(temporary, append(content, '\n'), 0o600); err != nil {
+		return fmt.Errorf("write runtime configuration: %w", err)
+	}
+	if err := os.Rename(temporary, p.configurationPath()); err != nil {
+		return fmt.Errorf("publish runtime configuration: %w", err)
+	}
+	return nil
+}
+
+func (p *Provisioner) loadConfiguration() (*SavedConfig, error) {
+	content, err := os.ReadFile(p.configurationPath())
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read runtime configuration: %w", err)
+	}
+	var configuration SavedConfig
+	if err := json.Unmarshal(content, &configuration); err != nil {
+		return nil, fmt.Errorf("decode runtime configuration: %w", err)
+	}
+	return &configuration, nil
+}
+
+func (p *Provisioner) configurationPath() string {
+	return filepath.Join(p.runtimeRoot, "runtime-config.json")
 }
 
 func (p *Provisioner) runtimeReady() bool {

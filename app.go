@@ -908,6 +908,26 @@ func (a *App) ChooseLocalConnectionFile() (LocalConnectionFileSelection, error) 
 	return LocalConnectionFileSelection{SourcePath: path, AdapterKind: kind}, nil
 }
 
+func (a *App) ChoosePythonExecutable() (string, error) {
+	return runtime.OpenFileDialog(a.appContext(), runtime.OpenDialogOptions{
+		Title: "Choose an organization-provided Python 3.12 executable",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Python executable", Pattern: "python;python3;python3.12;python.exe;*.exe"},
+			{DisplayName: "All files", Pattern: "*"},
+		},
+	})
+}
+
+func (a *App) ChooseCertificateBundle() (string, error) {
+	return runtime.OpenFileDialog(a.appContext(), runtime.OpenDialogOptions{
+		Title: "Choose a PEM certificate bundle",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Certificate bundle", Pattern: "*.pem;*.crt;*.cer"},
+			{DisplayName: "All files", Pattern: "*"},
+		},
+	})
+}
+
 // RuntimeStatus reports the embedded UV bundle and supported provisioning modes.
 func (a *App) RuntimeStatus() runtimeprovision.Status {
 	return a.provisioner.Status()
@@ -920,7 +940,7 @@ func (a *App) RuntimeDiagnostics() runtimeprovision.Diagnostics {
 
 // RuntimePlan validates a runtime configuration without changing the machine.
 func (a *App) RuntimePlan(config runtimeprovision.Config) (runtimeprovision.Plan, error) {
-	return a.provisioner.Plan(config)
+	return a.provisioner.PlanPreview(config)
 }
 
 // ProvisionRuntime creates the selected Python runtime using the embedded UV binary.
