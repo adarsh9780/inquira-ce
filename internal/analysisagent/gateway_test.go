@@ -10,18 +10,27 @@ import (
 )
 
 type fakeTransport struct {
-	method  string
-	request AgentWorkerRequest
+	method        string
+	request       AgentWorkerRequest
+	cancelParams  map[string]any
+	interventions map[string]any
 }
 
 func (f *fakeTransport) Call(_ context.Context, method string, params, result any) error {
 	f.method = method
-	workspaceID := params.(map[string]any)["workspace_id"]
-	*(result.(*struct {
-		Cancelled bool `json:"cancelled"`
-	})) = struct {
-		Cancelled bool `json:"cancelled"`
-	}{Cancelled: workspaceID == "workspace-1"}
+	values := params.(map[string]any)
+	if method == "agent_cancel" {
+		f.cancelParams = values
+		*(result.(*struct {
+			Cancelled bool `json:"cancelled"`
+		})) = struct {
+			Cancelled bool `json:"cancelled"`
+		}{Cancelled: values["workspace_id"] == "workspace-1" && values["client_request_id"] == "request-1"}
+	}
+	if method == "agent_intervention_respond" {
+		f.interventions = values
+		*(result.(*InterventionResponse)) = InterventionResponse{InterventionID: "intervention-1", Accepted: true}
+	}
 	return nil
 }
 
@@ -57,8 +66,22 @@ func TestWorkerGatewayUsesAgentRPCAndForwardsStructuredEvents(t *testing.T) {
 
 func TestWorkerGatewayCancelsWorkspaceAgent(t *testing.T) {
 	transport := &fakeTransport{}
-	cancelled, err := NewWorkerGateway(transport).Cancel(context.Background(), "workspace-1")
+	cancelled, err := NewWorkerGateway(transport).Cancel(context.Background(), "workspace-1", "request-1")
 	if err != nil || !cancelled || transport.method != "agent_cancel" {
 		t.Fatalf("cancelled=%v method=%q error=%v", cancelled, transport.method, err)
+	}
+	if transport.cancelParams["client_request_id"] != "request-1" {
+		t.Fatalf("cancel params = %#v", transport.cancelParams)
+	}
+}
+
+func TestWorkerGatewayRespondsToInterventionThroughWorkerRPC(t *testing.T) {
+	transport := &fakeTransport{}
+	response, err := NewWorkerGateway(transport).RespondIntervention(context.Background(), "intervention-1", []string{"approve"})
+	if err != nil || !response.Accepted || response.InterventionID != "intervention-1" {
+		t.Fatalf("response=%#v method=%q error=%v", response, transport.method, err)
+	}
+	if transport.method != "agent_intervention_respond" || transport.interventions["intervention_id"] != "intervention-1" {
+		t.Fatalf("intervention params = %#v", transport.interventions)
 	}
 }

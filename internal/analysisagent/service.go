@@ -7,6 +7,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
+
 	"inquira-go/internal/analysisruntime"
 	"inquira-go/internal/apperror"
 	"inquira-go/internal/conversation"
@@ -47,7 +49,8 @@ type modelSource interface {
 
 type agentGateway interface {
 	Analyze(context.Context, AgentWorkerRequest, func(analysisruntime.WorkerEvent)) (AgentWorkerResult, error)
-	Cancel(context.Context, string) (bool, error)
+	Cancel(context.Context, string, string) (bool, error)
+	RespondIntervention(context.Context, string, []string) (InterventionResponse, error)
 }
 
 type runStore interface {
@@ -68,19 +71,56 @@ func NewService(conversations conversationStore, catalogs catalogSource, models 
 	return &Service{conversations: conversations, catalogs: catalogs, models: models, agent: agent, runs: runs}
 }
 
-func (s *Service) Cancel(ctx context.Context, workspaceID string) (bool, error) {
+func (s *Service) Cancel(ctx context.Context, workspaceID, clientRequestID string) (bool, error) {
 	workspaceID = strings.TrimSpace(workspaceID)
 	if workspaceID == "" {
 		return false, apperror.New("workspace_required", "Workspace identity is required.")
 	}
-	cancelled, err := s.agent.Cancel(ctx, workspaceID)
+	clientRequestID = strings.TrimSpace(clientRequestID)
+	if clientRequestID == "" {
+		return false, apperror.New("agent_request_required", "Analysis request identity is required.")
+	}
+	cancelled, err := s.agent.Cancel(ctx, workspaceID, clientRequestID)
 	if err != nil {
 		return false, apperror.Wrap("agent_cancel_failed", "Could not cancel the running analysis.", err)
 	}
 	return cancelled, nil
 }
 
+func (s *Service) RespondIntervention(ctx context.Context, interventionID string, selected []string) (InterventionResponse, error) {
+	interventionID = strings.TrimSpace(interventionID)
+	if interventionID == "" {
+		return InterventionResponse{}, apperror.New("intervention_required", "Intervention identity is required.")
+	}
+	if len(interventionID) > 128 || len(selected) > 20 {
+		return InterventionResponse{}, apperror.New("intervention_selection_invalid", "The intervention response is invalid.")
+	}
+	normalized := make([]string, 0, len(selected))
+	for _, item := range selected {
+		value := strings.TrimSpace(item)
+		if value == "" {
+			continue
+		}
+		if utf8.RuneCountInString(value) > 200 {
+			return InterventionResponse{}, apperror.New("intervention_selection_invalid", "The intervention response is invalid.")
+		}
+		normalized = append(normalized, value)
+	}
+	response, err := s.agent.RespondIntervention(ctx, interventionID, normalized)
+	if err != nil {
+		return InterventionResponse{}, apperror.Wrap("intervention_response_failed", "Could not submit the intervention response.", err)
+	}
+	return response, nil
+}
+
 func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func(analysisruntime.WorkerEvent)) (AnalyzeResult, error) {
+	clientRequestID := strings.TrimSpace(request.ClientRequestID)
+	if clientRequestID == "" {
+		clientRequestID = uuid.NewString()
+	}
+	if len(clientRequestID) > 128 {
+		return AnalyzeResult{}, apperror.New("agent_request_invalid", "Analysis request identity is invalid.")
+	}
 	workspaceID := strings.TrimSpace(request.WorkspaceID)
 	question := strings.TrimSpace(request.Question)
 	currentCode := truncateRunes(request.CurrentCode, maxCodeRunes)
@@ -154,13 +194,18 @@ func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func
 	defer s.runs.CleanupRun(run)
 	events := make([]analysisruntime.WorkerEvent, 0)
 	forward := func(event analysisruntime.WorkerEvent) {
+		event.ClientRequestID = clientRequestID
+		event.WorkspaceID = workspaceID
+		event.ConversationID = ownedConversation.ID
+		event.TurnID = turn.ID
+		event.RunID = run.ID
 		events = append(events, event)
 		if emit != nil {
 			emit(event)
 		}
 	}
 	workerResult, err := s.agent.Analyze(ctx, AgentWorkerRequest{
-		WorkspaceID: workspaceID, ConversationID: ownedConversation.ID, TurnID: turn.ID,
+		ClientRequestID: clientRequestID, WorkspaceID: workspaceID, ConversationID: ownedConversation.ID, TurnID: turn.ID,
 		DatabasePath: catalog.DatabasePath, Question: question,
 		CurrentCode: currentCode,
 		RunID:       run.ID, ArtifactDirectory: run.StagingDirectory, TimeoutSeconds: request.TimeoutSeconds,

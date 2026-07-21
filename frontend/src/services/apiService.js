@@ -135,7 +135,11 @@ function normalizeNativeManualExecution(raw) {
 async function nativeAnalyze(payload, { signal = null, onEvent = null } = {}) {
   const app = nativeWailsApp()
   if (!app || typeof app.AnalyzeQuestion !== 'function') return null
+  const clientRequestId = globalThis.crypto?.randomUUID
+    ? globalThis.crypto.randomUUID()
+    : `analysis-${Date.now()}-${Math.random().toString(16).slice(2)}`
   const request = {
+    client_request_id: clientRequestId,
     workspace_id: String(payload?.workspace_id || ''),
     conversation_id: String(payload?.conversation_id || ''),
     parent_turn_id: payload?.selected_parent_turn_id ? String(payload.selected_parent_turn_id) : null,
@@ -147,6 +151,7 @@ async function nativeAnalyze(payload, { signal = null, onEvent = null } = {}) {
   let unsubscribe = () => {}
   if (onEvent && window.runtime?.EventsOnMultiple) {
     unsubscribe = EventsOn('agent-runtime-event', (event) => {
+      if (String(event?.client_request_id || '') !== clientRequestId) return
       const type = String(event?.type || 'status')
       const data = event?.data && typeof event.data === 'object' ? { ...event.data } : {}
       if (type === 'agent_status' && !data.message) data.message = nativeStatusMessage(data.stage)
@@ -154,14 +159,22 @@ async function nativeAnalyze(payload, { signal = null, onEvent = null } = {}) {
     }) || (() => {})
   }
   const onAbort = () => {
-    if (typeof app.InterruptWorkspaceKernel === 'function') {
-      void app.InterruptWorkspaceKernel(request.workspace_id)
+    if (typeof app.CancelAgentAnalysis === 'function') {
+      void app.CancelAgentAnalysis(request.workspace_id, clientRequestId)
     }
   }
   if (signal) signal.addEventListener('abort', onAbort, { once: true })
   try {
     const raw = await withAbortSignal(app.AnalyzeQuestion(request), signal)
     return normalizeNativeAnalysis(raw)
+  } catch (error) {
+    if (!signal?.aborted && onEvent) {
+      onEvent({
+        event: 'error',
+        data: { message: extractApiErrorMessage(error, 'The local analysis runtime stopped unexpectedly.') },
+      })
+    }
+    throw error
   } finally {
     if (signal) signal.removeEventListener('abort', onAbort)
     unsubscribe()
@@ -1329,6 +1342,10 @@ export const apiService = {
   },
 
   async v1RespondChatIntervention(interventionId, selected = []) {
+    const app = nativeWailsApp()
+    if (app?.RespondAgentIntervention) {
+      return app.RespondAgentIntervention(String(interventionId || ''), Array.isArray(selected) ? selected : [])
+    }
     return v1Api.chat.respondIntervention(interventionId, {
       selected: Array.isArray(selected) ? selected : [],
     })

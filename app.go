@@ -704,6 +704,22 @@ func (a *App) AnalyzeQuestion(request analysisagent.AnalyzeRequest) (analysisage
 	})
 }
 
+func (a *App) CancelAgentAnalysis(workspaceID, clientRequestID string) (bool, error) {
+	service, err := a.agentService()
+	if err != nil {
+		return false, err
+	}
+	return service.Cancel(a.appContext(), workspaceID, clientRequestID)
+}
+
+func (a *App) RespondAgentIntervention(interventionID string, selected []string) (analysisagent.InterventionResponse, error) {
+	service, err := a.agentService()
+	if err != nil {
+		return analysisagent.InterventionResponse{}, err
+	}
+	return service.RespondIntervention(a.appContext(), interventionID, selected)
+}
+
 func (a *App) GetWorkspaceKernelStatus(workspaceID string) (analysisruntime.KernelStatus, error) {
 	service, err := a.analysisService()
 	if err != nil {
@@ -725,12 +741,7 @@ func (a *App) InterruptWorkspaceKernel(workspaceID string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	agentCancelled := false
-	if a.agent != nil {
-		agentCancelled, _ = a.agent.Cancel(a.appContext(), workspaceID)
-	}
-	kernelInterrupted, err := service.Interrupt(a.appContext(), workspaceID)
-	return agentCancelled || kernelInterrupted, err
+	return service.Interrupt(a.appContext(), workspaceID)
 }
 
 func (a *App) PrepareWorkspaceCatalog(workspaceID string) (datacatalog.Catalog, error) {

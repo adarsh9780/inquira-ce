@@ -172,20 +172,62 @@ def test_runtime_rpc_cancels_an_active_agent_request_and_interrupts_its_workspac
         analysis = asyncio.create_task(runtime.handle({
             "id": "analysis",
             "method": "agent_analyze",
-            "params": {"workspace_id": "workspace-1"},
+            "params": {"workspace_id": "workspace-1", "client_request_id": "request-1"},
         }, lambda _: None))
         await runtime.agent.started.wait()
+
+        stale = await runtime.handle({
+            "id": "stale-cancel",
+            "method": "agent_cancel",
+            "params": {"workspace_id": "workspace-1", "client_request_id": "request-old"},
+        }, lambda _: None)
+        assert stale["result"] == {
+            "workspace_id": "workspace-1", "client_request_id": "request-old", "cancelled": False
+        }
 
         cancelled = await runtime.handle({
             "id": "cancel",
             "method": "agent_cancel",
-            "params": {"workspace_id": "workspace-1"},
+            "params": {"workspace_id": "workspace-1", "client_request_id": "request-1"},
         }, lambda _: None)
         response = await analysis
 
         assert cancelled["error"] is None
-        assert cancelled["result"] == {"workspace_id": "workspace-1", "cancelled": True}
+        assert cancelled["result"] == {
+            "workspace_id": "workspace-1", "client_request_id": "request-1", "cancelled": True
+        }
         assert response["error"]["code"] == "agent_cancelled"
         assert runtime.kernels.interrupted == ["workspace-1"]
+
+    asyncio.run(scenario())
+
+
+def test_runtime_rpc_accepts_only_pending_intervention_responses() -> None:
+    async def scenario() -> None:
+        runtime = WorkerRuntime()
+        try:
+            pending = await runtime.interventions.create_request(
+                workspace_id="workspace-1",
+                prompt="Continue?",
+                options=["approve", "deny"],
+                multi_select=False,
+                timeout_sec=10,
+            )
+            response = await runtime.handle({
+                "id": "respond",
+                "method": "agent_intervention_respond",
+                "params": {"intervention_id": pending.id, "selected": ["approve", "deny"]},
+            }, lambda _: None)
+            decision = await runtime.interventions.await_response(pending.id, timeout_sec=1)
+            duplicate = await runtime.handle({
+                "id": "duplicate",
+                "method": "agent_intervention_respond",
+                "params": {"intervention_id": pending.id, "selected": ["deny"]},
+            }, lambda _: None)
+        finally:
+            await runtime.shutdown()
+        assert response["result"] == {"intervention_id": pending.id, "accepted": True}
+        assert decision == {"selected": ["approve"], "timed_out": False, "status": "submitted"}
+        assert duplicate["result"] == {"intervention_id": pending.id, "accepted": False}
 
     asyncio.run(scenario())

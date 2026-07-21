@@ -43,13 +43,24 @@ type fakeAgentGateway struct {
 	err             error
 	events          []analysisruntime.WorkerEvent
 	cancelWorkspace string
+	cancelRequestID string
 	cancelled       bool
 	cancelErr       error
+	intervention    InterventionResponse
+	interventionErr error
 }
 
-func (f *fakeAgentGateway) Cancel(_ context.Context, workspaceID string) (bool, error) {
+func (f *fakeAgentGateway) Cancel(_ context.Context, workspaceID, clientRequestID string) (bool, error) {
 	f.cancelWorkspace = workspaceID
+	f.cancelRequestID = clientRequestID
 	return f.cancelled, f.cancelErr
+}
+
+func (f *fakeAgentGateway) RespondIntervention(_ context.Context, interventionID string, selected []string) (InterventionResponse, error) {
+	if f.intervention.InterventionID == "" {
+		f.intervention = InterventionResponse{InterventionID: interventionID, Accepted: len(selected) > 0}
+	}
+	return f.intervention, f.interventionErr
 }
 
 func (f *fakeAgentGateway) Analyze(_ context.Context, request AgentWorkerRequest, emit func(analysisruntime.WorkerEvent)) (AgentWorkerResult, error) {
@@ -140,20 +151,25 @@ func TestAnalyzeCreatesConversationExecutesAndPersistsTurn(t *testing.T) {
 		events: []analysisruntime.WorkerEvent{{Type: "agent_status", Data: map[string]any{"stage": "executing"}}},
 	}
 	service, conversations, workspaceID, runs := newAgentService(t, gateway)
+	events := make([]analysisruntime.WorkerEvent, 0)
 	result, err := service.Analyze(context.Background(), AnalyzeRequest{
-		WorkspaceID: workspaceID, Question: "What are total sales?", CurrentCode: "result = previous", TimeoutSeconds: 30,
+		ClientRequestID: "request-1", WorkspaceID: workspaceID, Question: "What are total sales?", CurrentCode: "result = previous", TimeoutSeconds: 30,
 		Attachments: []ImageAttachment{{
 			AttachmentID: "image-1", MediaType: "image/png", Filename: "chart.png", DataBase64: "aW1hZ2U=",
 		}},
-	}, nil)
+	}, func(event analysisruntime.WorkerEvent) { events = append(events, event) })
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result.Conversation.ID == "" || result.Turn.ID == "" || result.Answer != gateway.result.Answer || !result.Execution.Success || result.Route != "analysis" {
 		t.Fatalf("result = %#v", result)
 	}
-	if gateway.request.Model.APIKey != "runtime-secret" || gateway.request.DatabasePath == "" || gateway.request.RunID != "run-1" {
+	if gateway.request.ClientRequestID != "request-1" || gateway.request.Model.APIKey != "runtime-secret" || gateway.request.DatabasePath == "" || gateway.request.RunID != "run-1" {
 		t.Fatalf("worker request = %#v", gateway.request)
+	}
+	if len(events) != 1 || events[0].ClientRequestID != "request-1" || events[0].WorkspaceID != workspaceID ||
+		events[0].ConversationID != result.Conversation.ID || events[0].TurnID != result.Turn.ID || events[0].RunID != "run-1" {
+		t.Fatalf("scoped events = %#v", events)
 	}
 	if service.models.(*fakeModelSource).workspaceID != workspaceID {
 		t.Fatalf("model configuration workspace = %q", service.models.(*fakeModelSource).workspaceID)
@@ -213,16 +229,34 @@ func TestAnalyzeRejectsImagesForTextOnlyModel(t *testing.T) {
 func TestCancelValidatesWorkspaceAndDelegatesToWorker(t *testing.T) {
 	gateway := &fakeAgentGateway{cancelled: true}
 	service, _, _, _ := newAgentService(t, gateway)
-	cancelled, err := service.Cancel(context.Background(), " workspace-1 ")
-	if err != nil || !cancelled || gateway.cancelWorkspace != "workspace-1" {
-		t.Fatalf("cancelled=%v workspace=%q error=%v", cancelled, gateway.cancelWorkspace, err)
+	cancelled, err := service.Cancel(context.Background(), " workspace-1 ", " request-1 ")
+	if err != nil || !cancelled || gateway.cancelWorkspace != "workspace-1" || gateway.cancelRequestID != "request-1" {
+		t.Fatalf("cancelled=%v workspace=%q request=%q error=%v", cancelled, gateway.cancelWorkspace, gateway.cancelRequestID, err)
 	}
-	if _, err := service.Cancel(context.Background(), " "); appErrorCode(err) != "workspace_required" {
+	if _, err := service.Cancel(context.Background(), " ", "request-1"); appErrorCode(err) != "workspace_required" {
 		t.Fatalf("blank workspace error = %v", err)
 	}
+	if _, err := service.Cancel(context.Background(), "workspace-1", " "); appErrorCode(err) != "agent_request_required" {
+		t.Fatalf("blank request error = %v", err)
+	}
 	gateway.cancelErr = errors.New("worker unavailable")
-	if _, err := service.Cancel(context.Background(), "workspace-1"); appErrorCode(err) != "agent_cancel_failed" {
+	if _, err := service.Cancel(context.Background(), "workspace-1", "request-1"); appErrorCode(err) != "agent_cancel_failed" {
 		t.Fatalf("worker error = %v", err)
+	}
+}
+
+func TestRespondInterventionValidatesAndDelegatesToWorker(t *testing.T) {
+	gateway := &fakeAgentGateway{}
+	service, _, _, _ := newAgentService(t, gateway)
+	response, err := service.RespondIntervention(context.Background(), " intervention-1 ", []string{" approve "})
+	if err != nil || !response.Accepted || response.InterventionID != "intervention-1" {
+		t.Fatalf("response=%#v error=%v", response, err)
+	}
+	if _, err := service.RespondIntervention(context.Background(), "", nil); appErrorCode(err) != "intervention_required" {
+		t.Fatalf("blank intervention error = %v", err)
+	}
+	if _, err := service.RespondIntervention(context.Background(), "intervention-1", make([]string, 21)); appErrorCode(err) != "intervention_selection_invalid" {
+		t.Fatalf("oversized selection error = %v", err)
 	}
 }
 

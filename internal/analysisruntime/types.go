@@ -50,8 +50,13 @@ type ExecuteWorkerResult struct {
 }
 
 type WorkerEvent struct {
-	Type string `json:"type"`
-	Data any    `json:"data"`
+	Type            string `json:"type"`
+	Data            any    `json:"data"`
+	ClientRequestID string `json:"client_request_id,omitempty"`
+	WorkspaceID     string `json:"workspace_id,omitempty"`
+	ConversationID  string `json:"conversation_id,omitempty"`
+	TurnID          string `json:"turn_id,omitempty"`
+	RunID           string `json:"run_id,omitempty"`
 }
 
 type ExecuteResult struct {

@@ -81,6 +81,11 @@ short-lived staging paths and then copied into the conversation heap through
 the same atomic artifact publication contract; Python never writes final heap
 pointers or application metadata.
 
+Native agent streams are also scoped by client request, workspace,
+conversation, turn, and run. Cancelling a request cannot stop a newer analysis
+in the same workspace. Tool progress and intervention responses use the same
+local Go-to-worker RPC boundary rather than the legacy HTTP service.
+
 The same worker hosts the ported LangGraph agent, including tool calling,
 structured responses, retries, memory summarization, and the existing pandas,
 DuckDB, and Plotly analysis tools.

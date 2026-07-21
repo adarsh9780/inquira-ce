@@ -19,12 +19,22 @@ func NewWorkerGateway(transport runtimeTransport) *WorkerGateway {
 	return &WorkerGateway{transport: transport}
 }
 
-func (g *WorkerGateway) Cancel(ctx context.Context, workspaceID string) (bool, error) {
+func (g *WorkerGateway) Cancel(ctx context.Context, workspaceID, clientRequestID string) (bool, error) {
 	var result struct {
 		Cancelled bool `json:"cancelled"`
 	}
-	err := g.transport.Call(ctx, "agent_cancel", map[string]any{"workspace_id": workspaceID}, &result)
+	err := g.transport.Call(ctx, "agent_cancel", map[string]any{
+		"workspace_id": workspaceID, "client_request_id": clientRequestID,
+	}, &result)
 	return result.Cancelled, err
+}
+
+func (g *WorkerGateway) RespondIntervention(ctx context.Context, interventionID string, selected []string) (InterventionResponse, error) {
+	var result InterventionResponse
+	err := g.transport.Call(ctx, "agent_intervention_respond", map[string]any{
+		"intervention_id": interventionID, "selected": selected,
+	}, &result)
+	return result, err
 }
 
 func (g *WorkerGateway) Analyze(

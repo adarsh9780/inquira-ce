@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -10,8 +11,15 @@ from .langgraph_agent import LangGraphAnalysisAgent
 from .artifacts import inspect_parquet, query_parquet
 from .errors import AdapterError
 from .kernel import WorkspaceKernelManager
+from .interventions import InterventionBroker
 from .rpc import handle_request as handle_data_request
 from .schema_generation import SchemaGenerator
+
+
+@dataclass(frozen=True)
+class ActiveAgentTask:
+    client_request_id: str
+    task: asyncio.Task[Any]
 
 
 class WorkerRuntime:
@@ -19,7 +27,8 @@ class WorkerRuntime:
         self.kernels = WorkspaceKernelManager(idle_seconds=idle_seconds)
         self.agent = LangGraphAnalysisAgent(kernels=self.kernels)
         self.schema_generator = SchemaGenerator()
-        self._agent_tasks: dict[str, asyncio.Task[Any]] = {}
+        self.interventions = InterventionBroker()
+        self._agent_tasks: dict[str, ActiveAgentTask] = {}
 
     async def handle(
         self, request: dict[str, Any], emit: Callable[[dict[str, Any]], Any]
@@ -57,9 +66,10 @@ class WorkerRuntime:
             elif method == "agent_analyze":
 
                 workspace_id = _workspace_id(params)
+                client_request_id = _client_request_id(params, fallback=str(request_id))
                 current_task = asyncio.current_task()
                 active = self._agent_tasks.get(workspace_id)
-                if active is not None and not active.done():
+                if active is not None and not active.task.done():
                     raise RuntimeRequestError(
                         "agent_busy", "An analysis is already running for this workspace."
                     )
@@ -67,7 +77,7 @@ class WorkerRuntime:
                     raise RuntimeRequestError(
                         "worker_internal_error", "The agent task could not be registered."
                     )
-                self._agent_tasks[workspace_id] = current_task
+                self._agent_tasks[workspace_id] = ActiveAgentTask(client_request_id, current_task)
 
                 async def forward_agent(event: dict[str, Any]) -> None:
                     emitted = emit(event)
@@ -77,18 +87,41 @@ class WorkerRuntime:
                 try:
                     response["result"] = await self.agent.analyze(params, forward_agent)
                 finally:
-                    if self._agent_tasks.get(workspace_id) is current_task:
+                    current = self._agent_tasks.get(workspace_id)
+                    if current is not None and current.task is current_task:
                         self._agent_tasks.pop(workspace_id, None)
             elif method == "agent_cancel":
                 workspace_id = _workspace_id(params)
-                task = self._agent_tasks.get(workspace_id)
-                cancelled = task is not None and not task.done()
+                client_request_id = _client_request_id(params)
+                active = self._agent_tasks.get(workspace_id)
+                cancelled = (
+                    active is not None
+                    and active.client_request_id == client_request_id
+                    and not active.task.done()
+                )
                 if cancelled:
-                    task.cancel()
+                    active.task.cancel()
                     await self.kernels.interrupt(workspace_id)
                 response["result"] = {
                     "workspace_id": workspace_id,
+                    "client_request_id": client_request_id,
                     "cancelled": cancelled,
+                }
+            elif method == "agent_intervention_respond":
+                intervention_id = _intervention_id(params)
+                selected = params.get("selected", [])
+                if not isinstance(selected, list) or len(selected) > 20 or not all(
+                    isinstance(item, str) and len(item) <= 200 for item in selected
+                ):
+                    raise RuntimeRequestError(
+                        "invalid_params", "Intervention selection is invalid."
+                    )
+                accepted = await self.interventions.submit_response(
+                    intervention_id, selected
+                )
+                response["result"] = {
+                    "intervention_id": intervention_id,
+                    "accepted": accepted,
                 }
             elif method == "schema_describe":
                 response["result"] = await self.schema_generator.generate(params)
@@ -161,12 +194,13 @@ class WorkerRuntime:
         return response
 
     async def shutdown(self) -> None:
-        tasks = [task for task in self._agent_tasks.values() if not task.done()]
+        tasks = [active.task for active in self._agent_tasks.values() if not active.task.done()]
         self._agent_tasks.clear()
         for task in tasks:
             task.cancel()
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
+        await self.interventions.close()
         await self.kernels.shutdown()
 
 
@@ -188,6 +222,20 @@ def _workspace_id(params: dict[str, Any]) -> str:
     ):
         raise RuntimeRequestError("invalid_params", "workspace_id is invalid.")
     return value
+
+
+def _client_request_id(params: dict[str, Any], *, fallback: str = "") -> str:
+    value = params.get("client_request_id", fallback)
+    if not isinstance(value, str) or not value.strip() or len(value.strip()) > 128:
+        raise RuntimeRequestError("invalid_params", "client_request_id is invalid.")
+    return value.strip()
+
+
+def _intervention_id(params: dict[str, Any]) -> str:
+    value = params.get("intervention_id")
+    if not isinstance(value, str) or not value.strip() or len(value.strip()) > 128:
+        raise RuntimeRequestError("invalid_params", "intervention_id is invalid.")
+    return value.strip()
 
 
 def _artifact_path(params: dict[str, Any]) -> str:

@@ -286,7 +286,11 @@ func (a *recordingAgent) Analyze(_ context.Context, request analysisagent.AgentW
 	}, nil
 }
 
-func (*recordingAgent) Cancel(context.Context, string) (bool, error) { return true, nil }
+func (*recordingAgent) Cancel(context.Context, string, string) (bool, error) { return true, nil }
+
+func (*recordingAgent) RespondIntervention(_ context.Context, interventionID string, _ []string) (analysisagent.InterventionResponse, error) {
+	return analysisagent.InterventionResponse{InterventionID: interventionID, Accepted: true}, nil
+}
 
 type unusedKernel struct{}
 

@@ -10,13 +10,14 @@ import (
 )
 
 type AnalyzeRequest struct {
-	WorkspaceID    string            `json:"workspace_id"`
-	ConversationID string            `json:"conversation_id,omitempty"`
-	ParentTurnID   *string           `json:"parent_turn_id,omitempty"`
-	Question       string            `json:"question"`
-	CurrentCode    string            `json:"current_code,omitempty"`
-	TimeoutSeconds int               `json:"timeout_seconds"`
-	Attachments    []ImageAttachment `json:"attachments,omitempty"`
+	ClientRequestID string            `json:"client_request_id,omitempty"`
+	WorkspaceID     string            `json:"workspace_id"`
+	ConversationID  string            `json:"conversation_id,omitempty"`
+	ParentTurnID    *string           `json:"parent_turn_id,omitempty"`
+	Question        string            `json:"question"`
+	CurrentCode     string            `json:"current_code,omitempty"`
+	TimeoutSeconds  int               `json:"timeout_seconds"`
+	Attachments     []ImageAttachment `json:"attachments,omitempty"`
 }
 
 type ImageAttachment struct {
@@ -27,6 +28,7 @@ type ImageAttachment struct {
 }
 
 type AgentWorkerRequest struct {
+	ClientRequestID   string                           `json:"client_request_id"`
 	WorkspaceID       string                           `json:"workspace_id"`
 	ConversationID    string                           `json:"conversation_id,omitempty"`
 	TurnID            string                           `json:"turn_id,omitempty"`
@@ -40,6 +42,11 @@ type AgentWorkerRequest struct {
 	Context           ConversationContext              `json:"context"`
 	Schema            datacatalog.AnalysisSchema       `json:"schema"`
 	Attachments       []ImageAttachment                `json:"attachments,omitempty"`
+}
+
+type InterventionResponse struct {
+	InterventionID string `json:"intervention_id"`
+	Accepted       bool   `json:"accepted"`
 }
 
 type ConversationContext struct {
