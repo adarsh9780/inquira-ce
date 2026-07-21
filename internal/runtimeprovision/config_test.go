@@ -3,6 +3,7 @@ package runtimeprovision
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -151,9 +152,19 @@ func TestEveryRuntimePlanInstallsTheBundledDataWorkerIntoTheEnvironment(t *testi
 		if err != nil {
 			t.Fatal(err)
 		}
-		last := plan.Steps[len(plan.Steps)-1]
-		if last.Name != "install-data-worker" || last.Executable != filepath.Join(runtimeRoot, "tools", executableName("uv")) {
-			t.Fatalf("%s final step = %#v", config.Mode, last)
+		if len(plan.Steps) < 2 {
+			t.Fatalf("%s plan has too few steps: %#v", config.Mode, plan.Steps)
+		}
+		install := plan.Steps[len(plan.Steps)-2]
+		if install.Name != "install-data-worker" || install.Executable != filepath.Join(runtimeRoot, "tools", executableName("uv")) {
+			t.Fatalf("%s install step = %#v", config.Mode, install)
+		}
+		verify := plan.Steps[len(plan.Steps)-1]
+		if verify.Name != "verify-data-worker" || verify.Executable != provisioner.PythonExecutable() {
+			t.Fatalf("%s verification step = %#v", config.Mode, verify)
+		}
+		if len(verify.Arguments) != 2 || verify.Arguments[0] != "-c" || !strings.Contains(verify.Arguments[1], "inquira_data_worker") {
+			t.Fatalf("%s verification command = %#v", config.Mode, verify.Arguments)
 		}
 		if got := plan.Environment["UV_PROJECT_ENVIRONMENT"]; got != filepath.Join(runtimeRoot, "environments", "data-worker") {
 			t.Fatalf("%s environment = %q", config.Mode, got)

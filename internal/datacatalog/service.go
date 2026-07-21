@@ -102,7 +102,7 @@ func (s *Service) Prepare(ctx context.Context, workspaceID string) (Catalog, err
 	if err != nil {
 		return Catalog{}, apperror.Wrap("catalog_build_failed", "Could not prepare workspace data for analysis.", err)
 	}
-	if filepath.Clean(result.DatabasePath) != filepath.Clean(databasePath) ||
+	if !sameCatalogPath(result.DatabasePath, databasePath) ||
 		result.Fingerprint != fingerprint || result.TableCount != len(tables) || result.ByteSize < 0 {
 		return Catalog{}, apperror.New("catalog_invalid_result", "The data worker returned an invalid workspace catalog.")
 	}
@@ -114,6 +114,20 @@ func (s *Service) Prepare(ctx context.Context, workspaceID string) (Catalog, err
 		WorkspaceID: id, DatabasePath: databasePath, Fingerprint: fingerprint,
 		Tables: tables, AnalysisSchema: analysisSchema, Changed: result.Changed, ByteSize: result.ByteSize,
 	}, nil
+}
+
+func sameCatalogPath(left, right string) bool {
+	leftAbsolute, leftErr := filepath.Abs(filepath.Clean(left))
+	rightAbsolute, rightErr := filepath.Abs(filepath.Clean(right))
+	if leftErr != nil || rightErr != nil {
+		return false
+	}
+	leftResolved, leftErr := filepath.EvalSymlinks(leftAbsolute)
+	rightResolved, rightErr := filepath.EvalSymlinks(rightAbsolute)
+	if leftErr == nil && rightErr == nil {
+		return leftResolved == rightResolved
+	}
+	return leftAbsolute == rightAbsolute
 }
 
 func (s *Service) Remove(workspaceID string) error {

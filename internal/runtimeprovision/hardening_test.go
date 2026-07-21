@@ -1,6 +1,7 @@
 package runtimeprovision
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -148,5 +149,38 @@ func TestConcurrentRuntimeProvisioningIsRejectedBeforeMachineChanges(t *testing.
 	_, err := provisioner.Provision(t.Context(), DefaultConfig())
 	if err == nil || !strings.Contains(err.Error(), "already in progress") {
 		t.Fatalf("expected concurrent setup to be rejected, got %v", err)
+	}
+}
+
+func TestFailedWorkerVerificationDoesNotMarkRuntimeReady(t *testing.T) {
+	runtimeRoot := filepath.Join(t.TempDir(), "runtime")
+	provisioner := NewProvisioner(runtimeRoot)
+	config := DefaultConfig()
+	config.Mode = ModeExternalPython
+	config.PythonExecutable = testPythonExecutable(t)
+	if err := os.MkdirAll(filepath.Join(runtimeRoot, "worker"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runtimeRoot, "worker", "uv.lock"), []byte("lock"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var steps []string
+	provisioner.runner = func(_ context.Context, _ map[string]string, step Step) error {
+		steps = append(steps, step.Name)
+		if step.Name == "verify-data-worker" {
+			return errors.New("worker import failed")
+		}
+		return nil
+	}
+	_, err := provisioner.Provision(t.Context(), config)
+	if err == nil || !strings.Contains(err.Error(), "verify-data-worker") {
+		t.Fatalf("verification error = %v", err)
+	}
+	if len(steps) == 0 || steps[len(steps)-1] != "verify-data-worker" {
+		t.Fatalf("executed steps = %#v", steps)
+	}
+	if provisioner.Ready() {
+		t.Fatal("a runtime with a failed worker verification must not be ready")
 	}
 }

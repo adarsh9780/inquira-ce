@@ -161,6 +161,12 @@ func (s *Service) rows(ctx context.Context, artifact conversation.Artifact, requ
 	if request.Offset < 0 || request.Limit < 1 || request.Limit > 1000 {
 		return RowsResult{}, apperror.New("artifact_page_invalid", "Offset must be non-negative and limit must be between 1 and 1000.")
 	}
+	if request.SortModel == nil {
+		request.SortModel = []map[string]any{}
+	}
+	if request.FilterModel == nil {
+		request.FilterModel = map[string]any{}
+	}
 	path, err := s.store.ArtifactPath(ctx, artifact.ID)
 	if err != nil {
 		return RowsResult{}, err

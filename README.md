@@ -124,6 +124,30 @@ Verify the compiled executable's embedded runtime without launching the UI:
 
 On Windows, run `build\\bin\\inquira-go.exe runtime-info`.
 
+## Runtime validation
+
+Exercise the production Go-to-Python pipeline in a fresh isolated runtime:
+
+```sh
+make test-runtime-e2e
+```
+
+This provisions the embedded worker with the bundled UV binary, imports CSV,
+builds the DuckDB catalog, executes Jupyter code, runs LangGraph against a
+local OpenAI-compatible protocol server, persists artifacts, and reads them
+after restarting the worker.
+
+Live provider validation is opt-in so normal tests never consume credentials
+or paid tokens. Set `INQUIRA_E2E_PROVIDER`, `INQUIRA_E2E_MODEL`, and
+`INQUIRA_E2E_API_KEY`, then run:
+
+```sh
+make test-live-provider
+```
+
+`INQUIRA_E2E_BASE_URL`, `INQUIRA_E2E_LITE_MODEL`, and
+`INQUIRA_E2E_CODING_MODEL` can be supplied when the provider requires them.
+
 ## Layout
 
 ```text

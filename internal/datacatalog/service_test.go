@@ -201,6 +201,35 @@ func TestPrepareRejectsAWorkerResultForAnotherCatalog(t *testing.T) {
 	}
 }
 
+func TestPrepareAcceptsWorkerCanonicalPathForTheRequestedCatalog(t *testing.T) {
+	realRoot := t.TempDir()
+	aliasParent := t.TempDir()
+	aliasRoot := filepath.Join(aliasParent, "catalogs")
+	if err := os.Symlink(realRoot, aliasRoot); err != nil {
+		t.Skipf("filesystem does not support symlinks: %v", err)
+	}
+	requested := filepath.Join(aliasRoot, "workspace-1", "workspace.duckdb")
+	if err := os.MkdirAll(filepath.Dir(requested), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(requested, []byte("catalog"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	canonical, err := filepath.EvalSymlinks(requested)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gateway := &fakeCatalogGateway{result: BuildResult{DatabasePath: canonical}}
+	service := NewService(fakeWorkspaces{summary: workspace.Summary{ID: "workspace-1"}}, fakeConnections{}, gateway, aliasRoot)
+	result, err := service.Prepare(context.Background(), "workspace-1")
+	if err != nil {
+		t.Fatalf("canonical worker path was rejected: %v", err)
+	}
+	if result.DatabasePath != requested {
+		t.Fatalf("public catalog path = %q, want requested path %q", result.DatabasePath, requested)
+	}
+}
+
 func TestPrepareSerializesBuildsForTheSameWorkspace(t *testing.T) {
 	started := make(chan struct{}, 2)
 	continueRun := make(chan struct{}, 2)

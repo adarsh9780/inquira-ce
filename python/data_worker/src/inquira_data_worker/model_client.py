@@ -28,10 +28,12 @@ class ModelSettings:
         model = str(value.get("model") or "").strip()
         base_url = str(value.get("base_url") or "").strip().rstrip("/")
         api_key = str(value.get("api_key") or "")
-        if provider not in {"openai", "openrouter", "ollama"}:
+        if provider not in {"openai", "openrouter", "anthropic", "ollama"}:
             raise ValueError("The selected model provider is not supported.")
         if not model:
             raise ValueError("A model is required.")
+        if provider == "anthropic" and not base_url:
+            base_url = "https://api.anthropic.com/v1"
         if not base_url:
             raise ValueError("The model provider base URL is required.")
         if provider != "ollama" and not api_key.strip():
@@ -57,6 +59,30 @@ class ModelClient:
             body = {"model": self.settings.model, "messages": messages, "stream": False,
                     "options": {"temperature": self.settings.temperature, "top_p": self.settings.top_p}}
             headers = {"Content-Type": "application/json"}
+        elif self.settings.provider == "anthropic":
+            url = f"{self.settings.base_url}/messages"
+            system = "\n\n".join(
+                str(message.get("content") or "")
+                for message in messages
+                if message.get("role") == "system"
+            ).strip()
+            provider_messages = [
+                message for message in messages if message.get("role") != "system"
+            ]
+            body = {
+                "model": self.settings.model,
+                "messages": provider_messages,
+                "max_tokens": self.settings.max_tokens,
+                "temperature": self.settings.temperature,
+                "top_p": self.settings.top_p,
+            }
+            if system:
+                body["system"] = system
+            headers = {
+                "Content-Type": "application/json",
+                "x-api-key": self.settings.api_key,
+                "anthropic-version": "2023-06-01",
+            }
         else:
             url = f"{self.settings.base_url}/chat/completions"
             body = {
@@ -80,6 +106,12 @@ class ModelClient:
         try:
             if self.settings.provider == "ollama":
                 return str(payload["message"]["content"])
+            if self.settings.provider == "anthropic":
+                content = payload["content"]
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        return str(block["text"])
+                raise KeyError("text")
             return str(payload["choices"][0]["message"]["content"])
         except (KeyError, IndexError, TypeError) as exc:
             raise RuntimeError("The model provider returned an invalid response.") from exc

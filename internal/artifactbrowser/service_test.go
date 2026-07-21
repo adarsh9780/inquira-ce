@@ -39,14 +39,16 @@ type fakeGateway struct {
 	inspected InspectResult
 	rows      RowsResult
 	path      string
+	request   RowsRequest
 }
 
 func (f *fakeGateway) Inspect(_ context.Context, path string) (InspectResult, error) {
 	f.path = path
 	return f.inspected, nil
 }
-func (f *fakeGateway) Rows(_ context.Context, path string, _ RowsRequest) (RowsResult, error) {
+func (f *fakeGateway) Rows(_ context.Context, path string, request RowsRequest) (RowsResult, error) {
 	f.path = path
+	f.request = request
 	return f.rows, nil
 }
 
@@ -94,6 +96,9 @@ func TestArtifactBrowserReadsFigurePayloadPagesRowsAndChecksOwnership(t *testing
 	rows, err := service.RowsForTurn(context.Background(), "c1", "t1", "a1", RowsRequest{Offset: 0, Limit: 10})
 	if err != nil || rows.ArtifactID != "a1" || len(rows.Rows) != 1 {
 		t.Fatalf("RowsForTurn()=%#v,%v", rows, err)
+	}
+	if gateway.request.SortModel == nil || gateway.request.FilterModel == nil {
+		t.Fatalf("optional row query models were not normalized: %#v", gateway.request)
 	}
 	deleted, err := service.DeleteForTurn(context.Background(), "c1", "t1", "a1")
 	if err != nil || !deleted.Deleted || store.deleted != "a1" {

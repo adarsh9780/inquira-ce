@@ -1,6 +1,6 @@
 WAILS ?= $(shell go env GOPATH)/bin/wails
 
-.PHONY: prepare-uv test build clean
+.PHONY: prepare-uv test test-runtime-e2e test-live-provider build clean
 
 prepare-uv:
 	go run ./cmd/prepareuv
@@ -11,6 +11,12 @@ test:
 	uv run --project python/data_worker --group dev pytest
 	cd frontend && npm run test:runtime
 	cd frontend && npm run build
+
+test-runtime-e2e:
+	INQUIRA_RUN_RUNTIME_E2E=1 go test -run TestProductionRuntimePipelineEndToEnd -v .
+
+test-live-provider:
+	uv run --project python/data_worker --group dev pytest python/data_worker/tests/test_live_provider.py -v
 
 build: prepare-uv
 	$(WAILS) build -clean

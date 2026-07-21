@@ -172,6 +172,14 @@ func (p *Provisioner) Plan(config Config) (Plan, error) {
 			"sync", "--project", filepath.Join(p.runtimeRoot, "worker"), "--locked", "--no-progress",
 		},
 	})
+	plan.Steps = append(plan.Steps, Step{
+		Name:       "verify-data-worker",
+		Executable: environmentPython(environmentDir),
+		Arguments: []string{
+			"-c",
+			"from inquira_data_worker.runtime import WorkerRuntime; assert callable(WorkerRuntime)",
+		},
+	})
 	return plan, nil
 }
 

@@ -93,6 +93,34 @@ func TestPersistentTransportCancellationDoesNotPoisonWorker(t *testing.T) {
 	}
 }
 
+func TestPersistentTransportRestartsAfterWorkerCrash(t *testing.T) {
+	transport := newHelperTransport(t)
+	defer transport.Close()
+	var before struct {
+		PID int `json:"pid"`
+	}
+	if err := transport.Call(context.Background(), "echo", map[string]any{"value": "before"}, &before); err != nil {
+		t.Fatal(err)
+	}
+	if err := transport.Call(context.Background(), "crash", map[string]any{}, &struct{}{}); errorCode(err) != "worker_process_failed" {
+		t.Fatalf("crash error = %v", err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for transport.Running() && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	var after struct {
+		PID   int    `json:"pid"`
+		Value string `json:"value"`
+	}
+	if err := transport.Call(context.Background(), "echo", map[string]any{"value": "after"}, &after); err != nil {
+		t.Fatal(err)
+	}
+	if before.PID == 0 || after.PID == 0 || before.PID == after.PID || after.Value != "after" {
+		t.Fatalf("worker did not recover: before=%#v after=%#v", before, after)
+	}
+}
+
 func TestPersistentTransportRejectsUnavailableRuntimeAndCallsAfterClose(t *testing.T) {
 	transport := NewPersistentTransport(Config{ReadinessCheck: func() bool { return false }})
 	if err := transport.Call(context.Background(), "ping", map[string]any{}, &struct{}{}); errorCode(err) != "runtime_not_ready" {
@@ -137,6 +165,9 @@ func TestPersistentTransportHelperProcess(t *testing.T) {
 		group.Add(1)
 		go func() {
 			defer group.Done()
+			if request.Method == "crash" {
+				os.Exit(23)
+			}
 			if request.Method == "wait" || request.Params["value"] == "slow" {
 				time.Sleep(80 * time.Millisecond)
 			}
