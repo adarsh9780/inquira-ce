@@ -9,6 +9,8 @@ test('UI preferences service only exposes generic preference persistence helpers
 
   assert.equal(source.includes('async getPreferences()'), true)
   assert.equal(source.includes('async savePreferences(prefs)'), true)
+  assert.equal(source.includes('app?.LoadLocalState'), true)
+  assert.equal(source.includes('app?.SaveLocalState'), true)
   assert.equal(source.includes('hasSeenWalkthrough'), false)
   assert.equal(source.includes('markWalkthroughAsSeen'), false)
 })

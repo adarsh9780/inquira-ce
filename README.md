@@ -83,6 +83,9 @@ Wails session restoration also uses the local SQLite database. Small structured
 snapshots preserve pane layout, active workspace/conversation pointers, question
 history, and in-progress editor state per local user. They do not contain
 artifact payloads or duplicate conversation results from the filesystem heap.
+Theme and font preferences use a separate SQLite snapshot so they can be loaded
+before authentication; the first native load migrates any valid preference
+values left in WebView local storage by an earlier build.
 
 Python analysis runs through one lazily started worker process owned by Go.
 That process maintains one Jupyter kernel per active workspace, opens the
