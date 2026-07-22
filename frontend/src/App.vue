@@ -188,6 +188,11 @@ import KeyboardShortcutsModal from './components/modals/KeyboardShortcutsModal.v
 import FirstRunModelOnboarding from './components/onboarding/FirstRunModelOnboarding.vue'
 
 const appStore = useAppStore()
+
+function wailsApp() {
+  if (typeof window === 'undefined') return null
+  return window.go?.main?.App || null
+}
 const authStore = useAuthStore()
 
 const workspaceRuntimeStatus = reactive({
@@ -593,6 +598,18 @@ function handleOpenDatasetPickerRequest() {
 }
 
 async function readDesktopStartupState() {
+  if (wailsApp()?.GetStartupState) {
+    try {
+      return wailsApp().GetStartupState()
+    } catch (error) {
+      console.warn('⚠️ Failed to read desktop startup state from Go:', error)
+      return {
+        ready: false,
+        error: 'Could not read desktop service startup state. Restart the app or open the logs for details.',
+        message: '',
+      }
+    }
+  }
   if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
     return { ready: true, error: '', message: '' }
   }
@@ -610,6 +627,14 @@ async function readDesktopStartupState() {
 }
 
 async function invokeDesktopRecovery(command) {
+  if (command === 'restart_desktop_app' && wailsApp()?.RestartDesktopApp) {
+    await wailsApp().RestartDesktopApp()
+    return
+  }
+  if (command === 'open_startup_logs' && wailsApp()?.OpenStartupLogs) {
+    await wailsApp().OpenStartupLogs()
+    return
+  }
   if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
     startupRecoveryMessage.value = 'Desktop recovery actions are only available in the installed app.'
     return
@@ -641,6 +666,7 @@ async function copyStartupDiagnostics() {
 }
 
 async function subscribeDesktopStartupEvents(onMessage) {
+  if (wailsApp()?.GetStartupState) return () => {}
   if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
     return () => {}
   }

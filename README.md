@@ -99,6 +99,12 @@ scoped Wails events, and cleans up sessions on reset, workspace deletion, or
 application shutdown. Unix builds use the operating-system PTY and Windows uses
 ConPTY, including terminal resizing on both platforms.
 
+Desktop startup and recovery are native to Wails as well. The UI reads Go's
+actual initialization state, can open a private rotating startup log, and can
+restart the current executable with its original arguments. External links are
+opened through a Go allowlist that accepts only credential-free HTTP and HTTPS
+URLs and invokes the platform launcher without a shell.
+
 The same worker hosts the ported LangGraph agent, including tool calling,
 structured responses, retries, memory summarization, and the existing pandas,
 DuckDB, and Plotly analysis tools.
@@ -174,6 +180,7 @@ frontend/                      Existing Inquira Vue UI
 internal/appdirs/              Central application path resolution
 internal/connection/           Connection metadata, snapshots, refresh, and worker RPC
 internal/conversation/         SQLite conversation index and filesystem artifact heap
+internal/desktop/              Startup diagnostics, restart, and safe external links
 internal/modelconfig/          SQLite, keychain, provider, and model services
 internal/netclient/            Proxy and certificate-aware HTTP client
 internal/runtimeprovision/     Runtime policy and provisioning service

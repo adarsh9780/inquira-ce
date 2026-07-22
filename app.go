@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -17,6 +18,7 @@ import (
 	"inquira-go/internal/connection"
 	"inquira-go/internal/conversation"
 	"inquira-go/internal/datacatalog"
+	"inquira-go/internal/desktop"
 	"inquira-go/internal/manualanalysis"
 	"inquira-go/internal/modelconfig"
 	"inquira-go/internal/netclient"
@@ -45,6 +47,8 @@ type App struct {
 	worker        *workerruntime.PersistentTransport
 	catalog       *datacatalog.Service
 	terminals     *terminalruntime.Service
+	desktop       *desktop.Service
+	startupLog    sync.Once
 	initErr       error
 }
 
@@ -59,11 +63,16 @@ type RerunFinalResult struct {
 
 // NewApp creates a new App application struct
 func NewApp() *App {
+	app := &App{desktop: desktop.New()}
 	paths, err := appdirs.Resolve()
 	if err != nil {
-		return &App{initErr: err}
+		if logsDir, fallbackErr := createFallbackStartupLogDirectory(os.TempDir()); fallbackErr == nil {
+			app.paths.LogsDir = logsDir
+		}
+		app.initErr = err
+		return app
 	}
-	app := &App{paths: paths}
+	app.paths = paths
 	app.terminals = terminalruntime.NewPlatformService(func(eventName string, payload any) {
 		if app.ctx != nil {
 			runtime.EventsEmit(app.ctx, eventName, payload)
@@ -164,6 +173,10 @@ func NewApp() *App {
 		app.conversations, app.catalog, app.workspaces, analysisagent.NewWorkerGateway(transport), app.analysis,
 	)
 	return app
+}
+
+func createFallbackStartupLogDirectory(root string) (string, error) {
+	return os.MkdirTemp(root, "inquira-startup-logs-")
 }
 
 // startup is called when the app starts. The context is saved
@@ -302,6 +315,59 @@ func (a *App) terminalService() (*terminalruntime.Service, error) {
 		return nil, apperror.New("terminal_unavailable", "The local terminal is unavailable.")
 	}
 	return a.terminals, nil
+}
+
+type StartupSnapshot struct {
+	Ready   bool   `json:"ready"`
+	Error   string `json:"error"`
+	Message string `json:"message"`
+}
+
+func (a *App) GetStartupState() StartupSnapshot {
+	state := StartupSnapshot{Ready: a.initErr == nil}
+	if a.initErr != nil {
+		state.Error = "Inquira could not initialize its local services: " + a.initErr.Error()
+	}
+	a.startupLog.Do(func() {
+		message := "Desktop startup ready."
+		if state.Error != "" {
+			message = state.Error
+		}
+		if a.paths.LogsDir != "" {
+			_, _ = desktop.AppendStartupLog(a.paths.LogsDir, message)
+		}
+	})
+	return state
+}
+
+func (a *App) OpenExternalURL(rawURL string) error {
+	if a.desktop == nil {
+		return apperror.New("desktop_unavailable", "Desktop integration is unavailable.")
+	}
+	return a.desktop.OpenExternalURL(rawURL)
+}
+
+func (a *App) OpenStartupLogs() error {
+	if a.desktop == nil || a.paths.LogsDir == "" {
+		return apperror.New("desktop_unavailable", "Startup diagnostics are unavailable.")
+	}
+	if _, err := desktop.AppendStartupLog(a.paths.LogsDir, "Startup diagnostics opened by the user."); err != nil {
+		return err
+	}
+	return a.desktop.OpenDirectory(a.paths.LogsDir)
+}
+
+func (a *App) RestartDesktopApp() error {
+	if a.desktop == nil {
+		return apperror.New("desktop_unavailable", "Desktop restart is unavailable.")
+	}
+	if err := a.desktop.Restart(); err != nil {
+		return err
+	}
+	if a.ctx != nil {
+		runtime.Quit(a.ctx)
+	}
+	return nil
 }
 
 // ApplicationPaths exposes the resolved local directories for diagnostics.

@@ -1,5 +1,10 @@
 import { invoke } from '@tauri-apps/api/core'
 
+function wailsApp() {
+  if (typeof window === 'undefined') return null
+  return window.go?.main?.App || null
+}
+
 function normalizeExternalUrl(rawUrl) {
   const input = String(rawUrl || '').trim()
   if (!input) return ''
@@ -26,6 +31,17 @@ function normalizeExternalUrl(rawUrl) {
 export async function openExternalUrl(rawUrl) {
   const url = normalizeExternalUrl(rawUrl)
   if (!url) return false
+
+  const app = wailsApp()
+  if (app?.OpenExternalURL) {
+    try {
+      await app.OpenExternalURL(url)
+      return true
+    } catch (error) {
+      console.error('❌ Failed to open external URL via Go desktop command:', error)
+      return false
+    }
+  }
 
   const isTauriDesktop = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
 

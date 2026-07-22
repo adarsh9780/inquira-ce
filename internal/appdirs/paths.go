@@ -13,6 +13,7 @@ type Paths struct {
 	ConfigDir    string `json:"config_dir"`
 	DataDir      string `json:"data_dir"`
 	RuntimeDir   string `json:"runtime_dir"`
+	LogsDir      string `json:"logs_dir"`
 	DatabasePath string `json:"database_path"`
 }
 
@@ -36,13 +37,14 @@ func FromRoot(root string) Paths {
 		ConfigDir:    cleanRoot,
 		DataDir:      dataDir,
 		RuntimeDir:   filepath.Join(cleanRoot, "runtime"),
+		LogsDir:      filepath.Join(dataDir, "logs"),
 		DatabasePath: filepath.Join(dataDir, "inquira.db"),
 	}
 }
 
 // Ensure creates all application-owned directories with user-only permissions.
 func (p Paths) Ensure() error {
-	for _, directory := range []string{p.ConfigDir, p.DataDir, p.RuntimeDir} {
+	for _, directory := range []string{p.ConfigDir, p.DataDir, p.RuntimeDir, p.LogsDir} {
 		if err := os.MkdirAll(directory, 0o700); err != nil {
 			return fmt.Errorf("create application directory %q: %w", directory, err)
 		}
