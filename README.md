@@ -79,6 +79,11 @@ Provider-reported token and cost usage is aggregated from persisted turn
 metadata without estimating missing fields, and the same usage is shown in
 conversation trees.
 
+Wails session restoration also uses the local SQLite database. Small structured
+snapshots preserve pane layout, active workspace/conversation pointers, question
+history, and in-progress editor state per local user. They do not contain
+artifact payloads or duplicate conversation results from the filesystem heap.
+
 Python analysis runs through one lazily started worker process owned by Go.
 That process maintains one Jupyter kernel per active workspace, opens the
 workspace DuckDB catalog read-only, preserves notebook state between turns,
@@ -186,6 +191,7 @@ internal/appdirs/              Central application path resolution
 internal/connection/           Connection metadata, snapshots, refresh, and worker RPC
 internal/conversation/         SQLite conversation index and filesystem artifact heap
 internal/desktop/              Startup diagnostics, restart, and safe external links
+internal/localstate/           SQLite-backed local UI and session snapshots
 internal/modelconfig/          SQLite, keychain, provider, and model services
 internal/netclient/            Proxy and certificate-aware HTTP client
 internal/runtimeprovision/     Runtime policy and provisioning service

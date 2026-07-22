@@ -1,9 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('app store persists local session snapshot via Tauri app data file service', () => {
+test('app store persists local session snapshots through the desktop state service', () => {
   const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
   const source = readFileSync(storePath, 'utf-8')
 
@@ -76,14 +76,13 @@ test('preference sync payload excludes enabled_models and keeps selected model o
   assert.equal(source.includes('enabled_models:'), false)
 })
 
-test('tauri fs capability allows writing local snapshot into app data scope', () => {
+test('Go build uses the native local-state bridge and keeps legacy Tauri fallback isolated', () => {
   const capPath = resolve(process.cwd(), '../src-tauri/capabilities/default.json')
-  const raw = readFileSync(capPath, 'utf-8')
-  const capability = JSON.parse(raw)
-  const permissions = capability?.permissions || []
+  const servicePath = resolve(process.cwd(), 'src/services/localStateService.js')
+  const service = readFileSync(servicePath, 'utf-8')
 
-  assert.equal(Array.isArray(permissions), true)
-  assert.equal(permissions.includes('fs:create-app-specific-dirs'), true)
-  assert.equal(permissions.includes('fs:allow-appdata-read-recursive'), true)
-  assert.equal(permissions.includes('fs:allow-appdata-write-recursive'), true)
+  assert.equal(existsSync(capPath), false)
+  assert.equal(service.includes('app?.LoadLocalState'), true)
+  assert.equal(service.includes('app?.SaveLocalState'), true)
+  assert.equal(service.includes("BaseDirectory.AppData"), true)
 })

@@ -19,6 +19,7 @@ import (
 	"inquira-go/internal/conversation"
 	"inquira-go/internal/datacatalog"
 	"inquira-go/internal/desktop"
+	"inquira-go/internal/localstate"
 	"inquira-go/internal/manualanalysis"
 	"inquira-go/internal/modelconfig"
 	"inquira-go/internal/netclient"
@@ -48,6 +49,7 @@ type App struct {
 	catalog       *datacatalog.Service
 	terminals     *terminalruntime.Service
 	desktop       *desktop.Service
+	localState    localstate.Repository
 	saveDialog    func(context.Context, runtime.SaveDialogOptions) (string, error)
 	startupLog    sync.Once
 	initErr       error
@@ -173,6 +175,18 @@ func NewApp() *App {
 	app.agent = analysisagent.NewService(
 		app.conversations, app.catalog, app.workspaces, analysisagent.NewWorkerGateway(transport), app.analysis,
 	)
+	localStateRepository, err := localstate.OpenSQLite(paths.DatabasePath)
+	if err != nil {
+		_ = app.worker.Close()
+		_ = app.conversations.Close()
+		_ = app.catalog.Close()
+		_ = app.connections.Close()
+		_ = app.workspaces.Close()
+		_ = app.models.Close()
+		app.initErr = err
+		return app
+	}
+	app.localState = localStateRepository
 	return app
 }
 
@@ -195,6 +209,9 @@ func (a *App) shutdown(context.Context) {
 	}
 	if a.conversations != nil {
 		_ = a.conversations.Close()
+	}
+	if a.localState != nil {
+		_ = a.localState.Close()
 	}
 	if a.catalog != nil {
 		_ = a.catalog.Close()
@@ -318,6 +335,16 @@ func (a *App) terminalService() (*terminalruntime.Service, error) {
 	return a.terminals, nil
 }
 
+func (a *App) localStateRepository() (localstate.Repository, error) {
+	if a.initErr != nil {
+		return nil, a.initErr
+	}
+	if a.localState == nil {
+		return nil, apperror.New("local_state_unavailable", "Local session storage is unavailable.")
+	}
+	return a.localState, nil
+}
+
 type StartupSnapshot struct {
 	Ready   bool   `json:"ready"`
 	Error   string `json:"error"`
@@ -377,6 +404,32 @@ func (a *App) SaveExportFile(request desktop.ExportRequest) (bool, error) {
 		return false, nil
 	}
 	if err := desktop.WriteExport(target, prepared.Content); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (a *App) LoadLocalState(scope string) (localstate.Snapshot, error) {
+	repository, err := a.localStateRepository()
+	if err != nil {
+		return nil, err
+	}
+	snapshot, found, err := repository.Load(a.appContext(), scope)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, nil
+	}
+	return snapshot, nil
+}
+
+func (a *App) SaveLocalState(scope string, snapshot localstate.Snapshot) (bool, error) {
+	repository, err := a.localStateRepository()
+	if err != nil {
+		return false, err
+	}
+	if err := repository.Save(a.appContext(), scope, snapshot); err != nil {
 		return false, err
 	}
 	return true, nil
