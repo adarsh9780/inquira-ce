@@ -231,19 +231,19 @@ onUnmounted(() => {
 
 <style scoped>
 .workspace-shell-panel {
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-text-main) 3%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-text-main) 4%, transparent);
 }
 
 .workspace-center-pane {
   background-color: var(--color-workspace-surface);
   box-shadow: inset -1px 0 0 color-mix(in srgb, var(--color-text-main) 3%, transparent);
-  transition: width 220ms ease, border-color 180ms ease;
+  transition: width var(--motion-duration-standard) var(--motion-ease-spring), border-color var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .workspace-data-pane {
   background-color: var(--color-workspace-surface);
   box-shadow: inset 1px 0 0 color-mix(in srgb, var(--color-text-main) 2%, transparent);
-  transition: width 220ms ease, opacity 180ms ease;
+  transition: width var(--motion-duration-standard) var(--motion-ease-spring), opacity var(--motion-duration-fast) var(--motion-ease-standard);
   will-change: width, opacity;
 }
 

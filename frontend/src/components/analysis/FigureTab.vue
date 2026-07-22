@@ -61,7 +61,7 @@
         v-if="selectedFigure"
         :key="selectedArtifactId"
         ref="plotContainer"
-        class="absolute inset-0 p-4"
+        class="plotly-surface absolute inset-0 p-4"
       ></div>
 
       <!-- Empty State -->

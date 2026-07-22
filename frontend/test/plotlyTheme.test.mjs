@@ -145,6 +145,11 @@ test('plotly theme reads analytics colors and elevated legend surface from the a
     '--color-accent': '#D98958',
     '--color-chart-grid': '#243341',
     '--color-chart-zero': '#3B4F62',
+    '--color-chart-paper': '#121C27',
+    '--color-chart-plot': '#0F1822',
+    '--color-chart-tooltip-bg': '#233342',
+    '--color-chart-tooltip-border': '#476078',
+    '--font-ui': '"Premium Sans", sans-serif',
     '--color-chart-series-1': '#78A9E6',
     '--color-chart-series-2': '#E09963',
     '--color-chart-sequential-1': '#13243A',
@@ -170,14 +175,42 @@ test('plotly theme reads analytics colors and elevated legend surface from the a
       { mode: PLOTLY_THEME_MODE.SOFT },
     )
 
-    assert.equal(themed.layout.paper_bgcolor, '#101923')
-    assert.equal(themed.layout.plot_bgcolor, '#16212C')
+    assert.equal(themed.layout.paper_bgcolor, '#121C27')
+    assert.equal(themed.layout.plot_bgcolor, '#0F1822')
     assert.equal(themed.layout.legend.bgcolor, '#1B2835')
+    assert.equal(themed.layout.hoverlabel.bgcolor, '#233342')
+    assert.equal(themed.layout.hoverlabel.bordercolor, '#476078')
+    assert.equal(themed.layout.font.family, '"Premium Sans", sans-serif')
     assert.equal(themed.layout.xaxis.gridcolor, '#243341')
     assert.equal(themed.layout.xaxis.zerolinecolor, '#3B4F62')
     assert.equal(themed.layout.colorway[0], '#78A9E6')
     assert.equal(themed.layout.colorway[1], '#E09963')
     assert.equal(themed.layout.colorscale.diverging[1][1], '#1B2835')
+  } finally {
+    globalThis.window = previousWindow
+    globalThis.document = previousDocument
+    globalThis.getComputedStyle = previousGetComputedStyle
+  }
+})
+
+test('plotly typography follows live font token changes without a page reload', () => {
+  let selectedFont = '"Manrope", sans-serif'
+  const previousWindow = globalThis.window
+  const previousDocument = globalThis.document
+  const previousGetComputedStyle = globalThis.getComputedStyle
+  globalThis.window = {}
+  globalThis.document = { documentElement: {} }
+  globalThis.getComputedStyle = () => ({
+    getPropertyValue: (tokenName) => tokenName === '--font-ui' ? selectedFont : '',
+  })
+
+  try {
+    const first = applyPlotlyTheme({ data: [], layout: {} }, { mode: PLOTLY_THEME_MODE.HARD })
+    selectedFont = '"IBM Plex Sans", sans-serif'
+    const second = applyPlotlyTheme({ data: [], layout: {} }, { mode: PLOTLY_THEME_MODE.HARD })
+
+    assert.equal(first.layout.font.family, '"Manrope", sans-serif')
+    assert.equal(second.layout.font.family, '"IBM Plex Sans", sans-serif')
   } finally {
     globalThis.window = previousWindow
     globalThis.document = previousDocument

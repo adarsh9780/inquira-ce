@@ -35,7 +35,7 @@
           </ol>
         </section>
 
-        <section class="onboarding-enter self-center border-t border-[var(--color-border)] pt-8 lg:border-l lg:border-t-0 lg:pl-16 lg:pt-0" style="--onboarding-delay: 140ms" aria-label="Model connection">
+        <section class="onboarding-connection-panel onboarding-enter self-center p-6 sm:p-8" style="--onboarding-delay: 140ms" aria-label="Model connection">
           <Transition name="onboarding-success" mode="out-in">
             <div v-if="connected" key="connected" class="py-2" role="status" aria-live="polite">
               <div class="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-success-bg)] text-xl text-[var(--color-success)]">✓</div>
@@ -300,8 +300,19 @@ function openKeyPortal() {
 </script>
 
 <style scoped>
+.onboarding-root {
+  background: var(--color-base);
+}
+
+.onboarding-connection-panel {
+  background: var(--color-surface-raised);
+  border: 1px solid color-mix(in srgb, var(--color-border) 84%, var(--color-text-main) 16%);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-overlay), inset 0 1px 0 color-mix(in srgb, var(--color-text-main) 4%, transparent);
+}
+
 .onboarding-enter {
-  animation: onboarding-enter var(--motion-duration-slower) var(--motion-ease-standard) both;
+  animation: onboarding-enter var(--motion-duration-entrance) var(--motion-ease-spring) both;
   animation-delay: var(--onboarding-delay, 0ms);
 }
 

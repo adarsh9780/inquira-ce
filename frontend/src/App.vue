@@ -1053,11 +1053,11 @@ onUnmounted(() => {
 .app-nav-pane {
   /* App shell owns the structural sidebar rail width. */
   width: 244px;
-  transition: width var(--motion-duration-standard) var(--motion-ease-standard);
+  transition: width var(--motion-duration-slow) var(--motion-ease-spring);
   overflow: hidden;
   border-right: 1px solid var(--color-border);
   background-color: var(--color-sidebar-surface);
-  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--color-text-main) 4%, transparent);
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--color-text-main) 5%, transparent), 8px 0 24px color-mix(in srgb, var(--color-text-main) 3%, transparent);
 }
 
 .app-nav-pane-collapsed {

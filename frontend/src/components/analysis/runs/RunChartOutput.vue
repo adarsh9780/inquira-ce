@@ -1,5 +1,5 @@
 <template>
-  <div ref="plotContainer" class="h-80 min-h-72 w-full" data-run-chart></div>
+  <div ref="plotContainer" class="plotly-surface h-80 min-h-72 w-full" data-run-chart></div>
 </template>
 
 <script setup>

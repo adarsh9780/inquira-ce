@@ -47,9 +47,18 @@
   --color-selected-border: color-mix(in srgb, var(--color-accent) 38%, var(--color-border));
   --color-icon-muted: color-mix(in srgb, var(--color-text-muted) 84%, var(--color-base) 16%);
   --color-control-surface: color-mix(in srgb, var(--color-surface) 82%, var(--color-base) 18%);
+  --color-surface-raised: var(--color-panel-elevated);
+  --color-surface-inset: var(--color-panel-muted);
+  --color-focus-ring: color-mix(in srgb, var(--color-accent) 58%, transparent);
   --color-chart-accent: var(--color-secondary-accent);
   --color-chart-grid: var(--color-border);
   --color-chart-zero: var(--color-border-hover);
+  --color-chart-paper: var(--color-workspace-surface);
+  --color-chart-plot: var(--color-panel-elevated);
+  --color-chart-tooltip-bg: var(--color-panel-elevated);
+  --color-chart-tooltip-border: var(--color-border-hover);
+  --color-chart-modebar-bg: color-mix(in srgb, var(--color-panel-elevated) 92%, transparent);
+  --color-chart-modebar-icon: var(--color-text-muted);
   --color-chart-series-1: #D47948;
   --color-chart-series-2: #3B82F6;
   --color-chart-series-3: #0EA5E9;
@@ -133,8 +142,10 @@
   --motion-duration-popover-leave: 140ms;
   --motion-duration-dialog-enter: 220ms;
   --motion-duration-dialog-leave: 170ms;
+  --motion-duration-entrance: 420ms;
   --motion-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
   --motion-distance-popover: 0.25rem;
   --motion-scale-popover: 0.985;
   --blur-backdrop-subtle: 2px;
@@ -146,6 +157,8 @@
   --shadow-button: 0 1px 2px color-mix(in srgb, var(--color-text-main) 10%, transparent);
   --shadow-modal: 0 24px 48px color-mix(in srgb, var(--color-text-main) 20%, transparent);
   --shadow-lifted: 0 12px 32px color-mix(in srgb, var(--color-text-main) 14%, transparent);
+  --shadow-composer: 0 1px 2px color-mix(in srgb, var(--color-text-main) 7%, transparent), 0 10px 32px color-mix(in srgb, var(--color-text-main) 6%, transparent);
+  --shadow-overlay: 0 18px 48px color-mix(in srgb, var(--color-text-main) 16%, transparent);
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
@@ -204,9 +217,18 @@
   --color-selected-border: #D8B59C;
   --color-icon-muted: #6D726F;
   --color-control-surface: #F6F1E8;
+  --color-surface-raised: #FFFDF8;
+  --color-surface-inset: #F1EBE2;
+  --color-focus-ring: color-mix(in srgb, #B86A3D 58%, transparent);
   --color-chart-accent: #4F6FAF;
   --color-chart-grid: #DED5C8;
   --color-chart-zero: #CABDAD;
+  --color-chart-paper: #FBF8F2;
+  --color-chart-plot: #FFFDF8;
+  --color-chart-tooltip-bg: #FFFDF8;
+  --color-chart-tooltip-border: #CABDAD;
+  --color-chart-modebar-bg: color-mix(in srgb, #FFFDF8 92%, transparent);
+  --color-chart-modebar-icon: #6D726F;
   --color-chart-series-1: #B86A3D;
   --color-chart-series-2: #4F6FAF;
   --color-chart-series-3: #1686A7;
@@ -260,9 +282,18 @@
   --color-selected-border: #43617D;
   --color-icon-muted: #97A6B8;
   --color-control-surface: #17232F;
+  --color-surface-raised: #1B2835;
+  --color-surface-inset: #131E29;
+  --color-focus-ring: color-mix(in srgb, #D98958 62%, transparent);
   --color-chart-accent: #78A9E6;
   --color-chart-grid: #243341;
   --color-chart-zero: #3B4F62;
+  --color-chart-paper: #0F1722;
+  --color-chart-plot: #101923;
+  --color-chart-tooltip-bg: #1B2835;
+  --color-chart-tooltip-border: #3B4F62;
+  --color-chart-modebar-bg: color-mix(in srgb, #1B2835 94%, transparent);
+  --color-chart-modebar-icon: #97A6B8;
   --color-chart-series-1: #78A9E6;
   --color-chart-series-2: #E09963;
   --color-chart-series-3: #55B8A6;
@@ -305,6 +336,8 @@
   --shadow-button: 0 1px 2px color-mix(in srgb, var(--color-text-main) 10%, transparent);
   --shadow-modal: 0 24px 48px color-mix(in srgb, var(--color-text-main) 20%, transparent);
   --shadow-lifted: 0 12px 32px color-mix(in srgb, var(--color-text-main) 14%, transparent);
+  --shadow-composer: 0 1px 2px color-mix(in srgb, var(--color-text-main) 7%, transparent), 0 10px 32px color-mix(in srgb, var(--color-text-main) 6%, transparent);
+  --shadow-overlay: 0 18px 48px color-mix(in srgb, var(--color-text-main) 16%, transparent);
 }
 
 :root[data-font="ubuntu"],
@@ -387,6 +420,140 @@ body {
 #app {
   height: 100vh;
   width: 100vw;
+}
+
+:where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.app-shell-frame {
+  animation: shell-reveal var(--motion-duration-entrance) var(--motion-ease-spring) both;
+  isolation: isolate;
+}
+
+@keyframes shell-reveal {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0.25rem, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.chat-composer-surface {
+  background-color: var(--color-surface-raised);
+  border-color: color-mix(in srgb, var(--color-border) 88%, var(--color-text-main) 12%);
+  box-shadow: var(--shadow-composer);
+  transition:
+    border-color var(--motion-duration-standard) var(--motion-ease-standard),
+    box-shadow var(--motion-duration-standard) var(--motion-ease-standard),
+    transform var(--motion-duration-standard) var(--motion-ease-spring);
+}
+
+.chat-composer-surface:hover {
+  border-color: var(--color-border-hover);
+}
+
+.chat-composer-surface:focus-within {
+  border-color: var(--color-accent-border);
+  box-shadow: var(--shadow-composer), 0 0 0 3px color-mix(in srgb, var(--color-accent) 14%, transparent);
+  transform: translate3d(0, -1px, 0);
+}
+
+.chat-composer-surface.chat-composer-drag-active {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-composer), 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+}
+
+.composer-action-button {
+  align-items: center;
+  background: var(--color-text-main);
+  border: 1px solid color-mix(in srgb, var(--color-text-main) 76%, transparent);
+  border-radius: 999px;
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--color-text-main) 16%, transparent);
+  color: var(--color-base);
+  display: inline-flex;
+  height: 1.75rem;
+  justify-content: center;
+  width: 1.75rem;
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-standard),
+    transform var(--motion-duration-standard) var(--motion-ease-spring),
+    box-shadow var(--motion-duration-standard) var(--motion-ease-standard);
+}
+
+.composer-action-button:hover:not(:disabled) {
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--color-text-main) 20%, transparent);
+  transform: translate3d(0, -1px, 0) scale(1.025);
+}
+
+.composer-action-button:active:not(:disabled) {
+  box-shadow: var(--shadow-button);
+  transform: scale(0.965);
+}
+
+.composer-action-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.plotly-surface {
+  animation: chart-reveal var(--motion-duration-slow) var(--motion-ease-spring) both;
+  background: var(--color-chart-paper);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+@keyframes chart-reveal {
+  from {
+    opacity: 0;
+    transform: scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.plotly-surface .modebar {
+  background: var(--color-chart-modebar-bg) !important;
+  border: 1px solid var(--color-chart-tooltip-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-button);
+  margin: 0.45rem;
+  opacity: 0.7;
+  padding: 0.15rem;
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-standard),
+    transform var(--motion-duration-standard) var(--motion-ease-spring);
+}
+
+.plotly-surface:hover .modebar,
+.plotly-surface:focus-within .modebar {
+  opacity: 1;
+  transform: translate3d(0, 1px, 0);
+}
+
+.plotly-surface .modebar-group {
+  background: transparent !important;
+}
+
+.plotly-surface .modebar-btn {
+  border-radius: calc(var(--radius-md) - 0.125rem);
+  color: var(--color-chart-modebar-icon) !important;
+  transition: background-color var(--motion-duration-fast) var(--motion-ease-standard), color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.plotly-surface .modebar-btn:hover {
+  background: var(--color-selected-surface) !important;
+  color: var(--color-text-main) !important;
+}
+
+.plotly-surface .modebar-btn path {
+  fill: currentColor !important;
 }
 
 [data-tooltip] {
@@ -570,6 +737,12 @@ body {
     border-color: var(--color-primary-800);
   }
 
+  .btn-primary:active:not(:disabled),
+  .btn-secondary:active:not(:disabled),
+  .btn-danger:active:not(:disabled) {
+    transform: translateY(1px) scale(0.99);
+  }
+
   /* Secondary Button - Medium emphasis actions (e.g., Cancel, Refresh) */
   .btn-secondary {
     @apply inline-flex items-center justify-center font-medium rounded-lg focus:outline-none border disabled:opacity-50 disabled:cursor-not-allowed;
@@ -607,6 +780,10 @@ body {
   .btn-icon:hover {
     background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent);
     color: var(--color-text-main);
+  }
+
+  .btn-icon:active:not(:disabled) {
+    transform: scale(0.94);
   }
 
   /* Danger Button - For destructive actions */
@@ -657,7 +834,7 @@ body {
     @apply relative rounded-xl border overflow-hidden;
     background-color: var(--color-panel-elevated);
     border-color: var(--color-border);
-    box-shadow: var(--shadow-modal);
+    box-shadow: var(--shadow-modal), inset 0 1px 0 color-mix(in srgb, var(--color-text-main) 4%, transparent);
     transition: transform var(--motion-duration-standard) var(--motion-ease-standard),
       opacity var(--motion-duration-standard) var(--motion-ease-standard),
       box-shadow var(--motion-duration-standard) var(--motion-ease-standard);

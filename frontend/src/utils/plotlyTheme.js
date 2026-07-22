@@ -33,6 +33,11 @@ const DEFAULT_UI_COLORS = Object.freeze({
   accent: '#D47948',
   chartGrid: '#E4E4E7',
   chartZero: '#D4D4D8',
+  chartPaper: '#FFFFFF',
+  chartPlot: '#FFFFFF',
+  chartTooltipBg: '#FFFFFF',
+  chartTooltipBorder: '#D4D4D8',
+  fontFamily: 'sans-serif',
   colorway: DEFAULT_COLORWAY,
   sequentialScale: DEFAULT_SEQUENTIAL_SCALE,
   divergingScale: DEFAULT_DIVERGING_SCALE,
@@ -58,6 +63,11 @@ function refreshUiColors() {
     accent: readUiColor('--color-accent', DEFAULT_UI_COLORS.accent),
     chartGrid: readUiColor('--color-chart-grid', DEFAULT_UI_COLORS.chartGrid),
     chartZero: readUiColor('--color-chart-zero', DEFAULT_UI_COLORS.chartZero),
+    chartPaper: readUiColor('--color-chart-paper', DEFAULT_UI_COLORS.chartPaper),
+    chartPlot: readUiColor('--color-chart-plot', DEFAULT_UI_COLORS.chartPlot),
+    chartTooltipBg: readUiColor('--color-chart-tooltip-bg', DEFAULT_UI_COLORS.chartTooltipBg),
+    chartTooltipBorder: readUiColor('--color-chart-tooltip-border', DEFAULT_UI_COLORS.chartTooltipBorder),
+    fontFamily: readUiColor('--font-ui', DEFAULT_UI_COLORS.fontFamily),
     colorway: DEFAULT_COLORWAY.map((fallback, index) => (
       readUiColor(`--color-chart-series-${index + 1}`, fallback)
     )),
@@ -71,12 +81,6 @@ function refreshUiColors() {
     ],
   }
 }
-
-const FONT_FAMILY = (
-  typeof window !== 'undefined'
-    ? String(getComputedStyle(document.documentElement).getPropertyValue('--font-ui') || '').trim()
-    : ''
-) || 'sans-serif'
 
 const CARTESIAN_AXIS_KEY = /^(x|y)axis(\d+)?$/i
 const COLOR_AXIS_KEY = /^coloraxis(\d+)?$/i
@@ -277,12 +281,12 @@ function getHardAxisPatch() {
     title: {
       standoff: 10,
       font: {
-        family: FONT_FAMILY,
+        family: UI_COLORS.fontFamily,
         size: 12,
       },
     },
     tickfont: {
-      family: FONT_FAMILY,
+      family: UI_COLORS.fontFamily,
       size: 11,
     },
   })
@@ -311,7 +315,7 @@ function applyAnnotationTheme(layout, mode) {
   const annotationPatch = mode === PLOTLY_THEME_MODE.HARD
     ? {
         font: {
-          family: FONT_FAMILY,
+          family: UI_COLORS.fontFamily,
           size: 11,
           color: UI_COLORS.textMain,
         },
@@ -448,8 +452,8 @@ export function applyPlotlyTheme(figure, options = {}) {
   let themedData = applyBarTraceTemplate(rawData)
 
   const softLayoutPatch = {
-    paper_bgcolor: UI_COLORS.base,
-    plot_bgcolor: UI_COLORS.surface,
+    paper_bgcolor: UI_COLORS.chartPaper,
+    plot_bgcolor: UI_COLORS.chartPlot,
     colorway: [...UI_COLORS.colorway],
     colorscale: {
       sequential: [
@@ -472,6 +476,7 @@ export function applyPlotlyTheme(figure, options = {}) {
     },
     font: {
       color: UI_COLORS.textMain,
+      family: UI_COLORS.fontFamily,
     },
     title: {
       font: {
@@ -492,8 +497,8 @@ export function applyPlotlyTheme(figure, options = {}) {
       },
     },
     hoverlabel: {
-      bgcolor: UI_COLORS.surface,
-      bordercolor: UI_COLORS.border,
+      bgcolor: UI_COLORS.chartTooltipBg,
+      bordercolor: UI_COLORS.chartTooltipBorder,
       font: {
         color: UI_COLORS.textMain,
       },
@@ -506,14 +511,14 @@ export function applyPlotlyTheme(figure, options = {}) {
   if (mode === PLOTLY_THEME_MODE.HARD) {
     themedLayout = mergeDeep(themedLayout, {
       font: {
-        family: FONT_FAMILY,
+        family: UI_COLORS.fontFamily,
         size: 12,
       },
       title: {
         x: 0.02,
         xanchor: 'left',
         font: {
-          family: FONT_FAMILY,
+          family: UI_COLORS.fontFamily,
           size: 14,
         },
       },
@@ -524,14 +529,14 @@ export function applyPlotlyTheme(figure, options = {}) {
         xanchor: 'right',
         x: 1,
         font: {
-          family: FONT_FAMILY,
+          family: UI_COLORS.fontFamily,
           size: 11,
         },
       },
       hoverlabel: {
         align: 'left',
         font: {
-          family: FONT_FAMILY,
+          family: UI_COLORS.fontFamily,
           size: 12,
         },
       },

@@ -4,17 +4,12 @@
     <div class="relative">
       <div
         ref="inputCardRef"
-        class="group/composer relative flex flex-col rounded-xl border transition-all duration-150"
+        class="chat-composer-surface group/composer relative flex flex-col rounded-xl border"
+        :class="{ 'chat-composer-drag-active': isAttachmentDragActive }"
         @dragenter.prevent="handleAttachmentDragEnter"
         @dragover.prevent="handleAttachmentDragOver"
         @dragleave.prevent="handleAttachmentDragLeave"
         @drop.prevent="handleAttachmentDrop"
-        style="
-          background-color: var(--color-base);
-          border-color: var(--color-border);
-          box-shadow: var(--shadow-button);
-        "
-        :style="composerCardStyle"
       >
       <input
         ref="attachmentInputRef"
@@ -32,8 +27,6 @@
         @input="handleInputChange"
         @click="handleCaretInteraction"
         @keyup="handleCaretInteraction"
-        @focus="isFocused = true"
-        @blur="isFocused = false"
         placeholder="How can I help you today?"
         class="w-full px-3 pt-3 pb-1.5 resize-none focus:outline-none text-[13px] leading-[1.55] bg-transparent border-none"
         style="color: var(--color-text-main); min-height: 60px;"
@@ -121,18 +114,13 @@
           <button
             @click="handleActionButtonClick"
             :disabled="!canTriggerActionButton"
-            class="w-6 h-6 flex items-center justify-center transition-all duration-150 focus:outline-none"
-            :class="
-              canTriggerActionButton
-                ? 'hover:opacity-85'
-                : 'cursor-default opacity-50'
-            "
+            class="composer-action-button focus:outline-none"
             :title="actionButtonTitle"
             :aria-label="actionButtonTitle"
             :data-tooltip="actionButtonTitle"
           >
             <span
-              class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-text-main)] text-[var(--color-on-accent)] transition-all duration-300"
+              class="flex h-full w-full items-center justify-center rounded-full transition-transform duration-300"
               :class="{ 'voice-input-pulse': isVoiceInputActive }"
             >
               <StopIcon v-if="appStore.activeConversationIsLoading" class="w-3 h-3" />
@@ -237,7 +225,6 @@ useChatAutocomplete()
 useVoiceInput()
 
 const question = ref('')
-const isFocused = ref(false)
 const textareaRef = ref(null)
 const inputCardRef = ref(null)
 const attachmentInputRef = ref(null)
@@ -296,22 +283,6 @@ const stoppedConversationIds = ref(new Set())
 const showCommandSuggestions = computed(() => commandSuggestions.value.length > 0)
 const showColumnSuggestions = computed(() => columnSuggestions.value.length > 0)
 const imageAttachmentsSupported = computed(() => modelSupportsImages(appStore.selectedModel))
-const composerCardStyle = computed(() => {
-  const style = isFocused.value
-    ? {
-      borderColor: 'var(--color-accent-border)',
-      boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-accent) 15%, transparent)',
-    }
-    : {}
-  if (isAttachmentDragActive.value) {
-    return {
-      ...style,
-      borderColor: 'var(--color-accent)',
-      boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent)',
-    }
-  }
-  return style
-})
 const canSend = computed(() =>
   appStore.canAnalyze &&
   (question.value.trim().length > 0 || pendingAttachments.value.length > 0) &&

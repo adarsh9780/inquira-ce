@@ -894,7 +894,7 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
   height: 3rem;
   flex-shrink: 0;
   align-items: center;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
 }
 
 .sidebar-brand-button {
@@ -953,7 +953,9 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
   text-align: left;
   transition:
     background-color var(--motion-duration-standard) var(--motion-ease-standard),
-    color var(--motion-duration-standard) var(--motion-ease-standard);
+    box-shadow var(--motion-duration-standard) var(--motion-ease-standard),
+    color var(--motion-duration-standard) var(--motion-ease-standard),
+    transform var(--motion-duration-standard) var(--motion-ease-spring);
 }
 
 .sidebar-primary-row {
@@ -964,11 +966,13 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
 .sidebar-workspace-row:hover {
   background: color-mix(in srgb, var(--color-text-main) 5%, transparent);
   color: var(--color-text-main);
+  transform: translate3d(1px, 0, 0);
 }
 
 .sidebar-nav-row-active,
 .sidebar-workspace-row-active {
   background: var(--color-selected-surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-selected-border) 65%, transparent);
   color: var(--color-text-main);
 }
 
