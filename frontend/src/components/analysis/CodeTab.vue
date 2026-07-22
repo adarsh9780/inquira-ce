@@ -516,7 +516,7 @@ async function executeSnippet(code, successLine, options = {}) {
       // A notebook cell displays only its final expression. Kernel variables and
       // exports remain available to later code but are not repeated as outputs.
       variables: latestExpressionVariables(normalized),
-      artifacts: [],
+      artifacts: normalized.artifacts,
       execution_time: execTime,
     },
     {

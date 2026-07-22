@@ -1,5 +1,5 @@
 function isDataFrameLike(value) {
-  return Boolean(value && typeof value === 'object' && value.columns && value.data)
+  return Boolean(value && typeof value === 'object' && value.columns && (value.data || value.rows))
 }
 
 function isFigureLike(value) {
@@ -24,10 +24,11 @@ function normalizeDataFrameValue(value) {
   if (!value) return value
   if (Array.isArray(value)) return value
   if (!isDataFrameLike(value)) return value
-  if (!Array.isArray(value.columns) || !Array.isArray(value.data)) return value
+  const rawRows = Array.isArray(value.data) ? value.data : value.rows
+  if (!Array.isArray(value.columns) || !Array.isArray(rawRows)) return value
 
   // Convert pandas "split" JSON (columns + row arrays) into row objects.
-  const mappedRows = value.data.map((row) => {
+  const mappedRows = rawRows.map((row) => {
     if (!Array.isArray(row)) return row
     const result = {}
     value.columns.forEach((col, idx) => {
@@ -154,11 +155,11 @@ export function normalizeExecutionResponse(raw) {
   } else if (result !== null && result !== undefined) {
     const bucket = classifyResult(result, resultType)
     if (bucket === 'dataframe') {
-      response.variables.dataframes.result = normalizeDataFrameValue(result)
+      response.variables.dataframes[String(resultName || 'result')] = normalizeDataFrameValue(result)
     } else if (bucket === 'figure') {
-      response.variables.figures.result = result
+      response.variables.figures[String(resultName || 'result')] = result
     } else {
-      response.variables.scalars.result = result
+      response.variables.scalars[String(resultName || 'result')] = result
     }
   }
 
@@ -167,8 +168,13 @@ export function normalizeExecutionResponse(raw) {
 
 export function latestExpressionVariables(normalized) {
   const source = isObject(normalized?.variables) ? normalized.variables : {}
+  const preferredName = String(normalized?.result_name || 'result').trim() || 'result'
   const resultOnly = (bucket) => {
-    if (!isObject(bucket) || !Object.prototype.hasOwnProperty.call(bucket, 'result')) return {}
+    if (!isObject(bucket)) return {}
+    if (Object.prototype.hasOwnProperty.call(bucket, preferredName)) {
+      return { [preferredName]: bucket[preferredName] }
+    }
+    if (!Object.prototype.hasOwnProperty.call(bucket, 'result')) return {}
     return { result: bucket.result }
   }
 

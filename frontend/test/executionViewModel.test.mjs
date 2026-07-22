@@ -131,3 +131,31 @@ test('buildExecutionViewModel orders artifact-backed outputs newest-first by cre
   assert.equal(view.figures[0].name, 'newer_fig')
   assert.equal(view.figures[0].artifact_id, 'fig-new')
 })
+
+test('buildExecutionViewModel combines a durable dataframe pointer with its inline result preview', () => {
+  const view = buildExecutionViewModel({
+    output: '',
+    error: null,
+    variables: {
+      dataframes: {
+        sales_result: [{ customer: 'Carla', revenue: 2400 }],
+      },
+      figures: {},
+      scalars: {},
+    },
+    artifacts: [{
+      artifact_id: 'durable-sales-result',
+      kind: 'dataframe',
+      logical_name: 'sales_result',
+      display_name: 'Sales result',
+      row_count: 0,
+      schema: [],
+      preview_rows: [],
+    }],
+  })
+
+  assert.equal(view.dataframes.length, 1)
+  assert.equal(view.dataframes[0].data.artifact_id, 'durable-sales-result')
+  assert.deepEqual(view.dataframes[0].data.columns, ['customer', 'revenue'])
+  assert.deepEqual(view.dataframes[0].data.data, [{ customer: 'Carla', revenue: 2400 }])
+})

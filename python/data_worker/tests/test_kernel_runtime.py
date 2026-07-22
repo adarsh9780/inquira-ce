@@ -117,6 +117,36 @@ def test_kernel_captures_streams_dataframe_results_and_full_artifacts(tmp_path: 
     asyncio.run(scenario())
 
 
+def test_kernel_displays_and_captures_a_plotly_last_expression(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        catalog = tmp_path / "workspace.duckdb"
+        create_catalog(catalog)
+        manager = WorkspaceKernelManager(idle_seconds=300)
+        try:
+            result = await manager.execute(
+                workspace_id="workspace-plotly",
+                database_path=str(catalog),
+                code=(
+                    "import plotly.graph_objects as go\n"
+                    "sales_chart = go.Figure(data=[go.Bar(x=['West'], y=[25])])\n"
+                    "sales_chart"
+                ),
+                run_id="run-plotly",
+                artifact_dir=str(tmp_path / "plotly-artifacts"),
+                timeout_seconds=10,
+            )
+            assert result["success"] is True
+            assert result["result_kind"] == "figure"
+            assert result["result_name"] == "sales_chart"
+            assert result["result"]["data"][0]["type"] == "bar"
+            assert len(result["artifacts"]) == 1
+            assert result["artifacts"][0]["kind"] == "figure"
+        finally:
+            await manager.shutdown()
+
+    asyncio.run(scenario())
+
+
 def test_kernel_preserves_legacy_set_active_run_argument_order(tmp_path: Path) -> None:
     async def scenario() -> None:
         catalog = tmp_path / "workspace.duckdb"

@@ -320,6 +320,7 @@ function normalizeLiveDataframeArtifact(item, index) {
   const logicalName = String(data?.logical_name || item?.logical_name || item?.name || `dataframe_${index + 1}`).trim()
   return {
     artifact_id: artifactId,
+    source_artifact_id: String(data?.source_artifact_id || item?.source_artifact_id || '').trim() || undefined,
     logical_name: logicalName,
     display_name: String(data?.display_name || item?.display_name || logicalName).trim(),
     row_count: Number(data?.row_count || rows.length || 0),
@@ -578,6 +579,15 @@ watch(selectedArtifactId, async (newId) => {
       tableError.value = 'Selected table is not available for this turn.'
       return
     }
+    if (liveArtifact.source_artifact_id) {
+      try {
+        await prepareArtifact(newId)
+      } catch (error) {
+        if (isAbortError(error)) return
+        tableError.value = error?.message || 'Failed to load selected table.'
+      }
+      return
+    }
     const rows = normalizeClientRowsFromDataframeValue({
       columns: Array.isArray(liveArtifact.schema) ? liveArtifact.schema.map((column) => column?.name).filter(Boolean) : [],
       data: liveArtifact.preview_rows,
@@ -776,7 +786,9 @@ function columnsChanged(nextColumns) {
 // Data loading
 // ---------------------------------------------------------------------------
 async function prepareArtifact(artifactId) {
-  if (!artifactId || !appStore.activeWorkspaceId || !appStore.activeConversationId || !appStore.activeTurnId) return
+  if (!artifactId || !appStore.activeWorkspaceId) return
+  const sourceArtifactId = String(selectedArtifactMeta.value?.source_artifact_id || '').trim()
+  if (!sourceArtifactId && (!appStore.activeConversationId || !appStore.activeTurnId)) return
   tableError.value = ''
   useClientFallback.value = false
   clientRows.value = []
@@ -790,7 +802,8 @@ async function loadServerPage(artifactId, query = tableQuery.value) {
   const conversationId = String(appStore.activeConversationId || '').trim()
   const turnId = String(appStore.activeTurnId || '').trim()
   const normalizedArtifactId = String(artifactId || '').trim()
-  if (!workspaceId || !normalizedArtifactId || !conversationId || !turnId) return
+  const sourceArtifactId = String(selectedArtifactMeta.value?.source_artifact_id || '').trim()
+  if (!workspaceId || !normalizedArtifactId || (!sourceArtifactId && (!conversationId || !turnId))) return
 
   cancelPendingRequests()
   const requestToken = ++currentPageRequestToken
@@ -804,9 +817,23 @@ async function loadServerPage(artifactId, query = tableQuery.value) {
     const startRow = pageIndex * requestLimit
     const payload = await enqueueSerializedRequest(async () => {
       if (workspaceId !== String(appStore.activeWorkspaceId || '').trim()) throw createAbortError()
-      if (conversationId !== String(appStore.activeConversationId || '').trim()) throw createAbortError()
-      if (turnId !== String(appStore.activeTurnId || '').trim()) throw createAbortError()
+      if (!sourceArtifactId && conversationId !== String(appStore.activeConversationId || '').trim()) throw createAbortError()
+      if (!sourceArtifactId && turnId !== String(appStore.activeTurnId || '').trim()) throw createAbortError()
       if (normalizedArtifactId !== String(selectedArtifactId.value || '').trim()) throw createAbortError()
+      if (sourceArtifactId) {
+        return apiService.getDataframeArtifactRows(
+          workspaceId,
+          sourceArtifactId,
+          startRow,
+          requestLimit,
+          {
+            signal: controller.signal,
+            sortModel: toBackendSortModel(query),
+            filterModel: toBackendFilterModel(query),
+            searchText: String(tableSearch.value || '').trim(),
+          },
+        )
+      }
       return apiService.getTurnDataframeArtifactRows(
         conversationId,
         turnId,

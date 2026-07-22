@@ -427,6 +427,10 @@ body {
   outline-offset: 2px;
 }
 
+.chat-composer-surface textarea:focus-visible {
+  outline: none;
+}
+
 .app-shell-frame {
   animation: shell-reveal var(--motion-duration-entrance) var(--motion-ease-spring) both;
   isolation: isolate;

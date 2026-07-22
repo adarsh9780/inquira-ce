@@ -31,6 +31,59 @@ function dedupeByName(items = []) {
   })
 }
 
+function comparableNames(item) {
+  return [
+    item?.name,
+    item?.logical_name,
+    item?.display_name,
+    item?.data?.logical_name,
+    item?.data?.display_name,
+  ]
+    .map((value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ''))
+    .filter(Boolean)
+}
+
+function entriesMatch(left, right) {
+  const rightNames = new Set(comparableNames(right))
+  return comparableNames(left).some((name) => rightNames.has(name))
+}
+
+function dataframeShape(value) {
+  if (Array.isArray(value)) {
+    const rows = value.filter((row) => row && typeof row === 'object' && !Array.isArray(row))
+    return { rows, columns: rows[0] ? Object.keys(rows[0]) : [] }
+  }
+  if (!value || typeof value !== 'object') return { rows: [], columns: [] }
+  const columns = Array.isArray(value.columns) ? value.columns.map(String) : []
+  const rows = normalizePreviewRows(value.data ?? value.rows, columns)
+  return { rows, columns: columns.length ? columns : (rows[0] ? Object.keys(rows[0]) : []) }
+}
+
+function mergeDataframeEntries(artifactEntries, parsedEntries) {
+  const consumed = new Set()
+  const enrichedArtifacts = artifactEntries.map((artifact) => {
+    const parsedIndex = parsedEntries.findIndex((entry, index) => !consumed.has(index) && entriesMatch(artifact, entry))
+    if (parsedIndex < 0) return artifact
+    consumed.add(parsedIndex)
+    const parsed = parsedEntries[parsedIndex]
+    const shape = dataframeShape(parsed.data)
+    if (!shape.rows.length && !shape.columns.length) return artifact
+    return {
+      ...artifact,
+      data: {
+        ...(artifact.data || {}),
+        columns: shape.columns,
+        data: shape.rows,
+        row_count: Math.max(Number(artifact?.data?.row_count || 0), shape.rows.length),
+      },
+    }
+  })
+  return dedupeByName([
+    ...enrichedArtifacts,
+    ...parsedEntries.filter((_entry, index) => !consumed.has(index)),
+  ])
+}
+
 function normalizePreviewRows(rows, columns) {
   if (!Array.isArray(rows)) return []
   const names = Array.isArray(columns) ? columns.filter(Boolean).map((col) => String(col)) : []
@@ -184,7 +237,7 @@ export function buildExecutionViewModel(response, options = {}) {
   const artifactFigures = buildArtifactFigures(response?.artifacts)
   const artifactScalars = buildArtifactScalars(response?.artifacts)
 
-  const mergedDataframes = dedupeByName([...artifactDataframes, ...parsedDataframeEntries])
+  const mergedDataframes = mergeDataframeEntries(artifactDataframes, parsedDataframeEntries)
   const mergedFigures = dedupeByName([...artifactFigures, ...parsedFigureEntries])
   const mergedScalars = dedupeByName([...artifactScalars, ...parsedScalarEntries])
 

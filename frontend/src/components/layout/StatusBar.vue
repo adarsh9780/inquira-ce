@@ -401,7 +401,7 @@ function runtimeStatusMeta(status) {
     case 'ready':
       return { dotClass: 'bg-[var(--color-success)]', textClass: 'text-[var(--color-success)]', label: 'Ready', showSpinner: false }
     case 'busy':
-      return { dotClass: 'bg-[var(--color-warning)]', textClass: 'text-[var(--color-warning)]', label: 'Working', showSpinner: true }
+      return { dotClass: 'bg-[var(--color-warning)]', textClass: 'text-[var(--color-warning)]', label: 'Working', showSpinner: false }
     case 'starting':
     case 'connecting':
       return { dotClass: 'bg-[var(--color-accent)]', textClass: 'text-[var(--color-accent)]', label: 'Starting', showSpinner: true }

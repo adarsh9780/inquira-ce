@@ -16,5 +16,7 @@ test('TableTab exposes promoted user revisions alongside AI artifacts', () => {
   assert.equal(source.includes("const liveArtifact = liveDataframeArtifacts.value.find("), true)
   assert.equal(source.includes('appStore.promotedUserDataframes'), true)
   assert.equal(source.includes("item?.promoted ? 'revision' : 'live'"), true)
+  assert.equal(source.includes('source_artifact_id'), true)
+  assert.equal(source.includes('apiService.getDataframeArtifactRows('), true)
   assert.equal(source.includes('apiService.v1ListTurnArtifacts('), true)
 })

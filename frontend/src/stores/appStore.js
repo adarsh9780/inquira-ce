@@ -3076,6 +3076,7 @@ export const useAppStore = defineStore('app', () => {
     }
 
     const rawData = output?.data && typeof output.data === 'object' ? output.data : output
+    const sourceArtifactId = String(rawData?.artifact_id || output?.artifact_id || '').trim()
     const logicalName = String(
       rawData?.logical_name || output?.logical_name || output?.name || `user_table_${promotedUserDataframes.value.length + 1}`,
     ).trim()
@@ -3092,6 +3093,7 @@ export const useAppStore = defineStore('app', () => {
       data: {
         ...rawData,
         artifact_id: artifactId,
+        source_artifact_id: sourceArtifactId || undefined,
         logical_name: logicalName,
         display_name: displayName,
       },

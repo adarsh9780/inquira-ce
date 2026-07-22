@@ -11,6 +11,7 @@ dependencies = [
     "langchain-ollama>=1.0,<2",
     "langchain-openai>=1.0.1,<2",
     "langgraph>=1.0,<2",
+    "nbformat>=4.2,<6",
     "openpyxl>=3.1.5,<4",
     "pandas>=2.2,<4",
     "plotly>=6,<7",

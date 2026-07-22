@@ -38,6 +38,22 @@ test('maps DataFrame result to variables.dataframes', () => {
   assert.equal(Object.keys(normalized.variables.scalars).length, 0)
 })
 
+test('uses the kernel result name for a named dataframe final expression', () => {
+  const normalized = normalizeExecutionResponse({
+    success: true,
+    result: { columns: ['a'], rows: [{ a: 1 }] },
+    result_kind: 'dataframe',
+    result_name: 'edited_result',
+  })
+
+  assert.deepEqual(normalized.variables.dataframes.edited_result, [{ a: 1 }])
+  assert.deepEqual(latestExpressionVariables(normalized), {
+    dataframes: { edited_result: [{ a: 1 }] },
+    figures: {},
+    scalars: {},
+  })
+})
+
 test('maps scalar results to variables.scalars when type is missing', () => {
   const normalized = normalizeExecutionResponse({
     success: true,
