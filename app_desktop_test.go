@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
+	"encoding/base64"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"inquira-go/internal/appdirs"
 	"inquira-go/internal/desktop"
@@ -14,6 +18,59 @@ import (
 type desktopCommandRecorder struct {
 	name string
 	args []string
+}
+
+func TestSaveExportFileUsesNativeDialogAndPersistsTheChosenFile(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "analysis.csv")
+	dialogCalls := 0
+	app := &App{saveDialog: func(_ context.Context, options runtime.SaveDialogOptions) (string, error) {
+		dialogCalls++
+		if options.DefaultFilename != "analysis.csv" || len(options.Filters) != 1 || options.Filters[0].Pattern != "*.csv" {
+			t.Fatalf("dialog options = %#v", options)
+		}
+		return target, nil
+	}}
+	saved, err := app.SaveExportFile(desktop.ExportRequest{
+		DefaultFileName: "analysis.csv",
+		ContentBase64:   base64.StdEncoding.EncodeToString([]byte("a,b\n1,2\n")),
+		Filters:         []desktop.ExportFilter{{Name: "CSV File", Extensions: []string{"csv"}}},
+	})
+	if err != nil || !saved || dialogCalls != 1 {
+		t.Fatalf("SaveExportFile() = %v, %v; dialog calls = %d", saved, err, dialogCalls)
+	}
+	contents, err := os.ReadFile(target)
+	if err != nil || string(contents) != "a,b\n1,2\n" {
+		t.Fatalf("saved export = %q, %v", contents, err)
+	}
+}
+
+func TestSaveExportFileTreatsAnEmptyDialogPathAsCancellation(t *testing.T) {
+	app := &App{saveDialog: func(context.Context, runtime.SaveDialogOptions) (string, error) { return "", nil }}
+	saved, err := app.SaveExportFile(desktop.ExportRequest{
+		DefaultFileName: "analysis.py",
+		ContentBase64:   base64.StdEncoding.EncodeToString([]byte("print('ok')")),
+	})
+	if err != nil || saved {
+		t.Fatalf("SaveExportFile() = %v, %v", saved, err)
+	}
+}
+
+func TestSaveExportFileValidatesBeforeOpeningDialogAndPropagatesDialogErrors(t *testing.T) {
+	dialogCalls := 0
+	app := &App{saveDialog: func(context.Context, runtime.SaveDialogOptions) (string, error) {
+		dialogCalls++
+		return "", errors.New("dialog unavailable")
+	}}
+	if _, err := app.SaveExportFile(desktop.ExportRequest{DefaultFileName: "../unsafe.csv"}); err == nil || dialogCalls != 0 {
+		t.Fatalf("invalid export error = %v; dialog calls = %d", err, dialogCalls)
+	}
+	_, err := app.SaveExportFile(desktop.ExportRequest{
+		DefaultFileName: "analysis.csv",
+		ContentBase64:   base64.StdEncoding.EncodeToString([]byte("data")),
+	})
+	if err == nil || !strings.Contains(err.Error(), "dialog unavailable") || dialogCalls != 1 {
+		t.Fatalf("dialog error = %v; dialog calls = %d", err, dialogCalls)
+	}
 }
 
 func (r *desktopCommandRecorder) Start(name string, args ...string) error {

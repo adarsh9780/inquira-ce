@@ -1,4 +1,10 @@
 import { writeFile } from '@tauri-apps/plugin-fs'
+import { bytesToBase64 } from './exportEncoding'
+
+function wailsApp() {
+  if (typeof window === 'undefined') return null
+  return window.go?.main?.App || null
+}
 
 export async function persistExportFile({
   defaultFileName,
@@ -7,6 +13,23 @@ export async function persistExportFile({
   tauriFilters,
   browserFileTypes
 }) {
+  const app = wailsApp()
+  if (app?.SaveExportFile) {
+    try {
+      return Boolean(await app.SaveExportFile({
+        default_file_name: defaultFileName,
+        content_base64: bytesToBase64(payload),
+        filters: (Array.isArray(tauriFilters) ? tauriFilters : []).map((filter) => ({
+          name: String(filter?.name || ''),
+          extensions: Array.isArray(filter?.extensions) ? filter.extensions.map(String) : [],
+        })),
+      }))
+    } catch (error) {
+      console.error('Failed to save export through Wails:', error)
+      throw error
+    }
+  }
+
   if (window.__TAURI_INTERNALS__) {
     const { save } = await import('@tauri-apps/plugin-dialog')
     const savePath = await save({

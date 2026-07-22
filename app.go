@@ -48,6 +48,7 @@ type App struct {
 	catalog       *datacatalog.Service
 	terminals     *terminalruntime.Service
 	desktop       *desktop.Service
+	saveDialog    func(context.Context, runtime.SaveDialogOptions) (string, error)
 	startupLog    sync.Once
 	initErr       error
 }
@@ -63,7 +64,7 @@ type RerunFinalResult struct {
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	app := &App{desktop: desktop.New()}
+	app := &App{desktop: desktop.New(), saveDialog: runtime.SaveFileDialog}
 	paths, err := appdirs.Resolve()
 	if err != nil {
 		if logsDir, fallbackErr := createFallbackStartupLogDirectory(os.TempDir()); fallbackErr == nil {
@@ -345,6 +346,40 @@ func (a *App) OpenExternalURL(rawURL string) error {
 		return apperror.New("desktop_unavailable", "Desktop integration is unavailable.")
 	}
 	return a.desktop.OpenExternalURL(rawURL)
+}
+
+func (a *App) SaveExportFile(request desktop.ExportRequest) (bool, error) {
+	prepared, err := desktop.PrepareExport(request)
+	if err != nil {
+		return false, err
+	}
+	if a.saveDialog == nil {
+		return false, apperror.New("desktop_unavailable", "The desktop save dialog is unavailable.")
+	}
+	filters := make([]runtime.FileFilter, 0, len(prepared.Filters))
+	for _, filter := range prepared.Filters {
+		patterns := make([]string, 0, len(filter.Extensions))
+		for _, extension := range filter.Extensions {
+			patterns = append(patterns, "*."+extension)
+		}
+		filters = append(filters, runtime.FileFilter{DisplayName: filter.Name, Pattern: strings.Join(patterns, ";")})
+	}
+	target, err := a.saveDialog(a.appContext(), runtime.SaveDialogOptions{
+		Title:                "Export file",
+		DefaultFilename:      prepared.DefaultFileName,
+		Filters:              filters,
+		CanCreateDirectories: true,
+	})
+	if err != nil {
+		return false, fmt.Errorf("open export save dialog: %w", err)
+	}
+	if target == "" {
+		return false, nil
+	}
+	if err := desktop.WriteExport(target, prepared.Content); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (a *App) OpenStartupLogs() error {

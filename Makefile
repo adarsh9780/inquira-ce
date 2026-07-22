@@ -7,7 +7,7 @@ prepare-uv:
 
 test:
 	go test ./...
-	cd frontend && node --test test/firstRunModelOnboarding.test.mjs test/llmConfigTabFlow.test.mjs test/workspaceAiReadinessExperience.test.mjs test/localConnectionExperience.test.mjs test/nativeTurnArtifactApi.test.mjs test/nativeCatalogCodeApi.test.mjs test/runtimeProvisioningExperience.test.mjs test/conversationUsageAndShortcuts.test.mjs test/nativeWailsTerminalIntegration.test.mjs test/nativeWailsDesktopRecovery.test.mjs
+	cd frontend && node --test test/firstRunModelOnboarding.test.mjs test/llmConfigTabFlow.test.mjs test/workspaceAiReadinessExperience.test.mjs test/localConnectionExperience.test.mjs test/nativeTurnArtifactApi.test.mjs test/nativeCatalogCodeApi.test.mjs test/runtimeProvisioningExperience.test.mjs test/conversationUsageAndShortcuts.test.mjs test/nativeWailsTerminalIntegration.test.mjs test/nativeWailsDesktopRecovery.test.mjs test/nativeWailsExportFile.test.mjs
 	cd frontend && node --test test/nativeAgentRuntimeContract.test.mjs
 	uv run --project python/data_worker --group dev pytest
 	cd frontend && npm run test:runtime

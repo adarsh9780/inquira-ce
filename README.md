@@ -105,6 +105,11 @@ restart the current executable with its original arguments. External links are
 opened through a Go allowlist that accepts only credential-free HTTP and HTTPS
 URLs and invokes the platform launcher without a shell.
 
+CSV, Python, PNG, and HTML exports use the native Wails save dialog. Go validates
+the filename and file filters, decodes the binary payload, and atomically
+publishes a private file at the destination selected by the user. Canceling the
+dialog does not fall through to a browser download.
+
 The same worker hosts the ported LangGraph agent, including tool calling,
 structured responses, retries, memory summarization, and the existing pandas,
 DuckDB, and Plotly analysis tools.
