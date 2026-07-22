@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -19,6 +22,7 @@ import (
 	"inquira-go/internal/netclient"
 	"inquira-go/internal/runtimeprovision"
 	"inquira-go/internal/schemageneration"
+	terminalruntime "inquira-go/internal/terminal"
 	workerruntime "inquira-go/internal/worker"
 	"inquira-go/internal/workspace"
 	dataworkerbundle "inquira-go/python/data_worker"
@@ -40,6 +44,7 @@ type App struct {
 	agent         *analysisagent.Service
 	worker        *workerruntime.PersistentTransport
 	catalog       *datacatalog.Service
+	terminals     *terminalruntime.Service
 	initErr       error
 }
 
@@ -59,6 +64,11 @@ func NewApp() *App {
 		return &App{initErr: err}
 	}
 	app := &App{paths: paths}
+	app.terminals = terminalruntime.NewPlatformService(func(eventName string, payload any) {
+		if app.ctx != nil {
+			runtime.EventsEmit(app.ctx, eventName, payload)
+		}
+	})
 	if err := paths.Ensure(); err != nil {
 		app.initErr = err
 		return app
@@ -163,6 +173,9 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) shutdown(context.Context) {
+	if a.terminals != nil {
+		_ = a.terminals.Close()
+	}
 	if a.worker != nil {
 		_ = a.worker.Close()
 	}
@@ -279,6 +292,16 @@ func (a *App) modelService() (*modelconfig.Service, error) {
 		return nil, a.initErr
 	}
 	return a.models, nil
+}
+
+func (a *App) terminalService() (*terminalruntime.Service, error) {
+	if a.initErr != nil {
+		return nil, a.initErr
+	}
+	if a.terminals == nil {
+		return nil, apperror.New("terminal_unavailable", "The local terminal is unavailable.")
+	}
+	return a.terminals, nil
 }
 
 // ApplicationPaths exposes the resolved local directories for diagnostics.
@@ -424,6 +447,9 @@ func (a *App) DeleteWorkspace(workspaceID string) (workspace.DeletionResult, err
 	service, err := a.workspaceService()
 	if err != nil {
 		return workspace.DeletionResult{}, err
+	}
+	if a.terminals != nil {
+		_, _ = a.terminals.Stop("workspace:" + strings.TrimSpace(workspaceID))
 	}
 	connectionService, err := a.connectionService()
 	if err != nil {
@@ -855,8 +881,59 @@ func (a *App) GetWorkspacePaths(workspaceID string) (WorkspacePaths, error) {
 	return WorkspacePaths{
 		WorkspaceDirectory: directory,
 		DuckDBPath:         filepath.Join(directory, "workspace.duckdb"),
-		TerminalEnabled:    false,
+		TerminalEnabled:    true,
 	}, nil
+}
+
+func (a *App) StartTerminalSession(request terminalruntime.StartRequest) (terminalruntime.StartResponse, error) {
+	service, err := a.terminalService()
+	if err != nil {
+		return terminalruntime.StartResponse{}, err
+	}
+	workspaceID := strings.TrimSpace(request.WorkspaceID)
+	workspaceService, err := a.workspaceService()
+	if err != nil {
+		return terminalruntime.StartResponse{}, err
+	}
+	summary, err := workspaceService.Summary(a.appContext(), workspaceID)
+	if err != nil {
+		return terminalruntime.StartResponse{}, err
+	}
+	expectedSessionID := "workspace:" + summary.ID
+	if strings.TrimSpace(request.SessionID) != expectedSessionID {
+		return terminalruntime.StartResponse{}, apperror.New("terminal_session_invalid", "The terminal session does not match the active workspace.")
+	}
+	directory := filepath.Join(a.paths.DataDir, "workspaces", summary.ID)
+	if err := os.MkdirAll(directory, 0o700); err != nil {
+		return terminalruntime.StartResponse{}, fmt.Errorf("prepare terminal workspace: %w", err)
+	}
+	request.Cwd = directory
+	return service.Start(a.appContext(), request)
+}
+
+func (a *App) WriteTerminalSession(sessionID, data string) error {
+	service, err := a.terminalService()
+	if err != nil {
+		return err
+	}
+	return service.Write(sessionID, data)
+}
+
+func (a *App) ResizeTerminalSession(sessionID string, cols, rows int) error {
+	service, err := a.terminalService()
+	if err != nil {
+		return err
+	}
+	return service.Resize(sessionID, cols, rows)
+}
+
+func (a *App) StopTerminalSession(sessionID string) (terminalruntime.StopResponse, error) {
+	service, err := a.terminalService()
+	if err != nil {
+		return terminalruntime.StopResponse{}, err
+	}
+	stopped, err := service.Stop(sessionID)
+	return terminalruntime.StopResponse{SessionID: strings.TrimSpace(sessionID), Stopped: stopped}, err
 }
 
 func (a *App) ListConnections(workspaceID string) (connection.ListResponse, error) {

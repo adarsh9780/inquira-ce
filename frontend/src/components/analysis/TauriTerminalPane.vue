@@ -140,6 +140,7 @@ async function startSession() {
 
   try {
     const response = await tauriTerminalService.startSession({
+      workspaceId: appStore.activeWorkspaceId,
       sessionId: sessionId.value,
       cwd: appStore.terminalCwd || null,
       cols: terminal.cols,
@@ -179,7 +180,7 @@ function clearScreen() {
 
 onMounted(async () => {
   isMounted.value = true
-  if (!tauriTerminalService.isTauriRuntime()) return
+  if (!tauriTerminalService.isNativeRuntime()) return
   if (!terminalHostRef.value) return
 
   const terminalFontFamily = readThemeFont('--font-mono', '"JetBrainsMono Nerd Font", "JetBrains Mono", monospace')

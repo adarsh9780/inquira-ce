@@ -124,6 +124,7 @@ import { useAppStore } from '../../stores/appStore'
 import apiService from '../../services/apiService'
 import { toast } from '../../composables/useToast'
 import TauriTerminalPane from './TauriTerminalPane.vue'
+import tauriTerminalService from '../../services/tauriTerminalService'
 import { filenameFromPath } from '../../utils/pathUtils'
 
 const appStore = useAppStore()
@@ -140,7 +141,7 @@ const liveStderr = ref('')
 const commandInputRef = ref(null)
 const commandHistory = ref([])
 const commandHistoryIndex = ref(-1)
-const useTauriPty = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
+const useTauriPty = tauriTerminalService.isNativeRuntime()
 
 const displayCwd = computed(() => appStore.terminalCwd || 'n/a')
 const promptPrefix = computed(() => `${filenameFromPath(displayCwd.value, '~')} $`)

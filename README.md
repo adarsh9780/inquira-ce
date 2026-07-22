@@ -93,6 +93,12 @@ conversation, turn, and run. Cancelling a request cannot stop a newer analysis
 in the same workspace. Tool progress and intervention responses use the same
 local Go-to-worker RPC boundary rather than the legacy HTTP service.
 
+The consent-gated local terminal also runs natively in the Wails application.
+Go owns one interactive shell session per workspace, streams PTY data through
+scoped Wails events, and cleans up sessions on reset, workspace deletion, or
+application shutdown. Unix builds use the operating-system PTY and Windows uses
+ConPTY, including terminal resizing on both platforms.
+
 The same worker hosts the ported LangGraph agent, including tool calling,
 structured responses, retries, memory summarization, and the existing pandas,
 DuckDB, and Plotly analysis tools.
@@ -171,6 +177,7 @@ internal/conversation/         SQLite conversation index and filesystem artifact
 internal/modelconfig/          SQLite, keychain, provider, and model services
 internal/netclient/            Proxy and certificate-aware HTTP client
 internal/runtimeprovision/     Runtime policy and provisioning service
+internal/terminal/             Workspace-scoped native PTY lifecycle
 internal/worker/               Persistent Python process and concurrent JSON-RPC routing
 internal/workspace/            Native workspace metadata and activation service
 python/data_worker/            Embedded DuckDB adapter worker and contract tests
