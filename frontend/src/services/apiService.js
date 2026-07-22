@@ -42,6 +42,22 @@ function nativeWailsApp() {
   return window.go?.main?.App || null
 }
 
+function waitForAbortableDelay(delayMs, signal = null) {
+  if (signal?.aborted) return Promise.resolve(false)
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve(true)
+    }, Math.max(0, Number(delayMs || 0)))
+    const onAbort = () => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
+      resolve(false)
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
 function normalizeNativeTurn(turn) {
   if (!turn || typeof turn !== 'object') return turn
   const parse = (value, fallback) => {
@@ -1102,6 +1118,8 @@ export const apiService = {
   },
 
   async v1GetTermsAndConditions() {
+    const app = nativeWailsApp()
+    if (app?.GetTermsAndConditions) return app.GetTermsAndConditions()
     return axios.get('/api/v1/legal/terms')
   },
 
@@ -1376,10 +1394,24 @@ export const apiService = {
   },
 
   async v1ListWorkspaceCommands(workspaceId) {
+    const app = nativeWailsApp()
+    if (app?.ListWorkspaceCommands) return app.ListWorkspaceCommands(String(workspaceId || ''))
     return v1Api.runtime.listWorkspaceCommands(workspaceId)
   },
 
   async v1ExecuteWorkspaceCommand(workspaceId, payload) {
+    const app = nativeWailsApp()
+    if (app?.ExecuteWorkspaceCommand) {
+      return app.ExecuteWorkspaceCommand({
+        workspace_id: String(workspaceId || ''),
+        conversation_id: String(payload?.conversation_id || ''),
+        text: String(payload?.text || ''),
+        name: String(payload?.name || ''),
+        raw_args: String(payload?.raw_args || ''),
+        default_table: String(payload?.default_table || ''),
+        row_limit: Number(payload?.row_limit || 500),
+      })
+    }
     return v1Api.runtime.executeWorkspaceCommand(workspaceId, payload)
   },
 
@@ -1669,6 +1701,16 @@ export const apiService = {
   },
 
   async subscribeWorkspaceArtifactUsage(workspaceId, { signal = null, onEvent = null } = {}) {
+    const app = nativeWailsApp()
+    if (app?.GetWorkspaceArtifactUsage) {
+      while (!signal?.aborted) {
+        const snapshot = await this.v1GetWorkspaceArtifactUsage(workspaceId, { signal })
+        if (signal?.aborted) break
+        if (onEvent) onEvent({ event: 'snapshot', data: snapshot })
+        if (!await waitForAbortableDelay(3000, signal)) break
+      }
+      return
+    }
     const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/usage/stream`
     const response = await authorizedFetch(url, {
       method: 'GET',

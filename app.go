@@ -19,12 +19,14 @@ import (
 	"inquira-go/internal/conversation"
 	"inquira-go/internal/datacatalog"
 	"inquira-go/internal/desktop"
+	"inquira-go/internal/legal"
 	"inquira-go/internal/localstate"
 	"inquira-go/internal/manualanalysis"
 	"inquira-go/internal/modelconfig"
 	"inquira-go/internal/netclient"
 	"inquira-go/internal/runtimeprovision"
 	"inquira-go/internal/schemageneration"
+	"inquira-go/internal/slashcommand"
 	terminalruntime "inquira-go/internal/terminal"
 	workerruntime "inquira-go/internal/worker"
 	"inquira-go/internal/workspace"
@@ -43,6 +45,7 @@ type App struct {
 	artifacts     *artifactbrowser.Service
 	analysis      *analysisruntime.Service
 	manual        *manualanalysis.Service
+	commands      *slashcommand.Service
 	schemas       *schemageneration.Service
 	agent         *analysisagent.Service
 	worker        *workerruntime.PersistentTransport
@@ -172,6 +175,9 @@ func NewApp() *App {
 		filepath.Join(paths.DataDir, "workspaces"), filepath.Join(paths.DataDir, "execution-staging"),
 	)
 	app.manual = manualanalysis.NewService(app.conversations, app.catalog, app.analysis)
+	app.commands = slashcommand.NewService(
+		app.conversations, app.catalog, slashcommand.NewWorkerGateway(transport), app.analysis,
+	)
 	app.agent = analysisagent.NewService(
 		app.conversations, app.catalog, app.workspaces, analysisagent.NewWorkerGateway(transport), app.analysis,
 	)
@@ -245,6 +251,16 @@ func (a *App) manualAnalysisService() (*manualanalysis.Service, error) {
 		return nil, apperror.New("manual_analysis_unavailable", "Manual Python analysis is unavailable.")
 	}
 	return a.manual, nil
+}
+
+func (a *App) slashCommandService() (*slashcommand.Service, error) {
+	if a.initErr != nil {
+		return nil, a.initErr
+	}
+	if a.commands == nil {
+		return nil, apperror.New("slash_commands_unavailable", "Workspace commands are unavailable.")
+	}
+	return a.commands, nil
 }
 
 func (a *App) agentService() (*analysisagent.Service, error) {
@@ -373,6 +389,10 @@ func (a *App) OpenExternalURL(rawURL string) error {
 		return apperror.New("desktop_unavailable", "Desktop integration is unavailable.")
 	}
 	return a.desktop.OpenExternalURL(rawURL)
+}
+
+func (a *App) GetTermsAndConditions() legal.Terms {
+	return legal.CurrentTerms()
 }
 
 func (a *App) SaveExportFile(request desktop.ExportRequest) (bool, error) {
@@ -888,6 +908,24 @@ func (a *App) RunManualCode(request manualanalysis.RunRequest) (manualanalysis.R
 	return service.Run(a.appContext(), request, func(event analysisruntime.WorkerEvent) {
 		runtime.EventsEmit(a.appContext(), "analysis-runtime-event", event)
 	})
+}
+
+func (a *App) ExecuteWorkspaceCommand(request slashcommand.ExecuteRequest) (slashcommand.ExecuteResult, error) {
+	service, err := a.slashCommandService()
+	if err != nil {
+		return slashcommand.ExecuteResult{}, err
+	}
+	return service.Execute(a.appContext(), request, func(event analysisruntime.WorkerEvent) {
+		runtime.EventsEmit(a.appContext(), "analysis-runtime-event", event)
+	})
+}
+
+func (a *App) ListWorkspaceCommands(workspaceID string) (slashcommand.Catalog, error) {
+	service, err := a.slashCommandService()
+	if err != nil {
+		return slashcommand.Catalog{}, err
+	}
+	return service.List(a.appContext(), workspaceID)
 }
 
 func (a *App) AnalyzeQuestion(request analysisagent.AnalyzeRequest) (analysisagent.AnalyzeResult, error) {

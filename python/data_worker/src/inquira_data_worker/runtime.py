@@ -9,6 +9,7 @@ from typing import Any, Callable
 
 from .langgraph_agent import LangGraphAnalysisAgent
 from .artifacts import inspect_parquet, query_parquet
+from .commands import CommandExecutionError, compile_command, list_command_definitions
 from .errors import AdapterError
 from .kernel import WorkspaceKernelManager
 from .interventions import InterventionBroker
@@ -125,6 +126,10 @@ class WorkerRuntime:
                 }
             elif method == "schema_describe":
                 response["result"] = await self.schema_generator.generate(params)
+            elif method == "command_compile":
+                response["result"] = compile_command(params)
+            elif method == "command_list":
+                response["result"] = {"commands": list_command_definitions()}
             elif method == "artifact_inspect":
                 response["result"] = await asyncio.to_thread(
                     inspect_parquet, _artifact_path(params)
@@ -186,6 +191,8 @@ class WorkerRuntime:
             response["error"] = {"code": exc.code, "message": exc.message}
         except AdapterError as exc:
             response["error"] = {"code": exc.code, "message": exc.message}
+        except CommandExecutionError as exc:
+            response["error"] = {"code": "command_invalid", "message": str(exc)}
         except Exception as exc:
             response["error"] = {
                 "code": "worker_internal_error",

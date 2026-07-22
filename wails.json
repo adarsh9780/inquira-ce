@@ -6,6 +6,13 @@
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
+  "info": {
+    "companyName": "Inquira",
+    "productName": "Inquira",
+    "productVersion": "0.5.35",
+    "copyright": "Copyright © 2026 Inquira",
+    "comments": "Local-first AI data analysis"
+  },
   "author": {
     "name": "Adarsh Maurya",
     "email": "adarshmaurya7@gmail.com"

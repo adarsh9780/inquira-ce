@@ -166,6 +166,25 @@ func TestExecutionFailurePersistsTerminalTurnWithoutPublishingArtifacts(t *testi
 	}
 }
 
+func TestExecutionCanPersistAssistantOutputFromStructuredResultEnvelope(t *testing.T) {
+	gateway := &fakeKernelGateway{result: ExecuteWorkerResult{
+		Success: true, ResultKind: "object",
+		Result: json.RawMessage(`{"output":"/mean for sales.amount: 20","result":20}`),
+	}}
+	service, conversations, createdConversation, turn, _ := newExecutionService(t, gateway)
+	_, err := service.Execute(context.Background(), ExecuteRequest{
+		ConversationID: createdConversation.ID, TurnID: turn.ID, Code: "command", TimeoutSeconds: 30,
+		AssistantText: "Executed /mean.", UseResultOutput: true,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := conversations.GetTurn(context.Background(), turn.ID)
+	if err != nil || stored.AssistantText != "/mean for sales.amount: 20" {
+		t.Fatalf("persisted result output = %#v, %v", stored, err)
+	}
+}
+
 func TestExecutionRejectsOwnershipTimeoutCatalogAndUnsafeArtifactCandidates(t *testing.T) {
 	gateway := &fakeKernelGateway{result: ExecuteWorkerResult{Success: true}}
 	service, conversations, createdConversation, turn, catalog := newExecutionService(t, gateway)

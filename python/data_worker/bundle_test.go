@@ -22,6 +22,7 @@ func TestExtractWritesTheWorkerProjectAndIsRepeatable(t *testing.T) {
 		"src/inquira_data_worker/agent_v2/prompts/react_system.yaml",
 		"src/inquira_data_worker/rpc.py",
 		"src/inquira_data_worker/runtime.py",
+		"src/inquira_data_worker/commands.py",
 		"src/inquira_data_worker/adapters/file.py",
 	} {
 		content, err := os.ReadFile(filepath.Join(target, relative))

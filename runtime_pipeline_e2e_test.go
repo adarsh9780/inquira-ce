@@ -22,6 +22,7 @@ import (
 	"inquira-go/internal/manualanalysis"
 	"inquira-go/internal/modelconfig"
 	"inquira-go/internal/runtimeprovision"
+	"inquira-go/internal/slashcommand"
 	workerruntime "inquira-go/internal/worker"
 	"inquira-go/internal/workspace"
 	dataworkerbundle "inquira-go/python/data_worker"
@@ -177,6 +178,23 @@ func TestProductionRuntimePipelineEndToEnd(t *testing.T) {
 	}
 	if _, err := os.Stat(manualArtifactPath); err != nil {
 		t.Fatalf("stored manual artifact is unavailable: %v", err)
+	}
+	commands := slashcommand.NewService(
+		conversations, catalogs, slashcommand.NewWorkerGateway(transport), runs,
+	)
+	commandResult, err := commands.Execute(ctx, slashcommand.ExecuteRequest{
+		WorkspaceID: createdWorkspace.ID, Text: "/shape sales", RowLimit: 500,
+	}, nil)
+	if err != nil || commandResult.Name != "shape" || commandResult.ConversationID == "" || commandResult.TurnID == "" {
+		t.Fatalf("execute native slash command: result=%+v err=%v", commandResult, err)
+	}
+	var shapeResult struct {
+		Data []struct {
+			RowCount int `json:"row_count"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(commandResult.Result, &shapeResult); err != nil || len(shapeResult.Data) != 1 || shapeResult.Data[0].RowCount != 2 {
+		t.Fatalf("native slash command payload=%s err=%v", commandResult.Result, err)
 	}
 
 	agent := analysisagent.NewService(

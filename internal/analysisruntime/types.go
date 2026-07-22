@@ -12,10 +12,13 @@ type Run struct {
 }
 
 type ExecuteRequest struct {
-	ConversationID string `json:"conversation_id"`
-	TurnID         string `json:"turn_id"`
-	Code           string `json:"code"`
-	TimeoutSeconds int    `json:"timeout_seconds"`
+	ConversationID  string `json:"conversation_id"`
+	TurnID          string `json:"turn_id"`
+	Code            string `json:"code"`
+	TimeoutSeconds  int    `json:"timeout_seconds"`
+	AssistantText   string `json:"assistant_text,omitempty"`
+	MetadataJSON    string `json:"metadata_json,omitempty"`
+	UseResultOutput bool   `json:"use_result_output,omitempty"`
 }
 
 type ExecuteWorkerRequest struct {

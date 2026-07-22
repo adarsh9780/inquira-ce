@@ -94,7 +94,8 @@ func (s *Service) Execute(ctx context.Context, request ExecuteRequest, emit func
 		}
 		message := "The Python runtime could not execute this turn."
 		_, _ = s.conversations.FailTurn(persistContext, conversation.FailTurnRequest{
-			TurnID: turnID, CodeSnapshot: request.Code, ErrorMessage: message,
+			TurnID: turnID, AssistantText: request.AssistantText, CodeSnapshot: request.Code, ErrorMessage: message,
+			MetadataJSON:   request.MetadataJSON,
 			ToolEventsJSON: executionEventsJSON(false, "", "", message, false),
 		})
 		return ExecuteResult{}, apperror.Wrap("execution_failed", message, err)
@@ -111,7 +112,8 @@ func (s *Service) Execute(ctx context.Context, request ExecuteRequest, emit func
 			message = "Python execution failed."
 		}
 		if _, err := s.conversations.FailTurn(ctx, conversation.FailTurnRequest{
-			TurnID: turnID, CodeSnapshot: request.Code, ErrorMessage: message,
+			TurnID: turnID, AssistantText: request.AssistantText, CodeSnapshot: request.Code, ErrorMessage: message,
+			MetadataJSON:   request.MetadataJSON,
 			ToolEventsJSON: executionEventsJSON(false, workerResult.Stdout, workerResult.Stderr, message, workerResult.TimedOut),
 		}); err != nil {
 			return ExecuteResult{}, err
@@ -122,7 +124,8 @@ func (s *Service) Execute(ctx context.Context, request ExecuteRequest, emit func
 	result.Artifacts, err = s.PublishCandidates(ctx, ownedConversation, turn, run, workerResult.Artifacts)
 	if err != nil {
 		_, _ = s.conversations.FailTurn(ctx, conversation.FailTurnRequest{
-			TurnID: turnID, CodeSnapshot: request.Code, ErrorMessage: err.Error(),
+			TurnID: turnID, AssistantText: request.AssistantText, CodeSnapshot: request.Code, ErrorMessage: err.Error(),
+			MetadataJSON:   request.MetadataJSON,
 			ToolEventsJSON: executionEventsJSON(false, workerResult.Stdout, workerResult.Stderr, err.Error(), false),
 		})
 		return ExecuteResult{}, err
@@ -131,8 +134,18 @@ func (s *Service) Execute(ctx context.Context, request ExecuteRequest, emit func
 	if len(workerResult.Result) > 0 && string(workerResult.Result) != "null" {
 		resultJSON = string(workerResult.Result)
 	}
+	assistantText := request.AssistantText
+	if request.UseResultOutput {
+		var envelope struct {
+			Output string `json:"output"`
+		}
+		if json.Unmarshal(workerResult.Result, &envelope) == nil && strings.TrimSpace(envelope.Output) != "" {
+			assistantText = strings.TrimSpace(envelope.Output)
+		}
+	}
 	if _, err := s.conversations.CompleteTurn(ctx, conversation.CompleteTurnRequest{
-		TurnID: turnID, CodeSnapshot: request.Code, ResultJSON: resultJSON,
+		TurnID: turnID, AssistantText: assistantText, CodeSnapshot: request.Code, ResultJSON: resultJSON,
+		MetadataJSON:   request.MetadataJSON,
 		ResultKind:     workerResult.ResultKind,
 		ToolEventsJSON: executionEventsJSON(true, workerResult.Stdout, workerResult.Stderr, "", false),
 	}); err != nil {
