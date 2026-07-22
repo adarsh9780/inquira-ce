@@ -69,8 +69,15 @@ one local directory containing flat, UUID-named artifact and attachment files;
 there are no per-question folders or duplicate Markdown, Python, or manifest
 files. Payloads are staged and atomically published before their SQLite pointer
 is committed. Startup reconciliation removes unreferenced files, completes
-interrupted conversation deletion, and marks missing payloads without touching
-the workspace DuckDB catalog.
+interrupted conversation deletion, marks missing payloads, and changes turns
+left queued or running by an unclean shutdown into retryable failed turns
+without touching the workspace DuckDB catalog.
+
+Conversation history is loaded newest-first through stable SQLite cursor pages,
+so opening a long conversation does not load every turn into the UI.
+Provider-reported token and cost usage is aggregated from persisted turn
+metadata without estimating missing fields, and the same usage is shown in
+conversation trees.
 
 Python analysis runs through one lazily started worker process owned by Go.
 That process maintains one Jupyter kernel per active workspace, opens the

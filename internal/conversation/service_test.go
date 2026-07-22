@@ -4,10 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -16,6 +19,149 @@ import (
 	"inquira-go/internal/apperror"
 	"inquira-go/internal/workspace"
 )
+
+func TestConversationUsageAggregatesOnlyValidProviderReportedValues(t *testing.T) {
+	service, workspaceID, _, _ := newTestService(t)
+	ctx := context.Background()
+	created, err := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata := []string{
+		`{"token_usage":{"input_tokens":100,"output_tokens":40,"price_usd":0.001}}`,
+		`{"token_usage":{"input_tokens":20.9,"cached_tokens":5,"output_tokens":"10","total_tokens":35}}`,
+		`{"token_usage":{"input_tokens":-1,"output_tokens":true,"cached_tokens":9223372036854775808,"price_usd":"invalid"}}`,
+		`{"token_usage":null}`,
+		`{}`,
+	}
+	for index, value := range metadata {
+		turn, createErr := service.CreateTurn(ctx, CreateTurnRequest{
+			ConversationID: created.ID,
+			UserText:       fmt.Sprintf("Question %d", index),
+		})
+		if createErr != nil {
+			t.Fatal(createErr)
+		}
+		if _, completeErr := service.CompleteTurn(ctx, CompleteTurnRequest{
+			TurnID: turn.ID, AssistantText: "Answer", MetadataJSON: value,
+		}); completeErr != nil {
+			t.Fatal(completeErr)
+		}
+	}
+	repository := service.repository.(*SQLiteRepository)
+	if _, err := repository.db.ExecContext(ctx, `UPDATE turns SET metadata_json = 'not-json' WHERE sequence = 5 AND conversation_id = ?`, created.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := service.GetConversationUsage(ctx, created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.ConversationID != created.ID || summary.TurnCount != 5 || summary.TurnsWithUsage != 2 {
+		t.Fatalf("usage summary = %#v", summary)
+	}
+	if summary.Usage.InputTokens == nil || *summary.Usage.InputTokens != 120 ||
+		summary.Usage.OutputTokens == nil || *summary.Usage.OutputTokens != 50 ||
+		summary.Usage.CachedTokens == nil || *summary.Usage.CachedTokens != 5 ||
+		summary.Usage.TotalTokens == nil || *summary.Usage.TotalTokens != 35 ||
+		summary.Usage.PriceUSD == nil || math.Abs(*summary.Usage.PriceUSD-0.001) > 1e-12 {
+		t.Fatalf("usage totals = %#v", summary.Usage)
+	}
+	if _, err := service.GetConversationUsage(ctx, "missing"); appErrorCode(err) != "conversation_not_found" {
+		t.Fatalf("missing conversation error = %v", err)
+	}
+}
+
+func TestTurnPagesUseStableNewestFirstCursorWithoutDuplicates(t *testing.T) {
+	service, workspaceID, _, _ := newTestService(t)
+	ctx := context.Background()
+	created, _ := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID})
+	for index := 1; index <= 7; index++ {
+		if _, err := service.CreateTurn(ctx, CreateTurnRequest{
+			ConversationID: created.ID, UserText: fmt.Sprintf("Question %d", index),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	first, err := service.ListTurnPage(ctx, created.ID, 3, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := turnSequences(first.Turns); !slices.Equal(got, []int{7, 6, 5}) || first.NextCursor == "" {
+		t.Fatalf("first page = %#v, cursor %q", got, first.NextCursor)
+	}
+	second, err := service.ListTurnPage(ctx, created.ID, 3, first.NextCursor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := turnSequences(second.Turns); !slices.Equal(got, []int{4, 3, 2}) || second.NextCursor == "" {
+		t.Fatalf("second page = %#v, cursor %q", got, second.NextCursor)
+	}
+	third, err := service.ListTurnPage(ctx, created.ID, 3, second.NextCursor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := turnSequences(third.Turns); !slices.Equal(got, []int{1}) || third.NextCursor != "" {
+		t.Fatalf("third page = %#v, cursor %q", got, third.NextCursor)
+	}
+	if _, err := service.ListTurnPage(ctx, created.ID, 3, "invalid-cursor"); appErrorCode(err) != "turn_cursor_invalid" {
+		t.Fatalf("invalid cursor error = %v", err)
+	}
+	limited, err := service.ListTurnPage(ctx, created.ID, 500, "")
+	if err != nil || len(limited.Turns) != 7 {
+		t.Fatalf("bounded page = %#v, %v", limited, err)
+	}
+}
+
+func TestReconciliationFailsInterruptedTurnsOnceAndPreservesBranches(t *testing.T) {
+	service, workspaceID, _, _ := newTestService(t)
+	ctx := context.Background()
+	created, _ := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID})
+	completed, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: created.ID, UserText: "Done"})
+	if _, err := service.CompleteTurn(ctx, CompleteTurnRequest{TurnID: completed.ID, AssistantText: "Saved"}); err != nil {
+		t.Fatal(err)
+	}
+	queued, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: created.ID, ParentTurnID: &completed.ID, UserText: "Queued"})
+	running, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: created.ID, ParentTurnID: &completed.ID, UserText: "Running"})
+	repository := service.repository.(*SQLiteRepository)
+	if _, err := repository.db.ExecContext(ctx, `UPDATE turns SET status = ? WHERE id = ?`, TurnStatusRunning, running.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := service.ReconcileWorkspace(ctx, workspaceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.RecoveredTurns != 2 {
+		t.Fatalf("reconciliation = %#v", result)
+	}
+	turns, _ := service.ListTurns(ctx, created.ID)
+	byID := make(map[string]Turn, len(turns))
+	for _, turn := range turns {
+		byID[turn.ID] = turn
+	}
+	if byID[completed.ID].Status != TurnStatusCompleted || byID[completed.ID].AssistantText != "Saved" {
+		t.Fatalf("completed turn changed = %#v", byID[completed.ID])
+	}
+	for _, id := range []string{queued.ID, running.ID} {
+		if byID[id].Status != TurnStatusFailed || !strings.Contains(byID[id].ErrorMessage, "closed") || byID[id].ParentTurnID == nil || *byID[id].ParentTurnID != completed.ID {
+			t.Fatalf("recovered turn = %#v", byID[id])
+		}
+	}
+	second, err := service.ReconcileWorkspace(ctx, workspaceID)
+	if err != nil || second.RecoveredTurns != 0 {
+		t.Fatalf("second reconciliation = %#v, %v", second, err)
+	}
+}
+
+func turnSequences(turns []Turn) []int {
+	result := make([]int, 0, len(turns))
+	for _, turn := range turns {
+		result = append(result, turn.Sequence)
+	}
+	return result
+}
 
 func newTestService(t *testing.T) (*Service, string, string, string) {
 	t.Helper()

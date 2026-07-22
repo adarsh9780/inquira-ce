@@ -11,6 +11,24 @@ test('api client exposes durable conversation usage endpoint', () => {
 
   assert.equal(apiService.includes('async v1GetConversationUsage(conversationId)'), true)
   assert.equal(contract.includes("usage: (conversationId) => axios.get(`/api/v1/conversations/${conversationId}/usage`)"), true)
+  assert.equal(apiService.includes('app?.GetConversationUsage'), true)
+  assert.equal(apiService.includes('return app.GetConversationUsage(String(conversationId || \'\'))'), true)
+})
+
+test('native turn history uses the Go cursor page instead of loading every turn', () => {
+  const apiService = read('src/services/apiService.js')
+
+  assert.equal(apiService.includes('app?.ListConversationTurnPage'), true)
+  assert.equal(apiService.includes('app.ListConversationTurnPage('), true)
+  assert.equal(apiService.includes('String(before || \'\')'), true)
+})
+
+test('native conversation tree carries turn and conversation usage', () => {
+  const apiService = read('src/services/apiService.js')
+
+  assert.equal(apiService.includes('usage: turn?.metadata?.token_usage || null'), true)
+  assert.equal(apiService.includes('app.GetConversationUsage(String(item.id || \'\'))'), true)
+  assert.equal(apiService.includes('usage_summary: usageSummary'), true)
 })
 
 test('status bar and store use full active conversation usage aggregate', () => {

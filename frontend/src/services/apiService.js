@@ -61,6 +61,7 @@ function nativeTurnTree(turns) {
   const nodes = new Map(normalized.map((turn) => [String(turn.id), {
     ...turn,
     display_no: Number(turn.sequence || 0),
+    usage: turn?.metadata?.token_usage || null,
     children: [],
   }]))
   const roots = []
@@ -1224,14 +1225,24 @@ export const apiService = {
   },
 
   async v1GetConversationUsage(conversationId) {
-    if (nativeWailsApp()) {
-      return { conversation_id: String(conversationId || ''), request_count: 0, usage: {} }
-    }
+    const app = nativeWailsApp()
+    if (app?.GetConversationUsage) return app.GetConversationUsage(String(conversationId || ''))
     return v1Api.conversations.usage(conversationId)
   },
 
   async v1ListTurns(conversationId, limit = 5, before = null) {
     const app = nativeWailsApp()
+    if (app?.ListConversationTurnPage) {
+      const page = await app.ListConversationTurnPage(
+        String(conversationId || ''),
+        Number(limit || 5),
+        String(before || '')
+      )
+      return {
+        turns: (Array.isArray(page?.turns) ? page.turns : []).map(normalizeNativeTurn),
+        next_cursor: page?.next_cursor || null,
+      }
+    }
     if (app?.ListConversationTurns) {
       const all = (await app.ListConversationTurns(String(conversationId || ''))).map(normalizeNativeTurn).reverse()
       return { turns: all.slice(0, limit), next_cursor: null }
@@ -1283,7 +1294,10 @@ export const apiService = {
         workspace_id: String(workspaceId || ''),
         conversations: await Promise.all((Array.isArray(conversations) ? conversations : []).map(async (item) => {
           const tree = nativeTurnTree(await app.ListConversationTurns(String(item.id || '')))
-          return { ...item, roots: tree.roots, final_turn_id: item.final_turn_id || null, usage_summary: null }
+          const usageSummary = app.GetConversationUsage
+            ? await app.GetConversationUsage(String(item.id || ''))
+            : null
+          return { ...item, roots: tree.roots, final_turn_id: item.final_turn_id || null, usage_summary: usageSummary }
         })),
       }
     }

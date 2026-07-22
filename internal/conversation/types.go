@@ -29,6 +29,26 @@ type Conversation struct {
 	UpdatedAt   string  `json:"updated_at"`
 }
 
+type TurnPage struct {
+	Turns      []Turn `json:"turns"`
+	NextCursor string `json:"next_cursor,omitempty"`
+}
+
+type UsageSummary struct {
+	InputTokens  *int64   `json:"input_tokens"`
+	OutputTokens *int64   `json:"output_tokens"`
+	CachedTokens *int64   `json:"cached_tokens"`
+	TotalTokens  *int64   `json:"total_tokens"`
+	PriceUSD     *float64 `json:"price_usd"`
+}
+
+type ConversationUsage struct {
+	ConversationID string       `json:"conversation_id"`
+	TurnCount      int          `json:"turn_count"`
+	TurnsWithUsage int          `json:"turns_with_usage"`
+	Usage          UsageSummary `json:"usage"`
+}
+
 type MoveTurnRequest struct {
 	ConversationID string  `json:"conversation_id"`
 	TurnID         string  `json:"turn_id"`
@@ -144,4 +164,5 @@ type ReconciliationResult struct {
 	OrphansRemoved       int    `json:"orphans_removed"`
 	MissingArtifacts     int    `json:"missing_artifacts"`
 	DeletedConversations int    `json:"deleted_conversations"`
+	RecoveredTurns       int    `json:"recovered_turns"`
 }

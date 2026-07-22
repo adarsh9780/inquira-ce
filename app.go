@@ -483,6 +483,22 @@ func (a *App) ListConversationTurns(conversationID string) ([]conversation.Turn,
 	return service.ListTurns(a.appContext(), conversationID)
 }
 
+func (a *App) ListConversationTurnPage(conversationID string, limit int, before string) (conversation.TurnPage, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return conversation.TurnPage{}, err
+	}
+	return service.ListTurnPage(a.appContext(), conversationID, limit, before)
+}
+
+func (a *App) GetConversationUsage(conversationID string) (conversation.ConversationUsage, error) {
+	service, err := a.conversationService()
+	if err != nil {
+		return conversation.ConversationUsage{}, err
+	}
+	return service.GetConversationUsage(a.appContext(), conversationID)
+}
+
 func (a *App) GetConversationTurn(turnID string) (conversation.Turn, error) {
 	service, err := a.conversationService()
 	if err != nil {

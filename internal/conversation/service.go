@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,6 +32,8 @@ type repository interface {
 	CreateTurn(context.Context, Turn) (Turn, error)
 	GetTurn(context.Context, string) (Turn, error)
 	ListTurns(context.Context, string) ([]Turn, error)
+	ListTurnPage(context.Context, string, int, int) ([]Turn, error)
+	RecoverInterruptedTurns(context.Context, string, string, string) (int, error)
 	CompleteTurn(context.Context, Turn) (Turn, error)
 	FailTurn(context.Context, Turn) (Turn, error)
 	MoveTurn(context.Context, string, string, *string, string) (Turn, error)
@@ -192,6 +196,55 @@ func (s *Service) ListTurns(ctx context.Context, conversationID string) ([]Turn,
 		return nil, apperror.Wrap("turn_list_failed", "Could not load conversation turns.", err)
 	}
 	return turns, nil
+}
+
+func (s *Service) ListTurnPage(ctx context.Context, conversationID string, limit int, before string) (TurnPage, error) {
+	id := strings.TrimSpace(conversationID)
+	if id == "" {
+		return TurnPage{}, apperror.New("conversation_required", "Choose a conversation before listing turns.")
+	}
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	beforeSequence := 0
+	if cursorValue := strings.TrimSpace(before); cursorValue != "" {
+		cursor, err := decodeTurnCursor(cursorValue)
+		if err != nil {
+			return TurnPage{}, apperror.New("turn_cursor_invalid", "The turn history cursor is invalid.")
+		}
+		beforeSequence = cursor.Sequence
+	}
+	turns, err := s.repository.ListTurnPage(ctx, id, limit+1, beforeSequence)
+	if errors.Is(err, errConversationNotFound) {
+		return TurnPage{}, apperror.New("conversation_not_found", "Conversation not found.")
+	}
+	if err != nil {
+		return TurnPage{}, apperror.Wrap("turn_list_failed", "Could not load conversation turns.", err)
+	}
+	page := TurnPage{Turns: turns}
+	if len(turns) > limit {
+		page.Turns = turns[:limit]
+		page.NextCursor = encodeTurnCursor(page.Turns[len(page.Turns)-1])
+	}
+	return page, nil
+}
+
+func (s *Service) GetConversationUsage(ctx context.Context, conversationID string) (ConversationUsage, error) {
+	id := strings.TrimSpace(conversationID)
+	if id == "" {
+		return ConversationUsage{}, apperror.New("conversation_required", "Conversation identity is required.")
+	}
+	turns, err := s.repository.ListTurns(ctx, id)
+	if errors.Is(err, errConversationNotFound) {
+		return ConversationUsage{}, apperror.New("conversation_not_found", "Conversation not found.")
+	}
+	if err != nil {
+		return ConversationUsage{}, apperror.Wrap("conversation_usage_failed", "Could not load conversation usage.", err)
+	}
+	return aggregateConversationUsage(id, turns), nil
 }
 
 func (s *Service) GetTurn(ctx context.Context, turnID string) (Turn, error) {
@@ -625,6 +678,11 @@ func (s *Service) ReconcileWorkspace(ctx context.Context, workspaceID string) (R
 		return ReconciliationResult{}, apperror.Wrap("reconciliation_index_failed", "Could not load conversation storage references.", err)
 	}
 	result := ReconciliationResult{WorkspaceID: id}
+	recovered, err := s.repository.RecoverInterruptedTurns(ctx, id, formatTime(s.now().UTC()), "The application closed before this analysis completed. Run the question again.")
+	if err != nil {
+		return result, apperror.Wrap("reconciliation_index_failed", "Could not recover interrupted conversation turns.", err)
+	}
+	result.RecoveredTurns = recovered
 	referenced := make(map[string]map[string]struct{})
 	artifactsByPath := make(map[string]Artifact)
 	invalidArtifacts := make([]Artifact, 0)
@@ -715,6 +773,124 @@ func (s *Service) turnUpdateResult(turn Turn, err error) (Turn, error) {
 		return Turn{}, apperror.Wrap("turn_update_failed", "Could not update the conversation turn.", err)
 	}
 	return turn, nil
+}
+
+func aggregateConversationUsage(conversationID string, turns []Turn) ConversationUsage {
+	result := ConversationUsage{ConversationID: conversationID, TurnCount: len(turns)}
+	for _, turn := range turns {
+		var metadata map[string]any
+		decoder := json.NewDecoder(strings.NewReader(turn.MetadataJSON))
+		decoder.UseNumber()
+		if decoder.Decode(&metadata) != nil {
+			continue
+		}
+		var trailing any
+		if decoder.Decode(&trailing) != io.EOF {
+			continue
+		}
+		rawUsage, ok := metadata["token_usage"].(map[string]any)
+		if !ok {
+			continue
+		}
+		hasUsage := false
+		for _, field := range []struct {
+			name   string
+			target **int64
+		}{
+			{name: "input_tokens", target: &result.Usage.InputTokens},
+			{name: "output_tokens", target: &result.Usage.OutputTokens},
+			{name: "cached_tokens", target: &result.Usage.CachedTokens},
+			{name: "total_tokens", target: &result.Usage.TotalTokens},
+		} {
+			value, valid := normalizeUsageInteger(rawUsage[field.name])
+			if !valid {
+				continue
+			}
+			addUsageInteger(field.target, value)
+			hasUsage = true
+		}
+		if price, valid := normalizeUsageNumber(rawUsage["price_usd"]); valid {
+			if result.Usage.PriceUSD == nil {
+				result.Usage.PriceUSD = new(float64)
+			}
+			if *result.Usage.PriceUSD <= math.MaxFloat64-price {
+				*result.Usage.PriceUSD += price
+				hasUsage = true
+			}
+		}
+		if hasUsage {
+			result.TurnsWithUsage++
+		}
+	}
+	return result
+}
+
+func normalizeUsageInteger(value any) (int64, bool) {
+	if value == nil {
+		return 0, false
+	}
+	if number, ok := value.(float64); ok {
+		if math.IsNaN(number) || math.IsInf(number, 0) || number < 0 || number >= math.Exp2(63) {
+			return 0, false
+		}
+		return int64(number), true
+	}
+	var raw string
+	switch typed := value.(type) {
+	case json.Number:
+		raw = typed.String()
+	case string:
+		raw = strings.TrimSpace(typed)
+	default:
+		return 0, false
+	}
+	if integer, err := strconv.ParseInt(raw, 10, 64); err == nil {
+		return integer, integer >= 0
+	}
+	number, err := strconv.ParseFloat(raw, 64)
+	if err != nil || math.IsNaN(number) || math.IsInf(number, 0) || number < 0 || number >= math.Exp2(63) {
+		return 0, false
+	}
+	return int64(number), true
+}
+
+func normalizeUsageNumber(value any) (float64, bool) {
+	if value == nil {
+		return 0, false
+	}
+	var number float64
+	switch typed := value.(type) {
+	case float64:
+		number = typed
+	case json.Number:
+		parsed, err := typed.Float64()
+		if err != nil {
+			return 0, false
+		}
+		number = parsed
+	case string:
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 64)
+		if err != nil {
+			return 0, false
+		}
+		number = parsed
+	default:
+		return 0, false
+	}
+	return number, !math.IsNaN(number) && !math.IsInf(number, 0) && number >= 0
+}
+
+func addUsageInteger(target **int64, value int64) {
+	if *target == nil {
+		copy := value
+		*target = &copy
+		return
+	}
+	if value > math.MaxInt64-**target {
+		**target = math.MaxInt64
+		return
+	}
+	**target += value
 }
 
 func normalizeTitle(value string) (string, error) {

@@ -548,6 +548,64 @@ func (r *SQLiteRepository) ListTurns(ctx context.Context, conversationID string)
 	return result, rows.Err()
 }
 
+func (r *SQLiteRepository) ListTurnPage(ctx context.Context, conversationID string, limit, beforeSequence int) ([]Turn, error) {
+	if _, err := r.GetConversation(ctx, conversationID, false); err != nil {
+		return nil, err
+	}
+	query := turnSelect + ` WHERE t.conversation_id = ?`
+	arguments := []any{conversationID}
+	if beforeSequence > 0 {
+		query += ` AND t.sequence < ?`
+		arguments = append(arguments, beforeSequence)
+	}
+	query += ` ORDER BY t.sequence DESC, t.id DESC LIMIT ?`
+	arguments = append(arguments, limit)
+	rows, err := r.db.QueryContext(ctx, query, arguments...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make([]Turn, 0, limit)
+	for rows.Next() {
+		turn, err := scanTurn(rows)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, turn)
+	}
+	return result, rows.Err()
+}
+
+func (r *SQLiteRepository) RecoverInterruptedTurns(ctx context.Context, workspaceID, updatedAt, errorMessage string) (int, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `UPDATE conversations SET updated_at = ?
+		WHERE workspace_id = ? AND status = ? AND EXISTS (
+			SELECT 1 FROM turns WHERE turns.conversation_id = conversations.id AND turns.status IN (?, ?)
+		)`, updatedAt, workspaceID, ConversationStatusActive, TurnStatusQueued, TurnStatusRunning); err != nil {
+		return 0, err
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE turns SET status = ?, error_message = ?, updated_at = ?
+		WHERE status IN (?, ?) AND conversation_id IN (
+			SELECT id FROM conversations WHERE workspace_id = ? AND status = ?
+		)`, TurnStatusFailed, errorMessage, updatedAt, TurnStatusQueued, TurnStatusRunning,
+		workspaceID, ConversationStatusActive)
+	if err != nil {
+		return 0, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return int(affected), nil
+}
+
 func (r *SQLiteRepository) CompleteTurn(ctx context.Context, turn Turn) (Turn, error) {
 	result, err := r.db.ExecContext(ctx, `UPDATE turns SET status = ?, result_kind = ?, assistant_text = ?,
 		tool_events_json = ?, metadata_json = CASE WHEN ? = '' THEN metadata_json ELSE ? END,
