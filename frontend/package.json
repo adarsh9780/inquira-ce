@@ -10,6 +10,7 @@
     "test": "npm run test:source && npm run test:runtime",
     "test:source": "node --test test/*.test.mjs",
     "test:runtime": "vitest run",
+    "typecheck": "vue-tsc --noEmit",
     "bundle:report": "node scripts/bundle-report.mjs",
     "bundle:baseline": "npm run build && npm run bundle:report -- --output baselines/frontend-bundle-baseline.json",
     "bundle:check": "npm run build && npm run bundle:report && node scripts/check-bundle-budget.mjs"
@@ -43,8 +44,10 @@
     "@vue/test-utils": "^2.4.11",
     "axe-core": "^4.12.1",
     "happy-dom": "^20.10.2",
+    "typescript": "^5.9.3",
     "vite": "^8.0.16",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.8",
+    "vue-tsc": "^3.3.8"
   },
   "overrides": {
     "@codemirror/matchbrackets": "npm:@codemirror/language",
