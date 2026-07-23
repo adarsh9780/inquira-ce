@@ -10,7 +10,10 @@ test('table pagination avoids extra row animation churn and redundant viewport p
 
   const tableTab = readFileSync(tableTabPath, 'utf-8')
   const dataTable = readFileSync(dataTablePath, 'utf-8')
-  const store = readFileSync(storePath, 'utf-8')
+  const store = [
+    readFileSync(storePath, 'utf-8'),
+    readFileSync(resolve(process.cwd(), 'src/stores/artifactStore.ts'), 'utf-8'),
+  ].join('\n')
 
   assert.equal(tableTab.includes('<ag-grid-vue'), false)
   assert.equal(tableTab.includes('currentPageRequestToken'), true)
@@ -20,5 +23,5 @@ test('table pagination avoids extra row animation churn and redundant viewport p
   assert.equal(store.includes('tableWindowStart.value === nextStart'), true)
   assert.equal(store.includes('tableWindowEnd.value === nextEnd'), true)
   assert.equal(store.includes('tableRowCount.value === nextTotal'), true)
-  assert.equal(store.includes('if (Number(tablePageOffsets.value?.[key] || 0) === normalizedPage) return'), true)
+  assert.equal(store.includes('Number(tablePageOffsets.value[key] || 0) === normalizedPage'), true)
 })

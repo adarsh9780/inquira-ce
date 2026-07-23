@@ -61,7 +61,10 @@ test('figure renderer keeps a contextual artifact selector and export actions', 
 
 test('app store keeps figureCount synchronized with setFigures output', () => {
   const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
-  const source = readFileSync(storePath, 'utf-8')
+  const source = [
+    readFileSync(storePath, 'utf-8'),
+    readFileSync(resolve(process.cwd(), 'src/stores/artifactStore.ts'), 'utf-8'),
+  ].join('\n')
 
   assert.equal(source.includes('figureCount.value = 0'), true)
   assert.equal(source.includes('figureCount.value = figures.value.length'), true)

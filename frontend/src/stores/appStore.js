@@ -736,6 +736,7 @@ export const useAppStore = defineStore('app', () => {
   }
   uiStore.configurePersistence(saveLocalConfig)
   preferencesStore.configurePersistence(saveLocalConfig)
+  artifactStore.configurePersistence(scheduleLocalSnapshotSave)
 
   function scheduleLocalSnapshotSave() {
     const targetUserId = resolveSnapshotUserId()
@@ -2121,11 +2122,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setResultData(data) {
-    resultData.value = data
+    artifactStore.setResultData(data)
   }
 
   function setPlotlyFigure(figure) {
-    plotlyFigure.value = figure
+    artifactStore.setPlotlyFigure(figure)
   }
 
   function selectDataPaneForArtifacts({ hasFigures = false, hasDataframes = false, hasOutput = false } = {}) {
@@ -2159,36 +2160,15 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setDataframes(dfs) {
-    dataframes.value = Array.isArray(dfs) ? dfs : []
-    dataframeCount.value = dataframes.value.length
+    artifactStore.setDataframes(dfs)
   }
 
   function setFigures(figs) {
-    if (!Array.isArray(figs)) {
-      figures.value = []
-      figureCount.value = 0
-      return
-    }
-    figures.value = figs
-      .map((fig, idx) => {
-        const normalizedFigure = normalizePlotlyFigure(fig?.data ?? fig)
-        if (!normalizedFigure) return null
-        const artifactId = String(fig?.artifact_id || normalizedFigure?.artifact_id || '').trim()
-        const logicalName = String(fig?.logical_name || normalizedFigure?.logical_name || fig?.name || '').trim()
-        return {
-          ...(fig || {}),
-          name: String(fig?.name || `figure_${idx + 1}`),
-          artifact_id: artifactId || undefined,
-          logical_name: logicalName || undefined,
-          data: normalizedFigure,
-        }
-      })
-      .filter(Boolean)
-    figureCount.value = figures.value.length
+    artifactStore.setFigures(figs)
   }
 
   function setScalars(items) {
-    scalars.value = Array.isArray(items) ? items : []
+    artifactStore.setScalars(items)
   }
 
   function currentResultScopeKey() {
@@ -2295,58 +2275,31 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function removeResultArtifact(artifactId) {
-    const normalizedArtifactId = String(artifactId || '').trim()
-    if (!normalizedArtifactId) return
-    dataframes.value = dataframes.value.filter((item) => (
-      String(item?.data?.artifact_id || item?.artifact_id || '').trim() !== normalizedArtifactId
-    ))
-    figures.value = figures.value.filter((item) => (
-      String(item?.artifact_id || item?.data?.artifact_id || '').trim() !== normalizedArtifactId
-    ))
-    scalars.value = scalars.value.filter((item) => String(item?.artifact_id || '').trim() !== normalizedArtifactId)
-    dataframeCount.value = dataframes.value.length
-    figureCount.value = figures.value.length
+    artifactStore.removeResultArtifact(artifactId)
   }
 
   function setDataframeCount(count) {
-    dataframeCount.value = Number(count || 0)
+    artifactStore.setDataframeCount(count)
   }
 
   function setFigureCount(count) {
-    figureCount.value = Number(count || 0)
+    artifactStore.setFigureCount(count)
   }
 
   function setDataPaneError(msg) {
-    dataPaneError.value = String(msg || '')
+    artifactStore.setDataPaneError(msg)
   }
 
   function clearDataPaneError() {
-    dataPaneError.value = ''
+    artifactStore.clearDataPaneError()
   }
 
   function setTableViewport(start, end, total) {
-    const nextStart = Math.max(0, Number(start || 0))
-    const nextEnd = Math.max(0, Number(end || 0))
-    const nextTotal = Math.max(0, Number(total || 0))
-    if (
-      tableWindowStart.value === nextStart &&
-      tableWindowEnd.value === nextEnd &&
-      tableRowCount.value === nextTotal
-    ) {
-      return
-    }
-    tableWindowStart.value = nextStart
-    tableWindowEnd.value = nextEnd
-    tableRowCount.value = nextTotal
+    artifactStore.setTableViewport(start, end, total)
   }
 
   function clearTableViewport() {
-    if (tableWindowStart.value === 0 && tableWindowEnd.value === 0 && tableRowCount.value === 0) {
-      return
-    }
-    tableWindowStart.value = 0
-    tableWindowEnd.value = 0
-    tableRowCount.value = 0
+    artifactStore.clearTableViewport()
   }
 
   function tableOffsetKey(workspaceId, artifactId) {
@@ -2364,71 +2317,27 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setTablePageOffset(workspaceId, artifactId, page) {
-    const key = tableOffsetKey(workspaceId, artifactId)
-    if (!key || key === '::') return
-    const normalizedPage = Math.max(0, Number(page || 0))
-    if (Number(tablePageOffsets.value?.[key] || 0) === normalizedPage) return
-    tablePageOffsets.value = {
-      ...tablePageOffsets.value,
-      [key]: normalizedPage
-    }
-    scheduleLocalSnapshotSave()
+    artifactStore.setTablePageOffset(workspaceId, artifactId, page, activeTurnId.value)
   }
 
   function getTablePageOffset(workspaceId, artifactId) {
-    const key = tableOffsetKey(workspaceId, artifactId)
-    if (!key || key === '::') return 0
-    return Math.max(0, Number(tablePageOffsets.value?.[key] || 0))
+    return artifactStore.getTablePageOffset(workspaceId, artifactId, activeTurnId.value)
   }
 
   function setSelectedTableArtifact(workspaceId, artifactId) {
-    const key = workspaceSelectionKey(workspaceId)
-    if (!key) return
-    const normalizedArtifactId = String(artifactId || '').trim()
-    if (normalizedArtifactId) {
-      selectedTableArtifactsByWorkspace.value = {
-        ...selectedTableArtifactsByWorkspace.value,
-        [key]: normalizedArtifactId
-      }
-    } else if (Object.prototype.hasOwnProperty.call(selectedTableArtifactsByWorkspace.value, key)) {
-      const next = { ...selectedTableArtifactsByWorkspace.value }
-      delete next[key]
-      selectedTableArtifactsByWorkspace.value = next
-    } else {
-      return
-    }
-    scheduleLocalSnapshotSave()
+    artifactStore.setSelectedTableArtifact(workspaceId, artifactId, activeTurnId.value)
   }
 
   function getSelectedTableArtifact(workspaceId) {
-    const key = workspaceSelectionKey(workspaceId)
-    if (!key) return ''
-    return String(selectedTableArtifactsByWorkspace.value?.[key] || '').trim()
+    return artifactStore.getSelectedTableArtifact(workspaceId, activeTurnId.value)
   }
 
   function setSelectedFigureArtifact(workspaceId, artifactId) {
-    const key = workspaceSelectionKey(workspaceId)
-    if (!key) return
-    const normalizedArtifactId = String(artifactId || '').trim()
-    if (normalizedArtifactId) {
-      selectedFigureArtifactsByWorkspace.value = {
-        ...selectedFigureArtifactsByWorkspace.value,
-        [key]: normalizedArtifactId
-      }
-    } else if (Object.prototype.hasOwnProperty.call(selectedFigureArtifactsByWorkspace.value, key)) {
-      const next = { ...selectedFigureArtifactsByWorkspace.value }
-      delete next[key]
-      selectedFigureArtifactsByWorkspace.value = next
-    } else {
-      return
-    }
-    scheduleLocalSnapshotSave()
+    artifactStore.setSelectedFigureArtifact(workspaceId, artifactId, activeTurnId.value)
   }
 
   function getSelectedFigureArtifact(workspaceId) {
-    const key = workspaceSelectionKey(workspaceId)
-    if (!key) return ''
-    return String(selectedFigureArtifactsByWorkspace.value?.[key] || '').trim()
+    return artifactStore.getSelectedFigureArtifact(workspaceId, activeTurnId.value)
   }
 
   function setTerminalOutput(output) {
