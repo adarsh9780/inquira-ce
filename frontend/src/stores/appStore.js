@@ -2661,10 +2661,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function startBackgroundOperation(payload = {}) {
-    const operation = normalizeOperationPayload(payload)
-    const existing = backgroundOperations.value.filter((item) => String(item?.id || '') !== operation.id)
-    backgroundOperations.value = [...existing, operation]
-    return operation.id
+    return executionStore.startBackgroundOperation(payload)
   }
 
   function updateBackgroundOperation(operationId, payload = {}) {
@@ -2690,43 +2687,15 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function finishBackgroundOperation(operationId, payload = {}) {
-    const id = String(operationId || '').trim()
-    if (!id) return
-    updateBackgroundOperation(id, {
-      ...payload,
-      status: String(payload?.status || 'complete'),
-      progress: Number.isFinite(Number(payload?.progress)) ? payload.progress : 100,
-    })
-    const removeAfterMs = Number(payload?.removeAfterMs ?? 3500)
-    if (removeAfterMs >= 0) {
-      setTimeout(() => removeBackgroundOperation(id), removeAfterMs)
-    }
+    executionStore.finishBackgroundOperation(operationId, payload)
   }
 
   function isConversationRunning(conversationId) {
-    const id = String(conversationId || '').trim()
-    if (!id) return false
-    return String(conversationRuns.value?.[id]?.status || '') === 'running'
+    return executionStore.isConversationRunning(conversationId)
   }
 
   function setConversationRun(conversationId, runState = null) {
-    const id = String(conversationId || '').trim()
-    if (!id) return
-    const next = { ...(conversationRuns.value || {}) }
-    if (runState && typeof runState === 'object') {
-      const current = next[id] || {}
-      next[id] = {
-        status: String(runState.status || 'running'),
-        requestId: String(runState.requestId || current.requestId || ''),
-        startedAt: runState.startedAt || current.startedAt || new Date().toISOString(),
-        updatedAt: runState.updatedAt || new Date().toISOString(),
-        message: String(runState.message || current.message || ''),
-        abortController: runState.abortController ? markRaw(runState.abortController) : current.abortController || null,
-      }
-    } else {
-      delete next[id]
-    }
-    conversationRuns.value = next
+    executionStore.setConversationRun(conversationId, runState)
   }
 
   function clearConversationRun(conversationId) {
@@ -2734,36 +2703,15 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function getConversationRun(conversationId) {
-    const id = normalizeConversationId(conversationId)
-    return id ? conversationRuns.value?.[id] || null : null
+    return executionStore.getConversationRun(conversationId)
   }
 
   function abortConversationRun(conversationId) {
-    const run = getConversationRun(conversationId)
-    const controller = run?.abortController
-    if (controller && typeof controller.abort === 'function') {
-      controller.abort()
-      return true
-    }
-    return false
+    return executionStore.abortConversationRun(conversationId)
   }
 
   function setCodeRunning(running) {
-    isCodeRunning.value = running
-    if (running) {
-      startBackgroundOperation({
-        id: 'code-execution',
-        type: 'code',
-        title: 'Running code',
-        message: 'Executing workspace code...',
-        priority: 60,
-      })
-    } else {
-      finishBackgroundOperation('code-execution', {
-        title: 'Code run complete',
-        message: 'Workspace code execution finished.',
-      })
-    }
+    executionStore.setCodeRunning(running)
   }
 
   function resetSession() {
