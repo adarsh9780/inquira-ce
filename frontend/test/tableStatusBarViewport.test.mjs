@@ -11,7 +11,7 @@ test('status bar renders table row count and viewport window when table pane is 
   const tableTab = readFileSync(tableTabPath, 'utf-8')
 
   assert.equal(statusBar.includes('const tableViewportLabel = computed(() => {'), true)
-  assert.equal(statusBar.includes("if (appStore.dataPane !== 'table') return null"), true)
+  assert.equal(statusBar.includes("if (uiStore.dataPane !== 'table') return null"), true)
   assert.equal(statusBar.includes('appStore.tableRowCount'), true)
   assert.equal(statusBar.includes('Showing ${start.toLocaleString()}-${end.toLocaleString()} of ${total.toLocaleString()}'), true)
 

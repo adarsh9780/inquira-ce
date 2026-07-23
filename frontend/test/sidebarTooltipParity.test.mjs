@@ -16,6 +16,6 @@ test('sidebar uses native title tooltips for current navigation actions', () => 
   assert.equal(source.includes('title="Settings"'), true)
   assert.equal(source.includes('title="Profile Settings"'), true)
   assert.equal(source.includes('title="API Keys"'), false)
-  assert.equal(source.includes("appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Inquira'"), true)
+  assert.equal(source.includes("uiStore.isSidebarCollapsed ? 'Expand sidebar' : 'Inquira'"), true)
   assert.equal(source.includes('title="Collapse sidebar"'), true)
 })

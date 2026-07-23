@@ -19,6 +19,6 @@ test('workspace layout keeps only the default split view', () => {
   assert.equal(shortcutsSource.includes('layout-view'), false)
   assert.equal(shortcutsSource.includes('layout-chat'), false)
   assert.equal(shortcutsSource.includes('layout-output'), false)
-  assert.equal(panelSource.includes('const leftPaneWidth = computed(() => appStore.leftPaneWidth)'), true)
-  assert.equal(panelSource.includes('const rightPaneWidth = computed(() => 100 - appStore.leftPaneWidth)'), true)
+  assert.equal(panelSource.includes('const leftPaneWidth = computed(() => uiStore.leftPaneWidth)'), true)
+  assert.equal(panelSource.includes('const rightPaneWidth = computed(() => 100 - uiStore.leftPaneWidth)'), true)
 })

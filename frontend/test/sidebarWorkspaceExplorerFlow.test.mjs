@@ -10,7 +10,7 @@ test('sidebar lists workspace conversations while the context bar owns active co
 
   assert.equal(source.includes('workspaceRuntimeLabel'), false)
   assert.equal(source.includes('sidebarConversationsByWorkspace'), true)
-  assert.equal(source.includes("@click.stop=\"appStore.openSettings('workspace')\""), true)
+  assert.equal(source.includes("@click.stop=\"uiStore.openSettings('workspace')\""), true)
   assert.equal(source.includes('openSchemaEditor'), true)
   assert.equal(source.includes('CircleStackIcon'), true)
   assert.equal(source.includes('visibleConversationsForSidebar(workspace)'), true)

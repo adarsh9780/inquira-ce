@@ -13,16 +13,16 @@
 
     <div class="workspace-left-content min-h-0 flex-1 flex flex-col p-2.5 sm:p-3 pb-0">
       <div class="min-h-0 flex-1">
-      <div v-show="appStore.workspacePane === 'code'" class="h-full">
+      <div v-show="uiStore.workspacePane === 'code'" class="h-full">
         <CodeTab />
       </div>
-      <div v-show="appStore.workspacePane === 'chat'" class="h-full">
+      <div v-show="uiStore.workspacePane === 'chat'" class="h-full">
         <ChatTab />
       </div>
       </div>
 
       <div
-        v-if="appStore.workspacePane === 'chat' && appStore.workspaceReadiness.ready"
+        v-if="uiStore.workspacePane === 'chat' && appStore.workspaceReadiness.ready"
         class="flex-shrink-0 pt-2"
         style="background-color: var(--color-workspace-surface);"
       >
@@ -35,6 +35,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
+import { useUiStore } from '../../stores/uiStore'
 import CodeTab from '../analysis/CodeTab.vue'
 import ChatTab from '../chat/ChatTab.vue'
 import ChatInput from '../chat/ChatInput.vue'
@@ -46,12 +47,13 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
+const uiStore = useUiStore()
 const workspacePaneOptions = [
   { value: 'chat', label: 'Chat', icon: ChatBubbleLeftRightIcon },
   { value: 'code', label: 'Code', icon: CodeBracketIcon },
 ]
 const selectedWorkspacePane = computed({
-  get: () => appStore.workspacePane,
-  set: (pane) => appStore.setWorkspacePane(pane),
+  get: () => uiStore.workspacePane,
+  set: (pane) => uiStore.setWorkspacePane(pane),
 })
 </script>

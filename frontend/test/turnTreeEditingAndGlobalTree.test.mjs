@@ -50,11 +50,11 @@ test('frontend API and store expose the supported turn editing calls', () => {
 
 test('global tree lives in the dedicated page and opens turns', () => {
   assert.equal(sidebarSource.includes('openConversationTree'), true)
-  assert.equal(sidebarSource.includes("appStore.activeTab === 'conversation-tree'"), true)
+  assert.equal(sidebarSource.includes("uiStore.activeTab === 'conversation-tree'"), true)
   assert.equal(sidebarSource.includes('SidebarGlobalTurnTree'), false)
   assert.equal(sidebarSource.includes('<SidebarConversations'), false)
   assert.equal(sidebarSource.includes('visibleConversationsForSidebar(workspace)'), true)
-  assert.equal(rightPanelSource.includes("appStore.activeTab === 'conversation-tree'"), true)
+  assert.equal(rightPanelSource.includes("uiStore.activeTab === 'conversation-tree'"), true)
   assert.equal(rightPanelSource.includes('<SidebarGlobalTurnTree variant="page" />'), true)
   assert.equal(globalTreeSource.includes('TurnTreeGraphView'), true)
   assert.equal(globalTreeSource.includes('TurnTreeView'), false)

@@ -15,6 +15,7 @@ function normalizeDataPane(pane: unknown) {
 }
 
 export const useUiStore = defineStore('ui', () => {
+  let persistChange: (() => void) | null = null
   const activeTab = ref('workspace')
   const workspacePane = ref('chat')
   const dataPane = ref('table')
@@ -33,6 +34,14 @@ export const useUiStore = defineStore('ui', () => {
   const isLoading = ref(false)
   const isSettingsOpen = ref(false)
   const settingsInitialTab = ref('setup')
+
+  function configurePersistence(handler: (() => void) | null) {
+    persistChange = handler
+  }
+
+  function persist() {
+    persistChange?.()
+  }
 
   function openSettings(tab = 'setup') {
     const normalized = String(tab || '').trim().toLowerCase()
@@ -64,24 +73,33 @@ export const useUiStore = defineStore('ui', () => {
     } else {
       activeTab.value = normalized || 'workspace'
     }
+    persist()
   }
 
   function setWorkspacePane(pane: unknown) {
     workspacePane.value = normalizeWorkspacePane(pane)
     activeTab.value = 'workspace'
+    persist()
   }
 
   function setDataPane(pane: unknown) {
     dataPane.value = normalizeDataPane(pane)
     activeTab.value = 'workspace'
+    persist()
   }
 
   function setLeftPaneWidth(widthPct: number) {
-    if (widthPct >= 10 && widthPct <= 90) leftPaneWidth.value = widthPct
+    if (widthPct >= 10 && widthPct <= 90) {
+      leftPaneWidth.value = widthPct
+      persist()
+    }
   }
 
   function setTerminalHeight(heightPct: number) {
-    if (heightPct >= 10 && heightPct <= 90) terminalHeight.value = heightPct
+    if (heightPct >= 10 && heightPct <= 90) {
+      terminalHeight.value = heightPct
+      persist()
+    }
   }
 
   function toggleTerminal() {
@@ -89,10 +107,12 @@ export const useUiStore = defineStore('ui', () => {
     if (isTerminalOpen.value && ['schema-editor', 'conversation-tree'].includes(activeTab.value)) {
       activeTab.value = 'workspace'
     }
+    persist()
   }
 
   function setTerminalConsentGranted(granted: unknown) {
     terminalConsentGranted.value = Boolean(granted)
+    persist()
   }
 
   function setTerminalCwd(cwd: unknown) {
@@ -101,6 +121,7 @@ export const useUiStore = defineStore('ui', () => {
 
   function setSidebarCollapsed(collapsed: unknown) {
     isSidebarCollapsed.value = Boolean(collapsed)
+    persist()
   }
 
   function openKeyboardShortcuts() {
@@ -161,6 +182,7 @@ export const useUiStore = defineStore('ui', () => {
     isLoading,
     isSettingsOpen,
     settingsInitialTab,
+    configurePersistence,
     openSettings,
     setActiveTab,
     setWorkspacePane,

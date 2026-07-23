@@ -18,7 +18,7 @@ test('collapsed sidebar rows keep a stable fixed-size icon rail', () => {
 
   assert.ok(sidebarSource.includes('class="sidebar-nav-row sidebar-primary-row justify-start px-2.5"'))
   assert.ok(sidebarSource.includes('class="sidebar-workspace-row justify-start px-2.5"'))
-  assert.ok(sidebarSource.includes("'sidebar-root-collapsed': appStore.isSidebarCollapsed"))
+  assert.ok(sidebarSource.includes("'sidebar-root-collapsed': uiStore.isSidebarCollapsed"))
   assert.ok(sidebarSource.includes('.sidebar-root-collapsed .sidebar-nav-row'))
   assert.ok(sidebarSource.includes('.sidebar-root-collapsed .sidebar-workspace-row'))
   assert.ok(sidebarSource.includes('width: var(--size-sidebar-rail-control);'))

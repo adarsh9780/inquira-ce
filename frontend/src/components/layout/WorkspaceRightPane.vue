@@ -28,7 +28,10 @@
 
 <script setup>
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
-import { useAppStore } from '../../stores/appStore'
+import { useArtifactStore } from '../../stores/artifactStore'
+import { useConversationStore } from '../../stores/conversationStore'
+import { useExecutionStore } from '../../stores/executionStore'
+import { useUiStore } from '../../stores/uiStore'
 import AppToolbar from '../ui/AppToolbar.vue'
 import SegmentedControl from '../ui/SegmentedControl.vue'
 import { buildUserRunItems } from '../../utils/unifiedResults'
@@ -38,23 +41,26 @@ import {
   TableCellsIcon,
 } from '@heroicons/vue/24/outline'
 
-const appStore = useAppStore()
+const artifactStore = useArtifactStore()
+const conversationStore = useConversationStore()
+const executionStore = useExecutionStore()
+const uiStore = useUiStore()
 const resultAnnouncement = ref('')
 const TableTab = defineAsyncComponent(() => import('../analysis/TableTab.vue'))
 const FigureTab = defineAsyncComponent(() => import('../analysis/FigureTab.vue'))
 const OutputTab = defineAsyncComponent(() => import('../analysis/OutputTab.vue'))
 
 const tableResultCount = computed(() => Math.max(
-  Number(appStore.dataframeCount || 0),
-  Array.isArray(appStore.dataframes) ? appStore.dataframes.length : 0,
+  Number(artifactStore.dataframeCount || 0),
+  Array.isArray(artifactStore.dataframes) ? artifactStore.dataframes.length : 0,
 ))
 const chartResultCount = computed(() => Math.max(
-  Number(appStore.figureCount || 0),
-  Array.isArray(appStore.figures) ? appStore.figures.length : 0,
+  Number(artifactStore.figureCount || 0),
+  Array.isArray(artifactStore.figures) ? artifactStore.figures.length : 0,
 ))
 const runResultCount = computed(() => buildUserRunItems({
-  terminalEntries: appStore.terminalEntries,
-  conversationId: appStore.activeConversationId,
+  terminalEntries: executionStore.terminalEntries,
+  conversationId: conversationStore.activeConversationId,
 }).length)
 const resultCategoryOptions = computed(() => [
   { value: 'table', label: 'Tables', icon: TableCellsIcon, count: tableResultCount.value },
@@ -75,16 +81,16 @@ function paneForCategory(category) {
 }
 
 const selectedCategory = computed({
-  get: () => categoryForPane(appStore.dataPane),
+  get: () => categoryForPane(uiStore.dataPane),
   set: (category) => {
     const normalized = ['table', 'chart', 'runs'].includes(category) ? category : 'runs'
-    appStore.setDataPane(paneForCategory(normalized))
+    uiStore.setDataPane(paneForCategory(normalized))
     const selected = resultCategoryOptions.value.find((option) => option.value === normalized)
     resultAnnouncement.value = selected ? `${selected.label} selected` : ''
   },
 })
 
-watch(() => appStore.dataPane, (pane, previousPane) => {
+watch(() => uiStore.dataPane, (pane, previousPane) => {
   if (pane === previousPane) return
   const category = categoryForPane(pane)
   const selected = resultCategoryOptions.value.find((option) => option.value === category)

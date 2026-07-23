@@ -86,7 +86,7 @@
         <div
           class="h-full shrink-0 app-nav-pane"
           :class="{
-            'app-nav-pane-collapsed': appStore.isSidebarCollapsed,
+            'app-nav-pane-collapsed': uiStore.isSidebarCollapsed,
           }"
         >
           <UnifiedSidebar />
@@ -97,16 +97,16 @@
       </div>
       <StatusBar />
       <SettingsModal
-        v-model="appStore.isSettingsOpen"
-        :initial-tab="appStore.settingsInitialTab"
+        v-model="uiStore.isSettingsOpen"
+        :initial-tab="uiStore.settingsInitialTab"
       />
       <CommandPaletteModal
-        :is-open="appStore.isCommandPaletteOpen"
-        @close="appStore.closeCommandPalette()"
+        :is-open="uiStore.isCommandPaletteOpen"
+        @close="uiStore.closeCommandPalette()"
       />
       <KeyboardShortcutsModal
-        :is-open="appStore.isKeyboardShortcutsOpen"
-        @close="appStore.closeKeyboardShortcuts()"
+        :is-open="uiStore.isKeyboardShortcutsOpen"
+        @close="uiStore.closeKeyboardShortcuts()"
       />
     </div>
 
@@ -162,6 +162,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useAppStore } from './stores/appStore'
 import { useAuthStore } from './stores/authStore'
+import { useUiStore } from './stores/uiStore'
 import { apiService } from './services/apiService'
 import { modelConnectionService } from './services/modelConnectionService'
 import { themeService } from './services/themeService'
@@ -183,6 +184,7 @@ import KeyboardShortcutsModal from './components/modals/KeyboardShortcutsModal.v
 import FirstRunModelOnboarding from './components/onboarding/FirstRunModelOnboarding.vue'
 
 const appStore = useAppStore()
+const uiStore = useUiStore()
 
 function wailsApp() {
   if (typeof window === 'undefined') return null
@@ -457,31 +459,31 @@ function handleGlobalShortcuts(event) {
 
   if (matchShortcut(event, 'conversation-tree')) {
     event.preventDefault()
-    appStore.setActiveTab('conversation-tree')
+    uiStore.setActiveTab('conversation-tree')
     return
   }
 
   if (matchShortcut(event, 'command-palette')) {
     event.preventDefault()
-    appStore.toggleCommandPalette()
+    uiStore.toggleCommandPalette()
     return
   }
 
   if (matchShortcut(event, 'settings')) {
     event.preventDefault()
-    appStore.openSettings('setup')
+    uiStore.openSettings('setup')
     return
   }
 
   if (matchShortcut(event, 'sidebar')) {
     event.preventDefault()
-    appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
+    uiStore.setSidebarCollapsed(!uiStore.isSidebarCollapsed)
     return
   }
 
   if (matchShortcut(event, 'schema')) {
     event.preventDefault()
-    appStore.setActiveTab('schema-editor')
+    uiStore.setActiveTab('schema-editor')
     return
   }
 
@@ -493,7 +495,7 @@ function handleGlobalShortcuts(event) {
 
   if (matchShortcut(event, 'terminal')) {
     event.preventDefault()
-    appStore.toggleTerminal()
+    uiStore.toggleTerminal()
     return
   }
 
@@ -645,7 +647,7 @@ async function loadModelOnboardingStatus() {
 function handleModelOnboardingComplete(status) {
   modelOnboarding.status = status
   modelOnboarding.required = false
-  appStore.openSettings('workspace-general')
+  uiStore.openSettings('workspace-general')
 }
 
 watch(

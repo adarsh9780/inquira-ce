@@ -10,7 +10,7 @@ test('clicking the active conversation keeps the sidebar open', () => {
   )
 
   assert.equal(source.includes('if (target !== current) {'), true)
-  assert.equal(source.includes("appStore.setWorkspacePane('chat')"), true)
-  assert.equal(source.includes("appStore.setActiveTab('workspace')"), true)
+  assert.equal(source.includes("uiStore.setWorkspacePane('chat')"), true)
+  assert.equal(source.includes("uiStore.setActiveTab('workspace')"), true)
   assert.equal(source.includes('appStore.setSidebarCollapsed(true)'), false)
 })

@@ -10,7 +10,7 @@
       <span>{{ credentialLabel }}</span>
       <span aria-hidden="true">·</span>
       <span>{{ hasOverrides ? 'Workspace override' : 'Application defaults' }}</span>
-      <button v-if="config && !config.readiness?.credential_ready" type="button" class="font-semibold text-[var(--color-accent)] hover:underline" @click="appStore.openSettings('connections')">Manage connection</button>
+      <button v-if="config && !config.readiness?.credential_ready" type="button" class="font-semibold text-[var(--color-accent)] hover:underline" @click="uiStore.openSettings('connections')">Manage connection</button>
     </div>
 
     <div class="mt-3 space-y-4 border-t border-[var(--color-border)] pt-3">
@@ -74,10 +74,12 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { apiService } from '../../../services/apiService'
 import { useAppStore } from '../../../stores/appStore'
+import { useUiStore } from '../../../stores/uiStore'
 import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 
 const props = defineProps({ workspaceId: { type: String, required: true } })
 const appStore = useAppStore()
+const uiStore = useUiStore()
 const advancedOpen = ref(false)
 const isSaving = ref(false)
 const errorMessage = ref('')

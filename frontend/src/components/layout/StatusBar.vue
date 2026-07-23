@@ -35,11 +35,11 @@
     <!-- Center Section: Data pane status -->
     <div class="flex items-center gap-2 h-full">
       <!-- Data pane error takes priority -->
-      <template v-if="appStore.dataPaneError">
+      <template v-if="artifactStore.dataPaneError">
         <div class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--color-error)]/10 text-[var(--color-error)] max-w-[280px] truncate"
-             :title="appStore.dataPaneError">
+             :title="artifactStore.dataPaneError">
           <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-error)] shrink-0"></span>
-          <span class="truncate">{{ appStore.dataPaneError }}</span>
+          <span class="truncate">{{ artifactStore.dataPaneError }}</span>
         </div>
       </template>
       <template v-else>
@@ -76,9 +76,9 @@
     <div class="flex items-center gap-3 h-full">
       <!-- Terminal Toggle -->
       <button
-        @click="appStore.toggleTerminal()"
+        @click="uiStore.toggleTerminal()"
         class="flex items-center gap-1.5 h-full px-1.5 text-[11px] font-medium hover:bg-[var(--color-base)] transition-colors"
-        :class="appStore.isTerminalOpen ? 'text-[var(--color-accent)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
+        :class="uiStore.isTerminalOpen ? 'text-[var(--color-accent)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
         title="Toggle terminal panel (Cmd/Ctrl+J)"
       >
         <CommandLineIcon class="w-3.5 h-3.5" />
@@ -178,6 +178,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
+import { useArtifactStore } from '../../stores/artifactStore'
+import { useUiStore } from '../../stores/uiStore'
 import { useAuthStore } from '../../stores/authStore'
 import apiService from '../../services/apiService'
 import { formatUsageCompact, formatUsageTooltip, normalizeUsage } from '../../utils/usageFormat'
@@ -189,6 +191,8 @@ import {
 import { useToast } from '../../composables/useToast'
 
 const appStore = useAppStore()
+const artifactStore = useArtifactStore()
+const uiStore = useUiStore()
 const authStore = useAuthStore()
 const {
   notificationHistory,
@@ -286,7 +290,7 @@ const workspaceRuntimeStatusMeta = computed(() => {
 })
 
 const tableViewportLabel = computed(() => {
-  if (appStore.dataPane !== 'table') return null
+  if (uiStore.dataPane !== 'table') return null
   const total = Number(appStore.tableRowCount || 0)
   if (total <= 0) return null
   const start = Math.max(0, Number(appStore.tableWindowStart || 0))
@@ -299,7 +303,7 @@ const tableViewportLabel = computed(() => {
 
 // Tab-aware artifact count for the currently visible data pane.
 const paneArtifactCountLabel = computed(() => {
-  if (appStore.dataPane === 'table') {
+  if (uiStore.dataPane === 'table') {
     const n = Math.max(
       Number(appStore.dataframeCount || 0),
       Number(Array.isArray(appStore.dataframes) ? appStore.dataframes.length : 0)
@@ -307,7 +311,7 @@ const paneArtifactCountLabel = computed(() => {
     if (n <= 0) return null
     return `${n} table${n === 1 ? '' : 's'} saved`
   }
-  if (appStore.dataPane === 'figure') {
+  if (uiStore.dataPane === 'figure') {
     const n = Math.max(
       Number(appStore.figureCount || 0),
       Number(Array.isArray(appStore.figures) ? appStore.figures.length : 0)

@@ -195,6 +195,7 @@
 <script setup>
 import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
+import { useUiStore } from '../../stores/uiStore'
 import {
   DocumentDuplicateIcon,
   ChevronDownIcon,
@@ -225,6 +226,7 @@ DOMPurify.addHook('afterSanitizeAttributes', function(node) {
 
 
 const appStore = useAppStore()
+const uiStore = useUiStore()
 useChatScrollFollow()
 const chatContainer = ref(null)
 const scrollHost = ref(null)
@@ -841,8 +843,8 @@ function shouldRenderCodeDetails(message) {
 }
 
 function openCodePane() {
-  appStore.setActiveTab('workspace')
-  appStore.setWorkspacePane('code')
+  uiStore.setActiveTab('workspace')
+  uiStore.setWorkspacePane('code')
 }
 
 function resolveScrollHost() {

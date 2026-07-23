@@ -1,22 +1,22 @@
 <template>
   <div
     class="relative z-40 flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden sidebar-root"
-    :class="{ 'sidebar-root-collapsed': appStore.isSidebarCollapsed }"
+    :class="{ 'sidebar-root-collapsed': uiStore.isSidebarCollapsed }"
   >
     <!-- ─── Brand / Collapse Toggle ─── -->
     <div class="sidebar-brand-row justify-between px-3">
       <button
         class="sidebar-brand-button justify-start"
-        :title="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Inquira'"
-        :aria-label="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Inquira'"
-        @click="appStore.isSidebarCollapsed && handleBrandClick()"
+        :title="uiStore.isSidebarCollapsed ? 'Expand sidebar' : 'Inquira'"
+        :aria-label="uiStore.isSidebarCollapsed ? 'Expand sidebar' : 'Inquira'"
+        @click="uiStore.isSidebarCollapsed && handleBrandClick()"
       >
         <div class="flex h-6 w-6 shrink-0 items-center justify-center">
           <img :src="logo" alt="Inquira" class="block h-full w-full" />
         </div>
         <div
           class="flex items-center overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
-          :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[160px] opacity-100 ml-2.5'"
+          :class="uiStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[160px] opacity-100 ml-2.5'"
         >
           <span class="text-[13px] font-semibold tracking-[-0.01em] text-[var(--color-text-main)]">
             Inquira
@@ -24,7 +24,7 @@
         </div>
       </button>
       <button
-        v-if="!appStore.isSidebarCollapsed"
+        v-if="!uiStore.isSidebarCollapsed"
         type="button"
         class="sidebar-icon-button"
         title="Collapse sidebar"
@@ -50,7 +50,7 @@
           </span>
           <span
             class="sidebar-row-label"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[176px] opacity-100 ml-2.5'"
+            :class="uiStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[176px] opacity-100 ml-2.5'"
           >
             New analysis
           </span>
@@ -62,9 +62,9 @@
       <SidebarWorkspaceConversations>
         <div
           class="flex w-full items-center overflow-hidden transition-all duration-300"
-          :class="appStore.isSidebarCollapsed ? 'h-0 px-0 opacity-0' : 'h-7 justify-between px-2.5 opacity-100'"
+          :class="uiStore.isSidebarCollapsed ? 'h-0 px-0 opacity-0' : 'h-7 justify-between px-2.5 opacity-100'"
         >
-          <template v-if="!appStore.isSidebarCollapsed">
+          <template v-if="!uiStore.isSidebarCollapsed">
             <span class="sidebar-section-label">
               Workspaces
             </span>
@@ -72,7 +72,7 @@
               type="button"
               class="sidebar-icon-button"
               title="Workspace settings"
-              @click.stop="appStore.openSettings('workspace')"
+              @click.stop="uiStore.openSettings('workspace')"
             >
               <Cog6ToothIcon class="h-4 w-4" />
             </button>
@@ -83,7 +83,7 @@
           <div
             v-if="appStore.workspaces.length === 0"
             class="px-2.5 py-2 text-[12px] text-[var(--color-text-muted)] transition-opacity"
-            :class="appStore.isSidebarCollapsed ? 'opacity-0' : 'opacity-100'"
+            :class="uiStore.isSidebarCollapsed ? 'opacity-0' : 'opacity-100'"
           >
             Create a workspace to start.
           </div>
@@ -107,7 +107,7 @@
                   </span>
                   <div
                     class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
-                    :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[180px] opacity-100 ml-2.5'"
+                    :class="uiStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[180px] opacity-100 ml-2.5'"
                   >
                     <p class="truncate text-[13px] font-semibold leading-tight text-[var(--color-text-main)]">
                       {{ workspace.name || 'Untitled workspace' }}
@@ -117,7 +117,7 @@
               </div>
 
               <div
-                v-if="!appStore.isSidebarCollapsed && appStore.activeWorkspaceId === workspace.id"
+                v-if="!uiStore.isSidebarCollapsed && appStore.activeWorkspaceId === workspace.id"
                 class="space-y-px pl-6 pr-1"
               >
                 <div v-if="isWorkspaceConversationsLoading(workspace.id)" class="px-2 py-1 text-[12px] font-medium text-[var(--color-text-muted)]">
@@ -172,7 +172,7 @@
           <span class="sidebar-row-icon"><CircleStackIcon class="h-4 w-4" /></span>
           <span
             class="sidebar-row-label"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'ml-2.5 max-w-[176px] opacity-100'"
+            :class="uiStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'ml-2.5 max-w-[176px] opacity-100'"
           >
             Data sources
           </span>
@@ -180,14 +180,14 @@
         <button
           type="button"
           class="sidebar-nav-row justify-start px-2.5"
-          :class="appStore.activeTab === 'schema-editor' ? 'sidebar-nav-row-active' : ''"
+          :class="uiStore.activeTab === 'schema-editor' ? 'sidebar-nav-row-active' : ''"
           :title="shortcutTooltip('schema', 'Schema editor')"
           @click="openSchemaEditor"
         >
           <span class="sidebar-row-icon"><TableCellsIcon class="h-4 w-4" /></span>
           <span
             class="sidebar-row-label"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'ml-2.5 max-w-[176px] opacity-100'"
+            :class="uiStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'ml-2.5 max-w-[176px] opacity-100'"
           >
             Schema
           </span>
@@ -195,14 +195,14 @@
         <button
           type="button"
           class="sidebar-nav-row justify-start px-2.5"
-          :class="appStore.activeTab === 'conversation-tree' ? 'sidebar-nav-row-active' : ''"
+          :class="uiStore.activeTab === 'conversation-tree' ? 'sidebar-nav-row-active' : ''"
           :title="shortcutTooltip('conversation-tree', 'Conversation tree')"
           @click="openConversationTree"
         >
           <span class="sidebar-row-icon"><ShareIcon class="h-4 w-4" /></span>
           <span
             class="sidebar-row-label"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'ml-2.5 max-w-[176px] opacity-100'"
+            :class="uiStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'ml-2.5 max-w-[176px] opacity-100'"
           >
             Conversation tree
           </span>
@@ -218,14 +218,14 @@
             type="button"
             class="sidebar-nav-row justify-start px-2.5"
             title="Settings"
-            @click="appStore.openSettings('setup')"
+            @click="uiStore.openSettings('setup')"
           >
             <span class="sidebar-row-icon">
               <Cog6ToothIcon class="h-4 w-4" />
             </span>
             <span
               class="sidebar-row-label"
-              :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[176px] opacity-100 ml-2.5'"
+              :class="uiStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[176px] opacity-100 ml-2.5'"
             >
               Settings
             </span>
@@ -252,7 +252,7 @@
               </span>
               <span
                 class="sidebar-row-label"
-                :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[176px] opacity-100 ml-2.5'"
+                :class="uiStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[176px] opacity-100 ml-2.5'"
               >
                 {{ profileDisplayName }}
               </span>
@@ -333,6 +333,7 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
+import { useUiStore } from '../../stores/uiStore'
 import { useAuthStore } from '../../stores/authStore'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
@@ -361,6 +362,7 @@ import {
 
 // ─── Store ───────────────────────────────────────────────────────────────────
 const appStore = useAppStore()
+const uiStore = useUiStore()
 const authStore = useAuthStore()
 
 // ─── UI State ────────────────────────────────────────────────────────────────
@@ -531,15 +533,15 @@ async function loadSidebarConversations(workspaceId, { force = false } = {}) {
 
 // ─── Brand / collapse ─────────────────────────────────────────────────────────
 function handleBrandClick() {
-  appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
+  uiStore.setSidebarCollapsed(!uiStore.isSidebarCollapsed)
 }
 
 function openSchemaEditor() {
-  appStore.setActiveTab('schema-editor')
+  uiStore.setActiveTab('schema-editor')
 }
 
 function openConversationTree() {
-  appStore.setActiveTab('conversation-tree')
+  uiStore.setActiveTab('conversation-tree')
 }
 
 function conversationTimestampValue(conversation) {
@@ -585,7 +587,7 @@ function closeProfileMenu() {
 
 function openProfileSection(tab) {
   closeProfileMenu()
-  appStore.openSettings(tab)
+  uiStore.openSettings(tab)
 }
 
 function openTermsModal() {
@@ -595,7 +597,7 @@ function openTermsModal() {
 
 function openKeyboardShortcuts() {
   closeProfileMenu()
-  appStore.openKeyboardShortcuts()
+  uiStore.openKeyboardShortcuts()
 }
 
 function shortcutTooltip(shortcutId, fallback) {
@@ -616,7 +618,7 @@ function handleGlobalClick(event) {
 // ─── Settings open-from-outside ───────────────────────────────────────────────
 function handleOpenSettingsRequest(event) {
   const tab  = String(event?.detail?.tab  || 'api').trim() || 'api'
-  appStore.openSettings(tab)
+  uiStore.openSettings(tab)
 }
 
 // ─── Conversations ────────────────────────────────────────────────────────────
@@ -630,8 +632,8 @@ async function selectWorkspace(workspaceId) {
     await appStore.fetchConversations()
     updateSidebarConversationCache(normalizedWorkspaceId, appStore.conversations)
     await loadSidebarConversations(normalizedWorkspaceId, { force: true })
-    appStore.setWorkspacePane('chat')
-    appStore.setActiveTab('workspace')
+    uiStore.setWorkspacePane('chat')
+    uiStore.setActiveTab('workspace')
   } catch (error) {
     toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to open workspace'))
   }
@@ -670,8 +672,8 @@ async function selectConversation(workspaceId, id) {
     if (target !== current) {
       appStore.setActiveConversationId(target)
     } else {
-      appStore.setWorkspacePane('chat')
-      appStore.setActiveTab('workspace')
+      uiStore.setWorkspacePane('chat')
+      uiStore.setActiveTab('workspace')
     }
     await appStore.fetchConversationTurns({ preferLatest: true })
   } catch (error) {
@@ -862,7 +864,7 @@ watch(() => appStore.conversations, (items) => {
   updateSidebarConversationCache(workspaceId, Array.isArray(items) ? items : [])
 }, { deep: true })
 
-watch(() => appStore.isSidebarCollapsed, (collapsed) => {
+watch(() => uiStore.isSidebarCollapsed, (collapsed) => {
   if (collapsed) {
     closeProfileMenu()
     closeConversationMenu()

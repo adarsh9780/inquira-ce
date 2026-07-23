@@ -24,8 +24,8 @@ test('right panel includes unified workspace layout', () => {
 
   assert.equal(source.includes('WorkspaceLeftPane'), true)
   assert.equal(source.includes('WorkspaceRightPane'), true)
-  assert.equal(source.includes("appStore.activeTab === 'workspace'"), true)
-  assert.equal(source.includes("appStore.activeTab === 'conversation-tree'"), true)
+  assert.equal(source.includes("uiStore.activeTab === 'workspace'"), true)
+  assert.equal(source.includes("uiStore.activeTab === 'conversation-tree'"), true)
   assert.equal(source.includes('SidebarGlobalTurnTree'), true)
 })
 

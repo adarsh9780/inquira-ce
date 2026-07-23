@@ -9,7 +9,7 @@ test('workspace views live in the sidebar instead of the status bar', () => {
   const sidebarSource = readFileSync(sidebarPath, 'utf-8')
   const statusBarSource = readFileSync(statusBarPath, 'utf-8')
 
-  assert.equal(sidebarSource.includes("@click.stop=\"appStore.openSettings('workspace')\""), true)
+  assert.equal(sidebarSource.includes("@click.stop=\"uiStore.openSettings('workspace')\""), true)
   assert.equal(sidebarSource.includes('@click="openChat"'), false)
   assert.equal(sidebarSource.includes('@click="openSchemaEditor"'), true)
   assert.equal(sidebarSource.includes('@click="openConversationTree"'), true)
@@ -35,11 +35,11 @@ test('sidebar uses settings and profile actions in the footer', () => {
   const sidebarPath = resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue')
   const sidebarSource = readFileSync(sidebarPath, 'utf-8')
 
-  assert.equal(sidebarSource.includes("@click=\"appStore.openSettings('setup')\""), true)
+  assert.equal(sidebarSource.includes("@click=\"uiStore.openSettings('setup')\""), true)
   assert.equal(sidebarSource.includes("@click.stop=\"openSettings('workspace', 1)\""), false)
   assert.equal(sidebarSource.includes('title="Settings"'), true)
   assert.equal(sidebarSource.includes('title="Profile Settings"'), true)
-  assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Inquira'"), true)
+  assert.equal(sidebarSource.includes("uiStore.isSidebarCollapsed ? 'Expand sidebar' : 'Inquira'"), true)
   assert.equal(sidebarSource.includes('title="Collapse sidebar"'), true)
   assert.equal(sidebarSource.includes('Terms &amp; Conditions'), true)
   assert.equal(sidebarSource.includes('Account Settings'), true)

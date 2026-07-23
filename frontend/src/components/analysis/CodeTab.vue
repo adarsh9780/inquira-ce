@@ -1,6 +1,6 @@
 <template>
   <div class="flex h-full flex-col">
-    <Teleport to="#workspace-left-pane-toolbar" v-if="isMounted && appStore.workspacePane === 'code'">
+    <Teleport to="#workspace-left-pane-toolbar" v-if="isMounted && uiStore.workspacePane === 'code'">
       <div class="flex items-center w-full justify-between gap-2">
         <div v-if="showCodeSourceToggle" class="flex items-center gap-1">
           <button
@@ -123,6 +123,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
+import { useUiStore } from '../../stores/uiStore'
 import executionService from '../../services/executionService'
 import { toast } from '../../composables/useToast'
 import { buildExecutionViewModel } from '../../utils/executionViewModel'
@@ -148,6 +149,7 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
+const uiStore = useUiStore()
 
 const editorContainer = ref(null)
 const isRunning = ref(false)
@@ -439,7 +441,7 @@ function startRunEntry(scopeLabel, code) {
     exitCode: 0,
   })
   if (entryId) {
-    appStore.setDataPane('output')
+    uiStore.setDataPane('output')
   }
   return {
     entryId,
@@ -521,7 +523,7 @@ async function executeSnippet(code, successLine, options = {}) {
 
   if (normalized?.error) {
     appStore.setTerminalOutput(viewModel.output)
-    appStore.setDataPane('output')
+    uiStore.setDataPane('output')
     return {
       ok: false,
       execTime,
@@ -546,7 +548,7 @@ async function executeSnippet(code, successLine, options = {}) {
       scalarOutputs,
     })
   }
-  appStore.setDataPane('output')
+  uiStore.setDataPane('output')
   appStore.setTerminalOutput(viewModel.output)
   return {
     ok: true,
@@ -564,7 +566,7 @@ async function runCode() {
   }
   isRunning.value = true
   appStore.setCodeRunning(true)
-  appStore.setActiveTab('output')
+  uiStore.setActiveTab('output')
   appStore.setTerminalOutput('Running code...')
   const runMeta = startRunEntry('Code run', appStore.pythonFileContent)
   try {
@@ -583,7 +585,7 @@ async function runCode() {
       exitCode: 1,
       durationMs: Math.round(performance.now() - runMeta.startedAtMs),
     })
-    appStore.setDataPane('output')
+    uiStore.setDataPane('output')
   } finally {
     isRunning.value = false
     appStore.setCodeRunning(false)
@@ -625,7 +627,7 @@ async function runSelectedCode() {
       exitCode: 1,
       durationMs: Math.round(performance.now() - runMeta.startedAtMs),
     })
-    appStore.setDataPane('output')
+    uiStore.setDataPane('output')
   } finally {
     isRunning.value = false
     appStore.setCodeRunning(false)
@@ -765,21 +767,21 @@ async function initializeEditor() {
       if (update.selectionSet || update.docChanged) {
         const head = update.state.selection.main.head
         const line = update.state.doc.lineAt(head)
-        appStore.setEditorPosition(line.number, head - line.from + 1)
+        uiStore.setEditorPosition(line.number, head - line.from + 1)
       }
     }),
     EditorView.domEventHandlers({
       focus: () => {
-        appStore.setEditorFocused(true)
+        uiStore.setEditorFocused(true)
         // Ensure accurate position on initial focus
         if (editor) {
           const head = editor.state.selection.main.head
           const line = editor.state.doc.lineAt(head)
-          appStore.setEditorPosition(line.number, head - line.from + 1)
+          uiStore.setEditorPosition(line.number, head - line.from + 1)
         }
       },
       blur: () => {
-        appStore.setEditorFocused(false)
+        uiStore.setEditorFocused(false)
       }
     }),
     EditorView.lineWrapping,
@@ -849,12 +851,12 @@ watch(() => appStore.generatedCode, (newCode) => {
     appStore.setPythonFileContent(newCode)
     updateEditorContent()
     isGeneratingCode.value = false
-    appStore.setLoading(false)
+    uiStore.setLoading(false)
     appStore.setCodeRunning(false)
   }
 })
 
-watch(() => appStore.isLoading, (loading) => {
+watch(() => uiStore.isLoading, (loading) => {
   isGeneratingCode.value = loading
   syncEditorEditability()
 })

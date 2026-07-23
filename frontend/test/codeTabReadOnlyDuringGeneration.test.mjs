@@ -13,6 +13,6 @@ test('code tab keeps editor visible and switches it to read-only while generatio
   assert.equal(source.includes('editableCompartment.of(EditorView.editable.of(!isGeneratingCode.value))'), true)
   assert.equal(source.includes('function syncEditorEditability() {'), true)
   assert.equal(source.includes('editableCompartment.reconfigure(EditorView.editable.of(!isGeneratingCode.value))'), true)
-  assert.equal(source.includes('watch(() => appStore.isLoading, (loading) => {'), true)
+  assert.equal(source.includes('watch(() => uiStore.isLoading, (loading) => {'), true)
   assert.equal(source.includes('syncEditorEditability()'), true)
 })

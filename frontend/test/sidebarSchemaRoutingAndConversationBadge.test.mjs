@@ -60,6 +60,6 @@ test('selecting a workspace row returns the shell to workspace chat', () => {
   const createConversationIndex = sidebarSource.indexOf('async function createConversation(', selectWorkspaceIndex)
   const selectWorkspaceBlock = sidebarSource.slice(selectWorkspaceIndex, createConversationIndex)
 
-  assert.equal(selectWorkspaceBlock.includes("appStore.setWorkspacePane('chat')"), true)
-  assert.equal(selectWorkspaceBlock.includes("appStore.setActiveTab('workspace')"), true)
+  assert.equal(selectWorkspaceBlock.includes("uiStore.setWorkspacePane('chat')"), true)
+  assert.equal(selectWorkspaceBlock.includes("uiStore.setActiveTab('workspace')"), true)
 })

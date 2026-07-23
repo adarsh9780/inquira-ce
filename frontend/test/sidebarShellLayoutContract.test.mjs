@@ -8,7 +8,7 @@ test('app shell owns sidebar rail sizing while UnifiedSidebar fills the provided
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
   assert.equal(appSource.includes('class="h-full shrink-0 app-nav-pane"'), true)
-  assert.equal(appSource.includes("'app-nav-pane-collapsed': appStore.isSidebarCollapsed"), true)
+  assert.equal(appSource.includes("'app-nav-pane-collapsed': uiStore.isSidebarCollapsed"), true)
   assert.equal(appSource.includes('app-nav-pane-hidden'), false)
   assert.equal(appSource.includes('.app-nav-pane {'), true)
   assert.equal(appSource.includes('width: 260px;'), true)

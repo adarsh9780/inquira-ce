@@ -17,7 +17,7 @@ test('the workbench exposes one contextual shell and direct evidence destination
   assert.match(contextBar, /data-action="add-data"/)
   assert.match(contextBar, /v-if="appStore\.hasWorkspace"[\s\S]*data-workspace-status/)
   assert.match(contextBar, /:aria-label="[^"]*Add a data source[^"]*"/)
-  assert.match(leftPane, /v-if="appStore\.workspacePane === 'chat' && appStore\.workspaceReadiness\.ready"/)
+  assert.match(leftPane, /v-if="uiStore\.workspacePane === 'chat' && appStore\.workspaceReadiness\.ready"/)
   assert.match(rightPane, /<SegmentedControl/)
   assert.doesNotMatch(rightPane, /v-model="selectedCategory"[\s\S]*<HeaderDropdown/)
   assert.doesNotMatch(statusTemplate, /data-workspace-switcher/)

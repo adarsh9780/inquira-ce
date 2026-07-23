@@ -58,13 +58,13 @@
     <div
       v-if="isWorkspaceActive"
       class="pane-resizer-y relative z-20 -my-[1px] w-full bg-transparent transition-[height,opacity,background-color,box-shadow] motion-slow"
-      :class="appStore.isTerminalOpen ? 'h-[3px] cursor-row-resize opacity-100 hover:h-1' : 'h-0 pointer-events-none opacity-0'"
+      :class="uiStore.isTerminalOpen ? 'h-[3px] cursor-row-resize opacity-100 hover:h-1' : 'h-0 pointer-events-none opacity-0'"
       role="separator"
       aria-label="Resize workspace and terminal panes"
       aria-orientation="horizontal"
       :aria-valuenow="Math.round(terminalVisualHeight)"
-      :tabindex="appStore.isTerminalOpen ? 0 : -1"
-      @pointerdown="appStore.isTerminalOpen && startResizeY($event)"
+      :tabindex="uiStore.isTerminalOpen ? 0 : -1"
+      @pointerdown="uiStore.isTerminalOpen && startResizeY($event)"
       @keydown="handleResizeYKeydown"
     ></div>
 
@@ -72,8 +72,8 @@
     <div
       v-if="isWorkspaceActive"
       class="w-full flex flex-col border-t z-10 overflow-hidden transition-[height,opacity,border-color] motion-slow"
-      :class="appStore.isTerminalOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'"
-      :style="{ height: terminalVisualHeight + '%', borderColor: appStore.isTerminalOpen ? 'var(--color-border)' : 'transparent', backgroundColor: 'var(--color-workspace-surface)' }"
+      :class="uiStore.isTerminalOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'"
+      :style="{ height: terminalVisualHeight + '%', borderColor: uiStore.isTerminalOpen ? 'var(--color-border)' : 'transparent', backgroundColor: 'var(--color-workspace-surface)' }"
     >
       <div class="flex h-7 justify-between items-center px-3 border-b" style="background-color: var(--color-workspace-surface); border-color: var(--color-border);">
         <div class="text-[10px] font-medium uppercase tracking-wide flex items-center gap-1" style="color: var(--color-text-muted);">
@@ -85,7 +85,7 @@
         <div id="terminal-toolbar" class="flex-1 min-w-0 flex items-center justify-end ml-2 mr-1"></div>
 
         <button
-          @click="appStore.toggleTerminal()"
+          @click="uiStore.toggleTerminal()"
           class="btn-icon h-5 w-5 p-1"
           title="Close Terminal"
           aria-label="Close terminal"
@@ -100,11 +100,11 @@
     </div>
 
     <!-- Other Full-Screen Views -->
-    <div v-show="appStore.activeTab !== 'workspace'" class="relative flex-1 overflow-hidden" style="background-color: var(--color-workspace-surface);">
-      <div v-show="appStore.activeTab === 'schema-editor'" class="h-full p-3 sm:p-4">
+    <div v-show="uiStore.activeTab !== 'workspace'" class="relative flex-1 overflow-hidden" style="background-color: var(--color-workspace-surface);">
+      <div v-show="uiStore.activeTab === 'schema-editor'" class="h-full p-3 sm:p-4">
         <SchemaEditorTab />
       </div>
-      <div v-show="appStore.activeTab === 'conversation-tree'" class="flex h-full min-h-0 flex-col p-3 sm:p-4">
+      <div v-show="uiStore.activeTab === 'conversation-tree'" class="flex h-full min-h-0 flex-col p-3 sm:p-4">
         <div class="mb-3 flex h-9 shrink-0 items-center justify-between">
           <div class="min-w-0">
             <h2 class="truncate text-sm font-semibold text-[var(--color-text-main)]">Conversation Tree</h2>
@@ -132,7 +132,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useAppStore } from '../../stores/appStore'
+import { useUiStore } from '../../stores/uiStore'
 import WorkspaceLeftPane from './WorkspaceLeftPane.vue'
 import WorkspaceRightPane from './WorkspaceRightPane.vue'
 import WorkspaceContextBar from './WorkspaceContextBar.vue'
@@ -141,13 +141,13 @@ import TerminalTab from '../analysis/TerminalTab.vue'
 import SchemaEditorTab from '../preview/SchemaEditorTab.vue'
 import { CommandLineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 
-const appStore = useAppStore()
-const isWorkspaceActive = computed(() => appStore.activeTab === 'workspace')
-const leftPaneWidth = computed(() => appStore.leftPaneWidth)
-const rightPaneWidth = computed(() => 100 - appStore.leftPaneWidth)
+const uiStore = useUiStore()
+const isWorkspaceActive = computed(() => uiStore.activeTab === 'workspace')
+const leftPaneWidth = computed(() => uiStore.leftPaneWidth)
+const rightPaneWidth = computed(() => 100 - uiStore.leftPaneWidth)
 const terminalVisualHeight = computed(() => {
   if (!isWorkspaceActive.value) return 0
-  return appStore.isTerminalOpen ? appStore.terminalHeight : 0
+  return uiStore.isTerminalOpen ? uiStore.terminalHeight : 0
 })
 const workspaceVisualHeight = computed(() => 100 - terminalVisualHeight.value)
 
@@ -172,17 +172,17 @@ function startResizeY(e) {
 function handleResizeXKeydown(event) {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
   event.preventDefault()
-  if (event.key === 'Home') appStore.setLeftPaneWidth(20)
-  else if (event.key === 'End') appStore.setLeftPaneWidth(80)
-  else appStore.setLeftPaneWidth(Math.min(80, Math.max(20, leftPaneWidth.value + (event.key === 'ArrowRight' ? 2 : -2))))
+  if (event.key === 'Home') uiStore.setLeftPaneWidth(20)
+  else if (event.key === 'End') uiStore.setLeftPaneWidth(80)
+  else uiStore.setLeftPaneWidth(Math.min(80, Math.max(20, leftPaneWidth.value + (event.key === 'ArrowRight' ? 2 : -2))))
 }
 
 function handleResizeYKeydown(event) {
-  if (!appStore.isTerminalOpen || !['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
+  if (!uiStore.isTerminalOpen || !['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
   event.preventDefault()
-  if (event.key === 'Home') appStore.setTerminalHeight(10)
-  else if (event.key === 'End') appStore.setTerminalHeight(80)
-  else appStore.setTerminalHeight(Math.min(80, Math.max(10, terminalVisualHeight.value + (event.key === 'ArrowUp' ? 2 : -2))))
+  if (event.key === 'Home') uiStore.setTerminalHeight(10)
+  else if (event.key === 'End') uiStore.setTerminalHeight(80)
+  else uiStore.setTerminalHeight(Math.min(80, Math.max(10, terminalVisualHeight.value + (event.key === 'ArrowUp' ? 2 : -2))))
 }
 
 function onResize(e) {
@@ -195,7 +195,7 @@ function onResize(e) {
     if (newWidthPct < 20) newWidthPct = 20
     if (newWidthPct > 80) newWidthPct = 80
 
-    appStore.setLeftPaneWidth(newWidthPct)
+    uiStore.setLeftPaneWidth(newWidthPct)
   }
 
   if (isResizingY.value) {
@@ -205,7 +205,7 @@ function onResize(e) {
     if (newHeightPct < 10) newHeightPct = 10
     if (newHeightPct > 80) newHeightPct = 80
 
-    appStore.setTerminalHeight(newHeightPct)
+    uiStore.setTerminalHeight(newHeightPct)
   }
 }
 

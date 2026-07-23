@@ -11,7 +11,7 @@ const store = {
   toggleTerminal: vi.fn(),
 }
 
-vi.mock('../src/stores/appStore', () => ({ useAppStore: () => store }))
+vi.mock('../src/stores/uiStore', () => ({ useUiStore: () => store }))
 
 import RightPanel from '../src/components/layout/RightPanel.vue'
 

@@ -41,10 +41,12 @@ import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { ArrowPathIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { useAppStore } from '../../stores/appStore'
+import { useUiStore } from '../../stores/uiStore'
 import { toast } from '../../composables/useToast'
 import nativeTerminalService from '../../services/nativeTerminalService'
 
 const appStore = useAppStore()
+const uiStore = useUiStore()
 const terminalHostRef = ref(null)
 const sessionId = ref('')
 const sessionCwd = ref('')
@@ -57,7 +59,7 @@ let dataDisposable = null
 let resizeObserver = null
 let sessionCleanup = null
 
-const displayCwd = computed(() => sessionCwd.value || appStore.terminalCwd || 'n/a')
+const displayCwd = computed(() => sessionCwd.value || uiStore.terminalCwd || 'n/a')
 
 function readThemeColor(tokenName, fallback) {
   if (typeof window === 'undefined') return fallback
@@ -142,7 +144,7 @@ async function startSession() {
     const response = await nativeTerminalService.startSession({
       workspaceId: appStore.activeWorkspaceId,
       sessionId: sessionId.value,
-      cwd: appStore.terminalCwd || null,
+      cwd: uiStore.terminalCwd || null,
       cols: terminal.cols,
       rows: terminal.rows,
       onData: (chunk) => {
@@ -157,7 +159,7 @@ async function startSession() {
 
     shellLabel.value = String(response?.shell || shellLabel.value)
     sessionCwd.value = String(response?.cwd || '')
-    appStore.setTerminalCwd(sessionCwd.value)
+    uiStore.setTerminalCwd(sessionCwd.value)
     sessionCleanup = response?.dispose
     writeBanner()
   } catch (error) {

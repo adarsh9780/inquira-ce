@@ -143,6 +143,7 @@ import {
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import { useAppStore } from '../../stores/appStore'
+import { useUiStore } from '../../stores/uiStore'
 import apiService from '../../services/apiService'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
@@ -157,6 +158,7 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const appStore = useAppStore()
+const uiStore = useUiStore()
 const query = ref('')
 const loading = ref(false)
 const loadError = ref('')
@@ -190,7 +192,7 @@ const commandActions = computed(() => [
     icon: Cog6ToothIcon,
     run: () => {
       emit('close')
-      appStore.openSettings('setup')
+      uiStore.openSettings('setup')
     },
   },
   {
@@ -203,32 +205,32 @@ const commandActions = computed(() => [
     icon: ListBulletIcon,
     run: () => {
       emit('close')
-      appStore.openKeyboardShortcuts()
+      uiStore.openKeyboardShortcuts()
     },
   },
   {
     type: 'action',
     id: 'toggle-sidebar',
-    title: appStore.isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar',
+    title: uiStore.isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar',
     subtitle: 'Show or hide the workspace sidebar.',
     keywords: 'sidebar navigation collapse expand',
     statusLabel: shortcutText('sidebar'),
     icon: RectangleGroupIcon,
     run: () => {
-      appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
+      uiStore.setSidebarCollapsed(!uiStore.isSidebarCollapsed)
       emit('close')
     },
   },
   {
     type: 'action',
     id: 'toggle-terminal',
-    title: appStore.isTerminalOpen ? 'Close Terminal' : 'Open Terminal',
+    title: uiStore.isTerminalOpen ? 'Close Terminal' : 'Open Terminal',
     subtitle: 'Toggle the terminal panel.',
     keywords: 'terminal shell console command line',
     statusLabel: shortcutText('terminal'),
     icon: CommandLineIcon,
     run: () => {
-      appStore.toggleTerminal()
+      uiStore.toggleTerminal()
       emit('close')
     },
   },
@@ -241,7 +243,7 @@ const commandActions = computed(() => [
     statusLabel: shortcutText('schema'),
     icon: CircleStackIcon,
     run: () => {
-      appStore.setActiveTab('schema-editor')
+      uiStore.setActiveTab('schema-editor')
       emit('close')
     },
   },
@@ -254,7 +256,7 @@ const commandActions = computed(() => [
     statusLabel: shortcutText('conversation-tree'),
     icon: ShareIcon,
     run: () => {
-      appStore.setActiveTab('conversation-tree')
+      uiStore.setActiveTab('conversation-tree')
       emit('close')
     },
   },
@@ -475,8 +477,8 @@ async function selectConversation(row) {
       await appStore.fetchConversations()
     }
     appStore.setActiveConversationId(row.id)
-    appStore.setWorkspacePane('chat')
-    appStore.setActiveTab('workspace')
+    uiStore.setWorkspacePane('chat')
+    uiStore.setActiveTab('workspace')
     await appStore.fetchConversationTurns({ preferLatest: true })
     emit('close')
   } catch (error) {
@@ -492,8 +494,8 @@ async function createConversationFromPalette() {
   if (conversation?.id) {
     appStore.setActiveConversationId(conversation.id)
   }
-  appStore.setWorkspacePane('chat')
-  appStore.setActiveTab('workspace')
+  uiStore.setWorkspacePane('chat')
+  uiStore.setActiveTab('workspace')
   await appStore.fetchConversationTurns()
   emit('close')
 }

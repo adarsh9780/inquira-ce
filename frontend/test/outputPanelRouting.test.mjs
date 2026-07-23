@@ -44,6 +44,6 @@ test('manual runtime errors route to Runs without separate result selection stat
 
   assert.equal(source.includes('appStore.setSelectedResultId'), false)
   assert.equal(source.includes('executionLogResultId'), false)
-  assert.equal(source.includes("appStore.setDataPane('output')"), true)
+  assert.equal(source.includes("uiStore.setDataPane('output')"), true)
   assert.equal(source.includes('resultPaneForKind'), false)
 })

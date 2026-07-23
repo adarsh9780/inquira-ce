@@ -8,13 +8,13 @@ test('code tab runs manual code through execution service and surfaces output in
 
   assert.equal(source.includes('async function runCode() {'), true)
   assert.equal(source.includes('await executeSnippet(appStore.pythonFileContent, \'Code executed successfully!\''), true)
-  assert.equal(source.includes("appStore.setActiveTab('output')"), true)
+  assert.equal(source.includes("uiStore.setActiveTab('output')"), true)
   assert.equal(source.includes("appStore.setTerminalOutput('Running code...')"), true)
   assert.equal(source.includes('const pyResponse = await executionService.executePython(code)'), true)
   assert.equal(source.includes('tableOutputs = stampRunResults(viewModel.dataframes.slice(0, 1)'), true)
   assert.equal(source.includes('chartOutputs = stampRunResults(viewModel.figures.slice(0, 1)'), true)
   assert.equal(source.includes("origin: 'user'"), true)
-  assert.equal(source.includes("appStore.setDataPane('output')"), true)
+  assert.equal(source.includes("uiStore.setDataPane('output')"), true)
   assert.equal(source.includes('applyExecutionArtifactsToStore'), false)
 })
 

@@ -9,7 +9,7 @@ test('app keeps one sidebar container with a collapsed state only', () => {
 
   assert.equal(appSource.includes('function toggleSidebarVisibility() {'), false)
   assert.equal(appSource.includes('class="h-full shrink-0 app-nav-pane"'), true)
-  assert.equal(appSource.includes("'app-nav-pane-collapsed': appStore.isSidebarCollapsed"), true)
+  assert.equal(appSource.includes("'app-nav-pane-collapsed': uiStore.isSidebarCollapsed"), true)
   assert.equal(appSource.includes('app-nav-pane-hidden'), false)
   assert.equal(appSource.includes(':aria-hidden="!appStore.showSidebar"'), false)
   assert.equal(appSource.includes('class="app-sidebar-rail"'), false)

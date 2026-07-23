@@ -12,7 +12,7 @@ test('CodeTab generatedCode watcher does not auto-execute runCode', () => {
 
   const watcherStart = source.indexOf('watch(() => appStore.generatedCode, (newCode) => {')
   assert.notEqual(watcherStart, -1)
-  const watcherEnd = source.indexOf('watch(() => appStore.isLoading, (loading) => {', watcherStart)
+  const watcherEnd = source.indexOf('watch(() => uiStore.isLoading, (loading) => {', watcherStart)
   assert.notEqual(watcherEnd, -1)
 
   const watcherBody = source.slice(watcherStart, watcherEnd)

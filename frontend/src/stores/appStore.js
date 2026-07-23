@@ -734,6 +734,7 @@ export const useAppStore = defineStore('app', () => {
     schedulePreferenceSync()
     scheduleLocalSnapshotSave()
   }
+  uiStore.configurePersistence(saveLocalConfig)
 
   function scheduleLocalSnapshotSave() {
     const targetUserId = resolveSnapshotUserId()
@@ -2687,43 +2688,33 @@ export const useAppStore = defineStore('app', () => {
 
   function setActiveTab(tab) {
     uiStore.setActiveTab(tab)
-    saveLocalConfig()
   }
   function setWorkspacePane(pane) {
     uiStore.setWorkspacePane(pane)
-    saveLocalConfig()
   }
   function setDataPane(pane) {
     uiStore.setDataPane(pane)
-    saveLocalConfig()
   }
   function setLeftPaneWidth(widthPct) {
-    const previous = leftPaneWidth.value
     uiStore.setLeftPaneWidth(widthPct)
-    if (leftPaneWidth.value !== previous) saveLocalConfig()
   }
 
   function setTerminalHeight(heightPct) {
-    const previous = terminalHeight.value
     uiStore.setTerminalHeight(heightPct)
-    if (terminalHeight.value !== previous) saveLocalConfig()
   }
 
   function toggleTerminal() {
     uiStore.toggleTerminal()
-    saveLocalConfig()
   }
 
   function setTerminalConsentGranted(granted) {
     uiStore.setTerminalConsentGranted(granted)
-    saveLocalConfig()
   }
   function setTerminalCwd(cwd) {
     uiStore.setTerminalCwd(cwd)
   }
   function setSidebarCollapsed(collapsed) {
     uiStore.setSidebarCollapsed(collapsed)
-    saveLocalConfig()
   }
 
   function openKeyboardShortcuts() {

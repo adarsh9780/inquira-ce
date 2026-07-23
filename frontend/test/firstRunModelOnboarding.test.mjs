@@ -13,7 +13,7 @@ test('Wails startup gates the app on persisted model onboarding', () => {
   assert.match(app, /modelOnboarding\.checked && modelOnboarding\.required/)
   assert.match(app, /await loadModelOnboardingStatus\(\)/)
   assert.match(app, /handleModelOnboardingComplete/)
-  assert.match(app, /appStore\.openSettings\('workspace-general'\)/)
+  assert.match(app, /uiStore\.openSettings\('workspace-general'\)/)
   assert.match(service, /GetModelOnboardingStatus/)
   assert.match(service, /CompleteModelOnboarding/)
 })
