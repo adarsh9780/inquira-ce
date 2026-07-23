@@ -3,9 +3,12 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('chat trace uses plain muted text rows without expandable output payloads', () => {
+test('chat keeps ephemeral progress hidden inside the analysis-details implementation', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/chat/ChatHistory.vue'), 'utf-8')
 
+  assert.equal(source.includes('const SHOW_EPHEMERAL_TRACE = false'), true)
+  assert.equal(source.includes('Analysis details'), true)
+  assert.equal(source.includes('Final response'), false)
   assert.equal(source.includes('class="ephemeral-trace-list"'), true)
   assert.equal(source.includes('class="ephemeral-trace-item"'), true)
   assert.equal(source.includes('class="ephemeral-trace-action"'), true)
@@ -18,7 +21,6 @@ test('chat trace uses plain muted text rows without expandable output payloads',
   assert.equal(source.includes('if (isLikelyCodeText(text)) return \'\''), true)
   assert.equal(source.includes('class="stream-reasoning-list"'), true)
   assert.equal(source.includes('class="stream-action-section"'), true)
-  assert.equal(source.includes('Final response'), true)
   assert.equal(source.includes("const eventMessage = String(event?.message || '').trim()"), true)
 })
 

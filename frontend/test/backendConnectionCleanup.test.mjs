@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('backend connection state uses the status bar without the obsolete red alert', () => {
+test('backend connection state stays internal while the status bar surfaces engine state', () => {
   const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
   const statusBarSource = readFileSync(
     resolve(process.cwd(), 'src/components/layout/StatusBar.vue'),
@@ -15,10 +15,12 @@ test('backend connection state uses the status bar without the obsolete red aler
     existsSync(resolve(process.cwd(), 'src/components/ui/ConnectionStatusIndicator.vue')),
     false,
   )
-  assert.equal(statusBarSource.includes('settingsWebSocket.onConnection'), true)
-  assert.equal(statusBarSource.includes("label: 'Disconnected'"), true)
-  assert.equal(statusBarSource.includes('data-websocket-status'), true)
-  assert.equal(statusBarSource.includes('{{ wsConnectionMeta.label }}'), true)
+  assert.equal(statusBarSource.includes('settingsWebSocket.subscribeWorkspaceRuntimeStatus'), true)
+  assert.equal(statusBarSource.includes('workspaceRuntimeStatusMeta'), true)
+  assert.equal(statusBarSource.includes('Engine {{ workspaceRuntimeStatusMeta.label.toLowerCase() }}'), true)
+  assert.equal(statusBarSource.includes("label: 'Disconnected'"), false)
+  assert.equal(statusBarSource.includes('data-websocket-status'), false)
+  assert.equal(statusBarSource.includes('{{ wsConnectionMeta.label }}'), false)
 })
 
 test('frontend connection services omit HTTP readiness polling and legacy websocket APIs', () => {

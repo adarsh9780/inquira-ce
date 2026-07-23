@@ -11,7 +11,7 @@ test('chat input routes chart-like responses to figure data pane', () => {
   assert.equal(source.includes("appStore.setActiveTab('chart')"), false)
 })
 
-test('onboarding copy avoids provider-specific hardcoding in LLM settings', () => {
+test('readiness and provider settings avoid provider-specific hardcoding in chat', () => {
   const chatInputPath = resolve(process.cwd(), 'src/components/chat/ChatInput.vue')
   const chatTabPath = resolve(process.cwd(), 'src/components/chat/ChatTab.vue')
   const llmTabPath = resolve(process.cwd(), 'src/components/modals/tabs/LLMSettingsTab.vue')
@@ -24,10 +24,12 @@ test('onboarding copy avoids provider-specific hardcoding in LLM settings', () =
   assert.equal(chatTab.includes('Gemini API key'), false)
   assert.equal(chatInput.includes('OpenRouter API key'), false)
   assert.equal(chatTab.includes('OpenRouter API key'), false)
-  assert.equal(chatInput.includes('<InlineNotice'), true)
-  assert.equal(chatInput.includes('setupNotice'), true)
-  assert.equal(chatInput.includes('appStore.llmProvider'), true)
-  assert.equal(chatInput.includes('missingSetupRequirements'), true)
+  assert.equal(chatInput.includes('<InlineNotice'), false)
+  assert.equal(chatInput.includes('setupNotice'), false)
+  assert.equal(chatInput.includes('missingSetupRequirements'), false)
+  assert.equal(chatTab.includes('<WorkspaceReadinessJourney'), true)
+  assert.equal(chatTab.includes("state === 'model_connection_required'"), true)
+  assert.equal(chatTab.includes("appStore.openSettings('connections')"), true)
   assert.equal(llmTab.includes('API Key (OpenRouter)'), false)
   assert.equal(llmTab.includes('{{ apiKeyLabel }}'), true)
 })

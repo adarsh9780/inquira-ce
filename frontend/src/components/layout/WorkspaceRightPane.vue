@@ -2,18 +2,11 @@
   <div class="flex h-full w-full min-h-0 min-w-0 flex-col" style="background-color: var(--color-workspace-surface);">
     <AppToolbar aria-label="Results toolbar">
       <template #start>
-        <div class="flex min-w-0 items-center gap-2">
-          <span class="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">
-            Results
-          </span>
-          <HeaderDropdown
-            v-model="selectedCategory"
-            :options="resultCategoryOptions"
-            placeholder="Result type"
-            aria-label="Select result category"
-            max-width-class="w-[9.5rem]"
-          />
-        </div>
+        <SegmentedControl
+          v-model="selectedCategory"
+          :options="resultCategoryOptions"
+          aria-label="Result views"
+        />
       </template>
 
       <div id="workspace-right-pane-toolbar-center" class="min-w-0"></div>
@@ -36,8 +29,9 @@
 <script setup>
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
-import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import AppToolbar from '../ui/AppToolbar.vue'
+import SegmentedControl from '../ui/SegmentedControl.vue'
+import { buildUserRunItems } from '../../utils/unifiedResults'
 import {
   ChartBarIcon,
   PlayCircleIcon,
@@ -50,11 +44,23 @@ const TableTab = defineAsyncComponent(() => import('../analysis/TableTab.vue'))
 const FigureTab = defineAsyncComponent(() => import('../analysis/FigureTab.vue'))
 const OutputTab = defineAsyncComponent(() => import('../analysis/OutputTab.vue'))
 
-const resultCategoryOptions = [
-  { value: 'table', label: 'Tables', icon: TableCellsIcon },
-  { value: 'chart', label: 'Charts', icon: ChartBarIcon },
-  { value: 'runs', label: 'Runs', icon: PlayCircleIcon },
-]
+const tableResultCount = computed(() => Math.max(
+  Number(appStore.dataframeCount || 0),
+  Array.isArray(appStore.dataframes) ? appStore.dataframes.length : 0,
+))
+const chartResultCount = computed(() => Math.max(
+  Number(appStore.figureCount || 0),
+  Array.isArray(appStore.figures) ? appStore.figures.length : 0,
+))
+const runResultCount = computed(() => buildUserRunItems({
+  terminalEntries: appStore.terminalEntries,
+  conversationId: appStore.activeConversationId,
+}).length)
+const resultCategoryOptions = computed(() => [
+  { value: 'table', label: 'Tables', icon: TableCellsIcon, count: tableResultCount.value },
+  { value: 'chart', label: 'Charts', icon: ChartBarIcon, count: chartResultCount.value },
+  { value: 'runs', label: 'Runs', icon: PlayCircleIcon, count: runResultCount.value },
+])
 
 function categoryForPane(pane) {
   if (pane === 'table') return 'table'
@@ -73,7 +79,7 @@ const selectedCategory = computed({
   set: (category) => {
     const normalized = ['table', 'chart', 'runs'].includes(category) ? category : 'runs'
     appStore.setDataPane(paneForCategory(normalized))
-    const selected = resultCategoryOptions.find((option) => option.value === normalized)
+    const selected = resultCategoryOptions.value.find((option) => option.value === normalized)
     resultAnnouncement.value = selected ? `${selected.label} selected` : ''
   },
 })
@@ -81,7 +87,7 @@ const selectedCategory = computed({
 watch(() => appStore.dataPane, (pane, previousPane) => {
   if (pane === previousPane) return
   const category = categoryForPane(pane)
-  const selected = resultCategoryOptions.find((option) => option.value === category)
+  const selected = resultCategoryOptions.value.find((option) => option.value === category)
   resultAnnouncement.value = selected ? `${selected.label} available` : ''
 })
 </script>

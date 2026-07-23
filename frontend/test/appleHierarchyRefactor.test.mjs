@@ -13,30 +13,32 @@ test('workspace panes share one restrained toolbar and results use one adaptive 
   assert.match(left, /<AppToolbar/)
   assert.match(right, /<AppToolbar/)
   assert.match(left, /<SegmentedControl/)
-  assert.match(right, /<HeaderDropdown/)
-  assert.doesNotMatch(right, /<SegmentedControl/)
-  assert.match(right, /Select result/)
+  assert.match(right, /<SegmentedControl/)
+  assert.doesNotMatch(right, /<HeaderDropdown/)
+  assert.match(right, /aria-label="Result views"/)
   assert.match(styles, /\.app-toolbar/)
   assert.match(styles, /\.segmented-control-item-active/)
 })
 
-test('sidebar progressively discloses workspace tools while preserving collapsed access', () => {
+test('sidebar keeps core workspace tools directly accessible in the utility rail', () => {
   const source = read('src/components/layout/UnifiedSidebar.vue')
 
-  assert.match(source, /<DisclosureSection[^>]+label="Workspace tools"/)
-  assert.match(source, /v-else class="space-y-0\.5"/)
-  assert.match(source, /title="Schema editor"/)
-  assert.match(source, /title="Conversation tree"/)
+  assert.doesNotMatch(source, /<DisclosureSection/)
+  assert.match(source, /class="sidebar-tools/)
+  assert.match(source, /appStore\.openDataConnectionFlow\(\)/)
+  assert.match(source, /@click="openSchemaEditor"/)
+  assert.match(source, /@click="openConversationTree"/)
 })
 
-test('composer uses inline setup guidance and progressive model management', () => {
+test('composer stays focused while setup and model management live outside it', () => {
   const composer = read('src/components/chat/ChatInput.vue')
-  const selector = read('src/components/ui/ModelSelector.vue')
 
-  assert.match(composer, /<InlineNotice/)
-  assert.match(composer, /hasTurnNavigation/)
-  assert.match(composer, /@manage-models="appStore\.openSettings\('workspace-ai'\)"/)
-  assert.match(selector, /Workspace model settings…/)
+  assert.doesNotMatch(composer, /<InlineNotice/)
+  assert.doesNotMatch(composer, /<ModelSelector/)
+  assert.doesNotMatch(composer, /hasTurnNavigation/)
+  assert.match(composer, /aria-label="Start voice input"/)
+  assert.match(composer, /aria-label="Send message"/)
+  assert.match(composer, /effectiveWorkspaceModel/)
 })
 
 test('rare destructive result actions live in overflow menus', () => {
@@ -56,7 +58,9 @@ test('empty states and token summary use the shared quiet hierarchy', () => {
   const figure = read('src/components/analysis/FigureTab.vue')
   const usage = read('src/utils/usageFormat.js')
 
-  assert.match(chat, /<AppEmptyState/)
+  assert.match(chat, /<WorkspaceReadinessJourney/)
+  assert.match(chat, /v-for="starter in starterActions"/)
+  assert.doesNotMatch(chat, /<AppEmptyState/)
   assert.match(output, /<AppEmptyState/)
   assert.match(figure, /<AppEmptyState/)
   assert.match(usage, /in · .*out ·/)

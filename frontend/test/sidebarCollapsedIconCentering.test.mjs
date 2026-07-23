@@ -25,7 +25,7 @@ test('collapsed sidebar rows keep a stable fixed-size icon rail', () => {
   assert.ok(sidebarSource.includes('justify-content: center;'))
   assert.ok(sidebarSource.includes('padding-inline: 0 !important;'))
   assert.ok(sidebarSource.includes('.sidebar-root-collapsed .sidebar-tools'))
-  assert.ok(sidebarSource.includes('class="sidebar-tools shrink-0 px-0.5 pb-1"'))
+  assert.ok(sidebarSource.includes('class="sidebar-tools shrink-0 space-y-0.5 px-0.5 pb-1"'))
   assert.ok(sidebarSource.includes('.sidebar-row-icon'))
   assert.ok(sidebarSource.includes('height: calc(var(--size-sidebar-inline-icon) + 0.5rem);'))
   assert.ok(sidebarSource.includes('width: calc(var(--size-sidebar-inline-icon) + 0.5rem);'))

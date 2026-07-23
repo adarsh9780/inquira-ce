@@ -62,37 +62,8 @@
       <!-- Assistant Response -->
       <ChatAssistantMessage v-if="hasAssistantContent(message)">
         <div class="px-3 py-2.5 rounded-2xl rounded-tl-sm" style="background-color: transparent">
-          <div v-if="reasoningRows(message).length" class="stream-reasoning-list">
-            <div v-for="row in reasoningRows(message)" :key="row.id" class="stream-reasoning-item">
-              <template v-if="row.sections?.length">
-                <div v-for="section in row.sections" :key="`${row.id}-${section.label}`" class="stream-reasoning-section">
-                  <p class="stream-reasoning-label">{{ section.label }}</p>
-                  <p class="stream-reasoning-text">{{ section.text }}</p>
-                </div>
-              </template>
-              <template v-else>
-                <p class="stream-reasoning-label">Reasoning</p>
-                <p class="stream-reasoning-text">{{ row.message }}</p>
-              </template>
-            </div>
-          </div>
-
-          <div v-if="hasActionProgress(message)" class="stream-action-section">
-            <div v-if="SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length" class="ephemeral-trace-list">
-              <div v-for="row in ephemeralRows(message)" :key="row.id" class="ephemeral-trace-item">
-                <p class="ephemeral-trace-action">{{ row.action }}</p>
-                <p v-if="row.detail" class="ephemeral-trace-detail">{{ row.detail }}</p>
-              </div>
-            </div>
-
-            <div v-if="toolActivityRows(message).length" class="space-y-4">
-              <ToolActivityCard
-                v-for="(activity, index) in toolActivityRows(message)"
-                :key="activity.call_id || activity.started_at"
-                :activity="activity"
-                :collapsed="isToolActivityOutputCollapsed(message, index)"
-              />
-            </div>
+          <div v-if="message.explanation" class="chat-markdown-content final-response-body max-w-none" style="color: var(--color-text-main);">
+            <div v-html="renderMarkdown(message.explanation)"></div>
           </div>
 
           <AgentIntervention
@@ -104,29 +75,62 @@
           />
 
           <div
-            v-if="message.explanation"
-            class="mt-4 mb-3 flex items-center gap-3"
+            v-if="hasAnalysisDetails(message)"
+            class="mt-3 view-code-details"
+            :class="isAnalysisDetailsOpen(message.id) ? 'view-code-details-open' : ''"
           >
-            <div class="h-px flex-1" style="background-color: var(--color-border);"></div>
-            <span class="text-[11px] uppercase tracking-[0.08em] font-medium" style="color: var(--color-accent);">Final response</span>
-            <div class="h-px flex-1" style="background-color: var(--color-border);"></div>
-          </div>
-
-          <div v-if="message.explanation" class="chat-markdown-content final-response-body max-w-none" style="color: var(--color-text-main);">
-            <div v-html="renderMarkdown(message.explanation)"></div>
-          </div>
-
-          <div v-if="shouldRenderCodeDetails(message)" class="mt-2 view-code-details" :class="isCodeDetailsOpen(message.id) ? 'view-code-details-open' : ''">
-            <button type="button" class="view-code-toggle" :aria-expanded="isCodeDetailsOpen(message.id)" @click="toggleCodeDetails(message.id)">
+            <button
+              type="button"
+              class="view-code-toggle"
+              :aria-expanded="isAnalysisDetailsOpen(message.id)"
+              @click="toggleAnalysisDetails(message.id)"
+            >
               <span class="inline-flex items-center gap-1.5">
-                <CodeBracketIcon class="h-4 w-4" title="View code details" />
-                <span>View code</span>
+                <CodeBracketIcon class="h-4 w-4" aria-hidden="true" />
+                <span>Analysis details</span>
                 <span class="view-code-caret" aria-hidden="true">↓</span>
               </span>
             </button>
-            <div class="motion-disclosure" :class="isCodeDetailsOpen(message.id) ? 'motion-disclosure-open' : ''" :aria-hidden="!isCodeDetailsOpen(message.id)">
+            <div
+              class="motion-disclosure"
+              :class="isAnalysisDetailsOpen(message.id) ? 'motion-disclosure-open' : ''"
+              :aria-hidden="!isAnalysisDetailsOpen(message.id)"
+            >
             <div class="motion-disclosure-content">
             <div class="view-code-panel">
+              <div v-if="reasoningRows(message).length" class="stream-reasoning-list">
+                <div v-for="row in reasoningRows(message)" :key="row.id" class="stream-reasoning-item">
+                  <template v-if="row.sections?.length">
+                    <div v-for="section in row.sections" :key="`${row.id}-${section.label}`" class="stream-reasoning-section">
+                      <p class="stream-reasoning-label">{{ section.label }}</p>
+                      <p class="stream-reasoning-text">{{ section.text }}</p>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <p class="stream-reasoning-label">Reasoning</p>
+                    <p class="stream-reasoning-text">{{ row.message }}</p>
+                  </template>
+                </div>
+              </div>
+
+              <div v-if="hasActionProgress(message)" class="stream-action-section">
+                <div v-if="SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length" class="ephemeral-trace-list">
+                  <div v-for="row in ephemeralRows(message)" :key="row.id" class="ephemeral-trace-item">
+                    <p class="ephemeral-trace-action">{{ row.action }}</p>
+                    <p v-if="row.detail" class="ephemeral-trace-detail">{{ row.detail }}</p>
+                  </div>
+                </div>
+
+                <div v-if="toolActivityRows(message).length" class="space-y-4">
+                  <ToolActivityCard
+                    v-for="(activity, index) in toolActivityRows(message)"
+                    :key="activity.call_id || activity.started_at"
+                    :activity="activity"
+                    :collapsed="isToolActivityOutputCollapsed(message, index)"
+                  />
+                </div>
+              </div>
+
               <div v-if="tableUsageSummary(message)" class="mb-3">
                 <span class="view-code-meta-badge">{{ tableUsageSummary(message) }}</span>
               </div>
@@ -183,19 +187,6 @@
       <div class="analyzing-status">
         <div class="analyzing-spinner" aria-hidden="true"></div>
         <span class="analyzing-status-text">Analyzing your question...</span>
-      </div>
-    </div>
-
-    <!-- Placeholder message when no chat history -->
-    <div v-if="displayedChatHistory.length === 0 && !appStore.activeConversationIsLoading" class="flex items-center justify-center py-12">
-      <div class="text-center">
-        <div class="mb-4" style="color: var(--color-border-hover);">
-          <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-        </div>
-        <h3 class="text-lg font-medium mb-2" style="color: var(--color-text-main);">Start Your Analysis</h3>
-        <p style="color: var(--color-text-muted);">Ask a question about your data to begin the conversation.</p>
       </div>
     </div>
 
@@ -260,22 +251,22 @@ const chatContainer = ref(null)
 const scrollHost = ref(null)
 const end = ref(null)
 const pendingInterventionIds = ref(new Set())
-const expandedCodeMessageIds = ref(new Set())
-const SHOW_EPHEMERAL_TRACE = true
+const expandedAnalysisMessageIds = ref(new Set())
+const SHOW_EPHEMERAL_TRACE = false
 const showScrollToBottomButton = ref(false)
 let shouldAutoScroll = true
 let mutationObserver = null
 let lastScrollTop = 0
 
-function isCodeDetailsOpen(messageId) {
-  return expandedCodeMessageIds.value.has(messageId)
+function isAnalysisDetailsOpen(messageId) {
+  return expandedAnalysisMessageIds.value.has(messageId)
 }
 
-function toggleCodeDetails(messageId) {
-  const next = new Set(expandedCodeMessageIds.value)
+function toggleAnalysisDetails(messageId) {
+  const next = new Set(expandedAnalysisMessageIds.value)
   if (next.has(messageId)) next.delete(messageId)
   else next.add(messageId)
-  expandedCodeMessageIds.value = next
+  expandedAnalysisMessageIds.value = next
 }
 
 function mapTurnToMessage(turn) {
@@ -846,11 +837,18 @@ function hasActionProgress(message) {
   )
 }
 
+function hasAnalysisDetails(message) {
+  return Boolean(
+    reasoningRows(message).length > 0 ||
+    hasActionProgress(message) ||
+    shouldRenderCodeDetails(message)
+  )
+}
+
 function hasAssistantContent(message) {
   return Boolean(
     message?.explanation ||
-    shouldRenderCodeDetails(message) ||
-    toolActivityRows(message).length > 0 ||
+    hasAnalysisDetails(message) ||
     pendingIntervention(message) ||
     (SHOW_EPHEMERAL_TRACE && hasStreamTrace(message))
   )

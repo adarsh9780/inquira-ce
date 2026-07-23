@@ -1,8 +1,8 @@
 <template>
   <section class="setup-readiness mx-auto max-w-xl">
     <header class="mb-6">
-      <p class="text-sm font-semibold text-[var(--color-text-main)]">Ready to ask a question</p>
-      <p class="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">Complete the next required step. Finished setup stays out of your way.</p>
+      <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ setupHeadline }}</p>
+      <p class="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">{{ setupSummary }}</p>
     </header>
 
     <div class="divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
@@ -19,7 +19,6 @@
       </div>
     </div>
 
-    <p v-if="appStore.workspaceReadiness.ready" class="mt-5 text-xs text-[var(--color-text-muted)]">Everything is ready. Close Settings and use the composer to begin.</p>
   </section>
 </template>
 
@@ -50,12 +49,24 @@ const readinessItems = computed(() => {
   const hasConnection = modelConnectionReady.value
   const configured = Boolean(appStore.workspaceAIConfig?.readiness?.ready)
   const steps = [
-    { key: 'connection', label: 'Model connection', description: hasConnection ? 'The application provider is connected.' : 'Connect a provider once for all workspaces.', complete: hasConnection, actionLabel: 'Connect model', action: () => appStore.openSettings('connections') },
+    { key: 'connection', label: 'AI provider', description: hasConnection ? 'The application provider is connected.' : 'Connect a provider once for all workspaces.', complete: hasConnection, actionLabel: 'Connect provider', action: () => appStore.openSettings('connections') },
     { key: 'workspace', label: 'Workspace', description: hasWorkspace ? 'An active workspace is selected.' : 'Create a place for your data and conversations.', complete: hasWorkspace, actionLabel: 'Create workspace', action: () => appStore.openSettings('workspace-general') },
     { key: 'configuration', label: 'Workspace AI', description: configured ? 'Models and privacy are configured.' : 'Review workspace models and data-sharing permission.', complete: configured, actionLabel: 'Review', action: () => appStore.openSettings('workspace-ai') },
-    { key: 'data', label: 'Data', description: hasData ? 'Workspace data is prepared.' : 'Add a dataset to analyze.', complete: hasData, actionLabel: 'Add data', action: () => appStore.openSettings('workspace-data') },
+    { key: 'data', label: 'Data sources', description: hasData ? 'Workspace data is prepared.' : 'Add a local data source to analyze.', complete: hasData, actionLabel: 'Add data', action: () => appStore.openDataConnectionFlow() },
   ]
   const firstIncomplete = steps.findIndex((step) => !step.complete)
   return steps.map((step, index) => ({ ...step, index: index + 1, current: index === firstIncomplete }))
 })
+
+const setupHeadline = computed(() => (
+  readinessItems.value.every((item) => item.complete)
+    ? 'Setup complete'
+    : 'Complete your setup'
+))
+
+const setupSummary = computed(() => (
+  readinessItems.value.every((item) => item.complete)
+    ? 'Everything is ready. Close Settings and begin your analysis.'
+    : 'Complete the next required step. Finished setup stays out of your way.'
+))
 </script>

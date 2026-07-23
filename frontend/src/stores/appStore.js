@@ -150,6 +150,7 @@ export const useAppStore = defineStore('app', () => {
   const hideShortcutsModal = ref(false)
   const isKeyboardShortcutsOpen = ref(false)
   const isCommandPaletteOpen = ref(false)
+  const connectionFlowRequestId = ref(0)
 
   // Editor State
   const editorLine = ref(1)
@@ -178,6 +179,18 @@ export const useAppStore = defineStore('app', () => {
     else if (n === 'terms'  || n === 'legal')       settingsInitialTab.value = 'terms'
     else                                            settingsInitialTab.value = 'setup'
 
+    isSettingsOpen.value = true
+  }
+
+  function openDataConnectionFlow() {
+    const activeId = String(activeWorkspaceId.value || '').trim()
+    const workspaceExists = activeId && workspaces.value.some((workspace) => workspace.id === activeId)
+    if (!workspaceExists) {
+      openSettings('workspace-general')
+      return
+    }
+    settingsInitialTab.value = 'workspace-data'
+    connectionFlowRequestId.value += 1
     isSettingsOpen.value = true
   }
 
@@ -4132,6 +4145,7 @@ export const useAppStore = defineStore('app', () => {
     hideShortcutsModal,
     isKeyboardShortcutsOpen,
     isCommandPaletteOpen,
+    connectionFlowRequestId,
     editorLine,
     editorCol,
     isEditorFocused,
@@ -4152,6 +4166,9 @@ export const useAppStore = defineStore('app', () => {
     hasWorkspace,
     workspaceReadiness,
     activeWorkspaceRuntimeStatus,
+
+    // Primary UX flows
+    openDataConnectionFlow,
 
     // Actions
     saveLocalConfig,

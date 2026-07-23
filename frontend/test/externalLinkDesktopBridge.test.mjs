@@ -20,13 +20,14 @@ test('LLM settings use external link handler for provider URLs', () => {
   assert.equal(source.includes("import { openExternalUrl } from '../../../services/externalLinkService'"), true)
 })
 
-test('StatusBar uses external link helper (CE: AuthModal removed)', () => {
+test('StatusBar stays operational and does not duplicate product links or version copy', () => {
   const statusBarPath = resolve(process.cwd(), 'src/components/layout/StatusBar.vue')
   const statusBarSource = readFileSync(statusBarPath, 'utf-8')
-  assert.equal(statusBarSource.includes('@click.prevent="openInquiraSite"'), true)
-  assert.equal(statusBarSource.includes("openExternalUrl('https://inquiraai.com')"), true)
-  assert.equal(statusBarSource.includes('Inquira v{{ uiVersion }}'), true)
-  assert.equal(statusBarSource.includes('typeof __APP_VERSION__ !== \'undefined\''), true)
+  assert.equal(statusBarSource.includes('@click.prevent="openInquiraSite"'), false)
+  assert.equal(statusBarSource.includes("openExternalUrl('https://inquiraai.com')"), false)
+  assert.equal(statusBarSource.includes('Inquira v{{ uiVersion }}'), false)
+  assert.equal(statusBarSource.includes('typeof __APP_VERSION__ !== \'undefined\''), false)
+  assert.equal(statusBarSource.includes('data-background-operation-status'), true)
 
   // CE: AuthModal.vue was deleted
   const authPath = resolve(process.cwd(), 'src/components/modals/AuthModal.vue')

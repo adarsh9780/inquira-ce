@@ -3,15 +3,18 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import test from 'node:test'
 
-test('sidebar expand and collapse control sits immediately above Settings', () => {
+test('sidebar collapse control stays in the brand row and the collapsed logo expands it', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf8')
-  const toggleIndex = source.indexOf('<!-- Sidebar collapse / expand -->')
-  const settingsIndex = source.indexOf('<!-- Settings -->')
+  const brandIndex = source.indexOf('<!-- ─── Brand / Collapse Toggle ─── -->')
+  const mainIndex = source.indexOf('<!-- ─── Main Scroll Area ─── -->')
 
-  assert.ok(toggleIndex >= 0)
-  assert.ok(settingsIndex > toggleIndex)
-  assert.match(source.slice(toggleIndex, settingsIndex), /@click="handleBrandClick"/)
-  assert.match(source.slice(toggleIndex, settingsIndex), /ChevronDoubleRightIcon/)
-  assert.match(source.slice(toggleIndex, settingsIndex), /ChevronDoubleLeftIcon/)
-  assert.match(source.slice(toggleIndex, settingsIndex), /:aria-label="appStore\.isSidebarCollapsed \? 'Expand sidebar' : 'Collapse sidebar'"/)
+  assert.ok(brandIndex >= 0)
+  assert.ok(mainIndex > brandIndex)
+  const brandBlock = source.slice(brandIndex, mainIndex)
+  assert.match(brandBlock, /@click="appStore\.isSidebarCollapsed && handleBrandClick\(\)"/)
+  assert.match(brandBlock, /@click="handleBrandClick"/)
+  assert.match(brandBlock, /ChevronDoubleLeftIcon/)
+  assert.doesNotMatch(brandBlock, /ChevronDoubleRightIcon/)
+  assert.match(brandBlock, /aria-label="Collapse sidebar"/)
+  assert.match(brandBlock, /:aria-label="appStore\.isSidebarCollapsed \? 'Expand sidebar' : 'Inquira'"/)
 })

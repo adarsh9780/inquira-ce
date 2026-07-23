@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('status bar version label is sourced from frontend package version define', () => {
+test('build version stays available without cluttering the minimal status bar', () => {
   const statusBarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/StatusBar.vue'), 'utf-8')
   const viteConfigSource = readFileSync(resolve(process.cwd(), 'vite.config.js'), 'utf-8')
 
@@ -18,7 +18,7 @@ test('status bar version label is sourced from frontend package version define',
   assert.equal(viteConfigSource.includes('pluginTimings: false'), true)
   assert.equal(viteConfigSource.includes('manualChunks,'), true)
 
-  assert.equal(statusBarSource.includes('const uiVersion = String('), true)
-  assert.equal(statusBarSource.includes("typeof __APP_VERSION__ !== 'undefined'"), true)
-  assert.equal(statusBarSource.includes('Inquira v{{ uiVersion }}'), true)
+  assert.equal(statusBarSource.includes('const uiVersion = String('), false)
+  assert.equal(statusBarSource.includes("typeof __APP_VERSION__ !== 'undefined'"), false)
+  assert.equal(statusBarSource.includes('Inquira v{{ uiVersion }}'), false)
 })

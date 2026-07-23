@@ -3,13 +3,13 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('app theme uses Manrope with semantic theme surfaces and restrained warm brand accents', () => {
+test('app theme uses an offline-safe system stack with semantic warm brand surfaces', () => {
   const styleSource = readFileSync(resolve(process.cwd(), 'src/style.css'), 'utf-8')
 
-  assert.equal(styleSource.includes("family=Manrope:wght@400;500;600;700;800"), true)
-  assert.equal(styleSource.includes('--font-ui: "Manrope", "Avenir Next", "Segoe UI", sans-serif;'), true)
-  assert.equal(styleSource.includes('--font-display: "Manrope", "Avenir Next", "Segoe UI", sans-serif;'), true)
-  assert.equal(styleSource.includes('--font-mono: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;'), true)
+  assert.equal(styleSource.includes('fonts.googleapis.com'), false)
+  assert.equal(styleSource.includes('--font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", sans-serif;'), true)
+  assert.equal(styleSource.includes('--font-display: var(--font-ui);'), true)
+  assert.equal(styleSource.includes('--font-mono: "SFMono-Regular", "Cascadia Code", "Roboto Mono", monospace;'), true)
   assert.equal(styleSource.includes('--color-base: #FBF8F2;'), true)
   assert.equal(styleSource.includes('--color-sidebar-surface: #ECE6DD;'), true)
   assert.equal(styleSource.includes('--color-text-main: #1E2430;'), true)

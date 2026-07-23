@@ -267,16 +267,14 @@ const commandActions = computed(() => [
   {
     type: 'action',
     id: 'import-dataset',
-    title: 'Import Dataset',
-    subtitle: 'Choose CSV, TSV, Parquet, JSON, XLSX, or XLS files.',
-    keywords: 'dataset import data file upload add',
+    title: 'Add data source',
+    subtitle: 'Create a refreshable connection from a local file.',
+    keywords: 'dataset connection import data file upload add',
     statusLabel: shortcutText('dataset-import'),
     icon: FolderOpenIcon,
     run: () => {
       emit('close')
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('inquira:open-dataset-picker'))
-      }
+      appStore.openDataConnectionFlow()
     },
   },
   {

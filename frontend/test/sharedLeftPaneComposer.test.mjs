@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('workspace left pane hosts a shared chat composer below both code and chat views', () => {
+test('workspace left pane hosts the composer only for a ready chat view', () => {
   const leftPanePath = resolve(process.cwd(), 'src/components/layout/WorkspaceLeftPane.vue')
   const source = readFileSync(leftPanePath, 'utf-8')
 
@@ -13,15 +13,16 @@ test('workspace left pane hosts a shared chat composer below both code and chat 
   assert.equal(source.includes('<SegmentedControl'), true)
   assert.equal(source.includes('ChatBubbleLeftRightIcon'), true)
   assert.equal(source.includes('CodeBracketIcon'), true)
-  assert.equal(source.includes('MagnifyingGlassIcon'), true)
+  assert.equal(source.includes('MagnifyingGlassIcon'), false)
   assert.equal(source.includes('CommandLineIcon'), false)
-  assert.equal(source.includes("shortcutTitle('command-palette'"), true)
-  assert.equal(source.includes('appStore.openCommandPalette()'), true)
+  assert.equal(source.includes("shortcutTitle('command-palette'"), false)
+  assert.equal(source.includes('appStore.openCommandPalette()'), false)
   assert.equal(source.includes('selectedWorkspacePane'), true)
   assert.equal(source.includes('rounded-xl border p-1'), false)
   assert.equal(source.includes('workspace-left-content-chat-only'), false)
   assert.equal(source.includes('workspaceLayoutMode'), false)
   assert.equal(source.includes("class=\"flex-shrink-0 pt-2\""), true)
+  assert.equal(source.includes("v-if=\"appStore.workspacePane === 'chat' && appStore.workspaceReadiness.ready\""), true)
   assert.equal(source.includes("v-show=\"appStore.workspacePane === 'code'\""), true)
   assert.equal(source.includes("v-show=\"appStore.workspacePane === 'chat'\""), true)
   assert.equal(source.includes("v-show=\"appStore.workspacePane === 'ctree'\""), false)

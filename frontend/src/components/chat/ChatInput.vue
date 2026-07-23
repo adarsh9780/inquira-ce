@@ -27,7 +27,7 @@
         @input="handleInputChange"
         @click="handleCaretInteraction"
         @keyup="handleCaretInteraction"
-        placeholder="How can I help you today?"
+        :placeholder="composerPlaceholder"
         class="w-full px-3 pt-3 pb-1.5 resize-none focus:outline-none text-[13px] leading-[1.55] bg-transparent border-none"
         style="color: var(--color-text-main); min-height: 60px;"
         :class="{ 'opacity-60 cursor-not-allowed': !appStore.canAnalyze || appStore.activeConversationIsLoading }"
@@ -55,9 +55,7 @@
 
       <!-- Bottom Action Row -->
       <ChatComposerActions>
-
-        <!-- Left: Add button + turn controls -->
-        <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+        <div class="flex min-w-0 items-center gap-1.5">
           <button
             type="button"
             class="btn-icon"
@@ -68,65 +66,55 @@
           >
             <PlusIcon class="w-4 h-4" />
           </button>
-          <template v-if="appStore.activeTurnId && hasTurnNavigation">
-            <button
-              type="button"
-              class="btn-icon opacity-60 transition-opacity group-focus-within/composer:opacity-100 group-hover/composer:opacity-100"
-              title="Previous turn"
-              aria-label="Previous turn"
-              data-tooltip="Previous turn"
-              :disabled="!appStore.activeTurnRelations?.previous_turn"
-              @click="appStore.goToPreviousTurn()"
-            >
-              <ChevronLeftIcon class="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              class="btn-icon opacity-60 transition-opacity group-focus-within/composer:opacity-100 group-hover/composer:opacity-100"
-              title="Next turn"
-              aria-label="Next turn"
-              data-tooltip="Next turn"
-              :disabled="!appStore.activeTurnRelations?.next_turn"
-              @click="appStore.goToNextTurn()"
-            >
-              <ChevronRightIcon class="w-4 h-4" />
-            </button>
-          </template>
         </div>
 
-        <!-- Right: Model selector + action button -->
-        <div class="composer-model-actions flex min-w-0 flex-1 items-center justify-end gap-2 sm:min-w-[12rem] sm:gap-3">
-          <div class="min-w-0 flex-1" style="max-width: clamp(7rem, 30vw, 22rem);">
-            <ModelSelector
-              :selected-model="effectiveWorkspaceModel"
-              :model-options="workspaceModelOptions"
-              :provider="effectiveWorkspaceProvider"
-              :backend-search="searchProviderModels"
-              :search-loading="appStore.providerModelSearchLoading"
-              :search-debounce-ms="250"
-              :max-options-without-search="10"
-              @model-changed="handleModelChange"
-              @manage-models="appStore.openSettings('workspace-ai')"
-            />
-          </div>
-
-          <!-- Mic (empty) → ArrowUp (has text) -->
+        <div class="flex min-w-0 flex-1 items-center justify-end gap-2">
           <button
-            @click="handleActionButtonClick"
-            :disabled="!canTriggerActionButton"
-            class="composer-action-button focus:outline-none"
-            :title="actionButtonTitle"
-            :aria-label="actionButtonTitle"
-            :data-tooltip="actionButtonTitle"
+            v-if="isVoiceInputActive"
+            type="button"
+            class="btn-icon voice-input-pulse"
+            title="Stop voice input"
+            aria-label="Stop voice input"
+            data-tooltip="Stop voice input"
+            @click="stopVoiceInput"
           >
-            <span
-              class="flex h-full w-full items-center justify-center rounded-full transition-transform duration-300"
-              :class="{ 'voice-input-pulse': isVoiceInputActive }"
-            >
-              <StopIcon v-if="appStore.activeConversationIsLoading" class="w-3 h-3" />
-              <MicrophoneIcon v-else-if="isComposerEmpty" class="w-3 h-3" />
-              <ArrowUpIcon v-else class="w-3 h-3" />
-            </span>
+            <StopIcon class="h-3.5 w-3.5" />
+          </button>
+          <button
+            v-else
+            type="button"
+            class="btn-icon"
+            :disabled="!canTriggerVoiceInput"
+            :title="voiceButtonTitle"
+            aria-label="Start voice input"
+            data-tooltip="Start voice input"
+            @click="startVoiceInput"
+          >
+            <MicrophoneIcon class="h-3.5 w-3.5" />
+          </button>
+
+          <button
+            v-if="appStore.activeConversationIsLoading"
+            type="button"
+            class="composer-action-button focus:outline-none"
+            title="Stop generation"
+            aria-label="Stop generation"
+            data-tooltip="Stop generation"
+            @click="handleStopGeneration"
+          >
+            <StopIcon class="h-3 w-3" />
+          </button>
+          <button
+            v-else
+            type="button"
+            class="composer-action-button focus:outline-none"
+            :disabled="!canSend"
+            title="Send message"
+            aria-label="Send message"
+            data-tooltip="Send message"
+            @click="handleSubmit"
+          >
+            <ArrowUpIcon class="h-3 w-3" />
           </button>
         </div>
 
@@ -171,14 +159,6 @@
         />
       </Transition>
     </div>
-
-    <InlineNotice
-      v-if="!appStore.canAnalyze"
-      :title="setupNotice.title"
-      :message="setupNotice.message"
-      :action-label="setupNotice.actionLabel"
-      @action="setupNotice.action()"
-    />
   </div>
 </template>
 
@@ -190,36 +170,23 @@ import executionService from '../../services/executionService'
 import { executeCommand, getRegisteredCommands, isCommand } from '../../services/commandRegistry'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { buildBrowserDataPath, inferTableNameFromDataPath } from '../../utils/chatBootstrap'
+import { inferTableNameFromDataPath } from '../../utils/chatBootstrap'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import { modelSupportsImages, SUPPORTED_CHAT_IMAGE_TYPES } from '../../utils/modelCapabilities'
-import ModelSelector from '../ui/ModelSelector.vue'
 import ColumnSuggest from './ColumnSuggest.vue'
 import ChatAttachmentTray from './ChatAttachmentTray.vue'
 import ChatComposerActions from './ChatComposerActions.vue'
-import InlineNotice from '../ui/InlineNotice.vue'
 import { useChatAttachments } from '../../composables/useChatAttachments'
 import { useChatAutocomplete } from '../../composables/useChatAutocomplete'
 import { useVoiceInput } from '../../composables/useVoiceInput'
 import {
   PlusIcon,
   PhotoIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
 } from '@heroicons/vue/24/outline'
 import { ArrowUpIcon, MicrophoneIcon, StopIcon } from '@heroicons/vue/24/solid'
 
 const appStore = useAppStore()
-const effectiveWorkspaceProvider = computed(() => appStore.workspaceAIConfig?.effective?.provider || appStore.llmProvider)
 const effectiveWorkspaceModel = computed(() => appStore.workspaceAIConfig?.effective?.main_model || appStore.selectedModel)
-const workspaceModelOptions = computed(() => {
-  const configured = appStore.workspaceAIConfig?.defaults?.provider === effectiveWorkspaceProvider.value
-    ? appStore.availableModels
-    : []
-  const values = Array.isArray(configured) ? [...configured] : []
-  if (effectiveWorkspaceModel.value && !values.includes(effectiveWorkspaceModel.value)) values.unshift(effectiveWorkspaceModel.value)
-  return values
-})
 const { formatAttachmentSize } = useChatAttachments()
 useChatAutocomplete()
 useVoiceInput()
@@ -234,40 +201,6 @@ const columnSuggestions = ref([])
 const selectedColumnIndex = ref(0)
 const questionHistoryIndex = ref(-1)
 const questionHistoryDraft = ref('')
-const missingSetupRequirements = computed(() => {
-  const requirements = []
-  if (!appStore.hasWorkspace) requirements.push('Create or select a workspace from the sidebar')
-  if (appStore.workspaceReadiness.state === 'no_data') requirements.push('Add a dataset to this workspace')
-  if (appStore.workspaceReadiness.state === 'model_connection_required') requirements.push('Connect the effective model provider in Settings')
-  if (appStore.workspaceReadiness.state === 'workspace_configuration_required') requirements.push('Review workspace AI settings')
-  return requirements.length ? requirements : ['Finish model setup in Settings']
-})
-const hasTurnNavigation = computed(() => Boolean(
-  appStore.activeTurnRelations?.previous_turn || appStore.activeTurnRelations?.next_turn,
-))
-const setupNotice = computed(() => {
-  if (!appStore.hasWorkspace) {
-    return {
-      title: 'Select a workspace to start',
-      message: 'Your conversations and artifacts are stored per workspace.',
-      actionLabel: 'Choose',
-      action: () => appStore.openSettings('workspace'),
-    }
-  }
-  if (appStore.workspaceReadiness.state === 'no_data') {
-    return { title: 'Add data to begin', message: missingSetupRequirements.value[0], actionLabel: 'Add data', action: () => appStore.openSettings('workspace-data') }
-  }
-  if (appStore.workspaceReadiness.state === 'workspace_configuration_required') {
-    return { title: 'Review workspace AI', message: missingSetupRequirements.value[0], actionLabel: 'Review', action: () => appStore.openSettings('workspace-ai') }
-  }
-  const provider = String(appStore.llmProvider || 'model provider').trim()
-  return {
-    title: `Configure ${provider}`,
-    message: missingSetupRequirements.value[0] || 'Add provider access to start an analysis.',
-    actionLabel: 'Open Settings',
-    action: () => appStore.openSettings('connections'),
-  }
-})
 const activeTokenRange = ref({ start: 0, end: 0, token: '' })
 const suggestionsOpenUp = ref(false)
 const dismissedSuggestionSignature = ref('')
@@ -282,39 +215,27 @@ const stoppedConversationIds = ref(new Set())
 
 const showCommandSuggestions = computed(() => commandSuggestions.value.length > 0)
 const showColumnSuggestions = computed(() => columnSuggestions.value.length > 0)
-const imageAttachmentsSupported = computed(() => modelSupportsImages(appStore.selectedModel))
+const imageAttachmentsSupported = computed(() => modelSupportsImages(effectiveWorkspaceModel.value))
+const composerPlaceholder = computed(() => {
+  const tableName = String(appStore.ingestedTableName || '').trim()
+  return tableName ? `Ask about ${tableName}…` : 'Ask about your data…'
+})
 const canSend = computed(() =>
   appStore.canAnalyze &&
   (question.value.trim().length > 0 || pendingAttachments.value.length > 0) &&
   question.value.length <= 1000 &&
   !appStore.activeConversationIsLoading
 )
-const isComposerEmpty = computed(() =>
-  question.value.trim().length === 0 && pendingAttachments.value.length === 0
-)
 const canTriggerVoiceInput = computed(() =>
   appStore.canAnalyze &&
-  isComposerEmpty.value &&
   supportsVoiceInput.value &&
   !appStore.activeConversationIsLoading
 )
-const canTriggerActionButton = computed(() => {
-  if (appStore.activeConversationIsLoading) return true
-  if (!appStore.canAnalyze) return false
-  if (canSend.value) return true
-  return isComposerEmpty.value && supportsVoiceInput.value
-})
-const actionButtonTitle = computed(() => {
-  if (appStore.activeConversationIsLoading) return 'Stop generation'
-  if (canSend.value) return 'Send (Enter)'
-  if (canTriggerVoiceInput.value) {
-    return isVoiceInputActive.value ? 'Stop voice input' : 'Start voice input'
-  }
-  if (isComposerEmpty.value) {
-    return 'Voice input unavailable on this device/browser'
-  }
-  return 'Type a message or attach images to send'
-})
+const voiceButtonTitle = computed(() => (
+  supportsVoiceInput.value
+    ? 'Start voice input'
+    : 'Voice input unavailable on this device/browser'
+))
 
 const FINAL_STREAM_NODES = new Set([
   'explain_code',
@@ -490,28 +411,6 @@ async function handleAttachmentDrop(event) {
   }
 }
 
-async function handleModelChange(model) {
-  const config = appStore.workspaceAIConfig
-  if (!config || !appStore.activeWorkspaceId) return
-  const overrides = config.overrides || {}
-  await appStore.saveWorkspaceAIConfig({
-    llm_provider_override: overrides.provider,
-    main_model_override: model,
-    lite_model_override: overrides.lite_model,
-    coding_model_override: overrides.coding_model,
-    llm_temperature_override: overrides.temperature,
-    llm_max_tokens_override: overrides.max_tokens,
-    llm_top_p_override: overrides.top_p,
-    allow_llm_data_samples: Boolean(overrides.allow_llm_data_samples),
-  })
-}
-
-async function searchProviderModels(query, limit = 25) {
-  const response = await apiService.v1SearchProviderModels(effectiveWorkspaceProvider.value, query, limit)
-  const models = response?.models
-  return Array.isArray(models) ? models : []
-}
-
 function initializeVoiceInput() {
   if (typeof window === 'undefined') return
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -595,24 +494,6 @@ function handleStopGeneration() {
   if (!conversationId) return
   stoppedConversationIds.value = new Set([...stoppedConversationIds.value, conversationId])
   appStore.abortConversationRun(conversationId)
-}
-
-function handleActionButtonClick() {
-  if (appStore.activeConversationIsLoading) {
-    handleStopGeneration()
-    return
-  }
-  if (canSend.value) {
-    void handleSubmit()
-    return
-  }
-  if (canTriggerVoiceInput.value) {
-    if (isVoiceInputActive.value) {
-      stopVoiceInput()
-    } else {
-      startVoiceInput()
-    }
-  }
 }
 
 function isSimpleIdentifier(value) {
@@ -1758,6 +1639,28 @@ onUnmounted(() => {
 
 watch(() => appStore.activeWorkspaceId, () => {
   clearSuggestions()
+})
+
+watch(() => appStore.currentQuestion, async (nextQuestion) => {
+  const prompt = String(nextQuestion || '').trim()
+  if (!prompt || prompt === question.value.trim()) return
+
+  const messages = Array.isArray(appStore.chatHistory) ? appStore.chatHistory : []
+  const latestSubmittedQuestion = String(messages[messages.length - 1]?.question || '').trim()
+  if (latestSubmittedQuestion === prompt) return
+
+  question.value = prompt
+  questionHistoryIndex.value = -1
+  questionHistoryDraft.value = ''
+  clearSuggestions()
+  await nextTick()
+  if (textareaRef.value) {
+    textareaRef.value.focus()
+    const caret = question.value.length
+    textareaRef.value.selectionStart = caret
+    textareaRef.value.selectionEnd = caret
+  }
+  void updateAutocompleteSuggestions()
 })
 
 watch(() => appStore.ingestedTableName, () => {

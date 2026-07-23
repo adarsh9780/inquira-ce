@@ -14,7 +14,7 @@ test('app keeps one sidebar container with a collapsed state only', () => {
   assert.equal(appSource.includes(':aria-hidden="!appStore.showSidebar"'), false)
   assert.equal(appSource.includes('class="app-sidebar-rail"'), false)
   assert.equal(appSource.includes('@mouseenter='), false)
-  assert.equal(appSource.includes('transition: width var(--motion-duration-standard) var(--motion-ease-standard);'), true)
+  assert.equal(appSource.includes('transition: width var(--motion-duration-slow) var(--motion-ease-spring);'), true)
   assert.equal(appSource.includes('.app-nav-pane-collapsed {'), true)
   assert.equal(appSource.includes('.app-nav-pane-hidden {'), false)
   assert.equal(appSource.includes('<StatusBar />'), true)

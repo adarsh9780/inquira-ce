@@ -131,14 +131,7 @@
         </header>
 
         <div class="min-w-0 pb-2 pt-3" data-run-body>
-          <pre
-            class="max-h-40 overflow-auto whitespace-pre-wrap break-words px-0.5 text-[11px] font-mono leading-4"
-            :class="selectedExecution.code ? '' : 'italic'"
-            style="color: var(--color-text-muted);"
-            data-execution-code
-          >{{ selectedExecution.code || '# Code was not captured for this run.' }}</pre>
-
-          <div class="mt-3 min-w-0 border-t pt-4" style="border-color: var(--color-border);">
+          <div class="min-w-0">
             <div v-if="selectedExecution.status === 'running'" class="flex items-center gap-2 py-1 text-sm" style="color: var(--color-text-muted);">
               <ArrowPathIcon class="h-4 w-4 animate-spin" />
               Running code…
@@ -221,6 +214,17 @@
               <p v-if="selectedExecution.truncated" class="mt-3 text-[11px]" style="color: var(--color-text-muted);">Output was truncated by the runtime.</p>
             </template>
           </div>
+          <details class="mt-5 border-t pt-3 text-xs" style="border-color: var(--color-border);">
+            <summary class="cursor-pointer select-none font-medium text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]">
+              View source code
+            </summary>
+            <pre
+              class="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[var(--color-surface-inset)] p-3 text-[11px] font-mono leading-4"
+              :class="selectedExecution.code ? '' : 'italic'"
+              style="color: var(--color-text-muted);"
+              data-execution-code
+            >{{ selectedExecution.code || '# Code was not captured for this run.' }}</pre>
+          </details>
         </div>
       </article>
     </div>

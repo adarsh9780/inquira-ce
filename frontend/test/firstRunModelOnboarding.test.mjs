@@ -23,7 +23,8 @@ test('Wails startup gates the app on persisted model onboarding', () => {
 test('first-run model onboarding is focused, secure, and cannot be dismissed incomplete', () => {
   const source = read('src/components/onboarding/FirstRunModelOnboarding.vue')
 
-  assert.match(source, /Step 1 of 3/)
+  assert.doesNotMatch(source, /Step 1 of 3/)
+  assert.match(source, /First-time setup/)
   assert.match(source, /Connect a model/)
   assert.match(source, /Create a workspace/)
   assert.match(source, /Add local data/)

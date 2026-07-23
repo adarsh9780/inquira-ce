@@ -7,7 +7,8 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf
 test('settings modal is viewport bounded and exposes dialog keyboard semantics', () => {
   const source = read('src/components/modals/SettingsModal.vue')
 
-  assert.match(source, /h-\[min\(640px,calc\(100dvh-2rem\)\)\]/)
+  assert.match(source, /h-\[min\(760px,calc\(100dvh-2rem\)\)\]/)
+  assert.match(source, /max-w-\[1120px\]/)
   assert.match(source, /role="dialog"/)
   assert.match(source, /aria-modal="true"/)
   assert.match(source, /@keydown="handleDialogKeydown"/)
@@ -55,15 +56,17 @@ test('workspace panes have compact navigation and accessible pointer resizers', 
   assert.match(source, /handleResizeYKeydown/)
 })
 
-test('composer setup guidance is provider-aware and icon controls are labelled', () => {
+test('composer defers readiness guidance and keeps its direct controls labelled', () => {
   const source = read('src/components/chat/ChatInput.vue')
 
   assert.doesNotMatch(source, /Enter your OpenRouter API key/)
-  assert.match(source, /missingSetupRequirements/)
-  assert.match(source, /appStore\.workspaceReadiness\.state/)
-  assert.match(source, /model_connection_required/)
+  assert.doesNotMatch(source, /missingSetupRequirements/)
+  assert.doesNotMatch(source, /<InlineNotice/)
+  assert.doesNotMatch(source, /<ModelSelector/)
   assert.match(source, /aria-label="Attach images"/)
-  assert.match(source, /:aria-label="actionButtonTitle"/)
+  assert.match(source, /aria-label="Start voice input"/)
+  assert.match(source, /aria-label="Send message"/)
+  assert.match(source, /aria-label="Stop generation"/)
 })
 
 test('global UI honors reduced motion and startup states are announced', () => {

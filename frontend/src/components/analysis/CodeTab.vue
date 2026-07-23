@@ -2,53 +2,53 @@
   <div class="flex h-full flex-col">
     <Teleport to="#workspace-left-pane-toolbar" v-if="isMounted && appStore.workspacePane === 'code'">
       <div class="flex items-center w-full justify-between gap-2">
-        <div
-          v-if="showCodeSourceToggle"
-          class="flex items-center gap-0.5 rounded-lg border p-0.5"
-          style="border-color: color-mix(in srgb, var(--color-border) 80%, transparent); background-color: color-mix(in srgb, var(--color-base) 82%, var(--color-surface));"
-        >
+        <div v-if="showCodeSourceToggle" class="flex items-center gap-1">
           <button
             type="button"
-            class="rounded-md px-2.5 py-1 text-[11px] font-medium leading-4 transition-colors"
-            :class="appStore.codeEditorSource === 'agent' ? 'shadow-sm' : ''"
+            class="rounded-md px-2.5 py-1 text-xs font-medium leading-4 transition-colors"
             :style="codeSourceButtonStyle('agent')"
             :aria-pressed="appStore.codeEditorSource === 'agent'"
             title="Use agent generated code"
             @click="selectCodeSource('agent')"
           >
-            Agent
+            Generated code
           </button>
           <button
             type="button"
-            class="rounded-md px-2.5 py-1 text-[11px] font-medium leading-4 transition-colors"
-            :class="appStore.codeEditorSource === 'user' ? 'shadow-sm' : ''"
+            class="rounded-md px-2.5 py-1 text-xs font-medium leading-4 transition-colors"
             :style="codeSourceButtonStyle('user')"
             :aria-pressed="appStore.codeEditorSource === 'user'"
             title="Use your edited code"
             @click="selectCodeSource('user')"
           >
-            Edited
+            My edits
           </button>
+          <span v-if="hasDistinctUserRevision" class="ml-1 text-[11px] font-medium text-[var(--color-accent-text)]">
+            Modified
+          </span>
         </div>
         <div v-else></div>
-        <div class="flex items-center gap-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
+        <div class="flex items-center gap-1">
           <button
             @click="runCode"
             :disabled="!canRunCode || isRunning"
             title="Run Code (R)"
-            class="btn-icon"
-            :class="canRunCode && !isRunning
-              ? 'hover:bg-[var(--color-base)] hover:text-[var(--color-success)] hover:shadow-sm'
-              : ''"
+            class="btn-primary h-8 gap-1.5 px-3 text-xs"
+            data-code-run
           >
             <PlayIcon v-if="!isRunning" class="h-4 w-4" />
-            <div v-else class="h-4 w-4 animate-spin rounded-full border-b-2 border-[var(--color-text-muted)]"></div>
+            <div
+              v-else
+              class="h-4 w-4 animate-spin rounded-full border-2"
+              style="border-color: color-mix(in srgb, var(--color-on-accent) 35%, transparent); border-top-color: var(--color-on-accent);"
+            ></div>
+            <span>{{ isRunning ? 'Running…' : 'Run' }}</span>
           </button>
 
           <button
             @click="syncTableNameInCode"
             title="Sync table name in code to current data file"
-            class="btn-icon hover:bg-[var(--color-base)] hover:text-[var(--color-accent)] hover:shadow-sm"
+            class="btn-icon"
           >
             <ArrowPathIcon class="h-4 w-4" />
           </button>
@@ -59,7 +59,6 @@
             @click="undo"
             :disabled="!canUndo"
             class="btn-icon"
-            :class="canUndo ? 'hover:bg-[var(--color-base)] hover:text-[var(--color-accent)] hover:shadow-sm' : ''"
             title="Undo (Ctrl+Z)"
           >
             <ArrowUturnLeftIcon class="h-4 w-4" />
@@ -69,7 +68,6 @@
             @click="redo"
             :disabled="!canRedo"
             class="btn-icon"
-            :class="canRedo ? 'hover:bg-[var(--color-base)] hover:text-[var(--color-accent)] hover:shadow-sm' : ''"
             title="Redo (Ctrl+Y)"
           >
             <ArrowUturnRightIcon class="h-4 w-4" />
@@ -81,7 +79,6 @@
             @click="downloadCode"
             :disabled="!appStore.pythonFileContent"
             class="btn-icon"
-            :class="appStore.pythonFileContent ? 'hover:bg-[var(--color-base)] hover:text-[var(--color-accent)] hover:shadow-sm' : ''"
             title="Download code"
           >
             <ArrowDownTrayIcon class="h-4 w-4" />

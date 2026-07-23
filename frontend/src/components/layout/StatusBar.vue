@@ -4,68 +4,23 @@
     <!-- Left Section: Token usage, runtime status, and editor position -->
     <div class="flex items-center gap-3 h-full">
       <div
-        v-if="authStore.isAuthenticated"
+        v-if="authStore.isAuthenticated && hasTokenUsage"
         class="flex items-center gap-1 h-full px-1 tabular-nums text-[var(--color-text-muted)]"
         :title="tokenUsageHoverLabel"
       >
         <span class="truncate">{{ tokenUsageSummaryLabel }}</span>
       </div>
 
-      <div v-if="authStore.isAuthenticated" class="w-px h-3.5 bg-[var(--color-border)]"></div>
-
-      <div class="relative h-full" data-workspace-switcher>
-        <button
-          type="button"
-          class="flex h-full max-w-[260px] items-center gap-1.5 px-1 text-left transition-colors hover:text-[var(--color-text-main)]"
-          :title="`Active workspace: ${activeWorkspaceName}`"
-          @click="toggleWorkspaceSwitcher"
-        >
-          <span
-            v-if="workspaceRuntimeStatusMeta.showSpinner"
-            class="inline-block w-2 h-2 rounded-full border-[1.5px] border-[var(--color-border)] border-t-[var(--color-text-main)] animate-spin shrink-0"
-            aria-hidden="true"
-          ></span>
-          <span v-else class="w-2 h-2 rounded-full shrink-0" :class="workspaceRuntimeStatusMeta.dotClass"></span>
-          <span class="truncate font-medium text-[var(--color-text-main)]">
-            {{ activeWorkspaceName }}
-          </span>
-          <span class="hidden font-medium sm:inline" :class="workspaceRuntimeStatusMeta.textClass">
-            {{ workspaceRuntimeStatusMeta.label }}
-          </span>
-          <ChevronUpDownIcon class="h-3.5 w-3.5 shrink-0 text-[var(--color-text-muted)]" />
-        </button>
-
-        <Transition name="motion-popover">
-        <div
-          v-if="workspaceSwitcherOpen"
-          class="motion-popover-surface motion-popover-from-bottom layer-modal-dropdown absolute left-0 bottom-full mb-2 w-72 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-[var(--shadow-lifted)]"
-        >
-          <div class="border-b border-[var(--color-border)] px-3 py-2">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">Workspaces</p>
-          </div>
-          <div v-if="appStore.workspaces.length === 0" class="px-3 py-3 text-[12px] text-[var(--color-text-muted)]">
-            No workspaces yet.
-          </div>
-          <template v-else>
-            <button
-              v-for="workspace in appStore.workspaces"
-              :key="workspace.id"
-              type="button"
-              class="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--color-panel-muted)]"
-              :class="workspace.id === appStore.activeWorkspaceId ? 'bg-[var(--color-selected-surface)]' : ''"
-              @click="selectWorkspaceFromStatusBar(workspace.id)"
-            >
-              <span class="h-2 w-2 shrink-0 rounded-full" :class="runtimeStatusMetaForWorkspace(workspace.id).dotClass"></span>
-              <span class="min-w-0 flex-1 truncate text-[12px] font-medium text-[var(--color-text-main)]">
-                {{ workspace.name || 'Untitled workspace' }}
-              </span>
-              <span class="shrink-0 text-[10px]" :class="runtimeStatusMetaForWorkspace(workspace.id).textClass">
-                {{ runtimeStatusMetaForWorkspace(workspace.id).label }}
-              </span>
-            </button>
-          </template>
-        </div>
-        </Transition>
+      <div v-if="appStore.activeWorkspaceId" class="flex h-full items-center gap-1.5 px-1">
+        <span
+          v-if="workspaceRuntimeStatusMeta.showSpinner"
+          class="inline-block h-2 w-2 shrink-0 animate-spin rounded-full border-[1.5px] border-[var(--color-border)] border-t-[var(--color-text-main)]"
+          aria-hidden="true"
+        ></span>
+        <span v-else class="h-2 w-2 shrink-0 rounded-full" :class="workspaceRuntimeStatusMeta.dotClass"></span>
+        <span class="font-medium" :class="workspaceRuntimeStatusMeta.textClass">
+          Engine {{ workspaceRuntimeStatusMeta.label.toLowerCase() }}
+        </span>
       </div>
 
       <template v-if="appStore.isEditorFocused">
@@ -133,20 +88,8 @@
       </template>
     </div>
 
-    <!-- Right Section: Terminal, alerts & version -->
+    <!-- Right Section: Terminal and alerts -->
     <div class="flex items-center gap-3 h-full">
-      <div
-        data-websocket-status
-        class="flex items-center gap-1.5 h-full px-1 text-[11px] font-medium"
-        :class="wsConnectionMeta.textClass"
-        :title="`Realtime connection: ${wsConnectionMeta.label}`"
-      >
-        <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="wsConnectionMeta.dotClass"></span>
-        <span>{{ wsConnectionMeta.label }}</span>
-      </div>
-
-      <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
-
       <!-- Terminal Toggle -->
       <button
         @click="appStore.toggleTerminal()"
@@ -165,6 +108,8 @@
           type="button"
           class="relative flex items-center gap-1.5 h-full px-1.5 text-[11px] font-medium hover:bg-[var(--color-base)] transition-colors text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
           title="Session notifications"
+          aria-haspopup="true"
+          :aria-expanded="notificationsPanelOpen"
           @click="toggleNotificationsPanel"
         >
           <BellIcon class="w-3.5 h-3.5" />
@@ -199,6 +144,8 @@
               <button
                 type="button"
                 class="text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
+                title="Close notifications"
+                aria-label="Close notifications"
                 @click="closeNotificationsPanel"
               >
                 <XMarkIcon class="h-4 w-4" />
@@ -239,18 +186,6 @@
         </Transition>
       </div>
 
-      <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
-
-      <!-- Version -->
-      <a
-        href="https://inquiraai.com"
-        @click.prevent="openInquiraSite"
-        target="_blank"
-        class="text-[11px] font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] transition-colors"
-        title="Visit inquiraai.com"
-      >
-        Inquira v{{ uiVersion }}
-      </a>
     </div>
 
   </div>
@@ -261,12 +196,10 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { useAuthStore } from '../../stores/authStore'
 import apiService from '../../services/apiService'
-import { openExternalUrl } from '../../services/externalLinkService'
 import { settingsWebSocket } from '../../services/websocketService'
-import { formatUsageCompact, formatUsageTooltip } from '../../utils/usageFormat'
+import { formatUsageCompact, formatUsageTooltip, normalizeUsage } from '../../utils/usageFormat'
 import {
   BellIcon,
-  ChevronUpDownIcon,
   CommandLineIcon,
   ExclamationTriangleIcon,
   XMarkIcon,
@@ -281,16 +214,11 @@ const {
   markAllNotificationsRead,
   clearNotificationHistory,
 } = useToast()
-const uiVersion = String(
-  typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'
-).trim() || '0.0.0'
 
 // --- Workspace Status Management ---
 const workspaceRuntimeStatus = computed(() => appStore.activeWorkspaceRuntimeStatus)
-const workspaceSwitcherOpen = ref(false)
 
 const isWebSocketConnected = ref(false)
-const isWebSocketMonitoringActive = ref(false)
 let unsubscribeWebSocketConnection = null
 let unsubscribeWorkspaceRuntimeStatus = null
 let artifactUsageStreamAbortController = null
@@ -315,18 +243,22 @@ const unreadNotificationBadge = computed(() => {
   return count > 99 ? '99+' : String(count)
 })
 
-const tokenUsageSummaryLabel = computed(() => {
+const tokenUsageSource = computed(() => {
   const summary = appStore.activeConversationUsage && typeof appStore.activeConversationUsage === 'object'
     ? appStore.activeConversationUsage
     : null
-  return formatUsageCompact(summary?.usage || appStore.liveTokenUsage)
+  return summary?.usage || appStore.liveTokenUsage
 })
+
+const hasTokenUsage = computed(() => Boolean(normalizeUsage(tokenUsageSource.value)))
+
+const tokenUsageSummaryLabel = computed(() => formatUsageCompact(tokenUsageSource.value))
 
 const tokenUsageHoverLabel = computed(() => {
   const summary = appStore.activeConversationUsage && typeof appStore.activeConversationUsage === 'object'
     ? appStore.activeConversationUsage
     : null
-  return formatUsageTooltip(summary?.usage || appStore.liveTokenUsage, summary)
+  return formatUsageTooltip(tokenUsageSource.value, summary)
 })
 
 const primaryBackgroundOperation = computed(() => appStore.primaryBackgroundOperation)
@@ -367,35 +299,6 @@ const primaryBackgroundOperationTitle = computed(() => {
   ].filter(Boolean).join('\n')
 })
 
-const wsConnectionMeta = computed(() => {
-  if (!isWebSocketMonitoringActive.value) {
-    return {
-      dotClass: 'bg-[var(--color-border-hover)]',
-      textClass: 'text-[var(--color-text-muted)]',
-      label: 'Inactive'
-    }
-  }
-  if (isWebSocketConnected.value) {
-    return {
-      dotClass: 'bg-[var(--color-success)]',
-      textClass: 'text-[var(--color-success)]',
-      label: 'Connected'
-    }
-  }
-  return {
-    dotClass: 'bg-[var(--color-error)]',
-    textClass: 'text-[var(--color-error)]',
-    label: 'Disconnected'
-  }
-})
-
-const activeWorkspaceName = computed(() => {
-  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
-  if (!workspaceId) return 'No workspace'
-  const workspace = appStore.workspaces.find((item) => String(item?.id || '').trim() === workspaceId)
-  return String(workspace?.name || '').trim() || 'Untitled workspace'
-})
-
 function runtimeStatusMeta(status) {
   switch (status) {
     case 'ready':
@@ -416,10 +319,6 @@ function runtimeStatusMeta(status) {
 const workspaceRuntimeStatusMeta = computed(() => {
   return runtimeStatusMeta(workspaceRuntimeStatus.value)
 })
-
-function runtimeStatusMetaForWorkspace(workspaceId) {
-  return runtimeStatusMeta(appStore.getWorkspaceRuntimeStatus(workspaceId))
-}
 
 const tableViewportLabel = computed(() => {
   if (appStore.dataPane !== 'table') return null
@@ -502,7 +401,6 @@ const workspaceResourceWarningTitle = computed(() => {
 function updateWebSocketStatus(connected) {
   const status = settingsWebSocket.getConnectionStatus()
   const shouldMonitor = Boolean(status.isPersistentMode || status.lastConnectionAttempt)
-  isWebSocketMonitoringActive.value = shouldMonitor
   isWebSocketConnected.value = shouldMonitor ? connected : false
 }
 
@@ -694,10 +592,6 @@ async function refreshWorkspaceRuntimeStatusFromApi(workspaceId, fallbackStatus 
   }
 }
 
-function openInquiraSite() {
-  void openExternalUrl('https://inquiraai.com')
-}
-
 function formatNotificationTimestamp(value) {
   const timestamp = Number(value || 0)
   if (!Number.isFinite(timestamp) || timestamp <= 0) return ''
@@ -735,14 +629,11 @@ function handleGlobalPointerDown(event) {
   const target = event?.target
   if (!(target instanceof Element)) return
   if (target.closest('[data-notification-center]')) return
-  if (target.closest('[data-workspace-switcher]')) return
-  closeWorkspaceSwitcher()
   closeNotificationsPanel()
 }
 
 function handleStatusBarEscape(event) {
   if (event.key === 'Escape') {
-    closeWorkspaceSwitcher()
     closeNotificationsPanel()
   }
 }
@@ -761,30 +652,6 @@ function syncWorkspaceRealtimeSubscriptions() {
   settingsWebSocket.setWorkspaceRuntimeStatusWorkspace(workspaceId)
   void refreshWorkspaceRuntimeStatusFromApi(workspaceId, currentStatus)
   void startArtifactUsageStream()
-}
-
-function toggleWorkspaceSwitcher() {
-  workspaceSwitcherOpen.value = !workspaceSwitcherOpen.value
-}
-
-function closeWorkspaceSwitcher() {
-  workspaceSwitcherOpen.value = false
-}
-
-async function selectWorkspaceFromStatusBar(workspaceId) {
-  const normalizedWorkspaceId = String(workspaceId || '').trim()
-  if (!normalizedWorkspaceId || normalizedWorkspaceId === String(appStore.activeWorkspaceId || '').trim()) {
-    closeWorkspaceSwitcher()
-    return
-  }
-  try {
-    await appStore.activateWorkspace(normalizedWorkspaceId)
-    await appStore.fetchConversations()
-  } catch (error) {
-    toast.error('Workspace switch failed', error?.response?.data?.detail || error?.message || 'Could not switch workspace.')
-  } finally {
-    closeWorkspaceSwitcher()
-  }
 }
 
 // Named handler so we can remove the exact same reference on unmount

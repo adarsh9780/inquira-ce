@@ -19,12 +19,14 @@ test('status bar stays focused on runtime status and no longer renders workspace
   assert.equal(statusBarSource.includes('workspaceRuntimeStatusMeta'), true)
 })
 
-test('sidebar owns the profile and bottom action stack', () => {
+test('sidebar owns profile actions while the context bar owns workspace actions', () => {
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
+  const contextSource = readFileSync(resolve(process.cwd(), 'src/components/layout/WorkspaceContextBar.vue'), 'utf-8')
 
   assert.equal(sidebarSource.includes('title="Settings"'), true)
   assert.equal(sidebarSource.includes('title="Profile Settings"'), true)
-  assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"), true)
+  assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Inquira'"), true)
+  assert.equal(sidebarSource.includes('title="Collapse sidebar"'), true)
   assert.equal(sidebarSource.includes('Terms &amp; Conditions'), true)
   assert.equal(sidebarSource.includes('Account Settings'), true)
   assert.equal(sidebarSource.includes('Theme Preference'), true)
@@ -33,8 +35,12 @@ test('sidebar owns the profile and bottom action stack', () => {
   assert.equal(sidebarSource.includes('v-for="workspace in filteredSidebarWorkspaces"'), true)
   assert.equal(sidebarSource.includes('visibleConversationsForSidebar(workspace)'), true)
   assert.equal(sidebarSource.includes('Search conversations'), false)
-  assert.equal(sidebarSource.includes('Workspace tools'), true)
+  assert.equal(sidebarSource.includes('Workspace tools'), false)
+  assert.equal(sidebarSource.includes('Data sources'), true)
   assert.equal(sidebarSource.includes('Conversation tree'), true)
   assert.equal(sidebarSource.includes('Datasets</p>'), false)
   assert.equal(sidebarSource.includes('CircleStackIcon'), true)
+  assert.equal(contextSource.includes('data-workspace-context-bar'), true)
+  assert.equal(contextSource.includes('data-action="add-data"'), true)
+  assert.equal(contextSource.includes('title="Workspace settings"'), true)
 })

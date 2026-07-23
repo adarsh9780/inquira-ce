@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('code editor uses JetBrains font stack with design tokens for editor colors', () => {
+test('code editor uses the selected offline-safe mono token and semantic editor colors', () => {
   const codeTabSource = readFileSync(resolve(process.cwd(), 'src/components/analysis/CodeTab.vue'), 'utf-8')
   const styleSource = readFileSync(resolve(process.cwd(), 'src/style.css'), 'utf-8')
 
@@ -26,6 +26,7 @@ test('code editor uses JetBrains font stack with design tokens for editor colors
   assert.equal(codeTabSource.includes('color-mix(in srgb, var(--color-surface) 92%, white)'), false)
   assert.equal(codeTabSource.includes('hover:bg-white'), false)
   assert.equal(codeTabSource.includes('hover:text-green-600'), false)
-  assert.equal(styleSource.includes('family=JetBrains+Mono:wght@400;500;700'), true)
-  assert.equal(styleSource.includes('--font-mono: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;'), true)
+  assert.equal(styleSource.includes('fonts.googleapis.com'), false)
+  assert.equal(styleSource.includes('--font-mono: "SFMono-Regular", "Cascadia Code", "Roboto Mono", monospace;'), true)
+  assert.equal(styleSource.includes(':root[data-code-font="jetbrains-mono"]'), true)
 })

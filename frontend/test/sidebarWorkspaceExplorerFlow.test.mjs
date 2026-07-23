@@ -3,8 +3,9 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('sidebar shows active workspace context with conversations beneath it', () => {
+test('sidebar lists workspace conversations while the context bar owns active context', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
+  const contextSource = readFileSync(resolve(process.cwd(), 'src/components/layout/WorkspaceContextBar.vue'), 'utf-8')
   const menuSource = readFileSync(resolve(process.cwd(), 'src/components/layout/sidebar/SidebarConversationActionsMenu.vue'), 'utf-8')
 
   assert.equal(source.includes('workspaceRuntimeLabel'), false)
@@ -16,6 +17,11 @@ test('sidebar shows active workspace context with conversations beneath it', () 
   assert.equal(source.includes('filteredSidebarWorkspaces'), true)
   assert.equal(menuSource.includes('data-conversation-actions-menu'), true)
   assert.equal(source.includes('SidebarDatasets'), false)
-  assert.equal(source.includes('Workspace tools'), true)
+  assert.equal(source.includes('Workspace tools'), false)
+  assert.equal(source.includes('Data sources'), true)
   assert.equal(source.includes('Conversation tree'), true)
+  assert.equal(contextSource.includes('data-workspace-context-bar'), true)
+  assert.equal(contextSource.includes('{{ activeWorkspaceName }}'), true)
+  assert.equal(contextSource.includes('data-action="add-data"'), true)
+  assert.equal(contextSource.includes('appStore.openDataConnectionFlow()'), true)
 })

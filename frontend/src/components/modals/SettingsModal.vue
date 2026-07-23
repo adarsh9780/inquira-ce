@@ -16,7 +16,7 @@
       <div class="modal-overlay" @click="closeModal"></div>
       <div
         ref="dialogRef"
-        class="modal-card settings-modal-card relative h-[min(640px,calc(100dvh-2rem))] w-full max-w-[860px] text-[var(--color-text-main)]"
+        class="modal-card settings-modal-card relative h-[min(760px,calc(100dvh-2rem))] w-full max-w-[1120px] text-[var(--color-text-main)]"
         @click.stop
       >
         <button
@@ -55,7 +55,7 @@
                 @click="openLeafSection('connections')"
               >
                 <KeyIcon class="h-4 w-4 shrink-0" />
-                <span>Connections</span>
+                <span>AI providers</span>
               </button>
               <button
                 type="button"
@@ -171,7 +171,7 @@ const inactiveNavClass = 'nav-tab'
 
 const activeSectionTitle = computed(() => {
   if (activeSection.value === 'setup') return 'Setup'
-  if (activeSection.value === 'connections') return 'Connections'
+  if (activeSection.value === 'connections') return 'AI providers'
   if (activeSection.value === 'workspace') return 'Workspaces'
   if (activeSection.value === 'appearance') return 'Appearance'
   if (activeSection.value === 'account') return 'Account'
@@ -180,7 +180,7 @@ const activeSectionTitle = computed(() => {
 
 const activeSectionDescription = computed(() => {
   if (activeSection.value === 'setup') return 'See what is ready and complete the next required step.'
-  if (activeSection.value === 'connections') return 'Manage provider credentials shared by every workspace.'
+  if (activeSection.value === 'connections') return 'Manage AI provider credentials shared by every workspace.'
   if (activeSection.value === 'workspace') return 'Manage each workspace, its data, models, privacy, and advanced controls.'
   if (activeSection.value === 'appearance') return 'Choose the theme and typography used throughout Inquira.'
   if (activeSection.value === 'account') return 'Review local profile and application information.'

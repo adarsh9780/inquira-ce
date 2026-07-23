@@ -37,7 +37,8 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
+		// Match the default warm canvas so the webview never flashes a dark frame.
+		BackgroundColour: &options.RGBA{R: 251, G: 248, B: 242, A: 1},
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
 		Bind: []interface{}{

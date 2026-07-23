@@ -17,14 +17,7 @@
       <div class="flex min-w-0 items-center justify-end w-full gap-3">
         <div class="flex min-w-0 items-center space-x-3 text-sm">
           <span
-            v-if="appStore.isCodeRunning"
-            class="rounded px-2 py-1 text-xs"
-            style="background-color: var(--color-warning-bg); color: var(--color-warning);"
-          >
-            Processing
-          </span>
-          <span
-            v-else-if="isLoadingArtifacts || isLoadingFigure || isDeletingArtifact"
+            v-if="isLoadingArtifacts || isLoadingFigure || isDeletingArtifact"
             class="rounded px-2 py-1 text-xs"
             style="background-color: var(--color-panel-muted); color: var(--color-text-main);"
           >

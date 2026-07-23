@@ -482,8 +482,12 @@ async function startGlobalDatasetImport(paths, source = 'drop') {
 }
 
 async function openGlobalDatasetPicker() {
+  if (wailsApp()) {
+    appStore.openDataConnectionFlow()
+    return
+  }
   if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
-    toast.error('Desktop Only', 'Dataset file selection is only available in the desktop app.')
+    appStore.openDataConnectionFlow()
     return
   }
   if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) {
@@ -517,6 +521,11 @@ function handleAppDatasetDrop(event) {
   if (event.defaultPrevented) return
   const files = Array.from(event?.dataTransfer?.files || [])
   const paths = getDroppedDatasetPaths(files)
+  if (wailsApp() && files.length > 0) {
+    event.preventDefault()
+    appStore.openDataConnectionFlow()
+    return
+  }
   if (paths.length === 0 && files.length > 0 && (typeof window === 'undefined' || !window.__TAURI_INTERNALS__)) {
     event.preventDefault()
     toast.error('Desktop Only', 'Local dataset drops are only available in the desktop app.')
@@ -594,7 +603,7 @@ function handleGlobalShortcuts(event) {
 }
 
 function handleOpenDatasetPickerRequest() {
-  void openGlobalDatasetPicker()
+  appStore.openDataConnectionFlow()
 }
 
 async function readDesktopStartupState() {
@@ -1052,12 +1061,12 @@ onUnmounted(() => {
 
 .app-nav-pane {
   /* App shell owns the structural sidebar rail width. */
-  width: 244px;
+  width: 260px;
   transition: width var(--motion-duration-slow) var(--motion-ease-spring);
   overflow: hidden;
   border-right: 1px solid var(--color-border);
   background-color: var(--color-sidebar-surface);
-  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--color-text-main) 5%, transparent), 8px 0 24px color-mix(in srgb, var(--color-text-main) 3%, transparent);
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--color-text-main) 4%, transparent);
 }
 
 .app-nav-pane-collapsed {

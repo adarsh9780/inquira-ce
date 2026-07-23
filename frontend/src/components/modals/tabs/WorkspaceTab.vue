@@ -159,19 +159,40 @@
             </div>
           </div>
 
-          <div v-if="isNativeWorkspaceMetadata && activeWorkspaceSection === 'connections'" class="space-y-3" role="tabpanel" aria-label="Workspace connections">
+          <div v-show="isNativeWorkspaceMetadata && activeWorkspaceSection === 'connections'" class="space-y-3" role="tabpanel" aria-label="Workspace data sources">
             <section class="rounded-lg border p-4" :class="nativeRuntimeStatus.ready ? 'border-[var(--color-border)] bg-[var(--color-base-soft)]' : 'border-[var(--color-warning-border)] bg-[var(--color-warning-bg)]'">
               <div class="flex items-start justify-between gap-3">
                 <div>
-                  <h4 class="section-label">Data runtime setup</h4>
+                  <h4 class="section-label">Data runtime</h4>
                   <p class="mt-1 text-xs leading-5" :class="nativeRuntimeStatus.ready ? 'text-[var(--color-text-muted)]' : 'text-[var(--color-warning-text)]'">
-                    {{ nativeRuntimeStatus.ready ? runtimeConfigurationSummary : 'Choose how Inquira should obtain Python and DuckDB. Nothing is downloaded until you start setup.' }}
+                    {{ nativeRuntimeStatus.ready ? runtimeConfigurationSummary : 'Set up the local Python runtime before adding a data source.' }}
                   </p>
                 </div>
-                <button v-if="nativeRuntimeStatus.ready && !runtimeConfigurationOpen" type="button" class="btn-secondary shrink-0 px-3 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="startRuntimeReconfiguration">Change runtime</button>
+                <button v-if="nativeRuntimeStatus.ready && !runtimeConfigurationOpen" type="button" class="btn-secondary shrink-0 px-3 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="startRuntimeReconfiguration">Runtime settings</button>
               </div>
               <p v-if="runtimeProvisionError" class="mt-3 rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-xs text-[var(--color-danger-text)]" role="alert">{{ runtimeProvisionError }}</p>
-              <div v-if="runtimeConfigurationOpen || !nativeRuntimeStatus.ready" class="mt-3">
+
+              <div v-if="!nativeRuntimeStatus.ready && !runtimeConfigurationOpen" class="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <p class="max-w-sm text-[10px] leading-4 text-[var(--color-warning-text)]">
+                  Managed setup installs the supported Python version and data packages for you.
+                </p>
+                <div class="flex flex-wrap items-center justify-end gap-2">
+                  <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="startRuntimeReconfiguration">
+                    Company-managed setup
+                  </button>
+                  <button type="button" class="btn-primary px-4 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="setupManagedRuntime">
+                    {{ runtimeProvisioning ? 'Setting up managed runtime…' : 'Set up managed runtime' }}
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="runtimeConfigurationOpen" class="mt-4 border-t border-[var(--color-border)] pt-4">
+                <div class="mb-3">
+                  <h5 class="text-xs font-semibold text-[var(--color-text-main)]">{{ nativeRuntimeStatus.ready ? 'Runtime settings' : 'Company-managed setup' }}</h5>
+                  <p class="mt-1 text-[10px] leading-4 text-[var(--color-text-muted)]">
+                    Use a company Python installation, internal package mirror, proxy, or certificate bundle.
+                  </p>
+                </div>
                 <div class="grid gap-3 sm:grid-cols-2">
                 <label class="block sm:col-span-2">
                   <span class="input-label">Runtime source</span>
@@ -227,8 +248,8 @@
               <div class="mt-4 flex items-center justify-between gap-3">
                 <p class="text-[10px] text-[var(--color-text-muted)]">Proxy, mirror, and index values are cleared after every setup attempt and are never saved by Inquira. {{ runtimePlanSummary }}</p>
                 <div class="flex shrink-0 items-center gap-2">
-                  <button v-if="nativeRuntimeStatus.ready" type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="cancelRuntimeReconfiguration">Cancel</button>
-                  <button type="button" class="btn-primary px-4 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="provisionDataRuntime">{{ runtimeProvisioning ? 'Validating and setting up…' : 'Set up runtime' }}</button>
+                  <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="cancelRuntimeReconfiguration">Cancel</button>
+                  <button type="button" class="btn-primary px-4 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="provisionDataRuntime()">{{ runtimeProvisioning ? 'Validating and setting up…' : 'Apply runtime setup' }}</button>
                 </div>
               </div>
               </div>
@@ -237,11 +258,11 @@
             <section class="rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)] p-4">
               <div class="flex items-start justify-between gap-4">
                 <div>
-                  <h4 class="section-label">Connections</h4>
+                  <h4 class="section-label">Data sources</h4>
                   <p class="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">Create refreshable local snapshots from CSV, Parquet, and Excel files.</p>
                 </div>
                 <button type="button" class="btn-primary px-3 py-1.5 text-xs" :disabled="connectionActionLoading || !isWorkspaceActive || !nativeRuntimeStatus.ready" @click="chooseConnectionFile">
-                  Add connection
+                  Add data source
                 </button>
               </div>
 
@@ -261,7 +282,9 @@
                 </label>
                 <div v-if="pendingConnection.adapter_kind === 'excel'" class="space-y-2">
                   <div class="flex items-center justify-between gap-3">
-                    <span class="input-label">Select sheets</span>
+                    <span class="input-label">
+                      Select sheets · {{ pendingConnection.selected_object_ids.length }} selected
+                    </span>
                     <label class="flex items-center gap-2 text-[10px] text-[var(--color-text-muted)]">
                       Formula values
                       <select v-model="pendingConnection.formula_mode" class="rounded border border-[var(--color-border)] bg-[var(--color-base)] px-2 py-1" :disabled="connectionActionLoading" @change="previewPendingSheet(pendingConnection.active_object_id)">
@@ -270,8 +293,29 @@
                       </select>
                     </label>
                   </div>
-                  <div class="grid gap-2 sm:grid-cols-2">
-                    <label v-for="object in pendingConnection.objects" :key="object.id" class="flex items-start gap-2 rounded-lg border p-2" :class="object.id === pendingConnection.active_object_id ? 'border-[var(--color-accent)]' : 'border-[var(--color-border)]'">
+                  <div v-if="pendingConnection.objects.length > 6" class="flex items-center gap-2">
+                    <input
+                      v-model="sheetSearch"
+                      type="search"
+                      class="input-base input-outlined h-8 min-w-0 flex-1 text-xs"
+                      placeholder="Search sheets"
+                      aria-label="Search Excel sheets"
+                    />
+                    <button type="button" class="btn-ghost shrink-0 px-2 py-1 text-xs" :disabled="connectionActionLoading" @click="selectAllPendingSheets">
+                      Select all
+                    </button>
+                    <button
+                      v-if="pendingConnection.selected_object_ids.length"
+                      type="button"
+                      class="btn-ghost shrink-0 px-2 py-1 text-xs"
+                      :disabled="connectionActionLoading"
+                      @click="clearPendingSheetSelection"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div class="grid max-h-56 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+                    <label v-for="object in filteredPendingSheets" :key="object.id" class="flex items-start gap-2 rounded-lg border p-2" :class="object.id === pendingConnection.active_object_id ? 'border-[var(--color-accent)]' : 'border-[var(--color-border)]'">
                       <input v-model="pendingConnection.selected_object_ids" type="checkbox" :value="object.id" :disabled="connectionActionLoading || object.metadata?.selectable === false" />
                       <span class="min-w-0 flex-1">
                         <span class="block truncate text-xs font-medium text-[var(--color-text-main)]">{{ object.name }}</span>
@@ -280,10 +324,16 @@
                       <button v-if="object.metadata?.selectable !== false" type="button" class="text-[10px] font-medium text-[var(--color-accent)] hover:underline" :disabled="connectionActionLoading" @click.prevent="previewPendingSheet(object.id)">Preview</button>
                     </label>
                   </div>
+                  <p v-if="filteredPendingSheets.length === 0" class="py-4 text-center text-xs text-[var(--color-text-muted)]">
+                    No sheets match “{{ sheetSearch }}”.
+                  </p>
                 </div>
                 <div class="flex flex-wrap gap-1.5">
-                  <span v-for="column in pendingConnection.columns" :key="column.name" class="rounded-full bg-[var(--color-base-soft)] px-2 py-1 text-[10px] text-[var(--color-text-muted)]">
+                  <span v-for="column in visiblePendingColumns" :key="column.name" class="rounded-full bg-[var(--color-base-soft)] px-2 py-1 text-[10px] text-[var(--color-text-muted)]">
                     {{ column.name }} · {{ column.data_type }}
+                  </span>
+                  <span v-if="pendingConnection.columns.length > visiblePendingColumns.length" class="rounded-full bg-[var(--color-base-soft)] px-2 py-1 text-[10px] font-medium text-[var(--color-text-main)]">
+                    +{{ pendingConnection.columns.length - visiblePendingColumns.length }} more
                   </span>
                 </div>
                 <div v-if="pendingConnection.preview_rows.length" class="overflow-hidden rounded-lg border border-[var(--color-border)]">
@@ -322,16 +372,16 @@
               </article>
             </section>
             <div v-else-if="!pendingConnection && !connectionActionLoading" class="rounded-lg border border-dashed border-[var(--color-border)] py-8 text-center">
-              <p class="text-xs font-medium text-[var(--color-text-main)]">No connections yet</p>
+              <p class="text-xs font-medium text-[var(--color-text-main)]">No data sources yet</p>
               <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">Start with a local CSV, Parquet, or Excel file.</p>
             </div>
           </div>
 
-          <div v-if="activeWorkspaceSection === 'ai'" role="tabpanel" aria-label="Workspace AI settings">
+          <div v-show="activeWorkspaceSection === 'ai'" role="tabpanel" aria-label="Workspace AI settings">
             <WorkspaceAIConfigSection v-if="activeWorkspace?.id" :workspace-id="activeWorkspace.id" />
           </div>
 
-          <div v-if="!isNativeWorkspaceMetadata && activeWorkspaceSection === 'data'" role="tabpanel" aria-label="Workspace data settings">
+          <div v-show="!isNativeWorkspaceMetadata && activeWorkspaceSection === 'data'" role="tabpanel" aria-label="Workspace data settings">
             <WorkspaceDatasetSection>
             <div class="flex items-center justify-between gap-3">
               <h4 class="section-label">Linked Datasets</h4>
@@ -381,7 +431,7 @@
         </div>
 
         <div v-else class="flex flex-1 flex-col items-center justify-center rounded-lg bg-[var(--color-base-soft)] px-5 py-8 text-center">
-          <p class="mb-4 text-sm text-[var(--color-text-sub)]">Create a workspace to add context and datasets.</p>
+          <p class="mb-4 text-sm text-[var(--color-text-sub)]">Create a workspace to add context and data sources.</p>
           <button type="button" class="btn-primary px-4 py-2 text-sm" @click="beginInlineCreate">Create your first workspace</button>
         </div>
       </div>
@@ -418,6 +468,10 @@
     />
   </section>
 </template>
+
+<script>
+const handledConnectionFlowRequestIds = new WeakMap()
+</script>
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -468,7 +522,7 @@ const isNativeWorkspaceMetadata = workspaceService.isNative()
 const workspaceSections = isNativeWorkspaceMetadata
   ? [
       { id: 'general', label: 'General' },
-      { id: 'connections', label: 'Connections' },
+      { id: 'connections', label: 'Data sources' },
       { id: 'ai', label: 'AI' },
     ]
   : [
@@ -481,12 +535,17 @@ const nativeConnections = ref([])
 const pendingConnection = ref(null)
 const connectionActionLoading = ref(false)
 const connectionError = ref('')
+const sheetSearch = ref('')
 const refreshingConnectionIds = ref(new Set())
 const nativeRuntimeStatus = ref({ ready: false })
 const runtimeProvisioning = ref(false)
 const runtimeProvisionError = ref('')
 const runtimeConfigurationOpen = ref(false)
 const runtimePlanSummary = ref('')
+const isWorkspaceTabMounted = ref(false)
+const lastHandledConnectionFlowRequestId = ref(
+  Number(handledConnectionFlowRequestIds.get(appStore) || 0),
+)
 const runtimeConfig = ref({
   mode: 'managed',
   pythonVersion: '3.12',
@@ -499,6 +558,30 @@ const runtimeConfig = ref({
   httpsProxy: '',
   noProxy: '',
 })
+const pendingSelectableSheets = computed(() => (
+  Array.isArray(pendingConnection.value?.objects)
+    ? pendingConnection.value.objects.filter((object) => object?.metadata?.selectable !== false)
+    : []
+))
+const filteredPendingSheets = computed(() => {
+  const query = String(sheetSearch.value || '').trim().toLowerCase()
+  if (!query) return Array.isArray(pendingConnection.value?.objects) ? pendingConnection.value.objects : []
+  return (Array.isArray(pendingConnection.value?.objects) ? pendingConnection.value.objects : [])
+    .filter((object) => String(object?.name || object?.id || '').toLowerCase().includes(query))
+})
+const visiblePendingColumns = computed(() => (
+  Array.isArray(pendingConnection.value?.columns) ? pendingConnection.value.columns.slice(0, 12) : []
+))
+
+function selectAllPendingSheets() {
+  if (!pendingConnection.value) return
+  pendingConnection.value.selected_object_ids = pendingSelectableSheets.value.map((object) => String(object.id))
+}
+
+function clearPendingSheetSelection() {
+  if (!pendingConnection.value) return
+  pendingConnection.value.selected_object_ids = []
+}
 const workspaceActionsOpen = ref(false)
 const workspaceActionsRef = ref(null)
 
@@ -747,7 +830,23 @@ watch(
   { immediate: true },
 )
 
+watch(
+  [
+    () => Number(appStore.connectionFlowRequestId || 0),
+    () => isWorkspaceActive.value,
+    () => Boolean(nativeRuntimeStatus.value?.ready),
+    () => runtimeProvisioning.value,
+    () => connectionActionLoading.value,
+    () => isWorkspaceTabMounted.value,
+  ],
+  () => {
+    void handlePendingConnectionFlowRequest()
+  },
+  { flush: 'post' },
+)
+
 onMounted(async () => {
+  isWorkspaceTabMounted.value = true
   unsubscribeProgress = settingsWebSocket.subscribeProgress(handleSettingsProgressUpdate)
   unsubscribeRuntimeError = settingsWebSocket.subscribeError(handleRuntimeSocketError)
   unsubscribeRuntimeComplete = settingsWebSocket.subscribeComplete(handleRuntimeSocketComplete)
@@ -761,6 +860,7 @@ onMounted(async () => {
   await loadNativeConnections()
   await loadNativeRuntimeStatus()
   syncSetupIdentity()
+  await handlePendingConnectionFlowRequest()
 })
 
 async function loadNativeRuntimeStatus() {
@@ -768,7 +868,6 @@ async function loadNativeRuntimeStatus() {
   try {
     nativeRuntimeStatus.value = await runtimeProvisionService.status()
     applySavedRuntimeConfiguration(nativeRuntimeStatus.value?.configuration)
-    if (!nativeRuntimeStatus.value?.ready) runtimeConfigurationOpen.value = true
   } catch (error) {
     runtimeProvisionError.value = extractApiErrorMessage(error, 'Could not read data runtime status.')
   }
@@ -803,6 +902,23 @@ function startRuntimeReconfiguration() {
   runtimePlanSummary.value = ''
   runtimeProvisionError.value = ''
   runtimeConfigurationOpen.value = true
+}
+
+async function setupManagedRuntime() {
+  runtimeConfig.value = {
+    mode: 'managed',
+    pythonVersion: '3.12',
+    pythonExecutable: '',
+    pythonInstallMirror: '',
+    defaultIndex: '',
+    useSystemCertificates: false,
+    certificateBundle: '',
+    httpProxy: '',
+    httpsProxy: '',
+    noProxy: '',
+  }
+  runtimeConfigurationOpen.value = false
+  await provisionDataRuntime()
 }
 
 function cancelRuntimeReconfiguration() {
@@ -865,6 +981,19 @@ async function loadNativeConnections() {
   }
 }
 
+async function handlePendingConnectionFlowRequest() {
+  const requestId = Math.max(0, Math.floor(Number(appStore.connectionFlowRequestId || 0)))
+  if (!requestId || requestId <= lastHandledConnectionFlowRequestId.value) return
+  if (!isWorkspaceTabMounted.value || !isNativeWorkspaceMetadata || !isWorkspaceActive.value) return
+
+  activeWorkspaceSection.value = 'connections'
+  if (!nativeRuntimeStatus.value?.ready || runtimeProvisioning.value || connectionActionLoading.value) return
+
+  lastHandledConnectionFlowRequestId.value = requestId
+  handledConnectionFlowRequestIds.set(appStore, requestId)
+  await chooseConnectionFile()
+}
+
 async function chooseConnectionFile() {
   connectionError.value = ''
   connectionActionLoading.value = true
@@ -882,6 +1011,7 @@ async function chooseConnectionFile() {
     const preview = sourceObjectId || adapterKind !== 'excel'
       ? await connectionService.preview(adapterKind, sourcePath, sourceObjectId, 25, options)
       : { columns: [], rows: [] }
+    sheetSearch.value = ''
     pendingConnection.value = {
       source_path: sourcePath,
       adapter_kind: adapterKind,
@@ -927,6 +1057,7 @@ async function previewPendingSheet(source_object_id) {
 function cancelPendingConnection() {
   if (connectionActionLoading.value) return
   pendingConnection.value = null
+  sheetSearch.value = ''
   connectionError.value = ''
 }
 
@@ -946,6 +1077,7 @@ async function createPendingConnection() {
       options: pending.adapter_kind === 'excel' ? { formula_mode: pending.formula_mode } : {},
     })
     pendingConnection.value = null
+    sheetSearch.value = ''
     await loadNativeConnections()
     toast.success('Connection created', 'The local snapshot is ready for analysis.')
   } catch (error) {
@@ -1001,6 +1133,7 @@ function adapterKindLabel(kind) {
 }
 
 onUnmounted(() => {
+  isWorkspaceTabMounted.value = false
   if (typeof unsubscribeProgress === 'function') {
     unsubscribeProgress()
     unsubscribeProgress = null

@@ -4,47 +4,53 @@
     <!-- Top Workspace Area (Chat/Code & Data Panes) -->
     <div
       v-show="isWorkspaceActive"
-      class="relative flex w-full overflow-hidden transition-[height] motion-slow"
-      :class="isCompactLayout ? 'flex-col' : ''"
+      class="relative flex w-full flex-col transition-[height] motion-slow"
       :style="{ height: workspaceVisualHeight + '%' }"
     >
-      <div v-if="isCompactLayout" class="flex h-9 shrink-0 items-center justify-center gap-1 border-b border-[var(--color-border)]">
-        <button type="button" class="compact-pane-button" :aria-pressed="compactPane === 'work'" @click="compactPane = 'work'">Work</button>
-        <button type="button" class="compact-pane-button" :aria-pressed="compactPane === 'data'" @click="compactPane = 'data'">Data</button>
-      </div>
-      <!-- Left Pane (Chat / Code) -->
-      <div
-        class="flex h-full min-w-0 flex-col border-r workspace-center-pane"
-        v-show="!isCompactLayout || compactPane === 'work'"
-        :style="{ width: isCompactLayout ? '100%' : leftPaneWidth + '%', height: isCompactLayout ? 'calc(100% - 2.25rem)' : '100%', borderColor: 'var(--color-border)' }"
-      >
-        <WorkspaceLeftPane />
-      </div>
+      <WorkspaceContextBar />
 
-      <!-- Vertical Resizer Handle (Left/Right panes) -->
       <div
-        class="pane-resizer-x relative z-10 -mx-[1px] h-full w-[3px] cursor-col-resize bg-transparent transition-all motion-fast hover:w-1"
-        v-if="!isCompactLayout"
-        role="separator"
-        aria-label="Resize work and data panes"
-        aria-orientation="vertical"
-        :aria-valuenow="Math.round(leftPaneWidth)"
-        tabindex="0"
-        @pointerdown="startResizeX"
-        @keydown="handleResizeXKeydown"
-      ></div>
-
-      <!-- Right Pane (Table / Figure / Output) -->
-      <div
-        class="flex h-full min-w-0 flex-col overflow-hidden workspace-data-pane"
-        v-show="!isCompactLayout || compactPane === 'data'"
-        :style="{
-          width: isCompactLayout ? '100%' : `${rightPaneWidth}%`,
-          height: isCompactLayout ? 'calc(100% - 2.25rem)' : '100%',
-          opacity: 1
-        }"
+        class="relative flex min-h-0 w-full flex-1 overflow-hidden"
+        :class="isCompactLayout ? 'flex-col' : ''"
       >
-        <WorkspaceRightPane />
+        <div v-if="isCompactLayout" class="flex h-9 shrink-0 items-center justify-center gap-1 border-b border-[var(--color-border)]">
+          <button type="button" class="compact-pane-button" :aria-pressed="compactPane === 'work'" @click="compactPane = 'work'">Work</button>
+          <button type="button" class="compact-pane-button" :aria-pressed="compactPane === 'data'" @click="compactPane = 'data'">Data</button>
+        </div>
+        <!-- Left Pane (Chat / Code) -->
+        <div
+          class="flex h-full min-w-0 flex-col border-r workspace-center-pane"
+          v-show="!isCompactLayout || compactPane === 'work'"
+          :style="{ width: isCompactLayout ? '100%' : leftPaneWidth + '%', height: isCompactLayout ? 'calc(100% - 2.25rem)' : '100%', borderColor: 'var(--color-border)' }"
+        >
+          <WorkspaceLeftPane />
+        </div>
+
+        <!-- Vertical Resizer Handle (Left/Right panes) -->
+        <div
+          class="pane-resizer-x relative z-10 -mx-[1px] h-full w-[3px] cursor-col-resize bg-transparent transition-all motion-fast hover:w-1"
+          v-if="!isCompactLayout"
+          role="separator"
+          aria-label="Resize work and data panes"
+          aria-orientation="vertical"
+          :aria-valuenow="Math.round(leftPaneWidth)"
+          tabindex="0"
+          @pointerdown="startResizeX"
+          @keydown="handleResizeXKeydown"
+        ></div>
+
+        <!-- Right Pane (Table / Figure / Output) -->
+        <div
+          class="flex h-full min-w-0 flex-col overflow-hidden workspace-data-pane"
+          v-show="!isCompactLayout || compactPane === 'data'"
+          :style="{
+            width: isCompactLayout ? '100%' : `${rightPaneWidth}%`,
+            height: isCompactLayout ? 'calc(100% - 2.25rem)' : '100%',
+            opacity: 1
+          }"
+        >
+          <WorkspaceRightPane />
+        </div>
       </div>
     </div>
 
@@ -129,6 +135,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import WorkspaceLeftPane from './WorkspaceLeftPane.vue'
 import WorkspaceRightPane from './WorkspaceRightPane.vue'
+import WorkspaceContextBar from './WorkspaceContextBar.vue'
 import SidebarGlobalTurnTree from './sidebar/SidebarGlobalTurnTree.vue'
 import TerminalTab from '../analysis/TerminalTab.vue'
 import SchemaEditorTab from '../preview/SchemaEditorTab.vue'

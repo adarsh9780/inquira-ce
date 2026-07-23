@@ -90,8 +90,8 @@ test('settings sidebar keeps workspace ownership ahead of shared connections', (
   assert.equal(template.includes('User &amp; System'), false)
   assert.equal(template.includes('Switch &amp; Create'), false)
   assert.equal(template.includes('<span>Models</span>'), false)
-  assert.equal(template.indexOf('<span>Workspaces</span>') < template.indexOf('<span>Connections</span>'), true)
-  assert.equal(template.indexOf('<span>Connections</span>') < template.indexOf('<span>Appearance</span>'), true)
+  assert.equal(template.indexOf('<span>Workspaces</span>') < template.indexOf('<span>AI providers</span>'), true)
+  assert.equal(template.indexOf('<span>AI providers</span>') < template.indexOf('<span>Appearance</span>'), true)
   assert.equal(template.indexOf('<span>Appearance</span>') < template.indexOf('<span>Account</span>'), true)
 })
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('sidebar communicates active workspace context, chats, and bottom actions', () => {
+test('sidebar communicates workspaces, chats, and restrained utility actions', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
   const menuSource = readFileSync(resolve(process.cwd(), 'src/components/layout/sidebar/SidebarConversationActionsMenu.vue'), 'utf-8')
 
@@ -14,7 +14,9 @@ test('sidebar communicates active workspace context, chats, and bottom actions',
   assert.equal(source.includes('Search conversations'), false)
   assert.equal(source.includes('New conversation'), true)
   assert.equal(menuSource.includes('data-conversation-actions-menu'), true)
-  assert.equal(source.includes('Workspace tools'), true)
+  assert.equal(source.includes('Workspace tools'), false)
+  assert.equal(source.includes('Data sources'), true)
+  assert.equal(source.includes('Schema'), true)
   assert.equal(source.includes('Conversation tree'), true)
   assert.equal(source.includes('Profile Settings'), true)
   assert.equal(source.includes('Datasets</p>'), false)

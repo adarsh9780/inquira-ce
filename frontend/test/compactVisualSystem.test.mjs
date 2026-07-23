@@ -24,11 +24,11 @@ test('primary navigation and settings use the compact shell metrics', () => {
   const sidebar = read('src/components/layout/UnifiedSidebar.vue')
   const settings = read('src/components/modals/SettingsModal.vue')
 
-  assert.match(app, /\.app-nav-pane \{[\s\S]*width: 244px;/)
+  assert.match(app, /\.app-nav-pane \{[\s\S]*width: 260px;/)
   assert.match(app, /\.app-nav-pane-collapsed \{\s*width: 52px;/)
   assert.match(sidebar, /\.sidebar-brand-row \{[\s\S]*height: 3rem;/)
   assert.match(sidebar, /\.sidebar-row-label \{[\s\S]*font-weight: 500;/)
-  assert.match(settings, /h-\[min\(640px,calc\(100dvh-2rem\)\)\]/)
+  assert.match(settings, /h-\[min\(760px,calc\(100dvh-2rem\)\)\]/)
   assert.match(settings, /w-\[176px\]/)
 })
 

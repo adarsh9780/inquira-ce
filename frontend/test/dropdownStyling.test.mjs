@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('results uses an icon category dropdown with contextual artifact dropdowns', () => {
+test('results uses a direct category control with contextual artifact dropdowns', () => {
   const figureTabPath = resolve(process.cwd(), 'src/components/analysis/FigureTab.vue')
   const tableTabPath = resolve(process.cwd(), 'src/components/analysis/TableTab.vue')
   const rightPanePath = resolve(process.cwd(), 'src/components/layout/WorkspaceRightPane.vue')
@@ -14,17 +14,18 @@ test('results uses an icon category dropdown with contextual artifact dropdowns'
   const rightPane = readFileSync(rightPanePath, 'utf-8')
   const dropdown = readFileSync(dropdownPath, 'utf-8')
 
-  assert.equal(rightPane.includes('<HeaderDropdown'), true)
+  assert.equal(rightPane.includes('<SegmentedControl'), true)
+  assert.equal(rightPane.includes('<HeaderDropdown'), false)
   assert.equal(rightPane.includes('v-model="selectedCategory"'), true)
-  assert.equal(rightPane.includes('aria-label="Select result category"'), true)
-  assert.equal(rightPane.includes("{ value: 'table', label: 'Tables', icon: TableCellsIcon }"), true)
-  assert.equal(rightPane.includes("{ value: 'chart', label: 'Charts', icon: ChartBarIcon }"), true)
-  assert.equal(rightPane.includes("{ value: 'runs', label: 'Runs', icon: PlayCircleIcon }"), true)
+  assert.equal(rightPane.includes('aria-label="Result views"'), true)
+  assert.equal(rightPane.includes("{ value: 'table', label: 'Tables', icon: TableCellsIcon, count: tableResultCount.value }"), true)
+  assert.equal(rightPane.includes("{ value: 'chart', label: 'Charts', icon: ChartBarIcon, count: chartResultCount.value }"), true)
+  assert.equal(rightPane.includes("{ value: 'runs', label: 'Runs', icon: PlayCircleIcon, count: runResultCount.value }"), true)
   assert.equal(figureTab.includes('<HeaderDropdown'), true)
   assert.equal(tableTab.includes('<HeaderDropdown'), true)
   assert.equal(figureTab.includes('<select'), false)
   assert.equal(tableTab.includes('<select'), false)
-  assert.equal(rightPane.includes('max-width-class="w-[9.5rem]"'), true)
+  assert.equal(rightPane.includes('max-width-class="w-[9.5rem]"'), false)
   assert.equal(dropdown.includes('data-header-dropdown-icon'), true)
   assert.equal(dropdown.includes('const maxLabelChars = computed(() => {'), true)
   assert.equal(dropdown.includes('width: `${widthChars}ch`'), true)

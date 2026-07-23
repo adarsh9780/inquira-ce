@@ -7,8 +7,8 @@ const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
 test('native workspace data exposes local files and explicit Excel sheet selection', () => {
   const workspaceTab = read('src/components/modals/tabs/WorkspaceTab.vue')
-  assert.match(workspaceTab, /Connections/)
-  assert.match(workspaceTab, /Add connection/)
+  assert.match(workspaceTab, /Data sources/)
+  assert.match(workspaceTab, /Add data source/)
   assert.match(workspaceTab, /CSV/)
   assert.match(workspaceTab, /Parquet/)
   assert.match(workspaceTab, /Excel/)

@@ -4,13 +4,12 @@
     :class="{ 'sidebar-root-collapsed': appStore.isSidebarCollapsed }"
   >
     <!-- ─── Brand / Collapse Toggle ─── -->
-    <div
-      class="sidebar-brand-row justify-between px-3"
-    >
+    <div class="sidebar-brand-row justify-between px-3">
       <button
         class="sidebar-brand-button justify-start"
-        :title="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-        @click="handleBrandClick"
+        :title="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Inquira'"
+        :aria-label="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Inquira'"
+        @click="appStore.isSidebarCollapsed && handleBrandClick()"
       >
         <div class="flex h-6 w-6 shrink-0 items-center justify-center">
           <img :src="logo" alt="Inquira" class="block h-full w-full" />
@@ -23,6 +22,16 @@
             Inquira
           </span>
         </div>
+      </button>
+      <button
+        v-if="!appStore.isSidebarCollapsed"
+        type="button"
+        class="sidebar-icon-button"
+        title="Collapse sidebar"
+        aria-label="Collapse sidebar"
+        @click="handleBrandClick"
+      >
+        <ChevronDoubleLeftIcon class="h-4 w-4" />
       </button>
     </div>
 
@@ -43,7 +52,7 @@
             class="sidebar-row-label"
             :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[176px] opacity-100 ml-2.5'"
           >
-            New conversation
+            New analysis
           </span>
         </button>
 
@@ -57,7 +66,7 @@
         >
           <template v-if="!appStore.isSidebarCollapsed">
             <span class="sidebar-section-label">
-              Projects
+              Workspaces
             </span>
             <button
               type="button"
@@ -107,7 +116,10 @@
                 </button>
               </div>
 
-              <div v-if="!appStore.isSidebarCollapsed" class="space-y-px pl-6 pr-1">
+              <div
+                v-if="!appStore.isSidebarCollapsed && appStore.activeWorkspaceId === workspace.id"
+                class="space-y-px pl-6 pr-1"
+              >
                 <div v-if="isWorkspaceConversationsLoading(workspace.id)" class="px-2 py-1 text-[12px] font-medium text-[var(--color-text-muted)]">
                   Loading conversations
                 </div>
@@ -150,65 +162,57 @@
         </div>
       </SidebarWorkspaceConversations>
 
-      <div class="sidebar-tools shrink-0 px-0.5 pb-1">
-        <DisclosureSection v-if="!appStore.isSidebarCollapsed" v-model:open="workspaceToolsOpen" label="Workspace tools">
-          <div class="space-y-0.5">
-            <button
-              type="button"
-              class="sidebar-nav-row justify-start px-2.5"
-              :class="appStore.activeTab === 'schema-editor' ? 'sidebar-nav-row-active' : ''"
-              :title="shortcutTooltip('schema', 'Schema editor')"
-              @click="openSchemaEditor"
-            >
-              <span class="sidebar-row-icon"><CircleStackIcon class="h-4 w-4" /></span>
-              <span class="sidebar-row-label ml-2.5 max-w-[176px] opacity-100">Schema</span>
-            </button>
-            <button
-              type="button"
-              class="sidebar-nav-row justify-start px-2.5"
-              :class="appStore.activeTab === 'conversation-tree' ? 'sidebar-nav-row-active' : ''"
-              :title="shortcutTooltip('conversation-tree', 'Conversation tree')"
-              @click="openConversationTree"
-            >
-              <span class="sidebar-row-icon"><ShareIcon class="h-4 w-4" /></span>
-              <span class="sidebar-row-label ml-2.5 max-w-[176px] opacity-100">Conversation tree</span>
-            </button>
-          </div>
-        </DisclosureSection>
-        <div v-else class="space-y-0.5">
-          <button type="button" class="sidebar-nav-row justify-start px-2.5" title="Schema editor" @click="openSchemaEditor">
-            <span class="sidebar-row-icon"><CircleStackIcon class="h-4 w-4" /></span>
-          </button>
-          <button type="button" class="sidebar-nav-row justify-start px-2.5" title="Conversation tree" @click="openConversationTree">
-            <span class="sidebar-row-icon"><ShareIcon class="h-4 w-4" /></span>
-          </button>
-        </div>
+      <div class="sidebar-tools shrink-0 space-y-0.5 px-0.5 pb-1">
+        <button
+          type="button"
+          class="sidebar-nav-row justify-start px-2.5"
+          title="Data sources"
+          @click="appStore.openDataConnectionFlow()"
+        >
+          <span class="sidebar-row-icon"><CircleStackIcon class="h-4 w-4" /></span>
+          <span
+            class="sidebar-row-label"
+            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'ml-2.5 max-w-[176px] opacity-100'"
+          >
+            Data sources
+          </span>
+        </button>
+        <button
+          type="button"
+          class="sidebar-nav-row justify-start px-2.5"
+          :class="appStore.activeTab === 'schema-editor' ? 'sidebar-nav-row-active' : ''"
+          :title="shortcutTooltip('schema', 'Schema editor')"
+          @click="openSchemaEditor"
+        >
+          <span class="sidebar-row-icon"><TableCellsIcon class="h-4 w-4" /></span>
+          <span
+            class="sidebar-row-label"
+            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'ml-2.5 max-w-[176px] opacity-100'"
+          >
+            Schema
+          </span>
+        </button>
+        <button
+          type="button"
+          class="sidebar-nav-row justify-start px-2.5"
+          :class="appStore.activeTab === 'conversation-tree' ? 'sidebar-nav-row-active' : ''"
+          :title="shortcutTooltip('conversation-tree', 'Conversation tree')"
+          @click="openConversationTree"
+        >
+          <span class="sidebar-row-icon"><ShareIcon class="h-4 w-4" /></span>
+          <span
+            class="sidebar-row-label"
+            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'ml-2.5 max-w-[176px] opacity-100'"
+          >
+            Conversation tree
+          </span>
+        </button>
       </div>
 
       <!-- ─── Footer Navigation ─── -->
       <SidebarFooter>
         <div class="mx-1 mb-2 h-px bg-[var(--color-border)] opacity-70" />
         <div class="flex flex-col space-y-0.5">
-          <!-- Sidebar collapse / expand -->
-          <button
-            type="button"
-            class="sidebar-nav-row justify-start px-2.5"
-            :title="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-            :aria-label="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-            @click="handleBrandClick"
-          >
-            <span class="sidebar-row-icon">
-              <ChevronDoubleRightIcon v-if="appStore.isSidebarCollapsed" class="h-4 w-4" />
-              <ChevronDoubleLeftIcon v-else class="h-4 w-4" />
-            </span>
-            <span
-              class="sidebar-row-label"
-              :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[176px] opacity-100 ml-2.5'"
-            >
-              Collapse sidebar
-            </span>
-          </button>
-
           <!-- Settings -->
           <button
             type="button"
@@ -341,7 +345,6 @@ import SidebarConversationRow from './sidebar/SidebarConversationRow.vue'
 import SidebarFooter from './sidebar/SidebarFooter.vue'
 import SidebarPrimaryNav from './sidebar/SidebarPrimaryNav.vue'
 import SidebarWorkspaceConversations from './sidebar/SidebarWorkspaceConversations.vue'
-import DisclosureSection from '../ui/DisclosureSection.vue'
 import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
 import { sidebarConversationPageSize, useSidebarConversations } from '../../composables/useSidebarConversations'
@@ -352,8 +355,8 @@ import {
   ShareIcon,
   Cog6ToothIcon,
   ChevronDoubleLeftIcon,
-  ChevronDoubleRightIcon,
   PencilSquareIcon,
+  TableCellsIcon,
 } from '@heroicons/vue/24/outline'
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -371,7 +374,6 @@ const profileMenuOpen      = ref(false)
 const profileMenuRef       = ref(null)
 const profileMenuButtonRef = ref(null)
 const profileMenuPosition  = ref({ left: 0, top: 0 })
-const workspaceToolsOpen = ref(false)
 const sidebarConversationsByWorkspace = ref({})
 const loadingConversationsByWorkspace = ref({})
 const visibleConversationCountByWorkspace = ref({})
@@ -525,16 +527,6 @@ async function loadSidebarConversations(workspaceId, { force = false } = {}) {
       [normalizedWorkspaceId]: false,
     }
   }
-}
-
-async function loadAllSidebarConversations({ force = false } = {}) {
-  const workspaces = Array.isArray(appStore.workspaces) ? appStore.workspaces : []
-  await Promise.all(
-    workspaces
-      .map((workspace) => String(workspace?.id || '').trim())
-      .filter(Boolean)
-      .map((workspaceId) => loadSidebarConversations(workspaceId, { force })),
-  )
 }
 
 // ─── Brand / collapse ─────────────────────────────────────────────────────────
@@ -842,7 +834,6 @@ onMounted(async () => {
       await appStore.fetchConversations()
       updateSidebarConversationCache(appStore.activeWorkspaceId, appStore.conversations)
     }
-    await loadAllSidebarConversations()
   } catch {
     // Recovery handled by parent app
   }
@@ -864,10 +855,6 @@ watch(() => appStore.activeWorkspaceId, async (newId) => {
     await appStore.fetchConversations()
     updateSidebarConversationCache(newId, appStore.conversations)
   }
-})
-
-watch(() => appStore.workspaces.map((workspace) => workspace.id).join('|'), async () => {
-  await loadAllSidebarConversations()
 })
 
 watch(() => appStore.conversations, (items) => {
@@ -966,13 +953,11 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
 .sidebar-workspace-row:hover {
   background: color-mix(in srgb, var(--color-text-main) 5%, transparent);
   color: var(--color-text-main);
-  transform: translate3d(1px, 0, 0);
 }
 
 .sidebar-nav-row-active,
 .sidebar-workspace-row-active {
   background: var(--color-selected-surface);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-selected-border) 65%, transparent);
   color: var(--color-text-main);
 }
 

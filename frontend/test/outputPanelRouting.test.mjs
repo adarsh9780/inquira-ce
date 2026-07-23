@@ -9,13 +9,13 @@ test('workspace right pane routes through exactly three icon-labelled result cat
     'utf-8',
   )
 
-  assert.equal(source.includes('<HeaderDropdown'), true)
+  assert.equal(source.includes('<SegmentedControl'), true)
+  assert.equal(source.includes('<HeaderDropdown'), false)
   assert.equal(source.includes('v-model="selectedCategory"'), true)
   assert.equal(source.includes("selectedCategory === 'table'"), true)
   assert.equal(source.includes("selectedCategory === 'chart'"), true)
-  assert.equal(source.includes("{ value: 'runs', label: 'Runs', icon: PlayCircleIcon }"), true)
+  assert.equal(source.includes("{ value: 'runs', label: 'Runs', icon: PlayCircleIcon, count: runResultCount.value }"), true)
   assert.equal(source.includes('resultCategoryOptions.length'), false)
-  assert.equal(source.includes('<SegmentedControl'), false)
   assert.equal(source.includes('dataPaneOptions'), false)
 })
 

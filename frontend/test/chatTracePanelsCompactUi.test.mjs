@@ -3,14 +3,18 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('chat history renders subdued reasoning blocks before final response and keeps code details lightweight', () => {
+test('chat history renders the answer first and keeps technical work in analysis details', () => {
   const chatHistoryPath = resolve(process.cwd(), 'src/components/chat/ChatHistory.vue')
   const source = readFileSync(chatHistoryPath, 'utf-8')
 
-  assert.equal(source.includes('const SHOW_EPHEMERAL_TRACE = true'), true)
+  assert.equal(source.includes('const SHOW_EPHEMERAL_TRACE = false'), true)
   assert.equal(source.includes('SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length'), true)
   assert.equal(source.includes('(SHOW_EPHEMERAL_TRACE && hasStreamTrace(message))'), true)
-  assert.equal(source.includes('Checking if query is safe to process'), true)
+  assert.equal(source.includes('Analysis details'), true)
+  assert.equal(
+    source.indexOf('v-if="message.explanation"') < source.indexOf('v-if="hasAnalysisDetails(message)"'),
+    true,
+  )
   assert.equal(source.includes('class="ephemeral-trace-list"'), true)
   assert.equal(source.includes('class="ephemeral-trace-item"'), true)
   assert.equal(source.includes('class="ephemeral-trace-action"'), true)
@@ -20,7 +24,7 @@ test('chat history renders subdued reasoning blocks before final response and ke
   assert.equal(source.includes('action: normalizeEphemeralText(action) || \'Progress\''), true)
   assert.equal(source.includes('detail,'), true)
   assert.equal(source.includes("text.startsWith('{') && text.endsWith('}')"), true)
-  assert.equal(source.includes('Final response'), true)
+  assert.equal(source.includes('Final response'), false)
   assert.equal(source.includes('toggleEphemeralRow(row.id)'), false)
   assert.equal(source.includes('isEphemeralRowExpanded(row.id)'), false)
   assert.equal(source.includes('ephemeralExpandedRows.value.clear()'), false)
@@ -34,7 +38,8 @@ test('chat history renders subdued reasoning blocks before final response and ke
   assert.equal(source.includes('class="thinking-static"'), false)
   assert.equal(source.includes('Tool artifacts'), false)
   assert.equal(source.includes('&lt;/&gt; View code'), false)
-  assert.equal(source.includes('>View code<'), true)
+  assert.equal(source.includes('>View code<'), false)
+  assert.equal(source.includes('Open Code'), true)
   assert.equal(source.includes('Generated code details'), false)
   assert.equal(source.includes('Optional'), false)
   assert.equal(source.includes('class="view-code-meta-badge"'), true)

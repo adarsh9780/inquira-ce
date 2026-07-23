@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('sidebar adds workspace view entries and uses simple project conversations', () => {
+test('sidebar exposes compact workspace utilities and simple project conversations', () => {
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
   assert.equal(sidebarSource.includes('@click="openChat"'), false)
@@ -14,7 +14,8 @@ test('sidebar adds workspace view entries and uses simple project conversations'
   assert.equal(sidebarSource.includes('ShareIcon'), true)
   assert.equal(sidebarSource.includes("shortcutTooltip('conversation-tree'"), true)
   assert.equal(sidebarSource.includes('Schema'), true)
-  assert.equal(sidebarSource.includes('Workspace tools'), true)
+  assert.equal(sidebarSource.includes('Workspace tools'), false)
+  assert.equal(sidebarSource.includes('Data sources'), true)
   assert.equal(sidebarSource.includes('Conversation tree'), true)
   assert.equal(sidebarSource.includes('Conversations and analysis'), false)
   assert.equal(sidebarSource.includes('Datasets and column metadata'), false)

@@ -13,5 +13,5 @@ test('chat input requires active workspace before submit and does not auto-creat
   assert.equal(source.includes('preferred_table_name:'), false)
   assert.equal(source.includes('active_schema:'), false)
   assert.equal(source.includes('workspace_id: workspaceId'), true)
-  assert.equal(source.includes("Create or select a workspace from the sidebar"), true)
+  assert.equal(source.includes("Create or select a workspace from the sidebar"), false)
 })

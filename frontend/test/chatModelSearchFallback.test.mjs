@@ -3,24 +3,21 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('chat model selector wires provider-aware backend fallback search', () => {
+test('chat composer delegates model management to workspace settings', () => {
   const path = resolve(process.cwd(), 'src/components/chat/ChatInput.vue')
   const source = readFileSync(path, 'utf-8')
 
-  assert.equal(source.includes(':provider="effectiveWorkspaceProvider"'), true)
-  assert.equal(source.includes(':backend-search="searchProviderModels"'), true)
-  assert.equal(source.includes(':search-loading="appStore.providerModelSearchLoading"'), true)
-  assert.equal(source.includes(':search-debounce-ms="250"'), true)
-  assert.equal(source.includes('apiService.v1SearchProviderModels(effectiveWorkspaceProvider.value, query, limit)'), true)
+  assert.equal(source.includes('<ModelSelector'), false)
+  assert.equal(source.includes(':backend-search="searchProviderModels"'), false)
+  assert.equal(source.includes('apiService.v1SearchProviderModels('), false)
+  assert.equal(source.includes('const effectiveWorkspaceModel = computed('), true)
 })
 
-test('chat model selection updates only the active workspace main-model override', () => {
+test('chat requests continue to use the effective workspace model', () => {
   const path = resolve(process.cwd(), 'src/components/chat/ChatInput.vue')
   const source = readFileSync(path, 'utf-8')
 
-  assert.equal(source.includes('async function handleModelChange(model) {'), true)
-  assert.equal(source.includes('main_model_override: model'), true)
-  assert.equal(source.includes('coding_model_override: overrides.coding_model'), true)
-  assert.equal(source.includes('appStore.saveWorkspaceAIConfig'), true)
-  assert.equal(source.includes('appStore.setSelectedModel(model)'), false)
+  assert.equal(source.includes('async function handleModelChange(model) {'), false)
+  assert.equal(source.includes('model: effectiveWorkspaceModel.value'), true)
+  assert.equal(source.includes('resolveAnalyzeCancelTimeoutMs(effectiveWorkspaceModel.value)'), true)
 })

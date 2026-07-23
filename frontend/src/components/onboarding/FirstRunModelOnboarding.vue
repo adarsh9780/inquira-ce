@@ -11,7 +11,7 @@
 
       <main class="my-auto grid w-full gap-12 py-12 lg:grid-cols-[minmax(0,0.78fr)_minmax(360px,1fr)] lg:gap-20 lg:py-16">
         <section class="onboarding-enter self-center" style="--onboarding-delay: 70ms" aria-labelledby="onboarding-title">
-          <p class="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent-text)]">Step 1 of 3</p>
+          <p class="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent-text)]">First-time setup</p>
           <h1 id="onboarding-title" class="max-w-xl text-4xl font-semibold tracking-[-0.035em] sm:text-5xl">
             Connect a model.
           </h1>
@@ -41,14 +41,14 @@
               <div class="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-success-bg)] text-xl text-[var(--color-success)]">✓</div>
               <h2 class="mt-6 text-2xl font-semibold tracking-tight">{{ providerLabel }} is connected</h2>
               <p class="mt-2 max-w-md text-sm leading-6 text-[var(--color-text-muted)]">
-                The connection is ready. Workspace and data setup come next.
+                The connection is ready. Next, create a workspace for your data and analysis.
               </p>
               <button type="button" class="btn-primary mt-8 min-w-48 px-5 py-2.5" :disabled="completeLoading" @click="finishOnboarding">
                 <span v-if="completeLoading" class="inline-flex items-center gap-2">
                   <span class="loading-spinner"></span>
                   Opening Inquira…
                 </span>
-                <span v-else>Continue to Inquira</span>
+                <span v-else>Create a workspace</span>
               </button>
               <p v-if="actionError" class="mt-4 text-xs leading-5 text-[var(--color-danger-text)]">{{ actionError }}</p>
             </div>

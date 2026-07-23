@@ -27,17 +27,14 @@ test('model selector accepts injected model options prop', () => {
   assert.equal(source.includes('class="min-w-0 flex-1 truncate text-left"'), true)
 })
 
-test('chat input model dropdown uses and updates the effective workspace model', () => {
+test('chat input uses the effective workspace model without duplicating model settings', () => {
   const path = resolve(process.cwd(), 'src/components/chat/ChatInput.vue')
   const source = readFileSync(path, 'utf-8')
 
-  assert.equal(source.includes(':selected-model="effectiveWorkspaceModel"'), true)
-  assert.equal(source.includes(':max-options-without-search="10"'), true)
-  assert.equal(source.includes(':backend-search="searchProviderModels"'), true)
-  assert.equal(source.includes(':provider="effectiveWorkspaceProvider"'), true)
-  assert.equal(source.includes(':search-loading="appStore.providerModelSearchLoading"'), true)
-  assert.equal(source.includes('style="max-width: clamp(7rem, 30vw, 22rem);"'), true)
-  assert.equal(source.includes('main_model_override: model'), true)
+  assert.equal(source.includes('<ModelSelector'), false)
+  assert.equal(source.includes('const effectiveWorkspaceModel = computed('), true)
+  assert.equal(source.includes('model: effectiveWorkspaceModel.value'), true)
+  assert.equal(source.includes('resolveAnalyzeCancelTimeoutMs(effectiveWorkspaceModel.value)'), true)
 })
 
 test('app store reads available models from v1 preferences payload', () => {
