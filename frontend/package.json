@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "test": "npm run test:source && npm run test:runtime",
     "test:source": "node --test test/*.test.mjs",
-    "test:runtime": "vitest run"
+    "test:runtime": "vitest run",
+    "bundle:report": "node scripts/bundle-report.mjs",
+    "bundle:baseline": "npm run build && npm run bundle:report -- --output baselines/frontend-bundle-baseline.json",
+    "bundle:check": "npm run build && npm run bundle:report && node scripts/check-bundle-budget.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.6",
@@ -38,6 +41,7 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.7",
     "@vue/test-utils": "^2.4.11",
+    "axe-core": "^4.12.1",
     "happy-dom": "^20.10.2",
     "vite": "^8.0.16",
     "vitest": "^4.1.8"

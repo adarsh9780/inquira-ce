@@ -7,6 +7,9 @@
       class="relative overflow-hidden flex items-start gap-3 rounded-lg border p-4"
       :class="containerClass"
       :style="{ boxShadow: 'var(--shadow-lifted)' }"
+      :role="type === 'error' ? 'alert' : 'status'"
+      :aria-live="type === 'error' ? 'assertive' : 'polite'"
+      aria-atomic="true"
     >
       <!-- Icon -->
       <div class="flex-shrink-0 mt-0.5">
@@ -27,6 +30,7 @@
         @click="close"
         class="flex-shrink-0 transition-colors p-0.5 -mr-1"
         :class="closeButtonClass"
+        :aria-label="`Dismiss ${title} notification`"
       >
         <XMarkIcon class="h-4 w-4" />
       </button>

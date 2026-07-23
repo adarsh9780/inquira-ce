@@ -79,6 +79,7 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     emptyOutDir: true,
+    manifest: true,
     chunkSizeWarningLimit: 5000,
     rolldownOptions: {
       checks: {

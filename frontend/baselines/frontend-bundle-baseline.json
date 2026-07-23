@@ -1,0 +1,1004 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-23T16:52:40.884Z",
+  "build": {
+    "entry": "index.html",
+    "emitted": [
+      {
+        "file": "assets/plotly-charts-DC-x-v88.js",
+        "rawBytes": 4599496,
+        "gzipBytes": 1362807
+      },
+      {
+        "file": "assets/index-HBptRaDv.js",
+        "rawBytes": 1499133,
+        "gzipBytes": 437792
+      },
+      {
+        "file": "assets/index-8tDUEonV.css",
+        "rawBytes": 179260,
+        "gzipBytes": 33723
+      },
+      {
+        "file": "assets/utils-BhnvI9vw.js",
+        "rawBytes": 128560,
+        "gzipBytes": 54212
+      },
+      {
+        "file": "assets/pinia-store-q11DGr9M.js",
+        "rawBytes": 70600,
+        "gzipBytes": 27583
+      },
+      {
+        "file": "assets/KaTeX_AMS-Regular-DRggAlZN.ttf",
+        "rawBytes": 63632,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Main-Regular-ypZvNtVU.ttf",
+        "rawBytes": 53580,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Main-Bold-waoOVXN0.ttf",
+        "rawBytes": 51336,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/table-engine-CH9bZMSA.js",
+        "rawBytes": 50705,
+        "gzipBytes": 13200
+      },
+      {
+        "file": "assets/TableTab-CgahYwtu.js",
+        "rawBytes": 34758,
+        "gzipBytes": 10615
+      },
+      {
+        "file": "assets/KaTeX_Main-Italic-3WenGoN9.ttf",
+        "rawBytes": 33580,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_AMS-Regular-DMm9YOAa.woff",
+        "rawBytes": 33516,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Main-BoldItalic-DzxPMmG6.ttf",
+        "rawBytes": 32968,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Math-Italic-flOr_0UB.ttf",
+        "rawBytes": 31308,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Math-BoldItalic-B3XSjfu4.ttf",
+        "rawBytes": 31196,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Main-Regular-Dr94JaBh.woff",
+        "rawBytes": 30772,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Main-Bold-Jm3AIy58.woff",
+        "rawBytes": 29912,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_AMS-Regular-BQhdFMY1.woff2",
+        "rawBytes": 28076,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Typewriter-Regular-D3Ib7_Hf.ttf",
+        "rawBytes": 27556,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Main-Regular-B22Nviop.woff2",
+        "rawBytes": 26272,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Main-Bold-Cx986IdX.woff2",
+        "rawBytes": 25324,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/ui-icons-BneOztNG.js",
+        "rawBytes": 24767,
+        "gzipBytes": 4682
+      },
+      {
+        "file": "assets/KaTeX_SansSerif-Bold-CFMepnvq.ttf",
+        "rawBytes": 24504,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/ui-headless-DQL924H6.js",
+        "rawBytes": 22433,
+        "gzipBytes": 7774
+      },
+      {
+        "file": "assets/KaTeX_SansSerif-Italic-YYjJ1zSn.ttf",
+        "rawBytes": 22364,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Main-Italic-BMLOBm91.woff",
+        "rawBytes": 19676,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Fraktur-Bold-BdnERNNW.ttf",
+        "rawBytes": 19584,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Fraktur-Regular-CB_wures.ttf",
+        "rawBytes": 19572,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_SansSerif-Regular-BNo7hRIc.ttf",
+        "rawBytes": 19436,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Main-BoldItalic-SpSLRI95.woff",
+        "rawBytes": 19412,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Math-Italic-DA0__PXp.woff",
+        "rawBytes": 18748,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Math-BoldItalic-iY-2wyZ7.woff",
+        "rawBytes": 18668,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Main-Italic-NWA7e6Wa.woff2",
+        "rawBytes": 16988,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2",
+        "rawBytes": 16780,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Script-Regular-C5JkGWo-.ttf",
+        "rawBytes": 16648,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Math-Italic-t53AETM-.woff2",
+        "rawBytes": 16440,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2",
+        "rawBytes": 16400,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Typewriter-Regular-C0xS9mPB.woff",
+        "rawBytes": 16028,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_SansSerif-Bold-DbIhKOiC.woff",
+        "rawBytes": 14408,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_SansSerif-Italic-DN2j7dab.woff",
+        "rawBytes": 14112,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Typewriter-Regular-CO6r4hn1.woff2",
+        "rawBytes": 13568,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Fraktur-Bold-BsDP51OF.woff",
+        "rawBytes": 13296,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Fraktur-Regular-Dxdc4cR9.woff",
+        "rawBytes": 13208,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/OutputTab-IVXQJbd_.js",
+        "rawBytes": 12930,
+        "gzipBytes": 4500
+      },
+      {
+        "file": "assets/KaTeX_Caligraphic-Bold-ATXxdsX0.ttf",
+        "rawBytes": 12368,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Caligraphic-Regular-wX97UBjC.ttf",
+        "rawBytes": 12344,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_SansSerif-Regular-CS6fqUqJ.woff",
+        "rawBytes": 12316,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/FigureTab--bE-EjoE.js",
+        "rawBytes": 12310,
+        "gzipBytes": 4529
+      },
+      {
+        "file": "assets/KaTeX_Size1-Regular-Dbsnue_I.ttf",
+        "rawBytes": 12228,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_SansSerif-Bold-D1sUS0GD.woff2",
+        "rawBytes": 12216,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_SansSerif-Italic-C3H0VqGB.woff2",
+        "rawBytes": 12028,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Size2-Regular-B7gKUWhC.ttf",
+        "rawBytes": 11508,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Fraktur-Bold-CL6g_b3V.woff2",
+        "rawBytes": 11348,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Fraktur-Regular-CTYiF6lA.woff2",
+        "rawBytes": 11316,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Script-Regular-D5yQViql.woff",
+        "rawBytes": 10588,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Size4-Regular-DWFBv043.ttf",
+        "rawBytes": 10364,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_SansSerif-Regular-DDBCnlJ7.woff2",
+        "rawBytes": 10344,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Script-Regular-D3wIWfF6.woff2",
+        "rawBytes": 9644,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Caligraphic-Bold-BEiXGLvX.woff",
+        "rawBytes": 7716,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Caligraphic-Regular-CTRA-rTL.woff",
+        "rawBytes": 7656,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Size3-Regular-DgpXs0kz.ttf",
+        "rawBytes": 7588,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/TableTab-yDyysTux.css",
+        "rawBytes": 7378,
+        "gzipBytes": 1539
+      },
+      {
+        "file": "assets/plotlyTheme-CKbi2SXG.js",
+        "rawBytes": 7169,
+        "gzipBytes": 2550
+      },
+      {
+        "file": "assets/KaTeX_Caligraphic-Bold-Dq_IR9rO.woff2",
+        "rawBytes": 6912,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Caligraphic-Regular-Di6jR-x-.woff2",
+        "rawBytes": 6908,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Size1-Regular-C195tn64.woff",
+        "rawBytes": 6496,
+        "gzipBytes": null
+      },
+      {
+        "file": "terms-and-conditions.html",
+        "rawBytes": 6439,
+        "gzipBytes": 2711
+      },
+      {
+        "file": "assets/KaTeX_Size2-Regular-oD1tc_U0.woff",
+        "rawBytes": 6188,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Size4-Regular-BF-4gkZK.woff",
+        "rawBytes": 5980,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Size1-Regular-mCD8mA8B.woff2",
+        "rawBytes": 5468,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Size2-Regular-Dy4dx90m.woff2",
+        "rawBytes": 5208,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2",
+        "rawBytes": 4928,
+        "gzipBytes": null
+      },
+      {
+        "file": "assets/KaTeX_Size3-Regular-CTq5MqoE.woff",
+        "rawBytes": 4420,
+        "gzipBytes": null
+      },
+      {
+        "file": "splash.html",
+        "rawBytes": 3307,
+        "gzipBytes": 1137
+      },
+      {
+        "file": "assets/OutputTab-C61Q40Yf.css",
+        "rawBytes": 2817,
+        "gzipBytes": 801
+      },
+      {
+        "file": "assets/RunChartOutput-CYSfGTvM.js",
+        "rawBytes": 1167,
+        "gzipBytes": 717
+      },
+      {
+        "file": "assets/favicon-BM1ELmdG.svg",
+        "rawBytes": 971,
+        "gzipBytes": 523
+      },
+      {
+        "file": "favicon.svg",
+        "rawBytes": 971,
+        "gzipBytes": 523
+      },
+      {
+        "file": "index.html",
+        "rawBytes": 886,
+        "gzipBytes": 397
+      },
+      {
+        "file": "assets/AppEmptyState-CdC60SLU.js",
+        "rawBytes": 787,
+        "gzipBytes": 434
+      },
+      {
+        "file": "assets/rolldown-runtime-QTnfLwEv.js",
+        "rawBytes": 694,
+        "gzipBytes": 423
+      },
+      {
+        "file": "assets/FigureTab-x1XGuNl0.css",
+        "rawBytes": 1,
+        "gzipBytes": 21
+      }
+    ],
+    "initial": {
+      "rawBytes": 3000252,
+      "gzipBytes": 567109,
+      "files": [
+        {
+          "file": "assets/index-HBptRaDv.js",
+          "rawBytes": 1499133,
+          "gzipBytes": 437792
+        },
+        {
+          "file": "assets/index-8tDUEonV.css",
+          "rawBytes": 179260,
+          "gzipBytes": 33723
+        },
+        {
+          "file": "assets/utils-BhnvI9vw.js",
+          "rawBytes": 128560,
+          "gzipBytes": 54212
+        },
+        {
+          "file": "assets/pinia-store-q11DGr9M.js",
+          "rawBytes": 70600,
+          "gzipBytes": 27583
+        },
+        {
+          "file": "assets/KaTeX_AMS-Regular-DRggAlZN.ttf",
+          "rawBytes": 63632,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Main-Regular-ypZvNtVU.ttf",
+          "rawBytes": 53580,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Main-Bold-waoOVXN0.ttf",
+          "rawBytes": 51336,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Main-Italic-3WenGoN9.ttf",
+          "rawBytes": 33580,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_AMS-Regular-DMm9YOAa.woff",
+          "rawBytes": 33516,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Main-BoldItalic-DzxPMmG6.ttf",
+          "rawBytes": 32968,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Math-Italic-flOr_0UB.ttf",
+          "rawBytes": 31308,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Math-BoldItalic-B3XSjfu4.ttf",
+          "rawBytes": 31196,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Main-Regular-Dr94JaBh.woff",
+          "rawBytes": 30772,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Main-Bold-Jm3AIy58.woff",
+          "rawBytes": 29912,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_AMS-Regular-BQhdFMY1.woff2",
+          "rawBytes": 28076,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Typewriter-Regular-D3Ib7_Hf.ttf",
+          "rawBytes": 27556,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Main-Regular-B22Nviop.woff2",
+          "rawBytes": 26272,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Main-Bold-Cx986IdX.woff2",
+          "rawBytes": 25324,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/ui-icons-BneOztNG.js",
+          "rawBytes": 24767,
+          "gzipBytes": 4682
+        },
+        {
+          "file": "assets/KaTeX_SansSerif-Bold-CFMepnvq.ttf",
+          "rawBytes": 24504,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/ui-headless-DQL924H6.js",
+          "rawBytes": 22433,
+          "gzipBytes": 7774
+        },
+        {
+          "file": "assets/KaTeX_SansSerif-Italic-YYjJ1zSn.ttf",
+          "rawBytes": 22364,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Main-Italic-BMLOBm91.woff",
+          "rawBytes": 19676,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Fraktur-Bold-BdnERNNW.ttf",
+          "rawBytes": 19584,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Fraktur-Regular-CB_wures.ttf",
+          "rawBytes": 19572,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_SansSerif-Regular-BNo7hRIc.ttf",
+          "rawBytes": 19436,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Main-BoldItalic-SpSLRI95.woff",
+          "rawBytes": 19412,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Math-Italic-DA0__PXp.woff",
+          "rawBytes": 18748,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Math-BoldItalic-iY-2wyZ7.woff",
+          "rawBytes": 18668,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Main-Italic-NWA7e6Wa.woff2",
+          "rawBytes": 16988,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2",
+          "rawBytes": 16780,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Script-Regular-C5JkGWo-.ttf",
+          "rawBytes": 16648,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Math-Italic-t53AETM-.woff2",
+          "rawBytes": 16440,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2",
+          "rawBytes": 16400,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Typewriter-Regular-C0xS9mPB.woff",
+          "rawBytes": 16028,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_SansSerif-Bold-DbIhKOiC.woff",
+          "rawBytes": 14408,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_SansSerif-Italic-DN2j7dab.woff",
+          "rawBytes": 14112,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Typewriter-Regular-CO6r4hn1.woff2",
+          "rawBytes": 13568,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Fraktur-Bold-BsDP51OF.woff",
+          "rawBytes": 13296,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Fraktur-Regular-Dxdc4cR9.woff",
+          "rawBytes": 13208,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Caligraphic-Bold-ATXxdsX0.ttf",
+          "rawBytes": 12368,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Caligraphic-Regular-wX97UBjC.ttf",
+          "rawBytes": 12344,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_SansSerif-Regular-CS6fqUqJ.woff",
+          "rawBytes": 12316,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Size1-Regular-Dbsnue_I.ttf",
+          "rawBytes": 12228,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_SansSerif-Bold-D1sUS0GD.woff2",
+          "rawBytes": 12216,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_SansSerif-Italic-C3H0VqGB.woff2",
+          "rawBytes": 12028,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Size2-Regular-B7gKUWhC.ttf",
+          "rawBytes": 11508,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Fraktur-Bold-CL6g_b3V.woff2",
+          "rawBytes": 11348,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Fraktur-Regular-CTYiF6lA.woff2",
+          "rawBytes": 11316,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Script-Regular-D5yQViql.woff",
+          "rawBytes": 10588,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Size4-Regular-DWFBv043.ttf",
+          "rawBytes": 10364,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_SansSerif-Regular-DDBCnlJ7.woff2",
+          "rawBytes": 10344,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Script-Regular-D3wIWfF6.woff2",
+          "rawBytes": 9644,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Caligraphic-Bold-BEiXGLvX.woff",
+          "rawBytes": 7716,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Caligraphic-Regular-CTRA-rTL.woff",
+          "rawBytes": 7656,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Size3-Regular-DgpXs0kz.ttf",
+          "rawBytes": 7588,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Caligraphic-Bold-Dq_IR9rO.woff2",
+          "rawBytes": 6912,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Caligraphic-Regular-Di6jR-x-.woff2",
+          "rawBytes": 6908,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Size1-Regular-C195tn64.woff",
+          "rawBytes": 6496,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Size2-Regular-oD1tc_U0.woff",
+          "rawBytes": 6188,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Size4-Regular-BF-4gkZK.woff",
+          "rawBytes": 5980,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Size1-Regular-mCD8mA8B.woff2",
+          "rawBytes": 5468,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Size2-Regular-Dy4dx90m.woff2",
+          "rawBytes": 5208,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2",
+          "rawBytes": 4928,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/KaTeX_Size3-Regular-CTq5MqoE.woff",
+          "rawBytes": 4420,
+          "gzipBytes": null
+        },
+        {
+          "file": "assets/favicon-BM1ELmdG.svg",
+          "rawBytes": 971,
+          "gzipBytes": 523
+        },
+        {
+          "file": "index.html",
+          "rawBytes": 886,
+          "gzipBytes": 397
+        },
+        {
+          "file": "assets/rolldown-runtime-QTnfLwEv.js",
+          "rawBytes": 694,
+          "gzipBytes": 423
+        }
+      ]
+    },
+    "features": {
+      "settings": {
+        "source": "src/components/modals/SettingsModal.vue",
+        "bundledWithInitial": true,
+        "reason": "No independent feature chunk was emitted.",
+        "incremental": {
+          "rawBytes": 0,
+          "gzipBytes": 0,
+          "files": []
+        }
+      },
+      "code": {
+        "source": "src/components/analysis/CodeTab.vue",
+        "bundledWithInitial": true,
+        "reason": "No independent feature chunk was emitted.",
+        "incremental": {
+          "rawBytes": 0,
+          "gzipBytes": 0,
+          "files": []
+        }
+      },
+      "terminal": {
+        "source": "src/components/analysis/TerminalTab.vue",
+        "bundledWithInitial": true,
+        "reason": "No independent feature chunk was emitted.",
+        "incremental": {
+          "rawBytes": 0,
+          "gzipBytes": 0,
+          "files": []
+        }
+      },
+      "table": {
+        "source": "src/components/analysis/TableTab.vue",
+        "bundledWithInitial": false,
+        "incremental": {
+          "rawBytes": 93628,
+          "gzipBytes": 25788,
+          "files": [
+            {
+              "file": "assets/table-engine-CH9bZMSA.js",
+              "rawBytes": 50705,
+              "gzipBytes": 13200
+            },
+            {
+              "file": "assets/TableTab-CgahYwtu.js",
+              "rawBytes": 34758,
+              "gzipBytes": 10615
+            },
+            {
+              "file": "assets/TableTab-yDyysTux.css",
+              "rawBytes": 7378,
+              "gzipBytes": 1539
+            },
+            {
+              "file": "assets/AppEmptyState-CdC60SLU.js",
+              "rawBytes": 787,
+              "gzipBytes": 434
+            }
+          ]
+        }
+      },
+      "figure": {
+        "source": "src/components/analysis/FigureTab.vue",
+        "bundledWithInitial": false,
+        "incremental": {
+          "rawBytes": 4619763,
+          "gzipBytes": 1370341,
+          "files": [
+            {
+              "file": "assets/plotly-charts-DC-x-v88.js",
+              "rawBytes": 4599496,
+              "gzipBytes": 1362807
+            },
+            {
+              "file": "assets/FigureTab--bE-EjoE.js",
+              "rawBytes": 12310,
+              "gzipBytes": 4529
+            },
+            {
+              "file": "assets/plotlyTheme-CKbi2SXG.js",
+              "rawBytes": 7169,
+              "gzipBytes": 2550
+            },
+            {
+              "file": "assets/AppEmptyState-CdC60SLU.js",
+              "rawBytes": 787,
+              "gzipBytes": 434
+            },
+            {
+              "file": "assets/FigureTab-x1XGuNl0.css",
+              "rawBytes": 1,
+              "gzipBytes": 21
+            }
+          ]
+        }
+      },
+      "other": {
+        "source": "src/components/analysis/OutputTab.vue",
+        "bundledWithInitial": false,
+        "incremental": {
+          "rawBytes": 16534,
+          "gzipBytes": 5735,
+          "files": [
+            {
+              "file": "assets/OutputTab-IVXQJbd_.js",
+              "rawBytes": 12930,
+              "gzipBytes": 4500
+            },
+            {
+              "file": "assets/OutputTab-C61Q40Yf.css",
+              "rawBytes": 2817,
+              "gzipBytes": 801
+            },
+            {
+              "file": "assets/AppEmptyState-CdC60SLU.js",
+              "rawBytes": 787,
+              "gzipBytes": 434
+            }
+          ]
+        }
+      }
+    },
+    "sharedChunks": [
+      {
+        "key": "_AppEmptyState-CdC60SLU.js",
+        "file": "assets/AppEmptyState-CdC60SLU.js",
+        "importers": [
+          "src/components/analysis/FigureTab.vue",
+          "src/components/analysis/OutputTab.vue",
+          "src/components/analysis/TableTab.vue"
+        ]
+      },
+      {
+        "key": "_pinia-store-q11DGr9M.js",
+        "file": "assets/pinia-store-q11DGr9M.js",
+        "importers": [
+          "_AppEmptyState-CdC60SLU.js",
+          "_table-engine-CH9bZMSA.js",
+          "_ui-headless-DQL924H6.js",
+          "_ui-icons-BneOztNG.js",
+          "index.html",
+          "src/components/analysis/FigureTab.vue",
+          "src/components/analysis/OutputTab.vue",
+          "src/components/analysis/TableTab.vue",
+          "src/components/analysis/runs/RunChartOutput.vue"
+        ]
+      },
+      {
+        "key": "_plotly-charts-DC-x-v88.js",
+        "file": "assets/plotly-charts-DC-x-v88.js",
+        "importers": [
+          "src/components/analysis/FigureTab.vue",
+          "src/components/analysis/runs/RunChartOutput.vue"
+        ]
+      },
+      {
+        "key": "_plotlyTheme-CKbi2SXG.js",
+        "file": "assets/plotlyTheme-CKbi2SXG.js",
+        "importers": [
+          "src/components/analysis/FigureTab.vue",
+          "src/components/analysis/runs/RunChartOutput.vue"
+        ]
+      },
+      {
+        "key": "_rolldown-runtime-QTnfLwEv.js",
+        "file": "assets/rolldown-runtime-QTnfLwEv.js",
+        "importers": [
+          "_plotly-charts-DC-x-v88.js",
+          "_utils-BhnvI9vw.js",
+          "index.html",
+          "src/components/analysis/FigureTab.vue",
+          "src/components/analysis/runs/RunChartOutput.vue"
+        ]
+      },
+      {
+        "key": "_ui-icons-BneOztNG.js",
+        "file": "assets/ui-icons-BneOztNG.js",
+        "importers": [
+          "index.html",
+          "src/components/analysis/FigureTab.vue",
+          "src/components/analysis/OutputTab.vue",
+          "src/components/analysis/TableTab.vue"
+        ]
+      },
+      {
+        "key": "index.html",
+        "file": "assets/index-HBptRaDv.js",
+        "importers": [
+          "src/components/analysis/FigureTab.vue",
+          "src/components/analysis/OutputTab.vue",
+          "src/components/analysis/TableTab.vue",
+          "src/components/analysis/runs/RunChartOutput.vue"
+        ]
+      }
+    ]
+  },
+  "duplicatePackages": [
+    {
+      "name": "balanced-match",
+      "versions": [
+        "1.0.2",
+        "4.0.4"
+      ]
+    },
+    {
+      "name": "brace-expansion",
+      "versions": [
+        "2.1.1",
+        "5.0.6"
+      ]
+    },
+    {
+      "name": "commander",
+      "versions": [
+        "10.0.1",
+        "8.3.0"
+      ]
+    },
+    {
+      "name": "entities",
+      "versions": [
+        "4.5.0",
+        "7.0.1"
+      ]
+    },
+    {
+      "name": "estree-walker",
+      "versions": [
+        "2.0.2",
+        "3.0.3"
+      ]
+    },
+    {
+      "name": "minimatch",
+      "versions": [
+        "10.2.5",
+        "9.0.9"
+      ]
+    }
+  ]
+}

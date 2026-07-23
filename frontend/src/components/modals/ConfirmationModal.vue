@@ -8,10 +8,12 @@
     <!-- Modal Overlay -->
     <div
       v-if="isOpen"
+      ref="dialogRef"
       class="fixed inset-0 layer-modal overflow-y-auto"
       aria-labelledby="modal-title"
       role="dialog"
       aria-modal="true"
+      @keydown="handleDialogKeydown"
     >
       <!-- Background overlay -->
       <div
@@ -40,7 +42,7 @@
 
           <!-- Modal Footer -->
           <div class="modal-footer">
-            <button @click="closeModal" class="btn-secondary text-sm px-4 py-2">{{ cancelText }}</button>
+            <button ref="cancelButtonRef" @click="closeModal" class="btn-secondary text-sm px-4 py-2">{{ cancelText }}</button>
             <button @click="confirmAction" class="btn-danger text-sm px-4 py-2">{{ confirmText }}</button>
           </div>
         </div>
@@ -50,7 +52,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -77,6 +79,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'confirm'])
+const dialogRef = ref(null)
+const cancelButtonRef = ref(null)
+let previouslyFocusedElement = null
 
 function closeModal() {
   emit('close')
@@ -92,12 +97,45 @@ function handleEscape(e) {
   }
 }
 
+function focusableElements() {
+  return [...(dialogRef.value?.querySelectorAll(
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  ) || [])]
+}
+
+function handleDialogKeydown(event) {
+  if (event.key !== 'Tab') return
+  const focusable = focusableElements()
+  if (!focusable.length) return
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+watch(() => props.isOpen, async (isOpen) => {
+  if (isOpen) {
+    previouslyFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    await nextTick()
+    cancelButtonRef.value?.focus?.()
+    return
+  }
+  previouslyFocusedElement?.focus?.()
+  previouslyFocusedElement = null
+}, { immediate: true })
+
 onMounted(() => {
   document.addEventListener('keydown', handleEscape)
 })
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleEscape)
+  previouslyFocusedElement?.focus?.()
 })
 </script>
 
