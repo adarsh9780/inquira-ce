@@ -1,151 +1,18 @@
-<template>
-  <div class="relative" :class="maxWidthClass" :style="containerStyle">
-    <Listbox v-slot="{ open }" :model-value="modelValue" @update:model-value="handleChange">
-      <div class="relative">
-        <ListboxButton
-          ref="triggerRef"
-          class="inline-flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1 text-[13px] font-medium transition-colors focus:outline-none"
-          :style="triggerStyle"
-          :aria-label="ariaLabel"
-        >
-          <span class="flex min-w-0 items-center gap-2">
-            <span v-if="selectedOption?.icon" class="inline-flex h-4 w-4 shrink-0" data-header-dropdown-icon>
-              <component
-                :is="selectedOption.icon"
-                class="h-4 w-4"
-                style="color: var(--color-text-muted);"
-                aria-hidden="true"
-              />
-            </span>
-            <span class="truncate" :title="selectedLabel">{{ selectedLabel }}</span>
-          </span>
-          <ChevronUpDownIcon class="h-3.5 w-3.5 shrink-0 opacity-70" />
-        </ListboxButton>
-
-        <Portal>
-          <Transition name="motion-popover" @before-enter="prepareFloatingPosition">
-            <ListboxOptions
-              v-if="open"
-              ref="optionsRef"
-              :class="dropdownSurfaceClass"
-              :style="floatingOptionsStyle"
-            >
-              <div
-                v-if="searchable"
-                :class="dropdownSearchRowClass"
-                :style="dropdownSearchRowStyle"
-              >
-                <input
-                  v-model="searchQuery"
-                  type="text"
-                  :class="dropdownSearchInputClass"
-                  :placeholder="searchPlaceholder"
-                  :style="dropdownSearchInputStyle"
-                  @click.stop
-                  @keydown.stop
-                />
-              </div>
-              <div v-if="backendLoading && searchable && searchQuery" class="px-3 pb-1 text-[11px]" :style="dropdownMutedTextStyle">
-                Searching...
-              </div>
-
-              <template v-if="groupByProvider">
-                <template v-if="groupedFilteredOptions.length">
-                  <template v-for="group in groupedFilteredOptions" :key="group.key">
-                    <div
-                      :class="dropdownGroupLabelClass"
-                      :style="dropdownMutedTextStyle"
-                    >
-                      {{ group.label }}
-                    </div>
-                    <ListboxOption
-                      v-for="(option, index) in group.options"
-                      :key="optionKey(option, index, group.key)"
-                      v-slot="{ active, selected }"
-                      :value="option.value"
-                      as="template"
-                    >
-                      <li
-                        :style="dropdownOptionStyle(active)"
-                        :class="[dropdownOptionClass, 'pl-3 pr-9']"
-                      >
-                        <span :class="selected ? 'font-semibold' : 'font-normal'" class="flex min-w-0 items-center gap-2 pr-2" :title="option.label">
-                          <span v-if="option.icon" class="inline-flex h-4 w-4 shrink-0" data-header-dropdown-icon>
-                            <component
-                              :is="option.icon"
-                              class="h-4 w-4"
-                              style="color: var(--color-text-muted);"
-                              aria-hidden="true"
-                            />
-                          </span>
-                          <span class="truncate">{{ option.label }}</span>
-                        </span>
-                        <span v-if="selected" class="absolute right-2.5 top-1/2 -translate-y-1/2">
-                          <CheckIcon class="h-4 w-4" style="color: var(--color-text-muted);" />
-                        </span>
-                      </li>
-                    </ListboxOption>
-                  </template>
-                </template>
-                <div
-                  v-else
-                  :class="dropdownEmptyClass"
-                  :style="dropdownMutedTextStyle"
-                >
-                  {{ noResultsLabel }}
-                </div>
-              </template>
-
-              <template v-else>
-                <template v-if="filteredOptions.length">
-                  <ListboxOption
-                    v-for="(option, index) in filteredOptions"
-                    :key="optionKey(option, index)"
-                    v-slot="{ active, selected }"
-                    :value="option.value"
-                    as="template"
-                  >
-                    <li
-                      :style="dropdownOptionStyle(active)"
-                      :class="[dropdownOptionClass, 'pl-3 pr-9']"
-                    >
-                      <span :class="selected ? 'font-semibold' : 'font-normal'" class="flex min-w-0 items-center gap-2 pr-2" :title="option.label">
-                        <span v-if="option.icon" class="inline-flex h-4 w-4 shrink-0" data-header-dropdown-icon>
-                          <component
-                            :is="option.icon"
-                            class="h-4 w-4"
-                            style="color: var(--color-text-muted);"
-                            aria-hidden="true"
-                          />
-                        </span>
-                        <span class="truncate">{{ option.label }}</span>
-                      </span>
-                      <span v-if="selected" class="absolute right-2.5 top-1/2 -translate-y-1/2">
-                        <CheckIcon class="h-4 w-4" style="color: var(--color-text-muted);" />
-                      </span>
-                    </li>
-                  </ListboxOption>
-                </template>
-                <div
-                  v-else
-                  :class="dropdownEmptyClass"
-                  :style="dropdownMutedTextStyle"
-                >
-                  {{ noResultsLabel }}
-                </div>
-              </template>
-            </ListboxOptions>
-          </Transition>
-        </Portal>
-      </div>
-    </Listbox>
-  </div>
-</template>
-
-<script setup>
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { Listbox, ListboxButton, ListboxOption, ListboxOptions, Portal } from '@headlessui/vue'
+<script setup lang="ts">
+import {
+  ComboboxAnchor,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxItemIndicator,
+  ComboboxPortal,
+  ComboboxRoot,
+  ComboboxTrigger,
+  ComboboxViewport,
+} from 'reka-ui'
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/vue/20/solid'
+import { computed, nextTick, onBeforeUnmount, ref, watch, type Component } from 'vue'
 import {
   mergeModelOptions,
   normalizeModelOptions,
@@ -157,7 +24,6 @@ import {
   dropdownGroupLabelClass,
   dropdownMutedTextStyle,
   dropdownOptionClass,
-  dropdownOptionStyle,
   dropdownSearchInputClass,
   dropdownSearchInputStyle,
   dropdownSearchRowClass,
@@ -167,207 +33,165 @@ import {
 } from './dropdownShared'
 import { updateFloatingDropdownPosition } from '../../composables/useFloatingDropdown'
 
-const props = defineProps({
-  modelValue: {
-    type: [String, Number, null],
-    default: null
-  },
-  options: {
-    type: Array,
-    default: () => []
-  },
-  placeholder: {
-    type: String,
-    default: 'Select'
-  },
-  triggerLabel: {
-    type: String,
-    default: ''
-  },
-  ariaLabel: {
-    type: String,
-    default: 'Select option'
-  },
-  maxWidthClass: {
-    type: String,
-    default: 'max-w-[220px]'
-  },
-  fitToLongestLabel: {
-    type: Boolean,
-    default: false
-  },
-  minChars: {
-    type: Number,
-    default: 24
-  },
-  maxChars: {
-    type: Number,
-    default: 52
-  },
-  searchable: {
-    type: Boolean,
-    default: false
-  },
-  backendSearch: {
-    type: Function,
-    default: null,
-  },
-  backendSearchLimit: {
-    type: Number,
-    default: 25,
-  },
-  backendSearchMinChars: {
-    type: Number,
-    default: 3,
-  },
-  backendSearchDebounceMs: {
-    type: Number,
-    default: 250,
-  },
-  searchPlaceholder: {
-    type: String,
-    default: 'Search models'
-  },
-  groupByProvider: {
-    type: Boolean,
-    default: false
-  },
-  noResultsLabel: {
-    type: String,
-    default: 'No results found'
-  },
-  maxOptionsWithoutSearch: {
-    type: Number,
-    default: 0
-  },
-  dropdownMinWidth: {
-    type: Number,
-    default: 0
-  }
+type DropdownValue = string | number | null
+
+interface DropdownOption {
+  key?: string | number
+  value: Exclude<DropdownValue, null>
+  label: string
+  icon?: Component
+  provider?: string
+}
+
+const props = withDefaults(defineProps<{
+  modelValue?: DropdownValue
+  options?: DropdownOption[] | Array<string | number>
+  placeholder?: string
+  triggerLabel?: string
+  ariaLabel?: string
+  maxWidthClass?: string
+  fitToLongestLabel?: boolean
+  minChars?: number
+  maxChars?: number
+  searchable?: boolean
+  backendSearch?: ((query: string, limit: number) => Promise<unknown>) | null
+  backendSearchLimit?: number
+  backendSearchMinChars?: number
+  backendSearchDebounceMs?: number
+  searchPlaceholder?: string
+  groupByProvider?: boolean
+  noResultsLabel?: string
+  maxOptionsWithoutSearch?: number
+  dropdownMinWidth?: number
+}>(), {
+  modelValue: null,
+  options: () => [],
+  placeholder: 'Select',
+  triggerLabel: '',
+  ariaLabel: 'Select option',
+  maxWidthClass: 'max-w-[220px]',
+  fitToLongestLabel: false,
+  minChars: 24,
+  maxChars: 52,
+  searchable: false,
+  backendSearch: null,
+  backendSearchLimit: 25,
+  backendSearchMinChars: 3,
+  backendSearchDebounceMs: 250,
+  searchPlaceholder: 'Search models',
+  groupByProvider: false,
+  noResultsLabel: 'No results found',
+  maxOptionsWithoutSearch: 0,
+  dropdownMinWidth: 0,
 })
 
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits<{
+  'update:modelValue': [value: DropdownValue]
+}>()
+
 const searchQuery = ref('')
-const backendOptions = ref([])
+const backendOptions = ref<DropdownOption[]>([])
 const backendLoading = ref(false)
-const triggerRef = ref(null)
-const optionsRef = ref(null)
-const floatingOptionsStyle = ref({
+const isOpen = ref(false)
+const triggerRef = ref<HTMLElement | { $el?: HTMLElement } | null>(null)
+const floatingOptionsStyle = ref<Record<string, string>>({
   left: '0px',
   top: '0px',
   width: '0px',
   maxHeight: '240px',
   ...dropdownSurfaceStyle(),
 })
-let backendSearchTimer = null
+let backendSearchTimer: ReturnType<typeof setTimeout> | null = null
 let backendSearchToken = 0
 
-const normalizedOptions = computed(() => normalizeModelOptions(props.options))
+const normalizedOptions = computed<DropdownOption[]>(() => normalizeModelOptions(props.options) as DropdownOption[])
 const selectedOption = computed(() => normalizedOptions.value.find((option) => option.value === props.modelValue) ?? null)
 const selectedLabel = computed(() => String(props.triggerLabel || '').trim() || selectedOption.value?.label || props.placeholder)
-const hasSelection = computed(() => !!selectedOption.value)
+const hasSelection = computed(() => Boolean(selectedOption.value))
 const normalizedSearchQuery = computed(() => String(searchQuery.value || '').trim().toLowerCase())
 const filteredOptions = computed(() => {
   const options = normalizedOptions.value
   const query = normalizedSearchQuery.value
   if (!query) {
-    const maxCount = Number(props.maxOptionsWithoutSearch || 0)
-    if (maxCount > 0) {
-      return options.slice(0, maxCount)
-    }
-    return options
+    return props.maxOptionsWithoutSearch > 0 ? options.slice(0, props.maxOptionsWithoutSearch) : options
   }
   const localMatches = options.filter((option) => matchesModelOptionSearch(option, query))
-  if (!shouldSearchBackend(query, localMatches)) {
-    return localMatches
-  }
-  return mergeModelOptions(localMatches, backendOptions.value)
+  return shouldSearchBackend(query, localMatches)
+    ? mergeModelOptions(localMatches, backendOptions.value) as DropdownOption[]
+    : localMatches
 })
 const groupedFilteredOptions = computed(() => {
-  const groups = new Map()
-  filteredOptions.value.forEach((option) => {
+  const groups = new Map<string, DropdownOption[]>()
+  for (const option of filteredOptions.value) {
     const providerKey = normalizeProviderKey(resolveProvider(option))
-    if (!groups.has(providerKey)) {
-      groups.set(providerKey, [])
-    }
-    groups.get(providerKey).push(option)
-  })
-  return Array.from(groups.entries()).map(([key, options]) => ({
+    const options = groups.get(providerKey) || []
+    options.push(option)
+    groups.set(providerKey, options)
+  }
+  return [...groups.entries()].map(([key, options]) => ({
     key,
     label: sharedProviderLabel(key),
-    options
+    options,
   }))
 })
-const maxLabelChars = computed(() => {
-  const optionChars = props.options.reduce((maxChars, option) => {
-    const label = String(option?.label || '')
-    return Math.max(maxChars, label.length)
-  }, 0)
-  return Math.max(optionChars, String(props.placeholder || '').length)
-})
+const maxLabelChars = computed(() => Math.max(
+  ...normalizedOptions.value.map((option) => option.label.length),
+  props.placeholder.length,
+))
 const containerStyle = computed(() => {
-  if (!props.fitToLongestLabel) return null
-  const desiredChars = maxLabelChars.value + 5 // icon + horizontal padding
-  const widthChars = Math.min(Math.max(desiredChars, Number(props.minChars || 24)), Number(props.maxChars || 52))
-  return {
-    width: `${widthChars}ch`,
-    maxWidth: '100%'
-  }
+  if (!props.fitToLongestLabel) return undefined
+  const widthChars = Math.min(Math.max(maxLabelChars.value + 5, props.minChars), props.maxChars)
+  return { width: `${widthChars}ch`, maxWidth: '100%' }
 })
 const triggerStyle = computed(() => ({
   color: hasSelection.value ? 'var(--color-text-main)' : 'var(--color-text-muted)',
   backgroundColor: 'var(--color-surface)',
-  borderColor: 'var(--color-border)'
+  borderColor: 'var(--color-border)',
 }))
 
-watch(searchQuery, (value) => {
-  scheduleBackendSearch(String(value || '').trim())
+watch(searchQuery, (value) => scheduleBackendSearch(String(value || '').trim()))
+watch(() => props.backendSearch, () => {
+  backendOptions.value = []
+  scheduleBackendSearch(String(searchQuery.value || '').trim())
 })
+watch([filteredOptions, groupedFilteredOptions], () => void nextTick(updateFloatingPosition))
 
-watch(
-  () => props.backendSearch,
-  () => {
-    backendOptions.value = []
-    scheduleBackendSearch(String(searchQuery.value || '').trim())
-  }
-)
-
-function handleChange(value) {
-  if (props.searchable) {
-    searchQuery.value = ''
-    backendOptions.value = []
-  }
+function handleChange(value: DropdownValue) {
+  searchQuery.value = ''
+  backendOptions.value = []
   emit('update:modelValue', value)
 }
 
-function applyInlineStyle(element, style) {
-  if (!element?.style || !style) return
-  Object.entries(style).forEach(([property, value]) => {
-    if (property.startsWith('--')) element.style.setProperty(property, value)
-    else element.style[property] = value
-  })
+function handleOpenChange(open: boolean) {
+  isOpen.value = open
+  if (open) {
+    bindPositionListeners()
+    void nextTick(updateFloatingPosition)
+  } else {
+    unbindPositionListeners()
+    searchQuery.value = ''
+  }
 }
 
-function updateFloatingPosition(element = null) {
-  const nextStyle = updateFloatingDropdownPosition(triggerRef)
+function triggerElement(): HTMLElement | null {
+  const candidate = triggerRef.value
+  if (candidate instanceof HTMLElement) return candidate
+  return candidate?.$el instanceof HTMLElement ? candidate.$el : null
+}
+
+function updateFloatingPosition() {
+  const nextStyle = updateFloatingDropdownPosition({ value: triggerElement() })
   if (!nextStyle) return
-  const requestedMinWidth = Number(props.dropdownMinWidth || 0)
-  if (requestedMinWidth > 0) {
-    const triggerElement = triggerRef.value?.el ?? triggerRef.value
-    const rect = triggerElement?.getBoundingClientRect?.()
+  if (props.dropdownMinWidth > 0) {
+    const rect = triggerElement()?.getBoundingClientRect()
     if (rect) {
-      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || requestedMinWidth + 16
-      const width = Math.min(Math.max(rect.width, requestedMinWidth), Math.max(0, viewportWidth - 16))
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || props.dropdownMinWidth + 16
+      const width = Math.min(Math.max(rect.width, props.dropdownMinWidth), Math.max(0, viewportWidth - 16))
       nextStyle.width = `${Math.round(width)}px`
       nextStyle.left = `${Math.round(Math.max(8, Math.min(rect.left, viewportWidth - width - 8)))}px`
     }
   }
   floatingOptionsStyle.value = nextStyle
-  applyInlineStyle(element, nextStyle)
-}
-
-function prepareFloatingPosition(element) {
-  updateFloatingPosition(element)
 }
 
 function bindPositionListeners() {
@@ -380,109 +204,192 @@ function unbindPositionListeners() {
   window.removeEventListener('scroll', updateFloatingPosition, true)
 }
 
-function shouldSearchBackend(query, localMatches) {
-  if (typeof props.backendSearch !== 'function') return false
-  if (query.length < Number(props.backendSearchMinChars || 3)) return false
-  return localMatches.length === 0
+function shouldSearchBackend(query: string, localMatches: DropdownOption[]) {
+  return typeof props.backendSearch === 'function'
+    && query.length >= props.backendSearchMinChars
+    && localMatches.length === 0
 }
 
-function scheduleBackendSearch(query) {
+function scheduleBackendSearch(query: string) {
   if (backendSearchTimer) clearTimeout(backendSearchTimer)
   if (!query || typeof props.backendSearch !== 'function') {
     backendOptions.value = []
     backendLoading.value = false
     return
   }
-
   const localMatches = normalizedOptions.value.filter((option) => matchesModelOptionSearch(option, query))
   if (!shouldSearchBackend(query, localMatches)) {
     backendOptions.value = []
     backendLoading.value = false
     return
   }
-
-  const wait = Number(props.backendSearchDebounceMs || 250)
-  backendSearchTimer = setTimeout(() => {
-    void runBackendSearch(query)
-  }, Number.isFinite(wait) && wait >= 0 ? wait : 250)
+  backendSearchTimer = setTimeout(() => void runBackendSearch(query), Math.max(0, props.backendSearchDebounceMs))
 }
 
-async function runBackendSearch(query) {
+async function runBackendSearch(query: string) {
+  if (!props.backendSearch) return
   const token = ++backendSearchToken
   backendLoading.value = true
   try {
-    const result = await props.backendSearch(query, Number(props.backendSearchLimit || 25))
+    const result = await props.backendSearch(query, props.backendSearchLimit)
     if (token !== backendSearchToken) return
     const raw = Array.isArray(result)
       ? result
-      : Array.isArray(result?.models)
-        ? result.models
-        : []
-    backendOptions.value = normalizeModelOptions(raw)
-  } catch (_error) {
-    if (token === backendSearchToken) {
-      backendOptions.value = []
-    }
+      : (result && typeof result === 'object' && Array.isArray((result as { models?: unknown[] }).models)
+          ? (result as { models: unknown[] }).models
+          : [])
+    backendOptions.value = normalizeModelOptions(raw) as DropdownOption[]
+  } catch {
+    if (token === backendSearchToken) backendOptions.value = []
   } finally {
-    if (token === backendSearchToken) {
-      backendLoading.value = false
-    }
+    if (token === backendSearchToken) backendLoading.value = false
   }
 }
 
-watch(optionsRef, async (value) => {
-  if (!value) return
-  await nextTick()
-  updateFloatingPosition()
-})
+function optionKey(option: DropdownOption, fallbackIndex: number, prefix = '') {
+  const keyPrefix = prefix ? `${prefix}:` : ''
+  return `${keyPrefix}${String(option.key ?? option.value ?? fallbackIndex)}`
+}
 
-watch(triggerRef, (value) => {
-  if (!value) return
-  updateFloatingPosition()
-})
+function resolveProvider(option: DropdownOption) {
+  if (option.provider) return option.provider
+  const rawValue = String(option.value || '')
+  return rawValue.includes('/') ? rawValue.split('/')[0].trim() : ''
+}
 
-watch(searchQuery, () => {
-  nextTick(() => updateFloatingPosition())
-})
-
-watch(filteredOptions, () => {
-  nextTick(() => updateFloatingPosition())
-})
-
-watch(groupedFilteredOptions, () => {
-  nextTick(() => updateFloatingPosition())
-})
-
-watch(optionsRef, (value) => {
-  if (value) {
-    bindPositionListeners()
-    return
-  }
-  unbindPositionListeners()
-})
+function normalizeProviderKey(provider: string) {
+  return provider.trim().toLowerCase() || 'other'
+}
 
 onBeforeUnmount(() => {
   if (backendSearchTimer) clearTimeout(backendSearchTimer)
   unbindPositionListeners()
 })
-
-function optionKey(option, fallbackIndex, prefix = '') {
-  const keyPrefix = prefix ? `${prefix}:` : ''
-  if (option?.key != null) return `${keyPrefix}${String(option.key)}`
-  if (option?.value != null) return `${keyPrefix}${String(option.value)}`
-  return `${keyPrefix}${String(fallbackIndex)}`
-}
-
-function resolveProvider(option) {
-  const explicitProvider = String(option?.provider || '').trim()
-  if (explicitProvider) return explicitProvider
-  const rawValue = String(option?.value || '').trim()
-  if (!rawValue.includes('/')) return ''
-  return rawValue.split('/')[0].trim()
-}
-
-function normalizeProviderKey(provider) {
-  const normalized = String(provider || '').trim().toLowerCase()
-  return normalized || 'other'
-}
 </script>
+
+<template>
+  <div class="relative" :class="maxWidthClass" :style="containerStyle">
+    <ComboboxRoot
+      :model-value="modelValue"
+      :open="isOpen"
+      :ignore-filter="true"
+      :reset-search-term-on-select="true"
+      @update:model-value="handleChange"
+      @update:open="handleOpenChange"
+    >
+      <ComboboxAnchor as-child>
+        <div class="relative">
+          <ComboboxTrigger ref="triggerRef" as-child>
+            <button
+              type="button"
+              class="group inline-flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1 text-[13px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]"
+              :style="triggerStyle"
+              :aria-label="ariaLabel"
+            >
+              <span class="flex min-w-0 items-center gap-2">
+                <span v-if="selectedOption?.icon" class="inline-flex h-4 w-4 shrink-0" data-header-dropdown-icon>
+                  <component :is="selectedOption.icon" class="h-4 w-4 text-[var(--color-text-muted)]" aria-hidden="true" />
+                </span>
+                <span class="truncate" :title="selectedLabel">{{ selectedLabel }}</span>
+              </span>
+              <ChevronUpDownIcon class="h-3.5 w-3.5 shrink-0 opacity-70 transition-transform group-data-[state=open]:rotate-180" aria-hidden="true" />
+            </button>
+          </ComboboxTrigger>
+
+          <ComboboxPortal>
+            <ComboboxContent
+              :class="[dropdownSurfaceClass, 'ui-combobox-content']"
+              :style="floatingOptionsStyle"
+              position="popper"
+            >
+              <div v-if="searchable" :class="dropdownSearchRowClass" :style="dropdownSearchRowStyle">
+                <ComboboxInput
+                  v-model="searchQuery"
+                  :class="dropdownSearchInputClass"
+                  :placeholder="searchPlaceholder"
+                  :style="dropdownSearchInputStyle"
+                  :aria-label="searchPlaceholder"
+                />
+              </div>
+              <div v-if="backendLoading && searchable && searchQuery" class="px-3 pb-1 text-[11px]" :style="dropdownMutedTextStyle">
+                Searching...
+              </div>
+
+              <ComboboxViewport class="max-h-[240px] overflow-y-auto">
+                <template v-if="groupByProvider">
+                  <template v-for="group in groupedFilteredOptions" :key="group.key">
+                    <div :class="dropdownGroupLabelClass" :style="dropdownMutedTextStyle">{{ group.label }}</div>
+                    <ComboboxItem
+                      v-for="(option, index) in group.options"
+                      :key="optionKey(option, index, group.key)"
+                      :value="option.value"
+                      :text-value="option.label"
+                      :class="[dropdownOptionClass, 'relative flex pl-3 pr-9 data-[highlighted]:bg-[var(--color-panel-muted)] data-[state=checked]:font-semibold']"
+                      :title="option.label"
+                    >
+                      <span class="flex min-w-0 items-center gap-2 pr-2">
+                        <span v-if="option.icon" class="inline-flex h-4 w-4 shrink-0" data-header-dropdown-icon>
+                          <component :is="option.icon" class="h-4 w-4 text-[var(--color-text-muted)]" aria-hidden="true" />
+                        </span>
+                        <span class="truncate">{{ option.label }}</span>
+                      </span>
+                      <ComboboxItemIndicator class="absolute right-2.5 top-1/2 -translate-y-1/2">
+                        <CheckIcon class="h-4 w-4 text-[var(--color-text-muted)]" aria-hidden="true" />
+                      </ComboboxItemIndicator>
+                    </ComboboxItem>
+                  </template>
+                </template>
+                <template v-else>
+                  <ComboboxItem
+                    v-for="(option, index) in filteredOptions"
+                    :key="optionKey(option, index)"
+                    :value="option.value"
+                    :text-value="option.label"
+                    :class="[dropdownOptionClass, 'relative flex pl-3 pr-9 data-[highlighted]:bg-[var(--color-panel-muted)] data-[state=checked]:font-semibold']"
+                    :title="option.label"
+                  >
+                    <span class="flex min-w-0 items-center gap-2 pr-2">
+                      <span v-if="option.icon" class="inline-flex h-4 w-4 shrink-0" data-header-dropdown-icon>
+                        <component :is="option.icon" class="h-4 w-4 text-[var(--color-text-muted)]" aria-hidden="true" />
+                      </span>
+                      <span class="truncate">{{ option.label }}</span>
+                    </span>
+                    <ComboboxItemIndicator class="absolute right-2.5 top-1/2 -translate-y-1/2">
+                      <CheckIcon class="h-4 w-4 text-[var(--color-text-muted)]" aria-hidden="true" />
+                    </ComboboxItemIndicator>
+                  </ComboboxItem>
+                </template>
+                <ComboboxEmpty :class="dropdownEmptyClass" :style="dropdownMutedTextStyle">
+                  {{ noResultsLabel }}
+                </ComboboxEmpty>
+              </ComboboxViewport>
+              <div v-if="$slots.footer" class="sticky bottom-0 border-t border-[var(--color-border)] bg-[var(--color-panel-elevated)] p-1.5">
+                <slot name="footer" />
+              </div>
+            </ComboboxContent>
+          </ComboboxPortal>
+        </div>
+      </ComboboxAnchor>
+    </ComboboxRoot>
+  </div>
+</template>
+
+<style scoped>
+.ui-combobox-content[data-state='open'] {
+  animation: combobox-in var(--motion-duration-fast) var(--motion-ease-spring);
+}
+
+.ui-combobox-content[data-state='closed'] {
+  animation: combobox-out var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+@keyframes combobox-in {
+  from { opacity: 0; transform: translateY(-3px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes combobox-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-2px) scale(0.99); }
+}
+</style>

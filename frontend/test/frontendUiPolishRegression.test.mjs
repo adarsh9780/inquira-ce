@@ -9,11 +9,9 @@ test('settings modal is viewport bounded and exposes dialog keyboard semantics',
 
   assert.match(source, /h-\[min\(760px,calc\(100dvh-2rem\)\)\]/)
   assert.match(source, /max-w-\[1120px\]/)
-  assert.match(source, /role="dialog"/)
-  assert.match(source, /aria-modal="true"/)
-  assert.match(source, /@keydown="handleDialogKeydown"/)
-  assert.match(source, /event\.key === 'Escape'/)
-  assert.match(source, /previouslyFocusedElement\.value\?\.focus/)
+  assert.match(source, /<DialogShell/)
+  assert.match(source, /headerless/)
+  assert.match(source, /@close="closeModal"/)
 })
 
 test('inactive settings panels are removed from keyboard and accessibility navigation', () => {
@@ -21,16 +19,17 @@ test('inactive settings panels are removed from keyboard and accessibility navig
 
   assert.equal((source.match(/:inert="currentPanel !==/g) || []).length, 5)
   assert.equal((source.match(/:aria-hidden="currentPanel !==/g) || []).length, 5)
-  assert.match(source, /filter\(\(element\) => !element\.closest\('\[inert\]'\)\)/)
+  assert.doesNotMatch(source, /handleDialogKeydown/)
 })
 
 test('model selector uses a bounded scroll surface and full-name tooltips', () => {
-  const source = read('src/components/ui/ModelSelector.vue')
+  const selector = read('src/components/ui/ModelSelector.vue')
+  const dropdown = read('src/components/ui/HeaderDropdown.vue')
 
-  assert.match(source, /w-72 max-w-\[calc\(100vw-1rem\)\] max-h-72/)
-  assert.match(source, /overflow-y-auto overflow-x-hidden/)
-  assert.match(source, /:title="model\.label"/)
-  assert.match(source, /:title="getModelDisplayName\(selectedModel\)"/)
+  assert.match(selector, /:dropdown-min-width="288"/)
+  assert.match(dropdown, /max-h-\[240px\] overflow-y-auto/)
+  assert.match(dropdown, /:title="option\.label"/)
+  assert.match(selector, /:trigger-label="selectedLabel"/)
 })
 
 test('floating action menu supports menu roles, arrow navigation, and focus restoration', () => {

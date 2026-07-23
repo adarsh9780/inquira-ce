@@ -1,11 +1,12 @@
 import { mount } from '@vue/test-utils'
 import axe from 'axe-core'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import ConfirmationModal from '../src/components/modals/ConfirmationModal.vue'
 import FloatingActionMenu from '../src/components/ui/FloatingActionMenu.vue'
 import HeaderDropdown from '../src/components/ui/HeaderDropdown.vue'
 import ToastNotification from '../src/components/ui/ToastNotification.vue'
+import { DialogShell } from '../src/components/ui/dialog'
 
 async function expectNoAccessibilityViolations(element) {
   const result = await axe.run(element, {
@@ -20,7 +21,7 @@ describe('critical interaction safety net', () => {
     document.body.innerHTML = ''
   })
 
-  it('traps confirmation focus, closes with Escape or outside click, and restores focus', async () => {
+  it('traps confirmation focus, closes with Escape, ignores outside clicks, and restores focus', async () => {
     const trigger = document.createElement('button')
     trigger.textContent = 'Delete table'
     document.body.append(trigger)
@@ -38,25 +39,25 @@ describe('critical interaction safety net', () => {
     await wrapper.vm.$nextTick()
     await wrapper.vm.$nextTick()
 
-    const dialog = wrapper.get('[role="dialog"]')
-    const [cancel, confirm] = dialog.findAll('button')
-    expect(document.activeElement).toBe(cancel.element)
+    const dialog = document.body.querySelector('[role="alertdialog"]')
+    const [cancel, confirm] = [...dialog.querySelectorAll('button')]
+    expect(document.activeElement).toBe(cancel)
 
-    confirm.element.focus()
-    await dialog.trigger('keydown', { key: 'Tab' })
-    expect(document.activeElement).toBe(cancel.element)
+    confirm.focus()
+    dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+    expect(document.activeElement).toBe(cancel)
 
     await document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     expect(wrapper.emitted('close')).toHaveLength(1)
 
     await wrapper.setProps({ isOpen: false })
     await wrapper.vm.$nextTick()
-    expect(document.activeElement).toBe(trigger)
+    await vi.waitFor(() => expect(document.activeElement).toBe(trigger))
 
     await wrapper.setProps({ isOpen: true })
     await wrapper.vm.$nextTick()
-    await wrapper.get('.modal-overlay').trigger('click')
-    expect(wrapper.emitted('close')).toHaveLength(2)
+    document.body.querySelector('.modal-overlay').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
   it('supports menu arrow navigation, Escape, and focus restoration', async () => {
@@ -113,6 +114,52 @@ describe('critical interaction safety net', () => {
     input.dispatchEvent(new Event('input', { bubbles: true }))
     await wrapper.vm.$nextTick()
     expect(document.body.textContent).toContain('Beta')
+  })
+
+  it('limits unopened model results and emits a Reka combobox selection', async () => {
+    const wrapper = mount(HeaderDropdown, {
+      attachTo: document.body,
+      props: {
+        modelValue: 'alpha',
+        searchable: true,
+        maxOptionsWithoutSearch: 1,
+        ariaLabel: 'Choose model',
+        options: [
+          { value: 'alpha', label: 'Alpha', provider: 'openai' },
+          { value: 'beta', label: 'Beta', provider: 'google' },
+        ],
+      },
+    })
+
+    await wrapper.get('button').trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(document.body.querySelectorAll('[role="option"]')).toHaveLength(1)
+
+    const input = document.body.querySelector('input')
+    input.value = 'Beta'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await wrapper.vm.$nextTick()
+    document.body.querySelector('[role="option"]').dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['beta'])
+  })
+
+  it('uses Reka dialog focus management and restores the opening control', async () => {
+    const trigger = document.createElement('button')
+    trigger.textContent = 'Open settings'
+    document.body.append(trigger)
+    trigger.focus()
+
+    const wrapper = mount(DialogShell, {
+      attachTo: document.body,
+      props: { open: true, title: 'Settings' },
+      slots: { default: '<button type="button">First setting</button>' },
+    })
+    await vi.waitFor(() => expect(document.activeElement?.textContent).toBe('First setting'))
+
+    document.body.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    await wrapper.setProps({ open: false })
+    await vi.waitFor(() => expect(document.activeElement).toBe(trigger))
   })
 
   it('announces notifications and gives the dismiss action an accessible name', async () => {

@@ -1,19 +1,13 @@
 <template>
-  <Transition
-    enter-active-class="dialog-fade-enter-active dialog-pop-enter-active"
-    enter-from-class="dialog-fade-enter-from dialog-pop-enter-from"
-    leave-active-class="dialog-fade-leave-active dialog-pop-leave-active"
-    leave-to-class="dialog-fade-leave-to dialog-pop-leave-to"
+  <DialogShell
+    :open="isOpen"
+    title="Command Palette"
+    description="Run commands or switch conversations across workspaces."
+    headerless
+    content-class="command-palette-card max-w-3xl"
+    @close="emit('close')"
   >
-  <div
-    v-if="isOpen"
-    class="fixed inset-0 z-[95] flex items-start justify-center px-4 pt-[9vh]"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="command-palette-title"
-  >
-    <div class="modal-overlay" @click="emit('close')"></div>
-    <div class="modal-card command-palette-card relative flex w-full max-w-3xl flex-col overflow-hidden" @click.stop @keydown="handlePaletteKeydown">
+    <div class="flex h-full w-full flex-col overflow-hidden" @keydown="handlePaletteKeydown">
       <div class="flex items-center gap-3 border-b border-[var(--color-border)] px-4 py-3">
         <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--color-selected-surface)] text-[var(--color-text-main)]">
           <MagnifyingGlassIcon class="h-4 w-4" />
@@ -129,8 +123,7 @@
         <span v-if="loadError" class="truncate text-[var(--color-warning)]">{{ loadError }}</span>
       </div>
     </div>
-  </div>
-  </Transition>
+  </DialogShell>
 </template>
 
 <script setup>
@@ -156,6 +149,7 @@ import { extractApiErrorMessage } from '../../utils/apiError'
 import { formatCompactRelativeTimestamp, formatExactTimestamp, parseTimestamp } from '../../utils/dateUtils'
 import { SHORTCUTS, shortcutLabel } from '../../utils/keyboardShortcuts'
 import { workspaceInitials } from '../../utils/workspaceDisplay'
+import { DialogShell } from '../ui/dialog'
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },

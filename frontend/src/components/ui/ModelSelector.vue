@@ -1,274 +1,92 @@
-<template>
-  <div class="relative w-full min-w-0">
-    <Listbox v-model="selectedModel" @update:model-value="handleModelChange">
-      <div class="relative">
-        <!-- Text-only trigger (Cursor-style: "Model Name ↓") -->
-        <ListboxButton
-          class="inline-flex w-full min-w-0 items-center justify-between gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none group"
-          style="color: var(--color-text-main); border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-surface) 88%, var(--color-workspace-surface));"
-          :title="getModelDisplayName(selectedModel)"
-          aria-label="Select model"
-        >
-          <span class="min-w-0 flex-1 truncate text-left" style="color: var(--color-text-main);">
-            {{ getModelDisplayName(selectedModel) }}
-          </span>
-          <ChevronDownIcon class="h-3.5 w-3.5 shrink-0 transition-transform group-data-[open]:rotate-180" style="color: var(--color-text-muted);" />
-        </ListboxButton>
+<script setup lang="ts">
+import { computed } from 'vue'
+import HeaderDropdown from './HeaderDropdown.vue'
+import { normalizeModelOptions, prettifyModelName } from './modelDropdownUtils'
 
-        <Transition name="motion-popover">
-          <ListboxOptions
-            :class="modelDropdownSurfaceClass"
-            style="background-color: var(--color-workspace-surface); border: 1px solid var(--color-border);"
-          >
-            <div class="px-2 pb-1 pt-1">
-              <input
-                v-model="searchQuery"
-                type="text"
-                :class="dropdownSearchInputClass"
-                placeholder="Search model"
-                :style="dropdownSearchInputStyle"
-                @click.stop
-                @keydown.stop
-              />
-            </div>
-            <div v-if="backendLoading && searchQuery" class="px-3 pb-1 text-[11px]" :style="dropdownMutedTextStyle">
-              Searching...
-            </div>
-            <ListboxOption
-              v-slot="{ active, selected }"
-              v-for="model in filteredModels"
-              :key="model.value"
-              :value="model.value"
-              as="template"
-            >
-              <li
-                :style="dropdownOptionStyle(active, { activeMix: 'var(--color-surface) 78%' })"
-                :class="[dropdownOptionClass, 'pl-3 pr-9 flex items-center justify-between']"
-                :title="model.label"
-              >
-                <span :class="selected ? 'font-semibold' : 'font-normal'" class="block truncate">
-                  {{ model.label }}
-                </span>
-                <span v-if="selected" class="absolute right-3 flex items-center">
-                  <CheckIcon class="h-4 w-4" style="color: var(--color-text-muted);" aria-hidden="true" />
-                </span>
-              </li>
-            </ListboxOption>
-            <li
-              v-if="!backendLoading && filteredModels.length === 0"
-              :class="dropdownEmptyClass"
-              :style="dropdownMutedTextStyle"
-            >
-              No models found.
-            </li>
-            <div class="sticky bottom-0 border-t border-[var(--color-border)] bg-[var(--color-workspace-surface)] p-1.5">
-              <button type="button" class="w-full rounded-md px-2 py-1.5 text-left text-[11px] font-semibold text-[var(--color-text-muted)] hover:bg-[var(--color-panel-muted)] hover:text-[var(--color-text-main)]" @click.stop="emit('manage-models')">
-                Workspace model settings…
-              </button>
-            </div>
-          </ListboxOptions>
-        </Transition>
-      </div>
-    </Listbox>
-  </div>
-</template>
+interface ModelOption {
+  value: string
+  label: string
+  provider?: string
+}
 
-<script setup>
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
-import {
-  Listbox,
-  ListboxButton,
-  ListboxOptions,
-  ListboxOption,
-} from '@headlessui/vue'
-import { CheckIcon, ChevronDownIcon } from '@heroicons/vue/20/solid'
-import {
-  mergeModelOptions,
-  normalizeModelOptions,
-  optionMatchesSearch,
-  prettifyModelName,
-} from './modelDropdownUtils'
-import {
-  dropdownEmptyClass,
-  dropdownMutedTextStyle,
-  dropdownOptionClass,
-  dropdownOptionStyle,
-  dropdownSearchInputClass,
-  dropdownSearchInputStyle,
-  dropdownSurfaceClass,
-} from './dropdownShared'
-
-const props = defineProps({
-  selectedModel: {
-    type: String,
-    required: true
-  },
-  provider: {
-    type: String,
-    default: '',
-  },
-  modelOptions: {
-    type: Array,
-    default: () => []
-  },
-  backendSearch: {
-    type: Function,
-    default: null,
-  },
-  searchLoading: {
-    type: Boolean,
-    default: false,
-  },
-  backendSearchLimit: {
-    type: Number,
-    default: 25,
-  },
-  backendSearchMinChars: {
-    type: Number,
-    default: 3,
-  },
-  searchDebounceMs: {
-    type: Number,
-    default: 250,
-  },
-  backendSearchDebounceMs: {
-    type: Number,
-    default: 250,
-  },
-  maxOptionsWithoutSearch: {
-    type: Number,
-    default: 10
-  }
+const props = withDefaults(defineProps<{
+  selectedModel: string
+  provider?: string
+  modelOptions?: Array<ModelOption | string>
+  backendSearch?: ((query: string, limit: number) => Promise<unknown>) | null
+  searchLoading?: boolean
+  backendSearchLimit?: number
+  backendSearchMinChars?: number
+  searchDebounceMs?: number
+  backendSearchDebounceMs?: number
+  maxOptionsWithoutSearch?: number
+}>(), {
+  provider: '',
+  modelOptions: () => [],
+  backendSearch: null,
+  searchLoading: false,
+  backendSearchLimit: 25,
+  backendSearchMinChars: 3,
+  searchDebounceMs: 250,
+  backendSearchDebounceMs: 250,
+  maxOptionsWithoutSearch: 10,
 })
 
-const emit = defineEmits(['model-changed', 'manage-models'])
-
-const selectedModel = ref(props.selectedModel)
-const searchQuery = ref('')
-const backendModels = ref([])
-const backendLoadingLocal = ref(false)
-let backendSearchTimer = null
-let backendSearchToken = 0
-const modelDropdownSurfaceClass = `${dropdownSurfaceClass.replace('fixed', 'absolute')} motion-popover-from-bottom z-50 bottom-full mb-2 right-0 w-72 max-w-[calc(100vw-1rem)] max-h-72 rounded-lg text-xs overflow-y-auto overflow-x-hidden`
+const emit = defineEmits<{
+  'model-changed': [value: string]
+  'manage-models': []
+}>()
 
 const fallbackModels = [
   'google/gemini-3-flash-preview',
   'google/gemini-2.5-flash',
   'google/gemini-2.5-flash-lite',
-  'openrouter/free'
+  'openrouter/free',
 ]
 
-const availableModels = computed(() => {
-  const source = Array.isArray(props.modelOptions) && props.modelOptions.length
-    ? props.modelOptions
-    : fallbackModels
-  return normalizeModelOptions(source, props.provider)
+const availableModels = computed<ModelOption[]>(() => {
+  const source = props.modelOptions.length ? props.modelOptions : fallbackModels
+  return normalizeModelOptions(source, props.provider) as ModelOption[]
 })
 
-const backendLoading = computed(() => Boolean(props.searchLoading) || backendLoadingLocal.value)
-
-const filteredModels = computed(() => {
-  const query = String(searchQuery.value || '').trim().toLowerCase()
-  const source = availableModels.value
-  if (!query) {
-    const limit = Number(props.maxOptionsWithoutSearch || 0)
-    if (limit > 0) return source.slice(0, limit)
-    return source
-  }
-  const localMatches = source.filter((model) => optionMatchesSearch(model, query))
-  if (!shouldSearchBackend(query, localMatches)) {
-    return localMatches
-  }
-  return mergeModelOptions(localMatches, backendModels.value)
+const selectedLabel = computed(() => {
+  const model = availableModels.value.find((option) => option.value === props.selectedModel)
+  return model?.label || prettifyModelName(props.selectedModel)
 })
 
-watch(
-  () => props.selectedModel,
-  (next) => {
-    selectedModel.value = next
-  }
-)
-
-watch(searchQuery, (value) => {
-  scheduleBackendSearch(String(value || '').trim())
-})
-
-watch(
-  () => props.backendSearch,
-  () => {
-    backendModels.value = []
-    scheduleBackendSearch(String(searchQuery.value || '').trim())
-  }
-)
-
-onBeforeUnmount(() => {
-  if (backendSearchTimer) clearTimeout(backendSearchTimer)
-})
-
-function handleModelChange(value) {
-  selectedModel.value = value
-  searchQuery.value = ''
-  backendModels.value = []
-  emit('model-changed', value)
-}
-
-function getModelDisplayName(modelValue) {
-  const model = availableModels.value.find(m => m.value === modelValue)
-  return model ? model.label : prettifyModelName(modelValue)
-}
-
-function shouldSearchBackend(query, localMatches) {
-  const normalizedQuery = String(query || '').trim().toLowerCase()
-  if (typeof props.backendSearch !== 'function') return false
-  if (normalizedQuery.length < Number(props.backendSearchMinChars || 3)) return false
-  return !localMatches.some((model) => {
-    const value = String(model?.value || '').trim().toLowerCase()
-    const label = String(model?.label || '').trim().toLowerCase()
-    return value === normalizedQuery || label === normalizedQuery
-  })
-}
-
-function scheduleBackendSearch(query) {
-  if (backendSearchTimer) clearTimeout(backendSearchTimer)
-  if (!query || typeof props.backendSearch !== 'function') {
-    backendModels.value = []
-    backendLoadingLocal.value = false
-    return
-  }
-
-  const localMatches = availableModels.value.filter((model) => optionMatchesSearch(model, query))
-  if (!shouldSearchBackend(query, localMatches)) {
-    backendModels.value = []
-    backendLoadingLocal.value = false
-    return
-  }
-
-  const wait = Number(props.searchDebounceMs ?? props.backendSearchDebounceMs ?? 250)
-  backendSearchTimer = setTimeout(() => {
-    void runBackendSearch(query)
-  }, Number.isFinite(wait) && wait >= 0 ? wait : 250)
-}
-
-async function runBackendSearch(query) {
-  const token = ++backendSearchToken
-  backendLoadingLocal.value = true
-  try {
-    const result = await props.backendSearch(query, Number(props.backendSearchLimit || 25))
-    if (token !== backendSearchToken) return
-    const raw = Array.isArray(result)
-      ? result
-      : Array.isArray(result?.models)
-        ? result.models
-        : []
-    backendModels.value = normalizeModelOptions(raw, props.provider)
-  } catch (_error) {
-    if (token === backendSearchToken) {
-      backendModels.value = []
-    }
-  } finally {
-    if (token === backendSearchToken) {
-      backendLoadingLocal.value = false
-    }
-  }
+function handleModelChange(value: string | number | null) {
+  if (value != null) emit('model-changed', String(value))
 }
 </script>
+
+<template>
+  <div class="relative w-full min-w-0">
+    <HeaderDropdown
+      :model-value="selectedModel"
+      :options="availableModels"
+      :trigger-label="selectedLabel"
+      :backend-search="backendSearch"
+      :backend-search-limit="backendSearchLimit"
+      :backend-search-min-chars="backendSearchMinChars"
+      :backend-search-debounce-ms="searchDebounceMs ?? backendSearchDebounceMs"
+      :max-options-without-search="maxOptionsWithoutSearch"
+      searchable
+      search-placeholder="Search model"
+      no-results-label="No models found."
+      aria-label="Select model"
+      max-width-class="w-full"
+      :dropdown-min-width="288"
+      @update:model-value="handleModelChange"
+    >
+      <template #footer>
+        <button
+          type="button"
+          class="w-full rounded-md px-2 py-1.5 text-left text-[11px] font-semibold text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-panel-muted)] hover:text-[var(--color-text-main)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]"
+          @click.stop="emit('manage-models')"
+        >
+          Workspace model settings…
+        </button>
+      </template>
+    </HeaderDropdown>
+  </div>
+</template>

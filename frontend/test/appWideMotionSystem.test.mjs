@@ -21,40 +21,37 @@ test('app motion primitives share intentional timing and reduced-motion behavior
 
 test('floating overlays animate from their anchor and are positioned before enter', () => {
   const headerDropdown = read('src/components/ui/HeaderDropdown.vue')
-  const modelSelector = read('src/components/ui/ModelSelector.vue')
   const floatingMenu = read('src/components/ui/FloatingActionMenu.vue')
   const floatingPosition = read('src/composables/useFloatingDropdown.js')
   const sharedDropdown = read('src/components/ui/dropdownShared.js')
 
-  for (const source of [headerDropdown]) {
-    assert.match(source, /<Transition name="motion-popover" @before-enter="prepareFloatingPosition">/)
-    assert.match(source, /function prepareFloatingPosition\(element\)/)
-    assert.doesNotMatch(source, /duration-100 ease-out|duration-75 ease-in/)
-  }
+  assert.match(headerDropdown, /ui-combobox-content\[data-state='open'\]/)
+  assert.match(headerDropdown, /animation: combobox-in/)
+  assert.match(headerDropdown, /void nextTick\(updateFloatingPosition\)/)
+  assert.doesNotMatch(headerDropdown, /duration-100 ease-out|duration-75 ease-in/)
 
   assert.match(sharedDropdown, /motion-popover-surface/)
   assert.match(floatingPosition, /'--motion-popover-origin'/)
   assert.match(floatingPosition, /'--motion-popover-y'/)
-  assert.match(modelSelector, /motion-popover-from-bottom/)
   assert.match(floatingMenu, /@before-enter="prepareMenuEnter"/)
   assert.match(floatingMenu, /element\.style\.left/)
 })
 
 test('dialogs, compact panels, disclosures, and toasts all have exit motion', () => {
-  const modalPaths = [
+  const dialogShellConsumers = [
     'src/components/modals/SettingsModal.vue',
-    'src/components/modals/ConfirmationModal.vue',
     'src/components/modals/KeyboardShortcutsModal.vue',
     'src/components/modals/TermsModal.vue',
     'src/components/modals/CommandPaletteModal.vue',
     'src/components/modals/ConversationTreeRulesModal.vue',
-    'src/components/chat/TurnTreeNodeActions.vue',
   ]
-  for (const path of modalPaths) {
-    const source = read(path)
-    assert.match(source, /dialog-fade-leave-active dialog-pop-leave-active/, path)
-    assert.match(source, /dialog-fade-leave-to dialog-pop-leave-to/, path)
+  for (const path of dialogShellConsumers) {
+    assert.match(read(path), /<DialogShell/, path)
   }
+  assert.match(read('src/components/ui/dialog/DialogShell.vue'), /\[data-state='closed'\]/)
+  assert.match(read('src/components/ui/alert-dialog/AlertDialogShell.vue'), /ui-alert-content\[data-state='closed'\]/)
+  assert.match(read('src/components/modals/ConfirmationModal.vue'), /<AlertDialogShell/)
+  assert.match(read('src/components/chat/TurnTreeNodeActions.vue'), /dialog-fade-leave-active dialog-pop-leave-active/)
 
   const popoverPaths = [
     'src/components/layout/StatusBar.vue',

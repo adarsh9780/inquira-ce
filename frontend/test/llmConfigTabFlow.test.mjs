@@ -110,5 +110,5 @@ test('HeaderDropdown supports limiting default visible options before search', (
   const source = read('src/components/ui/HeaderDropdown.vue')
 
   assert.equal(source.includes('maxOptionsWithoutSearch'), true)
-  assert.equal(source.includes('return options.slice(0, maxCount)'), true)
+  assert.equal(source.includes('options.slice(0, props.maxOptionsWithoutSearch)'), true)
 })

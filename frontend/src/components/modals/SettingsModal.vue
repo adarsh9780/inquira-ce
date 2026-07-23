@@ -1,36 +1,23 @@
 <template>
-  <Transition
-    enter-active-class="dialog-fade-enter-active dialog-pop-enter-active"
-    enter-from-class="dialog-fade-enter-from dialog-pop-enter-from"
-    leave-active-class="dialog-fade-leave-active dialog-pop-leave-active"
-    leave-to-class="dialog-fade-leave-to dialog-pop-leave-to"
+  <DialogShell
+    :open="modelValue"
+    title="Settings"
+    headerless
+    content-class="settings-modal-card h-[min(760px,calc(100dvh-2rem))] max-w-[1120px] text-[var(--color-text-main)]"
+    @close="closeModal"
   >
-    <div
-      v-if="modelValue"
-      class="fixed inset-0 layer-modal flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="settings-modal-title"
-      @keydown="handleDialogKeydown"
+    <button
+      type="button"
+      class="btn-icon absolute right-3 top-3 z-20"
+      aria-label="Close settings"
+      @click="closeModal"
     >
-      <div class="modal-overlay" @click="closeModal"></div>
-      <div
-        ref="dialogRef"
-        class="modal-card settings-modal-card relative h-[min(760px,calc(100dvh-2rem))] w-full max-w-[1120px] text-[var(--color-text-main)]"
-        @click.stop
-      >
-        <button
-          type="button"
-          class="btn-icon absolute right-3 top-3 z-20"
-          aria-label="Close settings"
-          @click="closeModal"
-        >
-          <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M6 6l12 12M18 6L6 18" />
-          </svg>
-        </button>
+      <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    </button>
 
-        <div class="settings-modal-layout flex h-full">
+    <div class="settings-modal-layout flex h-full">
           <aside class="settings-modal-nav w-[176px] shrink-0 border-r border-[var(--color-border)] bg-[var(--color-base-soft)] px-2.5 py-3 flex flex-col justify-between select-none">
             <div class="space-y-0.5">
               <button
@@ -114,14 +101,12 @@
               </section>
             </div>
           </main>
-        </div>
-      </div>
     </div>
-  </Transition>
+  </DialogShell>
 </template>
 
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useLLMConfig } from '../../composables/useLLMConfig'
 import { useAppStore } from '../../stores/appStore'
 import { filenameFromPath } from '../../utils/pathUtils'
@@ -130,6 +115,7 @@ import WorkspaceTab from './tabs/WorkspaceTab.vue'
 import AppearanceTab from './tabs/AppearanceTab.vue'
 import AccountTab from './tabs/AccountTab.vue'
 import SetupTab from './tabs/SetupTab.vue'
+import { DialogShell } from '../ui/dialog'
 import {
   CheckCircleIcon,
   ListBulletIcon,
@@ -159,8 +145,6 @@ const activeWorkspaceId = ref('')
 const workspaceInitialSection = ref('general')
 const currentPanel = ref('setup')
 const panelDirection = ref('forward')
-const dialogRef = ref(null)
-const previouslyFocusedElement = ref(null)
 
 const activeNavClass = 'nav-tab-active'
 const inactiveNavClass = 'nav-tab'
@@ -199,18 +183,13 @@ watch(
   () => props.modelValue,
   async (isOpen) => {
     if (isOpen) {
-      previouslyFocusedElement.value = document.activeElement instanceof HTMLElement ? document.activeElement : null
       await appStore.fetchWorkspaces()
       const initialWorkspace = String(appStore.activeWorkspaceId || '').trim() || String(workspaceItems.value[0]?.id || '').trim()
       activeWorkspaceId.value = initialWorkspace
       initializePanelState(props.initialTab)
-      await nextTick()
-      dialogRef.value?.querySelector('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')?.focus?.()
       return
     }
     llmConfig.clearSensitiveState()
-    previouslyFocusedElement.value?.focus?.()
-    previouslyFocusedElement.value = null
   },
   { immediate: true },
 )
@@ -303,28 +282,6 @@ function handleWorkspaceCreated(payload) {
 
 function closeModal() {
   emit('update:modelValue', false)
-}
-
-function handleDialogKeydown(event) {
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    closeModal()
-    return
-  }
-  if (event.key !== 'Tab') return
-  const focusable = [...(dialogRef.value?.querySelectorAll(
-    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
-  ) || [])].filter((element) => !element.closest('[inert]'))
-  if (!focusable.length) return
-  const first = focusable[0]
-  const last = focusable[focusable.length - 1]
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault()
-    last.focus()
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault()
-    first.focus()
-  }
 }
 
 </script>

@@ -16,7 +16,7 @@ const manualChunkGroups = {
   'pinia-store': ['node_modules/pinia/'],
   'table-engine': ['node_modules/@tanstack/table-core/', 'node_modules/@tanstack/vue-table/'],
   'ui-icons': ['node_modules/@heroicons/vue/'],
-  'ui-headless': ['node_modules/@headlessui/vue/'],
+  'ui-primitives': ['node_modules/reka-ui/', 'node_modules/@internationalized/'],
   'plotly-charts': ['node_modules/plotly.js-dist-min/'],
   'utils': ['node_modules/markdown-it/', 'node_modules/dompurify/'],
 }
@@ -55,7 +55,7 @@ export default defineConfig({
       'vue',
       'pinia',
       '@heroicons/vue',
-      '@headlessui/vue',
+      'reka-ui',
       'markdown-it',
       'dompurify',
       'plotly.js-dist-min'

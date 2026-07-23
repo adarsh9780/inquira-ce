@@ -1,88 +1,58 @@
 <template>
-  <Transition
-    enter-active-class="dialog-fade-enter-active dialog-pop-enter-active"
-    enter-from-class="dialog-fade-enter-from dialog-pop-enter-from"
-    leave-active-class="dialog-fade-leave-active dialog-pop-leave-active"
-    leave-to-class="dialog-fade-leave-to dialog-pop-leave-to"
+  <DialogShell
+    :open="isOpen"
+    title="Terms &amp; Conditions"
+    content-class="h-[600px] max-w-2xl"
+    @close="closeModal"
   >
-    <!-- Modal Overlay -->
-    <div
-      v-if="isOpen"
-      class="fixed inset-0 layer-modal overflow-y-auto"
-      aria-labelledby="modal-title"
-      role="dialog"
-      aria-modal="true"
-    >
-      <!-- Background overlay -->
+    <template #icon>
+      <DocumentTextIcon class="h-5 w-5 shrink-0 text-[var(--color-accent)]" aria-hidden="true" />
+    </template>
+    <template #header-actions>
+      <Button variant="ghost" size="icon" aria-label="Close terms" @click="closeModal">
+        <XMarkIcon class="h-5 w-5" aria-hidden="true" />
+      </Button>
+    </template>
+
+    <div class="min-h-0 flex-1 overflow-y-auto px-6 py-4 scrollbar-thin">
+      <p v-if="termsLastUpdated" class="mb-4 text-xs text-[var(--color-text-muted)]">
+        Last updated: {{ termsLastUpdated }}
+      </p>
       <div
-        class="modal-overlay"
-        @click="closeModal"
-      ></div>
-
-      <!-- Modal container -->
-      <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-        <div
-          class="modal-card relative w-full max-w-2xl text-left sm:my-8 h-[600px] flex flex-col"
-          @click.stop
+        class="rounded-xl border bg-[var(--color-base)] p-4 text-sm leading-6"
+        style="border-color: var(--color-border);"
+      >
+        <p v-if="isTermsLoading" class="text-[var(--color-text-muted)]">Loading terms...</p>
+        <p
+          v-else-if="termsError"
+          class="rounded-md border border-[var(--color-danger)]/35 bg-[var(--color-danger-bg)] px-3 py-2 text-xs text-[var(--color-danger-text)]"
         >
-          <!-- Modal Header -->
-          <div class="modal-header shrink-0 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <DocumentTextIcon class="h-5 w-5 shrink-0 text-[var(--color-accent)]" />
-              <h3 class="text-base font-semibold text-[var(--color-text-main)]" id="modal-title">Terms &amp; Conditions</h3>
-            </div>
-            <button
-              type="button"
-              class="btn-icon"
-              aria-label="Close terms"
-              @click="closeModal"
-            >
-              <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
-          </div>
-
-          <!-- Modal Body -->
-          <div class="flex-1 overflow-y-auto px-6 py-4 min-h-0 scrollbar-thin">
-            <p v-if="termsLastUpdated" class="mb-4 text-xs text-[var(--color-text-muted)]">
-              Last updated: {{ termsLastUpdated }}
-            </p>
-            <div
-              class="rounded-xl border bg-[var(--color-base)] p-4 text-sm leading-6"
-              style="border-color: var(--color-border);"
-            >
-              <p v-if="isTermsLoading" class="text-[var(--color-text-muted)]">Loading terms...</p>
-              <p
-                v-else-if="termsError"
-                class="rounded-md border border-[var(--color-danger)]/35 bg-[var(--color-danger-bg)] px-3 py-2 text-xs text-[var(--color-danger-text)]"
-              >
-                {{ termsError }}
-              </p>
-              <div
-                v-else
-                class="terms-markdown-content"
-                v-html="termsHtml"
-              ></div>
-            </div>
-          </div>
-
-          <!-- Modal Footer -->
-          <div class="modal-footer shrink-0 justify-end">
-            <button @click="closeModal" class="btn-primary text-sm px-4 py-2">Close</button>
-          </div>
-        </div>
+          {{ termsError }}
+        </p>
+        <div
+          v-else
+          class="terms-markdown-content"
+          v-html="termsHtml"
+        ></div>
       </div>
     </div>
-  </Transition>
+
+    <template #footer>
+      <div class="modal-footer shrink-0 justify-end">
+        <Button variant="primary" size="lg" @click="closeModal">Close</Button>
+      </div>
+    </template>
+  </DialogShell>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { DocumentTextIcon } from '@heroicons/vue/24/outline'
+import { computed, ref, watch } from 'vue'
+import { DocumentTextIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import { apiService } from '../../services/apiService'
+import { Button } from '../ui/button'
+import { DialogShell } from '../ui/dialog'
 
 const props = defineProps({
   isOpen: {
@@ -141,19 +111,6 @@ function closeModal() {
   emit('close')
 }
 
-function handleEscape(e) {
-  if (e.key === 'Escape' && props.isOpen) {
-    closeModal()
-  }
-}
-
-onMounted(() => {
-  document.addEventListener('keydown', handleEscape)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('keydown', handleEscape)
-})
 </script>
 
 <style scoped>

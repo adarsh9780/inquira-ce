@@ -66,13 +66,12 @@ test('component styles avoid hardcoded hex/rgba colors outside approved brand ic
 })
 
 test('modal surfaces use shared tokenized dialog transition primitives', () => {
-  const settingsModal = readFileSync(resolve(process.cwd(), 'src/components/modals/SettingsModal.vue'), 'utf-8')
-  const confirmationModal = readFileSync(resolve(process.cwd(), 'src/components/modals/ConfirmationModal.vue'), 'utf-8')
-  const termsModal = readFileSync(resolve(process.cwd(), 'src/components/modals/TermsModal.vue'), 'utf-8')
+  const dialogShell = readFileSync(resolve(process.cwd(), 'src/components/ui/dialog/DialogShell.vue'), 'utf-8')
+  const alertDialogShell = readFileSync(resolve(process.cwd(), 'src/components/ui/alert-dialog/AlertDialogShell.vue'), 'utf-8')
 
-  for (const source of [settingsModal, confirmationModal, termsModal]) {
-    assert.equal(source.includes('dialog-fade-enter-active'), true)
-    assert.equal(source.includes('dialog-pop-enter-active'), true)
+  for (const source of [dialogShell, alertDialogShell]) {
+    assert.match(source, /\[data-state='open'\]/)
+    assert.match(source, /\[data-state='closed'\]/)
     assert.match(source, /class="[^"]*\bmodal-overlay\b[^"]*"/)
     assert.match(source, /class="[^"]*\bmodal-card\b[^"]*"/)
   }

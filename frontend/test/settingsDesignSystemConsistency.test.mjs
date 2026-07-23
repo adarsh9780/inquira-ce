@@ -34,14 +34,10 @@ test('settings-related modals use shared modal primitives and avoid scoped globa
   const settingsSource = read('src/components/modals/SettingsModal.vue')
   const termsSource = read('src/components/modals/TermsModal.vue')
 
-  assert.equal(settingsSource.includes('class="fixed inset-0 layer-modal'), true)
-  assert.equal(settingsSource.includes('class="modal-overlay"'), true)
-  assert.equal(settingsSource.includes('class="modal-card'), true)
+  assert.equal(settingsSource.includes('<DialogShell'), true)
   assert.equal(settingsSource.includes(':global('), false)
 
-  assert.equal(termsSource.includes('class="fixed inset-0 layer-modal'), true)
-  assert.equal(termsSource.includes('class="modal-overlay"'), true)
-  assert.equal(termsSource.includes('class="modal-card'), true)
+  assert.equal(termsSource.includes('<DialogShell'), true)
   assert.equal(termsSource.includes('bg-white'), false)
   assert.equal(termsSource.includes('text-gray-'), false)
 })
