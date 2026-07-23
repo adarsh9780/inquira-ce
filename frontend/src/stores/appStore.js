@@ -1,9 +1,15 @@
-import { defineStore } from 'pinia'
+import { defineStore, storeToRefs } from 'pinia'
 import { ref, computed, watch, markRaw } from 'vue'
 import { apiService } from '../services/apiService'
 import { workspaceService } from '../services/workspaceService'
 import { localStateService } from '../services/localStateService'
 import { useAuthStore } from './authStore'
+import { useUiStore } from './uiStore'
+import { usePreferencesStore } from './preferencesStore'
+import { useArtifactStore } from './artifactStore'
+import { useExecutionStore } from './executionStore'
+import { useWorkspaceStore } from './workspaceStore'
+import { useConversationStore } from './conversationStore'
 import { normalizePlotlyFigure } from '../utils/figurePayload'
 import { DEFAULT_THEME_ID, THEME_OPTIONS, normalizeThemeId } from '../constants/themes'
 import {
@@ -18,6 +24,118 @@ import { mergeUsageTotals, normalizeUsage } from '../utils/usageFormat'
 
 export const useAppStore = defineStore('app', () => {
   const authStore = useAuthStore()
+  const uiStore = useUiStore()
+  const preferencesStore = usePreferencesStore()
+  const artifactStore = useArtifactStore()
+  const executionStore = useExecutionStore()
+  const workspaceStore = useWorkspaceStore()
+  const conversationStore = useConversationStore()
+  const {
+    activeTab,
+    workspacePane,
+    dataPane,
+    leftPaneWidth,
+    terminalConsentGranted,
+    isTerminalOpen,
+    terminalHeight,
+    terminalCwd,
+    isSidebarCollapsed,
+    isKeyboardShortcutsOpen,
+    isCommandPaletteOpen,
+    connectionFlowRequestId,
+    editorLine,
+    editorCol,
+    isEditorFocused,
+    isLoading,
+    isSettingsOpen,
+    settingsInitialTab,
+  } = storeToRefs(uiStore)
+  const {
+    llmProvider,
+    availableProviders,
+    selectedModel,
+    selectedLiteModel,
+    selectedCodingModel,
+    slowRequestWarningSeconds,
+    availableModels,
+    providerMainModels,
+    providerLiteModels,
+    providerModelSearchResults,
+    providerModelSearchLoading,
+    providerModelSearchQuery,
+    providerModelCatalogs,
+    providerRequiresApiKey,
+    apiKeyPresenceByProvider,
+    selectedProviderApiKeyPresent,
+    apiKey,
+    apiKeyConfigured,
+    allowLlmDataSamples,
+    uiTheme,
+    availableThemes,
+    uiFont,
+    availableFonts,
+    uiCodeFont,
+    availableCodeFonts,
+  } = storeToRefs(preferencesStore)
+  const {
+    activeTurnArtifactRefreshKey,
+    resultData,
+    plotlyFigure,
+    dataframes,
+    figures,
+    scalars,
+    promotedUserDataframes,
+    promotedUserFigures,
+    dataframeCount,
+    tableRowCount,
+    tableWindowStart,
+    tableWindowEnd,
+    tablePageOffsets,
+    selectedTableArtifactsByWorkspace,
+    selectedFigureArtifactsByWorkspace,
+    dataPaneError,
+    figureCount,
+  } = storeToRefs(artifactStore)
+  const {
+    pythonFileContent,
+    userEditedCode,
+    hasUserEditedCode,
+    codeEditorSource,
+    generatedCode,
+    conversationRuns,
+    workspaceRuntimeStatusById,
+    terminalOutput,
+    terminalEntries,
+    terminalEntriesTrimmedCount,
+    runtimeError,
+    isCodeRunning,
+    backgroundOperations,
+  } = storeToRefs(executionStore)
+  const {
+    columnCatalog,
+    workspaces,
+    activeWorkspaceSummary,
+    workspaceAIConfig,
+    activeWorkspaceId,
+    schemaContext,
+  } = storeToRefs(workspaceStore)
+  const {
+    chatHistory,
+    questionHistory,
+    currentQuestion,
+    liveTokenUsage,
+    activeConversationUsage,
+    conversationUsageById,
+    conversations,
+    activeConversationId,
+    conversationStateById,
+    activeTurnId,
+    activeTurn,
+    activeTurnCode,
+    activeTurnRelations,
+    workspaceTurnTree,
+    finalTurnId,
+  } = storeToRefs(conversationStore)
   const DEFAULT_MODELS = [
     'google/gemini-3-flash-preview',
     'google/gemini-2.5-flash',
@@ -29,141 +147,11 @@ export const useAppStore = defineStore('app', () => {
   const DEFAULT_PROVIDER_LIST = ['openrouter', 'openai', 'anthropic', 'ollama']
   const DEFAULT_SLOW_REQUEST_WARNING_SECONDS = 120
 
-  // Active connection schema
-  const columnCatalog = ref([])
-
-  // LLM Configuration
-  const llmProvider = ref(DEFAULT_PROVIDER)
-  const availableProviders = ref([...DEFAULT_PROVIDER_LIST])
-  const selectedModel = ref('google/gemini-2.5-flash')
-  const selectedLiteModel = ref(DEFAULT_LITE_MODEL)
-  const selectedCodingModel = ref('google/gemini-2.5-flash')
-  const slowRequestWarningSeconds = ref(DEFAULT_SLOW_REQUEST_WARNING_SECONDS)
-  const availableModels = ref([...DEFAULT_MODELS])
-  const providerMainModels = ref([...DEFAULT_MODELS])
-  const providerLiteModels = ref([DEFAULT_LITE_MODEL])
-  const providerModelSearchResults = ref({})
-  const providerModelSearchLoading = ref(false)
-  const providerModelSearchQuery = ref('')
-  const providerModelCatalogs = ref({})
-  const providerRequiresApiKey = ref(true)
-  const apiKeyPresenceByProvider = ref({})
-  const selectedProviderApiKeyPresent = ref(false)
-  const apiKey = ref('')
-  const apiKeyConfigured = ref(false)
-
-  const allowLlmDataSamples = ref(false)
-  const uiTheme = ref(DEFAULT_THEME_ID)
-  const availableThemes = THEME_OPTIONS.map((theme) => ({ ...theme }))
-  const uiFont = ref(DEFAULT_APP_FONT_ID)
-  const availableFonts = APP_FONT_OPTIONS.map((font) => ({ ...font }))
-  const uiCodeFont = ref(DEFAULT_CODE_FONT_ID)
-  const availableCodeFonts = CODE_FONT_OPTIONS.map((font) => ({ ...font }))
-
-
-  // Single Python File per Session (simplified)
-  const pythonFileContent = ref('')
-  const userEditedCode = ref('')
-  const hasUserEditedCode = ref(false)
-  const codeEditorSource = ref('agent')
-
-  // Chat
-  const chatHistory = ref([])
-  const questionHistory = ref([])
-  const currentQuestion = ref('')
-  const liveTokenUsage = ref(null)
-  const activeConversationUsage = ref(null)
-  const conversationUsageById = ref({})
-  const workspaces = ref([])
-  const activeWorkspaceSummary = ref(null)
-  const workspaceAIConfig = ref(null)
-  const activeWorkspaceId = ref('')
-  const schemaContext = computed(() => {
-    const activeId = String(activeWorkspaceId.value || '').trim()
-    const summary = activeWorkspaceSummary.value
-    if (summary && String(summary.id || '').trim() === activeId) {
-      return String(summary.schema_context || '')
-    }
-    const workspace = workspaces.value.find(
-      (item) => String(item?.id || '').trim() === activeId,
-    )
-    return String(workspace?.schema_context || '')
-  })
-  const conversations = ref([])
-  const activeConversationId = ref('')
-  const conversationStateById = ref({})
-  const conversationRuns = ref({})
-  const activeTurnId = ref('')
-  const activeTurn = ref(null)
-  const activeTurnCode = ref('')
-  const activeTurnRelations = ref(null)
-  const activeTurnArtifactRefreshKey = ref(0)
-  const workspaceTurnTree = ref(null)
-  const finalTurnId = ref('')
-  const workspaceRuntimeStatusById = ref({})
-
   // Analysis
-  const generatedCode = ref('')
-  const resultData = ref(null)
-  const plotlyFigure = ref(null)
-  const dataframes = ref([])
-  const figures = ref([])
-  const scalars = ref([])
-  const promotedUserDataframes = ref([])
-  const promotedUserFigures = ref([])
-  const dataframeCount = ref(0)
-  const tableRowCount = ref(0)
-  const tableWindowStart = ref(0)
-  const tableWindowEnd = ref(0)
-  const tablePageOffsets = ref({})
-  const selectedTableArtifactsByWorkspace = ref({})
-  const selectedFigureArtifactsByWorkspace = ref({})
-  const dataPaneError = ref('')
-  const figureCount = ref(0)
-  const terminalOutput = ref('')
-  const terminalEntries = ref([])
-  const terminalEntriesTrimmedCount = ref(0)
-  const runtimeError = ref('')
-  const activeTab = ref('workspace')
-  const workspacePane = ref('chat') // 'code' | 'chat'
-  const dataPane = ref('table') // 'table' | 'figure' | 'output'
-  const leftPaneWidth = ref(50) // percentage
-  const terminalConsentGranted = ref(false)
-  const isTerminalOpen = ref(false)
-  const terminalHeight = ref(30) // percentage
-  const terminalCwd = ref('')
-  const isSidebarCollapsed = ref(false)
-  const isKeyboardShortcutsOpen = ref(false)
-  const isCommandPaletteOpen = ref(false)
-  const connectionFlowRequestId = ref(0)
-
-  // Editor State
-  const editorLine = ref(1)
-  const editorCol = ref(1)
-  const isEditorFocused = ref(false)
-
   // UI State
-  const isLoading = ref(false)
-  const isCodeRunning = ref(false)
-  const backgroundOperations = ref([])
-
-  // Settings trigger
-  const isSettingsOpen = ref(false)
-  const settingsInitialTab = ref('setup')
 
   function openSettings(tab = 'setup') {
-    const n = String(tab || '').trim().toLowerCase()
-    if      (n === 'setup' || n === 'readiness')   settingsInitialTab.value = 'setup'
-    else if (n === 'api' || n === 'llm' || n === 'connections') settingsInitialTab.value = 'connections'
-    else if (n === 'models' || n === 'workspace-ai') settingsInitialTab.value = 'workspace-ai'
-    else if (n === 'data' || n === 'workspace-data') settingsInitialTab.value = 'workspace-data'
-    else if (n === 'workspace' || n === 'workspace-general') settingsInitialTab.value = 'workspace-general'
-    else if (n === 'account')                       settingsInitialTab.value = 'account'
-    else if (n === 'appearance' || n === 'theme')   settingsInitialTab.value = 'appearance'
-    else if (n === 'terms'  || n === 'legal')       settingsInitialTab.value = 'terms'
-    else                                            settingsInitialTab.value = 'setup'
-
-    isSettingsOpen.value = true
+    uiStore.openSettings(tab)
   }
 
   function openDataConnectionFlow() {
@@ -173,9 +161,7 @@ export const useAppStore = defineStore('app', () => {
       openSettings('workspace-general')
       return
     }
-    settingsInitialTab.value = 'workspace-data'
-    connectionFlowRequestId.value += 1
-    isSettingsOpen.value = true
+    uiStore.requestConnectionFlow()
   }
 
   // Computed
@@ -234,11 +220,9 @@ export const useAppStore = defineStore('app', () => {
   const MAX_TERMINAL_STREAM_CHARS = 200000
   const MAX_TERMINAL_TOTAL_CHARS = 2000000
   const MAX_QUESTION_HISTORY = 30
-  const WORKSPACE_PANES = new Set(['code', 'chat'])
-
   function normalizeWorkspacePane(pane) {
     const normalized = String(pane || '').trim().toLowerCase()
-    return WORKSPACE_PANES.has(normalized) ? normalized : 'chat'
+    return ['code', 'chat'].includes(normalized) ? normalized : 'chat'
   }
 
   function cloneConversationValue(value) {
@@ -2702,108 +2686,76 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setActiveTab(tab) {
-    const normalized = String(tab || '').trim().toLowerCase()
-    if (normalized === 'code') {
-      activeTab.value = 'workspace'
-      workspacePane.value = 'code'
-    } else if (normalized === 'chat') {
-      activeTab.value = 'workspace'
-      workspacePane.value = 'chat'
-    } else if (normalized === 'ctree') {
-      activeTab.value = 'workspace'
-      workspacePane.value = 'chat'
-    } else if (['table', 'figure', 'output'].includes(normalized)) {
-      // Route data-related tabs to the right pane instead of a full-screen view
-      activeTab.value = 'workspace'
-      dataPane.value = normalized
-    } else if (normalized === 'terminal') {
-      // Open the bottom terminal pane instead of navigating away
-      activeTab.value = 'workspace'
-      isTerminalOpen.value = true
-    } else if (normalized === 'preview') {
-      activeTab.value = 'workspace'
-    } else {
-      activeTab.value = normalized || 'workspace'
-    }
+    uiStore.setActiveTab(tab)
     saveLocalConfig()
   }
   function setWorkspacePane(pane) {
-    workspacePane.value = normalizeWorkspacePane(pane)
-    activeTab.value = 'workspace'
+    uiStore.setWorkspacePane(pane)
     saveLocalConfig()
   }
   function setDataPane(pane) {
-    const normalizedPane = String(pane || '').trim().toLowerCase()
-    dataPane.value = ['table', 'figure', 'output'].includes(normalizedPane) ? normalizedPane : 'table'
-    activeTab.value = 'workspace'
+    uiStore.setDataPane(pane)
     saveLocalConfig()
   }
   function setLeftPaneWidth(widthPct) {
-    if (widthPct >= 10 && widthPct <= 90) {
-      leftPaneWidth.value = widthPct
-      saveLocalConfig()
-    }
+    const previous = leftPaneWidth.value
+    uiStore.setLeftPaneWidth(widthPct)
+    if (leftPaneWidth.value !== previous) saveLocalConfig()
   }
 
   function setTerminalHeight(heightPct) {
-    if (heightPct >= 10 && heightPct <= 90) {
-      terminalHeight.value = heightPct
-      saveLocalConfig()
-    }
+    const previous = terminalHeight.value
+    uiStore.setTerminalHeight(heightPct)
+    if (terminalHeight.value !== previous) saveLocalConfig()
   }
 
   function toggleTerminal() {
-    isTerminalOpen.value = !isTerminalOpen.value
-    // If opening the terminal, ensure we are not hiding the workspace if we were previously in a full-screen view.
-    if (isTerminalOpen.value && ['schema-editor', 'conversation-tree'].includes(activeTab.value)) {
-      activeTab.value = 'workspace'
-    }
+    uiStore.toggleTerminal()
     saveLocalConfig()
   }
 
   function setTerminalConsentGranted(granted) {
-    terminalConsentGranted.value = !!granted
+    uiStore.setTerminalConsentGranted(granted)
     saveLocalConfig()
   }
   function setTerminalCwd(cwd) {
-    terminalCwd.value = String(cwd || '')
+    uiStore.setTerminalCwd(cwd)
   }
   function setSidebarCollapsed(collapsed) {
-    isSidebarCollapsed.value = !!collapsed
+    uiStore.setSidebarCollapsed(collapsed)
     saveLocalConfig()
   }
 
   function openKeyboardShortcuts() {
-    isKeyboardShortcutsOpen.value = true
+    uiStore.openKeyboardShortcuts()
   }
 
   function closeKeyboardShortcuts() {
-    isKeyboardShortcutsOpen.value = false
+    uiStore.closeKeyboardShortcuts()
   }
 
   function openCommandPalette() {
-    isCommandPaletteOpen.value = true
+    uiStore.openCommandPalette()
   }
 
   function closeCommandPalette() {
-    isCommandPaletteOpen.value = false
+    uiStore.closeCommandPalette()
   }
 
   function toggleCommandPalette() {
-    isCommandPaletteOpen.value = !isCommandPaletteOpen.value
+    uiStore.toggleCommandPalette()
   }
 
   // Editor tracking
   function setEditorPosition(line, col) {
-    editorLine.value = line
-    editorCol.value = col
+    uiStore.setEditorPosition(line, col)
   }
   function setEditorFocused(focused) {
-    isEditorFocused.value = focused
+    uiStore.setEditorFocused(focused)
   }
 
   function setLoading(loading) {
-    isLoading.value = loading
+    uiStore.setLoading(loading)
   }
 
   function normalizeOperationPayload(payload = {}) {

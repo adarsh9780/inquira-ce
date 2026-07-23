@@ -23,7 +23,7 @@ test('workspace settings separate General, Data sources, and AI without losing w
 
 test('workspace entry points deep-link to the relevant scoped tab', () => {
   const settings = read('src/components/modals/SettingsModal.vue')
-  const store = read('src/stores/appStore.js')
+  const store = read('src/stores/uiStore.ts')
   const setup = read('src/components/modals/tabs/SetupTab.vue')
   const composer = read('src/components/chat/ChatInput.vue')
 

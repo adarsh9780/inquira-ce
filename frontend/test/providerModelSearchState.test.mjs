@@ -5,9 +5,12 @@ import { resolve } from 'node:path'
 
 test('app store keeps provider-scoped search cache and merged model ordering', () => {
   const path = resolve(process.cwd(), 'src/stores/appStore.js')
-  const source = readFileSync(path, 'utf-8')
+  const source = [
+    readFileSync(path, 'utf-8'),
+    readFileSync(resolve(process.cwd(), 'src/stores/preferencesStore.ts'), 'utf-8'),
+  ].join('\n')
 
-  assert.equal(source.includes('const providerModelSearchResults = ref({})'), true)
+  assert.match(source, /const providerModelSearchResults = ref[^(]*\(\{\}\)/)
   assert.equal(source.includes('const providerModelSearchLoading = ref(false)'), true)
   assert.equal(source.includes("const providerModelSearchQuery = ref('')"), true)
   assert.equal(source.includes('function providerModelSearchCacheKey(provider, query)'), true)

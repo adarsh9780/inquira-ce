@@ -45,7 +45,7 @@ test('app shell applies and persists font preference through font service', () =
 
 test('style and store include offline-safe app and code font catalogs', () => {
   const styleSource = read('src/style.css')
-  const storeSource = read('src/stores/appStore.js')
+  const storeSource = `${read('src/stores/appStore.js')}\n${read('src/stores/preferencesStore.ts')}`
   const fontsSource = read('src/constants/fonts.js')
 
   assert.equal(styleSource.includes('fonts.googleapis.com'), false)

@@ -5,7 +5,10 @@ import { resolve } from 'node:path'
 
 test('app store caps and trims terminal entries to bound memory usage', () => {
   const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
-  const source = readFileSync(storePath, 'utf-8')
+  const source = [
+    readFileSync(storePath, 'utf-8'),
+    readFileSync(resolve(process.cwd(), 'src/stores/executionStore.ts'), 'utf-8'),
+  ].join('\n')
 
   assert.equal(source.includes('const MAX_TERMINAL_ENTRIES = 50'), true)
   assert.equal(source.includes('const MAX_TERMINAL_STREAM_CHARS = 200000'), true)

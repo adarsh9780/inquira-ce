@@ -8,9 +8,9 @@ function read(relativePath) {
 }
 
 test('app store exposes background operation state with the helpers used by the UI', () => {
-  const store = read('src/stores/appStore.js')
+  const store = `${read('src/stores/appStore.js')}\n${read('src/stores/executionStore.ts')}`
 
-  assert.equal(store.includes('const backgroundOperations = ref([])'), true)
+  assert.match(store, /const backgroundOperations = ref(?:<[^>]+>)?\(\[\]\)/)
   assert.equal(store.includes('const activeBackgroundOperations = computed(() => {'), true)
   assert.equal(store.includes('const primaryBackgroundOperation = computed(() => {'), true)
   assert.equal(store.includes('function startBackgroundOperation(payload = {})'), true)

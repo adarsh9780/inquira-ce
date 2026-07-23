@@ -29,12 +29,13 @@ test('the workbench exposes one contextual shell and direct evidence destination
 test('all primary add-data entry points use the native connection flow contract', () => {
   const app = read('src/App.vue')
   const store = read('src/stores/appStore.js')
+  const uiStore = read('src/stores/uiStore.ts')
   const chat = read('src/components/chat/ChatTab.vue')
   const palette = read('src/components/modals/CommandPaletteModal.vue')
   const setup = read('src/components/modals/tabs/SetupTab.vue')
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
 
-  assert.match(store, /const connectionFlowRequestId = ref\(0\)/)
+  assert.match(uiStore, /const connectionFlowRequestId = ref\(0\)/)
   assert.match(store, /function openDataConnectionFlow\(/)
   assert.match(app, /appStore\.openDataConnectionFlow\(\)/)
   assert.match(chat, /appStore\.openDataConnectionFlow\(\)/)

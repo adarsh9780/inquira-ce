@@ -4,17 +4,15 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('app store maps persisted code and chat tabs into workspace pane routing', () => {
-  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const storePath = resolve(process.cwd(), 'src/stores/uiStore.ts')
   const source = readFileSync(storePath, 'utf-8')
 
   assert.equal(source.includes("const activeTab = ref('workspace')"), true)
   assert.equal(source.includes("const workspacePane = ref('chat')"), true)
   assert.equal(source.includes("const WORKSPACE_PANES = new Set(['code', 'chat'])"), true)
-  assert.equal(source.includes("if (normalized === 'code')"), true)
-  assert.equal(source.includes("if (normalized === 'chat')"), true)
-  assert.equal(source.includes("if (normalized === 'ctree')"), true)
+  assert.equal(source.includes("normalized === 'code' || normalized === 'chat' || normalized === 'ctree'"), true)
   assert.equal(source.includes("workspacePane.value = 'ctree'"), false)
-  assert.equal(source.includes("workspacePane.value = 'chat'"), true)
+  assert.equal(source.includes("workspacePane.value = normalized === 'code' ? 'code' : 'chat'"), true)
   assert.equal(source.includes('normalizeWorkspacePane(pane)'), true)
   assert.equal(source.includes("'conversation-tree'"), true)
   assert.equal(source.includes("activeTab.value = 'workspace'"), true)

@@ -4,9 +4,13 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('store keeps conversation-scoped streaming state and per-conversation abort controllers', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf-8')
+  const source = [
+    'src/stores/appStore.js',
+    'src/stores/conversationStore.ts',
+    'src/stores/executionStore.ts',
+  ].map((path) => readFileSync(resolve(process.cwd(), path), 'utf-8')).join('\n')
 
-  assert.equal(source.includes('const conversationStateById = ref({})'), true)
+  assert.match(source, /const conversationStateById = ref[^(]*\(\{\}\)/)
   assert.equal(source.includes('function patchConversationState(conversationId, statePatch = {})'), true)
   assert.equal(source.includes('function syncActiveConversationState(options = {})'), true)
   assert.equal(source.includes('function applyConversationStateToActive(conversationId, state)'), true)

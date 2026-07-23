@@ -41,11 +41,14 @@ test('app boot and unload flows load and flush local snapshot state', () => {
 test('terminal pane visibility and execution consent are persisted to local snapshot', () => {
   const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
   const source = readFileSync(storePath, 'utf-8')
+  const uiStore = readFileSync(resolve(process.cwd(), 'src/stores/uiStore.ts'), 'utf-8')
 
   assert.equal(source.includes('function toggleTerminal() {'), true)
-  assert.equal(source.includes('isTerminalOpen.value = !isTerminalOpen.value'), true)
+  assert.equal(source.includes('uiStore.toggleTerminal()'), true)
+  assert.equal(uiStore.includes('isTerminalOpen.value = !isTerminalOpen.value'), true)
   assert.equal(source.includes('function setTerminalConsentGranted(granted) {'), true)
-  assert.equal(source.includes('terminalConsentGranted.value = !!granted'), true)
+  assert.equal(source.includes('uiStore.setTerminalConsentGranted(granted)'), true)
+  assert.equal(uiStore.includes('terminalConsentGranted.value = Boolean(granted)'), true)
   assert.equal(source.includes('saveLocalConfig()'), true)
 })
 

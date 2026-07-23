@@ -17,9 +17,12 @@ test('chat input supports ArrowUp/ArrowDown question recall without breaking aut
 
 test('app store keeps a capped, persisted question history for recall', () => {
   const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
-  const source = readFileSync(storePath, 'utf-8')
+  const source = [
+    readFileSync(storePath, 'utf-8'),
+    readFileSync(resolve(process.cwd(), 'src/stores/conversationStore.ts'), 'utf-8'),
+  ].join('\n')
 
-  assert.equal(source.includes('const questionHistory = ref([])'), true)
+  assert.match(source, /const questionHistory = ref(?:<[^>]+>)?\(\[\]\)/)
   assert.equal(source.includes('const MAX_QUESTION_HISTORY = 30'), true)
   assert.equal(source.includes('question_history: Array.isArray(questionHistory.value) ? questionHistory.value : []'), true)
   assert.equal(source.includes('.slice(-MAX_QUESTION_HISTORY)'), true)

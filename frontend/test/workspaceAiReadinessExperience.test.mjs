@@ -37,13 +37,13 @@ test('workspace AI editor inherits application defaults and keeps privacy worksp
 test('native workspace settings expose the AI section selected by readiness actions', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
   const settings = read('src/components/modals/SettingsModal.vue')
-  const store = read('src/stores/appStore.js')
+  const store = read('src/stores/uiStore.ts')
 
   assert.match(workspace, /const workspaceSections = \[[\s\S]*?\{ id: 'general', label: 'General' \}[\s\S]*?\{ id: 'connections', label: 'Data sources' \}[\s\S]*?\{ id: 'ai', label: 'AI' \}/)
   assert.match(workspace, /v-show="activeWorkspaceSection === 'ai'"/)
   assert.doesNotMatch(workspace, /!isNativeWorkspaceMetadata && activeWorkspaceSection === 'ai'/)
   assert.match(settings, /candidate === 'models' \|\| candidate === 'workspace-ai'/)
-  assert.match(store, /n === 'models' \|\| n === 'workspace-ai'/)
+  assert.match(store, /normalized === 'models' \|\| normalized === 'workspace-ai'/)
 })
 
 test('settings puts workspace models with workspace data and isolates credentials', () => {

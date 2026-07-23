@@ -18,11 +18,14 @@ test('code tab shows a source toggle after user edits generated code', () => {
 })
 
 test('app store persists edited code source selection separately from generated code', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf-8')
+  const source = [
+    'src/stores/appStore.js',
+    'src/stores/executionStore.ts',
+  ].map((path) => readFileSync(resolve(process.cwd(), path), 'utf-8')).join('\n')
 
   assert.equal(source.includes('const userEditedCode = ref(\'\')'), true)
   assert.equal(source.includes('const hasUserEditedCode = ref(false)'), true)
-  assert.equal(source.includes('const codeEditorSource = ref(\'agent\')'), true)
+  assert.match(source, /const codeEditorSource = ref(?:<[^>]+>)?\('agent'\)/)
   assert.equal(source.includes('user_edited_code: userEditedCode.value || \'\''), true)
   assert.equal(source.includes('has_user_edited_code: !!hasUserEditedCode.value'), true)
   assert.equal(source.includes('function resolveAgentCodeBaseline(fallbackCode = \'\')'), true)

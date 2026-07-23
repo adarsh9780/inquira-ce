@@ -43,10 +43,10 @@ test('app runtime applies html data-theme and persists changes via theme service
 })
 
 test('app store snapshot and preference sync include ui_theme', () => {
-  const source = read('src/stores/appStore.js')
+  const source = `${read('src/stores/appStore.js')}\n${read('src/stores/preferencesStore.ts')}`
 
   assert.equal(source.includes('const uiTheme = ref(DEFAULT_THEME_ID)'), true)
-  assert.equal(source.includes('const availableThemes = THEME_OPTIONS.map((theme) => ({ ...theme }))'), true)
+  assert.equal(source.includes('const availableThemes = ref(THEME_OPTIONS.map((theme) => ({ ...theme })))'), true)
   assert.equal(source.includes('ui_theme: uiTheme.value,'), true)
   assert.equal(source.includes('if (typeof ui.ui_theme === \'string\' && ui.ui_theme.trim()) {'), true)
   assert.equal(source.includes('uiTheme.value = normalizeThemeId(ui.ui_theme)'), true)

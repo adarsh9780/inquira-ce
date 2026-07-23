@@ -5,6 +5,6 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     environment: 'happy-dom',
-    include: ['test-runtime/**/*.test.js'],
+    include: ['test-runtime/**/*.test.{js,ts}'],
   },
 })

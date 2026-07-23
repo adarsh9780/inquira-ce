@@ -4,10 +4,13 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('app store persists selected table/figure artifacts per workspace', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf-8')
+  const source = [
+    'src/stores/appStore.js',
+    'src/stores/artifactStore.ts',
+  ].map((path) => readFileSync(resolve(process.cwd(), path), 'utf-8')).join('\n')
 
-  assert.equal(source.includes('const selectedTableArtifactsByWorkspace = ref({})'), true)
-  assert.equal(source.includes('const selectedFigureArtifactsByWorkspace = ref({})'), true)
+  assert.match(source, /const selectedTableArtifactsByWorkspace = ref[^(]*\(\{\}\)/)
+  assert.match(source, /const selectedFigureArtifactsByWorkspace = ref[^(]*\(\{\}\)/)
   assert.equal(source.includes('table_selected_artifacts: selectedTableArtifactsByWorkspace.value || {}'), true)
   assert.equal(source.includes('figure_selected_artifacts: selectedFigureArtifactsByWorkspace.value || {}'), true)
   assert.equal(source.includes('function setSelectedTableArtifact(workspaceId, artifactId) {'), true)

@@ -15,7 +15,10 @@ test('workspace AI settings expose an explicit per-workspace data samples prefer
 
 test('app store syncs LLM data samples preference with backend preferences', () => {
   const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
-  const storeSource = readFileSync(storePath, 'utf-8')
+  const storeSource = [
+    readFileSync(storePath, 'utf-8'),
+    readFileSync(resolve(process.cwd(), 'src/stores/preferencesStore.ts'), 'utf-8'),
+  ].join('\n')
 
   assert.equal(storeSource.includes('const allowLlmDataSamples = ref(false)'), true)
   assert.equal(storeSource.includes('allow_llm_data_samples: allowLlmDataSamples.value'), true)

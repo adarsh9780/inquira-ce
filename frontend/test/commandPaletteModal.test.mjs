@@ -7,7 +7,7 @@ const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
 test('command palette is app-level, uses Cmd/Ctrl+K, and launches common commands', () => {
   const app = read('src/App.vue')
-  const store = read('src/stores/appStore.js')
+  const store = read('src/stores/uiStore.ts')
   const shortcuts = read('src/utils/keyboardShortcuts.js')
   const modal = read('src/components/modals/CommandPaletteModal.vue')
   const leftPane = read('src/components/layout/WorkspaceLeftPane.vue')

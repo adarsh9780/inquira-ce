@@ -4,11 +4,15 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('app store exposes only the live token state and actions consumed by the UI', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf8')
+  const appSource = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf8')
+  const source = [
+    'src/stores/appStore.js',
+    'src/stores/conversationStore.ts',
+  ].map((path) => readFileSync(resolve(process.cwd(), path), 'utf8')).join('\n')
 
-  assert.equal(source.includes('const liveTokenUsage = ref(null)'), true)
-  assert.equal(source.includes('const activeConversationUsage = ref(null)'), true)
-  assert.equal(source.includes('const conversationUsageById = ref({})'), true)
+  assert.match(source, /const liveTokenUsage = ref[^(]*\(null\)/)
+  assert.match(source, /const activeConversationUsage = ref[^(]*\(null\)/)
+  assert.match(source, /const conversationUsageById = ref[^(]*\(\{\}\)/)
   assert.equal(source.includes('function setLiveTokenUsage(usage)'), true)
   assert.equal(source.includes('function setLiveTokenUsageForCurrentTurn(usage, options = {})'), true)
   assert.equal(source.includes('function setActiveConversationUsage(summary)'), true)
@@ -22,12 +26,12 @@ test('app store exposes only the live token state and actions consumed by the UI
   assert.equal(source.includes('syncLiveTokenUsageFromChatHistory()'), true)
   assert.equal(source.includes('liveTokenUsage,'), true)
   assert.equal(source.includes('activeConversationUsage,'), true)
-  assert.equal(source.includes('conversationUsageById,'), false)
-  assert.equal(source.includes('setLiveTokenUsage,'), false)
-  assert.equal(source.includes('setLiveTokenUsageForCurrentTurn,'), true)
-  assert.equal(source.includes('setActiveConversationUsage,'), false)
-  assert.equal(source.includes('fetchActiveConversationUsage,'), true)
-  assert.equal(source.includes('clearLiveTokenUsage,'), false)
+  assert.equal(appSource.slice(appSource.indexOf('  return {')).includes('conversationUsageById,'), false)
+  assert.equal(appSource.slice(appSource.indexOf('  return {')).includes('setLiveTokenUsage,'), false)
+  assert.equal(appSource.slice(appSource.indexOf('  return {')).includes('setLiveTokenUsageForCurrentTurn,'), true)
+  assert.equal(appSource.slice(appSource.indexOf('  return {')).includes('setActiveConversationUsage,'), false)
+  assert.equal(appSource.slice(appSource.indexOf('  return {')).includes('fetchActiveConversationUsage,'), true)
+  assert.equal(appSource.slice(appSource.indexOf('  return {')).includes('clearLiveTokenUsage,'), false)
 })
 
 test('chat input applies streamed token usage as current-turn cumulative delta', () => {
