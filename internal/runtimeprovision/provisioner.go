@@ -150,19 +150,19 @@ func (p *Provisioner) Plan(config Config) (Plan, error) {
 	case ModeManaged:
 		plan.Steps = []Step{
 			{Name: "install-python", Executable: uvPath, Arguments: []string{"python", "install", config.PythonVersion, "--install-dir", pythonDir, "--no-progress"}},
-			{Name: "create-data-environment", Executable: uvPath, Arguments: []string{"venv", environmentDir, "--python", config.PythonVersion, "--managed-python"}},
+			{Name: "create-data-environment", Executable: uvPath, Arguments: []string{"venv", environmentDir, "--python", config.PythonVersion, "--managed-python", "--clear"}},
 		}
 	case ModeExternalPython:
 		environment["UV_NO_MANAGED_PYTHON"] = "true"
 		plan.Steps = []Step{
 			{Name: "validate-external-python", Executable: config.PythonExecutable, Arguments: []string{"-c", "import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 12) else 'Inquira requires Python 3.12')"}},
-			{Name: "create-data-environment", Executable: uvPath, Arguments: []string{"venv", environmentDir, "--python", config.PythonExecutable, "--no-python-downloads"}},
+			{Name: "create-data-environment", Executable: uvPath, Arguments: []string{"venv", environmentDir, "--python", config.PythonExecutable, "--no-python-downloads", "--clear"}},
 		}
 	case ModeInternalMirror:
 		environment["UV_PYTHON_INSTALL_MIRROR"] = config.PythonInstallMirror
 		plan.Steps = []Step{
 			{Name: "install-python-from-mirror", Executable: uvPath, Arguments: []string{"python", "install", config.PythonVersion, "--install-dir", pythonDir, "--no-progress"}},
-			{Name: "create-data-environment", Executable: uvPath, Arguments: []string{"venv", environmentDir, "--python", config.PythonVersion, "--managed-python"}},
+			{Name: "create-data-environment", Executable: uvPath, Arguments: []string{"venv", environmentDir, "--python", config.PythonVersion, "--managed-python", "--clear"}},
 		}
 	}
 	plan.Steps = append(plan.Steps, Step{

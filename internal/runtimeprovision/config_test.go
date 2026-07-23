@@ -108,8 +108,8 @@ func TestPlansKeepExternalModeOfflineAndMirrorModePrivate(t *testing.T) {
 	if externalPlan.Environment["UV_NO_MANAGED_PYTHON"] != "true" {
 		t.Fatal("external mode must disable managed Python downloads")
 	}
-	if got := externalPlan.Steps[1].Arguments[len(externalPlan.Steps[1].Arguments)-1]; got != "--no-python-downloads" {
-		t.Fatalf("external environment may not download Python, got final argument %q", got)
+	if !containsArgument(externalPlan.Steps[1].Arguments, "--no-python-downloads") {
+		t.Fatalf("external environment may not download Python: %#v", externalPlan.Steps[1].Arguments)
 	}
 
 	mirror := DefaultConfig()
@@ -173,6 +173,52 @@ func TestEveryRuntimePlanInstallsTheBundledDataWorkerIntoTheEnvironment(t *testi
 			t.Fatalf("%s private index not applied", config.Mode)
 		}
 	}
+}
+
+func TestEveryRuntimePlanCanReplaceAnExistingDedicatedEnvironment(t *testing.T) {
+	runtimeRoot := filepath.Join(t.TempDir(), "runtime")
+	provisioner := NewProvisioner(runtimeRoot)
+	configs := []Config{DefaultConfig()}
+
+	external := DefaultConfig()
+	external.Mode = ModeExternalPython
+	external.PythonExecutable = testPythonExecutable(t)
+	configs = append(configs, external)
+
+	mirror := DefaultConfig()
+	mirror.Mode = ModeInternalMirror
+	mirror.PythonInstallMirror = "https://packages.example/python"
+	mirror.DefaultIndex = "https://packages.example/simple"
+	configs = append(configs, mirror)
+
+	for _, config := range configs {
+		plan, err := provisioner.Plan(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var create Step
+		for _, step := range plan.Steps {
+			if step.Name == "create-data-environment" {
+				create = step
+				break
+			}
+		}
+		if create.Name == "" {
+			t.Fatalf("%s plan is missing the environment creation step", config.Mode)
+		}
+		if !containsArgument(create.Arguments, "--clear") {
+			t.Fatalf("%s environment creation must replace an existing dedicated environment: %#v", config.Mode, create.Arguments)
+		}
+	}
+}
+
+func containsArgument(arguments []string, expected string) bool {
+	for _, argument := range arguments {
+		if argument == expected {
+			return true
+		}
+	}
+	return false
 }
 
 func testPythonExecutable(t *testing.T) string {
