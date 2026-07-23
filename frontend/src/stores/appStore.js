@@ -29,15 +29,8 @@ export const useAppStore = defineStore('app', () => {
   const DEFAULT_PROVIDER_LIST = ['openrouter', 'openai', 'anthropic', 'ollama']
   const DEFAULT_SLOW_REQUEST_WARNING_SECONDS = 120
 
-  // Files
-  const dataFilePath = ref('')
-  const schemaFilePath = ref('')
-  const schemaFileId = ref('')
-  const isSchemaFileUploaded = ref(false)
-  const ingestedTableName = ref('')
-  const ingestedColumns = ref([])
+  // Active connection schema
   const columnCatalog = ref([])
-  const profileData = ref(null)
 
   // LLM Configuration
   const llmProvider = ref(DEFAULT_PROVIDER)
@@ -59,11 +52,7 @@ export const useAppStore = defineStore('app', () => {
   const apiKey = ref('')
   const apiKeyConfigured = ref(false)
 
-  // Schema Context
-  const schemaContext = ref('')
-  const allowSchemaSampleValues = ref(false)
   const allowLlmDataSamples = ref(false)
-  const plotlyThemeMode = ref('soft')
   const uiTheme = ref(DEFAULT_THEME_ID)
   const availableThemes = THEME_OPTIONS.map((theme) => ({ ...theme }))
   const uiFont = ref(DEFAULT_APP_FONT_ID)
@@ -82,35 +71,36 @@ export const useAppStore = defineStore('app', () => {
   const chatHistory = ref([])
   const questionHistory = ref([])
   const currentQuestion = ref('')
-  const currentExplanation = ref('')
   const liveTokenUsage = ref(null)
   const activeConversationUsage = ref(null)
   const conversationUsageById = ref({})
   const workspaces = ref([])
   const activeWorkspaceSummary = ref(null)
   const workspaceAIConfig = ref(null)
-  const workspaceAIConfigLoading = ref(false)
-  const workspaceDeletionJobs = ref([])
   const activeWorkspaceId = ref('')
+  const schemaContext = computed(() => {
+    const activeId = String(activeWorkspaceId.value || '').trim()
+    const summary = activeWorkspaceSummary.value
+    if (summary && String(summary.id || '').trim() === activeId) {
+      return String(summary.schema_context || '')
+    }
+    const workspace = workspaces.value.find(
+      (item) => String(item?.id || '').trim() === activeId,
+    )
+    return String(workspace?.schema_context || '')
+  })
   const conversations = ref([])
   const activeConversationId = ref('')
   const conversationStateById = ref({})
   const conversationRuns = ref({})
-  const turnViewEnabled = ref(true)
   const activeTurnId = ref('')
   const activeTurn = ref(null)
   const activeTurnCode = ref('')
-  const activeTurnArtifacts = ref([])
   const activeTurnRelations = ref(null)
-  const activeTurnTree = ref(null)
   const activeTurnArtifactRefreshKey = ref(0)
   const workspaceTurnTree = ref(null)
   const finalTurnId = ref('')
-  const turnsNextCursor = ref(null)
   const workspaceRuntimeStatusById = ref({})
-
-  // Wasm Execution State
-  const historicalCodeBlocks = ref([]) // Tracks successfully executed code snippets
 
   // Analysis
   const generatedCode = ref('')
@@ -121,7 +111,6 @@ export const useAppStore = defineStore('app', () => {
   const scalars = ref([])
   const promotedUserDataframes = ref([])
   const promotedUserFigures = ref([])
-  const selectedResultId = ref('')
   const dataframeCount = ref(0)
   const tableRowCount = ref(0)
   const tableWindowStart = ref(0)
@@ -134,7 +123,6 @@ export const useAppStore = defineStore('app', () => {
   const terminalOutput = ref('')
   const terminalEntries = ref([])
   const terminalEntriesTrimmedCount = ref(0)
-  const terminalEnabled = ref(false)
   const runtimeError = ref('')
   const activeTab = ref('workspace')
   const workspacePane = ref('chat') // 'code' | 'chat'
@@ -144,10 +132,7 @@ export const useAppStore = defineStore('app', () => {
   const isTerminalOpen = ref(false)
   const terminalHeight = ref(30) // percentage
   const terminalCwd = ref('')
-  const isChatOverlayOpen = ref(true)
-  const chatOverlayWidth = ref(0.25) // 25% of area
   const isSidebarCollapsed = ref(false)
-  const hideShortcutsModal = ref(false)
   const isKeyboardShortcutsOpen = ref(false)
   const isCommandPaletteOpen = ref(false)
   const connectionFlowRequestId = ref(0)
@@ -160,7 +145,6 @@ export const useAppStore = defineStore('app', () => {
   // UI State
   const isLoading = ref(false)
   const isCodeRunning = ref(false)
-  const foregroundOperation = ref(null)
   const backgroundOperations = ref([])
 
   // Settings trigger
@@ -195,8 +179,6 @@ export const useAppStore = defineStore('app', () => {
   }
 
   // Computed
-  const hasDataFile = computed(() => dataFilePath.value.trim() !== '')
-  const hasSchemaFile = computed(() => schemaFilePath.value.trim() !== '' || isSchemaFileUploaded.value)
   const hasWorkspace = computed(() => {
     const activeId = activeWorkspaceId.value.trim()
     if (!activeId) return false
@@ -215,7 +197,7 @@ export const useAppStore = defineStore('app', () => {
     if (aiReadiness && !aiReadiness.credential_ready) return { state: 'model_connection_required', ready: false }
     if (aiReadiness && (!aiReadiness.model_ready || !aiReadiness.configuration_reviewed)) return { state: 'workspace_configuration_required', ready: false }
     const tableCount = Number(activeWorkspaceSummary.value?.table_count || 0)
-    if (tableCount < 1 && !hasDataFile.value) return { state: 'no_data', ready: false }
+    if (tableCount < 1) return { state: 'no_data', ready: false }
     return { state: 'ready', ready: true }
   })
   const activeWorkspaceRuntimeStatus = computed(() => getWorkspaceRuntimeStatus())
@@ -245,8 +227,6 @@ export const useAppStore = defineStore('app', () => {
   let preferenceSyncTimer = null
   let localStateSyncTimer = null
   let suppressPreferenceSync = false
-  let runtimeEnsureWorkspaceId = ''
-  let runtimeEnsurePromise = null
   let providerModelSearchToken = 0
   const ensuredRuntimeWorkspaceIds = new Set()
   const LOCAL_SNAPSHOT_VERSION = 1
@@ -292,15 +272,11 @@ export const useAppStore = defineStore('app', () => {
       ...existing,
       chatHistory: cloneConversationValue(chatHistory.value),
       currentQuestion: currentQuestion.value,
-      currentExplanation: currentExplanation.value,
       activeTurnId: activeTurnId.value,
       activeTurn: cloneConversationValue(activeTurn.value),
       activeTurnCode: activeTurnCode.value,
-      activeTurnArtifacts: cloneConversationValue(activeTurnArtifacts.value),
       activeTurnRelations: cloneConversationValue(activeTurnRelations.value),
-      activeTurnTree: cloneConversationValue(activeTurnTree.value),
       finalTurnId: finalTurnId.value,
-      turnsNextCursor: turnsNextCursor.value,
       liveTokenUsage: cloneConversationValue(liveTokenUsage.value),
       activeConversationUsage: cloneConversationValue(activeConversationUsage.value),
       generatedCode: generatedCode.value,
@@ -323,7 +299,6 @@ export const useAppStore = defineStore('app', () => {
       dataPaneError: dataPaneError.value,
       figureCount: figureCount.value,
       terminalOutput: terminalOutput.value,
-      hasLoadedTurns: existing.hasLoadedTurns === true,
       updatedAt: Date.now(),
     }
   }
@@ -350,7 +325,6 @@ export const useAppStore = defineStore('app', () => {
     if (isActiveConversation(id)) {
       if (Object.prototype.hasOwnProperty.call(statePatch, 'chatHistory')) chatHistory.value = cloneConversationValue(statePatch.chatHistory || [])
       if (Object.prototype.hasOwnProperty.call(statePatch, 'currentQuestion')) currentQuestion.value = String(statePatch.currentQuestion || '')
-      if (Object.prototype.hasOwnProperty.call(statePatch, 'currentExplanation')) currentExplanation.value = String(statePatch.currentExplanation || '')
       if (Object.prototype.hasOwnProperty.call(statePatch, 'generatedCode')) generatedCode.value = String(statePatch.generatedCode || '')
       if (Object.prototype.hasOwnProperty.call(statePatch, 'pythonFileContent')) pythonFileContent.value = String(statePatch.pythonFileContent || '')
       if (Object.prototype.hasOwnProperty.call(statePatch, 'userEditedCode')) userEditedCode.value = String(statePatch.userEditedCode || '')
@@ -383,15 +357,11 @@ export const useAppStore = defineStore('app', () => {
     return setConversationState(id, {
       chatHistory: [],
       currentQuestion: '',
-      currentExplanation: '',
       activeTurnId: '',
       activeTurn: null,
       activeTurnCode: '',
-      activeTurnArtifacts: [],
       activeTurnRelations: null,
-      activeTurnTree: null,
       finalTurnId: '',
-      turnsNextCursor: null,
       liveTokenUsage: null,
       activeConversationUsage: null,
       generatedCode: '',
@@ -414,7 +384,6 @@ export const useAppStore = defineStore('app', () => {
       dataPaneError: '',
       figureCount: 0,
       terminalOutput: '',
-      hasLoadedTurns: false,
     })
   }
 
@@ -438,15 +407,11 @@ export const useAppStore = defineStore('app', () => {
     }
     chatHistory.value = cloneConversationValue(source.chatHistory || [])
     currentQuestion.value = String(source.currentQuestion || '')
-    currentExplanation.value = String(source.currentExplanation || '')
     activeTurnId.value = String(source.activeTurnId || '')
     activeTurn.value = cloneConversationValue(source.activeTurn || null)
     activeTurnCode.value = String(source.activeTurnCode || '')
-    activeTurnArtifacts.value = cloneConversationValue(source.activeTurnArtifacts || [])
     activeTurnRelations.value = cloneConversationValue(source.activeTurnRelations || null)
-    activeTurnTree.value = cloneConversationValue(source.activeTurnTree || null)
     finalTurnId.value = String(source.finalTurnId || '')
-    turnsNextCursor.value = source.turnsNextCursor || null
     liveTokenUsage.value = cloneConversationValue(source.liveTokenUsage || null)
     activeConversationUsage.value = cloneConversationValue(source.activeConversationUsage || null)
     generatedCode.value = String(source.generatedCode || '')
@@ -591,12 +556,10 @@ export const useAppStore = defineStore('app', () => {
         workspace_pane: workspacePane.value || 'chat',
         data_pane: dataPane.value || 'table',
         left_pane_width: Number(leftPaneWidth.value || 50),
-        chat_overlay_open: !!isChatOverlayOpen.value,
-        chat_overlay_width: Number(chatOverlayWidth.value || 0.25),
         terminal_open: !!isTerminalOpen.value,
+        terminal_consent_granted: !!terminalConsentGranted.value,
         terminal_height: Number(terminalHeight.value || 30),
         is_sidebar_collapsed: !!isSidebarCollapsed.value,
-        hide_shortcuts_modal: !!hideShortcutsModal.value,
         table_row_count: Number(tableRowCount.value || 0),
         table_window_start: Number(tableWindowStart.value || 0),
         table_window_end: Number(tableWindowEnd.value || 0),
@@ -606,13 +569,9 @@ export const useAppStore = defineStore('app', () => {
       },
       session: {
         active_workspace_id: activeWorkspaceId.value || '',
-        active_dataset_path: dataFilePath.value || '',
-        active_table_name: ingestedTableName.value || '',
         active_conversation_id: activeConversationId.value || '',
         active_turn_id: activeTurnId.value || '',
         question_history: Array.isArray(questionHistory.value) ? questionHistory.value : [],
-        schema_file_id: schemaFileId.value || '',
-        schema_uploaded: !!isSchemaFileUploaded.value,
       },
       editor: {
         generated_code: generatedCode.value || '',
@@ -696,23 +655,17 @@ export const useAppStore = defineStore('app', () => {
     if (typeof ui.left_pane_width === 'number' && ui.left_pane_width > 10 && ui.left_pane_width < 90) {
       leftPaneWidth.value = ui.left_pane_width
     }
-    if (typeof ui.chat_overlay_open === 'boolean') {
-      isChatOverlayOpen.value = ui.chat_overlay_open
-    }
-    if (typeof ui.chat_overlay_width === 'number' && ui.chat_overlay_width > 0.1 && ui.chat_overlay_width < 0.9) {
-      chatOverlayWidth.value = ui.chat_overlay_width
-    }
     if (typeof ui.terminal_open === 'boolean') {
       isTerminalOpen.value = ui.terminal_open
+    }
+    if (typeof ui.terminal_consent_granted === 'boolean') {
+      terminalConsentGranted.value = ui.terminal_consent_granted
     }
     if (typeof ui.terminal_height === 'number' && ui.terminal_height >= 10 && ui.terminal_height <= 90) {
       terminalHeight.value = ui.terminal_height
     }
     if (typeof ui.is_sidebar_collapsed === 'boolean') {
       isSidebarCollapsed.value = ui.is_sidebar_collapsed
-    }
-    if (typeof ui.hide_shortcuts_modal === 'boolean') {
-      hideShortcutsModal.value = ui.hide_shortcuts_modal
     }
     if (typeof ui.ui_theme === 'string' && ui.ui_theme.trim()) {
       uiTheme.value = normalizeThemeId(ui.ui_theme)
@@ -745,12 +698,6 @@ export const useAppStore = defineStore('app', () => {
     if (typeof sessionState.active_workspace_id === 'string') {
       activeWorkspaceId.value = sessionState.active_workspace_id
     }
-    if (typeof sessionState.active_dataset_path === 'string') {
-      dataFilePath.value = sessionState.active_dataset_path
-    }
-    if (typeof sessionState.active_table_name === 'string') {
-      ingestedTableName.value = sessionState.active_table_name
-    }
     if (typeof sessionState.active_conversation_id === 'string') {
       activeConversationId.value = sessionState.active_conversation_id
     }
@@ -763,13 +710,6 @@ export const useAppStore = defineStore('app', () => {
         .filter((item) => item.length > 0)
         .slice(-MAX_QUESTION_HISTORY)
     }
-    if (typeof sessionState.schema_file_id === 'string') {
-      schemaFileId.value = sessionState.schema_file_id
-    }
-    if (typeof sessionState.schema_uploaded === 'boolean') {
-      isSchemaFileUploaded.value = sessionState.schema_uploaded
-    }
-
     if (typeof editor.generated_code === 'string') {
       generatedCode.value = editor.generated_code
     }
@@ -847,19 +787,9 @@ export const useAppStore = defineStore('app', () => {
         selected_lite_model: selectedLiteModel.value,
         selected_coding_model: selectedModel.value,
         slow_request_warning_seconds: normalizeSlowRequestWarningSeconds(slowRequestWarningSeconds.value),
-        schema_context: schemaContext.value,
-        allow_schema_sample_values: allowSchemaSampleValues.value,
         allow_llm_data_samples: allowLlmDataSamples.value,
-        terminal_risk_acknowledged: terminalConsentGranted.value,
-        chat_overlay_width: chatOverlayWidth.value,
-        ui_theme: uiTheme.value,
-        is_sidebar_collapsed: isSidebarCollapsed.value,
-        hide_shortcuts_modal: hideShortcutsModal.value,
-        active_workspace_id: activeWorkspaceId.value || '',
-        active_dataset_path: dataFilePath.value || '',
-        active_table_name: ingestedTableName.value || ''
       })
-      applyPreferencesResponse(response, { preserveLocalSchemaContext: true })
+      applyPreferencesResponse(response)
     } catch (_error) {
       // Best-effort sync. Keep UI responsive even if backend is unavailable.
     }
@@ -892,16 +822,7 @@ export const useAppStore = defineStore('app', () => {
     providerRequiresApiKey.value = true
     apiKeyPresenceByProvider.value = {}
     selectedProviderApiKeyPresent.value = false
-    dataFilePath.value = ''
-    schemaFilePath.value = ''
-    schemaFileId.value = ''
-    isSchemaFileUploaded.value = false
-    ingestedTableName.value = ''
-    ingestedColumns.value = []
     columnCatalog.value = []
-    profileData.value = null
-    schemaContext.value = ''
-    allowSchemaSampleValues.value = false
     uiTheme.value = DEFAULT_THEME_ID
     uiFont.value = DEFAULT_APP_FONT_ID
     uiCodeFont.value = DEFAULT_CODE_FONT_ID
@@ -913,19 +834,15 @@ export const useAppStore = defineStore('app', () => {
     chatHistory.value = []
     questionHistory.value = []
     currentQuestion.value = ''
-    currentExplanation.value = ''
     liveTokenUsage.value = null
     activeConversationUsage.value = null
     conversationUsageById.value = {}
     workspaces.value = []
     activeWorkspaceSummary.value = null
     workspaceAIConfig.value = null
-    workspaceAIConfigLoading.value = false
-    workspaceDeletionJobs.value = []
     activeWorkspaceId.value = ''
     conversations.value = []
     activeConversationId.value = ''
-    turnsNextCursor.value = null
     workspaceRuntimeStatusById.value = {}
 
     generatedCode.value = ''
@@ -947,13 +864,10 @@ export const useAppStore = defineStore('app', () => {
     terminalOutput.value = ''
     terminalEntries.value = []
     terminalEntriesTrimmedCount.value = 0
-    terminalEnabled.value = false
     runtimeError.value = ''
     terminalConsentGranted.value = false
     terminalCwd.value = ''
-    foregroundOperation.value = null
     backgroundOperations.value = []
-    historicalCodeBlocks.value = []
   }
 
   function clearPendingSyncTimers() {
@@ -969,146 +883,18 @@ export const useAppStore = defineStore('app', () => {
 
   function resetForAuthBoundary() {
     clearPendingSyncTimers()
-    runtimeEnsureWorkspaceId = ''
-    runtimeEnsurePromise = null
     ensuredRuntimeWorkspaceIds.clear()
     workspaceRuntimeStatusById.value = {}
     clearInMemoryUserState()
   }
 
-  function clearLocalConfig() {
-    try {
-      clearInMemoryUserState()
-      hideShortcutsModal.value = false
-      schedulePreferenceSync()
-      scheduleLocalSnapshotSave()
-
-      return true
-    } catch (error) {
-      console.error('Failed to clear local configuration:', error)
-      return false
-    }
-  }
-
   // Actions
-  function setDataFilePath(path) {
-    dataFilePath.value = path
-    saveLocalConfig()
-    if (!path) {
-      // Clear chat history when no dataset is selected
-      chatHistory.value = []
-      generatedCode.value = ''
-      pythonFileContent.value = ''
-      userEditedCode.value = ''
-      hasUserEditedCode.value = false
-      codeEditorSource.value = 'agent'
-      schemaFileId.value = ''
-      isSchemaFileUploaded.value = false
-      ingestedTableName.value = ''
-      ingestedColumns.value = []
-      columnCatalog.value = []
-      profileData.value = null
-    }
-  }
-
-  function setSchemaFilePath(path) {
-    schemaFilePath.value = path
-    saveLocalConfig()
-  }
-
-  function setSchemaFileId(schemaId) {
-    schemaFileId.value = schemaId || ''
-    saveLocalConfig()
-  }
-
-  function setIsSchemaFileUploaded(uploaded) {
-    isSchemaFileUploaded.value = !!uploaded
-    saveLocalConfig()
-  }
-
-  function setIngestedTableName(tableName) {
-    ingestedTableName.value = tableName || ''
-    saveLocalConfig()
-  }
-
-  function setIngestedColumns(columns) {
-    ingestedColumns.value = Array.isArray(columns) ? columns : []
-    saveLocalConfig()
-  }
-
-  function clearActiveDatasetSelection() {
-    setDataFilePath('')
-    setIngestedColumns([])
-    setSchemaFileId('')
-    setGeneratedCode('')
-    setPythonFileContent('')
-    setResultData(null)
-    setPlotlyFigure(null)
-    setDataframes([])
-    setFigures([])
-    setTerminalOutput('')
-  }
-
-  function handleDatasetRemoved(tableName) {
-    const removedTable = String(tableName || '').trim().toLowerCase()
-    const activeTable = String(ingestedTableName.value || '').trim().toLowerCase()
-    if (!removedTable || !activeTable || removedTable !== activeTable) return false
-    clearActiveDatasetSelection()
-    return true
-  }
-
   function setColumnCatalog(columns) {
     columnCatalog.value = Array.isArray(columns) ? columns : []
   }
 
-  function setProfileData(data) {
-    profileData.value = data && typeof data === 'object' ? data : null
-  }
-
   function setApiKey(key) {
     apiKey.value = key
-  }
-
-  function setLlmProvider(provider) {
-    const value = String(provider || '').trim().toLowerCase()
-    llmProvider.value = value || DEFAULT_PROVIDER
-    clearProviderModelSearchState()
-    mergeProviderModelOptions(llmProvider.value, [])
-    saveLocalConfig()
-  }
-
-  function setSelectedLiteModel(model) {
-    selectedLiteModel.value = String(model || '').trim()
-    saveLocalConfig()
-  }
-
-  function setSelectedCodingModel(model) {
-    selectedCodingModel.value = String(model || '').trim() || selectedModel.value
-    if (selectedCodingModel.value !== selectedModel.value) {
-      selectedCodingModel.value = selectedModel.value
-    }
-    saveLocalConfig()
-  }
-
-  function setSlowRequestWarningSeconds(seconds) {
-    slowRequestWarningSeconds.value = normalizeSlowRequestWarningSeconds(seconds)
-    saveLocalConfig()
-  }
-
-  function setProviderDisplayModels(models) {
-    const cleaned = normalizeModelList(models, llmProvider.value)
-    providerMainModels.value = cleaned.length ? cleaned : [...DEFAULT_MODELS]
-    mergeProviderModelOptions(llmProvider.value, [])
-    saveLocalConfig()
-  }
-
-  // Backward-compatible alias. This mutates provider display cache, not full provider catalog.
-  function setEnabledModels(models) {
-    setProviderDisplayModels(models)
-  }
-
-  function setApiKeyConfigured(configured) {
-    apiKeyConfigured.value = !!configured
   }
 
   function setSelectedModel(model) {
@@ -1157,16 +943,6 @@ export const useAppStore = defineStore('app', () => {
         providerModelSearchLoading.value = false
       }
     }
-  }
-
-  function setSchemaContext(context) {
-    schemaContext.value = context
-    saveLocalConfig()
-  }
-
-  function setAllowSchemaSampleValues(enabled) {
-    allowSchemaSampleValues.value = !!enabled
-    saveLocalConfig()
   }
 
   function setUiTheme(themeId, options = {}) {
@@ -1242,7 +1018,6 @@ export const useAppStore = defineStore('app', () => {
       planNode: '',
       events: [],
       toolCalls: [],
-      intervention: null,
       stopped: false,
       stoppedReason: ''
     }
@@ -1273,9 +1048,6 @@ export const useAppStore = defineStore('app', () => {
     if (!Array.isArray(message.streamTrace.toolCalls)) {
       message.streamTrace.toolCalls = []
     }
-    if (message.streamTrace.intervention !== null && typeof message.streamTrace.intervention !== 'object') {
-      message.streamTrace.intervention = null
-    }
     if (typeof message.streamTrace.stopped !== 'boolean') {
       message.streamTrace.stopped = false
     }
@@ -1303,9 +1075,6 @@ export const useAppStore = defineStore('app', () => {
         planNode: String(options.streamTrace.planNode || ''),
         events: Array.isArray(options.streamTrace.events) ? options.streamTrace.events : [],
         toolCalls: Array.isArray(options.streamTrace.toolCalls) ? options.streamTrace.toolCalls : [],
-        intervention: options.streamTrace.intervention && typeof options.streamTrace.intervention === 'object'
-          ? options.streamTrace.intervention
-          : null,
         stopped: Boolean(options.streamTrace.stopped),
         stoppedReason: String(options.streamTrace.stoppedReason || '')
       }
@@ -1330,11 +1099,9 @@ export const useAppStore = defineStore('app', () => {
       if (active) {
         chatHistory.value.push(message)
         currentQuestion.value = question
-        currentExplanation.value = resultExplanation
       } else {
         state.chatHistory = [...(state.chatHistory || []), message]
         state.currentQuestion = question
-        state.currentExplanation = resultExplanation
       }
     })
     return message.id
@@ -1377,33 +1144,23 @@ export const useAppStore = defineStore('app', () => {
 
   function updateLastMessageExplanation(explanation, messageId = null, options = {}) {
     const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
-    mutateConversationState(targetConversationId, (state, active) => {
+    mutateConversationState(targetConversationId, () => {
       const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
       if (!lastMessage) return
       lastMessage.explanation = explanation
       lastMessage.resultExplanation = explanation
-      if (active) {
-        currentExplanation.value = explanation
-      } else {
-        state.currentExplanation = explanation
-      }
     })
   }
 
   function appendLastMessageExplanationChunk(text, messageId = null, options = {}) {
     const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
-    mutateConversationState(targetConversationId, (state, active) => {
+    mutateConversationState(targetConversationId, () => {
       const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
       if (!lastMessage || typeof text !== 'string' || !text) return
       const current = String(lastMessage.explanation || '')
       const updated = current + text
       lastMessage.explanation = updated
       lastMessage.resultExplanation = updated
-      if (active) {
-        currentExplanation.value = updated
-      } else {
-        state.currentExplanation = updated
-      }
     })
   }
 
@@ -1719,51 +1476,6 @@ export const useAppStore = defineStore('app', () => {
     })
   }
 
-  function setLastMessageInterventionRequest(event, messageId = null) {
-    const options = arguments[2] || {}
-    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
-    mutateConversationState(targetConversationId, () => {
-      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
-      if (!lastMessage || !event || typeof event !== 'object') return
-      const trace = ensureMessageStreamTrace(lastMessage)
-      if (!trace) return
-      trace.intervention = {
-        id: String(event.id || ''),
-        prompt: String(event.prompt || ''),
-        options: Array.isArray(event.options) ? event.options.map((item) => String(item || '')) : [],
-        multi_select: Boolean(event.multi_select),
-        timeout_sec: Number.isFinite(Number(event.timeout_sec)) ? Number(event.timeout_sec) : null,
-        selected: [],
-        status: 'pending',
-        requested_at: new Date().toISOString(),
-      }
-    })
-  }
-
-  function setLastMessageInterventionResponse(event, messageId = null) {
-    const options = arguments[2] || {}
-    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
-    mutateConversationState(targetConversationId, () => {
-      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
-      if (!lastMessage || !event || typeof event !== 'object') return
-      const trace = ensureMessageStreamTrace(lastMessage)
-      if (!trace || !trace.intervention) return
-      if (String(event.id || '') !== String(trace.intervention.id || '')) return
-      trace.intervention.selected = Array.isArray(event.selected) ? event.selected.map((item) => String(item || '')) : []
-      trace.intervention.status = 'submitted'
-      trace.intervention.responded_at = new Date().toISOString()
-    })
-  }
-
-  function markLastMessageInterventionError(interventionId) {
-    const lastMessage = getLastChatMessage()
-    if (!lastMessage) return
-    const trace = ensureMessageStreamTrace(lastMessage)
-    if (!trace || !trace.intervention) return
-    if (String(trace.intervention.id || '') !== String(interventionId || '')) return
-    trace.intervention.status = 'error'
-  }
-
   function setLastMessageCodeSnapshot(code, messageId = null, options = {}) {
     const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
     mutateConversationState(targetConversationId, () => {
@@ -1789,119 +1501,6 @@ export const useAppStore = defineStore('app', () => {
         state.activeTurnId = normalizedTurnId
       }
     })
-  }
-
-  async function fetchChatHistory() {
-    try {
-      const response = await apiService.getHistory()
-      const responseData = response.data || response
-
-      if (responseData) {
-        // Backend returns: { messages: [...], current_code: string }
-        const messages = responseData.messages || []
-        const currentCode = responseData.current_code || ''
-
-        // Update code editor if we have persistent code
-        if (currentCode) {
-          setGeneratedCode(currentCode)
-          setPythonFileContent(currentCode)
-        } else {
-          setGeneratedCode('')
-          setPythonFileContent('')
-        }
-
-        // We need to parse the flat list of messages into Q&A pairs
-        const history = []
-        let currentPair = {}
-
-        messages.forEach((msg, index) => {
-          if (msg.role === 'user') {
-            if (currentPair.question) {
-              history.push({
-                ...currentPair,
-                id: Date.now() + index,
-                streamTrace: null,
-                codeSnapshot: '',
-                codeUpdated: false,
-                toolEvents: null,
-                timestamp: new Date().toISOString()
-              })
-            }
-            currentPair = { question: msg.content }
-          } else if (msg.role === 'assistant') {
-            if (currentPair.question) {
-              currentPair.explanation = msg.content
-              history.push({
-                ...currentPair,
-                id: Date.now() + index,
-                streamTrace: null,
-                codeSnapshot: '',
-                codeUpdated: false,
-                toolEvents: null,
-                timestamp: new Date().toISOString()
-              })
-              currentPair = {}
-            }
-          }
-        })
-
-        if (currentPair.question) {
-          history.push({
-            ...currentPair,
-            id: Date.now(),
-            streamTrace: null,
-            codeSnapshot: '',
-            codeUpdated: false,
-            toolEvents: null,
-            timestamp: new Date().toISOString()
-          })
-        }
-
-
-        chatHistory.value = history
-        syncLiveTokenUsageFromChatHistory()
-      } else {
-        console.warn("⚠️ fetchChatHistory: No data in response")
-        clearLiveTokenUsage()
-      }
-    } catch (e) {
-      console.error("❌ Failed to fetch chat history", e)
-      clearLiveTokenUsage()
-    }
-  }
-
-  function setWorkspaces(items) {
-    workspaces.value = Array.isArray(items) ? items : []
-    const validWorkspaceIds = new Set(
-      workspaces.value
-        .map((workspace) => String(workspace?.id || '').trim())
-        .filter(Boolean),
-    )
-    if (validWorkspaceIds.size === 0) {
-      workspaceRuntimeStatusById.value = {}
-      ensuredRuntimeWorkspaceIds.clear()
-      return
-    }
-    const nextStatuses = {}
-    Object.entries(workspaceRuntimeStatusById.value || {}).forEach(([workspaceId, status]) => {
-      if (!validWorkspaceIds.has(workspaceId)) {
-        ensuredRuntimeWorkspaceIds.delete(workspaceId)
-        return
-      }
-      nextStatuses[workspaceId] = normalizeWorkspaceRuntimeStatus(status)
-    })
-    workspaceRuntimeStatusById.value = nextStatuses
-  }
-
-  function setWorkspaceDeletionJobs(items) {
-    workspaceDeletionJobs.value = Array.isArray(items) ? items : []
-  }
-
-  function setActiveWorkspaceId(workspaceId) {
-    activeWorkspaceId.value = workspaceId || ''
-    columnCatalog.value = []
-    profileData.value = null
-    saveLocalConfig()
   }
 
   async function fetchColumnCatalog({ force = false } = {}) {
@@ -1941,107 +1540,13 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  async function waitForWorkspaceRuntimeReady(workspaceId, { timeoutMs = 15000, pollMs = 250 } = {}) {
-    const targetWorkspaceId = String(workspaceId || '').trim()
-    if (!targetWorkspaceId) return false
-
-    const startedAt = Date.now()
-    while (Date.now() - startedAt < timeoutMs) {
-      try {
-        const payload = await apiService.v1GetWorkspaceRuntimeStatus(targetWorkspaceId)
-        const status = normalizeWorkspaceRuntimeStatus(payload?.status)
-        setWorkspaceRuntimeStatus(targetWorkspaceId, status)
-        if (status === 'ready' || status === 'busy') {
-          return true
-        }
-        if (status === 'error') {
-          return false
-        }
-      } catch (_error) {
-        // Keep polling while the runtime finishes binding the workspace runtime.
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, pollMs))
-    }
-
-    return false
-  }
-
-  async function ensureWorkspaceRuntimeReady(workspaceId = activeWorkspaceId.value) {
-    if (!authStore.isAuthenticated) return false
-    const targetWorkspaceId = (workspaceId || '').trim()
-    if (!targetWorkspaceId) return false
-    if (!workspaces.value.some((ws) => ws.id === targetWorkspaceId)) return false
-
-    try {
-      const paths = await apiService.v1GetWorkspacePaths(targetWorkspaceId)
-      setTerminalEnabled(Boolean(paths?.terminal_enabled))
-    } catch (_error) {
-      setTerminalEnabled(false)
-    }
-
-    const cachedRuntimeStatus = getWorkspaceRuntimeStatus(targetWorkspaceId)
-    if (cachedRuntimeStatus === 'ready' || cachedRuntimeStatus === 'busy') {
-      ensuredRuntimeWorkspaceIds.add(targetWorkspaceId)
-      setRuntimeError('')
-      return true
-    }
-
-    if (runtimeEnsurePromise && runtimeEnsureWorkspaceId === targetWorkspaceId) {
-      return runtimeEnsurePromise
-    }
-
-    runtimeEnsureWorkspaceId = targetWorkspaceId
-    runtimeEnsurePromise = (async () => {
-      try {
-        setWorkspaceRuntimeStatus(targetWorkspaceId, 'starting')
-        const bootstrapped = await apiService.v1BootstrapWorkspaceRuntime(targetWorkspaceId)
-        if (bootstrapped?.reset === true) {
-          setWorkspaceRuntimeStatus(targetWorkspaceId, 'connecting')
-          const runtimeReady = await waitForWorkspaceRuntimeReady(targetWorkspaceId)
-          if (runtimeReady) {
-            setRuntimeError('')
-            return true
-          }
-          setWorkspaceRuntimeStatus(targetWorkspaceId, 'error')
-          setRuntimeError('Workspace runtime is still starting. Wait for the workspace to be ready, then try again.')
-          setTerminalEnabled(false)
-          return false
-        }
-
-        setWorkspaceRuntimeStatus(targetWorkspaceId, 'error')
-        setRuntimeError('Workspace runtime bootstrap did not complete.')
-        setTerminalEnabled(false)
-        return false
-      } catch (error) {
-        setWorkspaceRuntimeStatus(targetWorkspaceId, 'error')
-        const message = error?.response?.data?.detail || error?.message || 'Workspace runtime bootstrap failed.'
-        setRuntimeError(String(message))
-        setTerminalEnabled(false)
-        return false
-      } finally {
-        runtimeEnsureWorkspaceId = ''
-        runtimeEnsurePromise = null
-      }
-    })()
-
-    return runtimeEnsurePromise
-  }
-
-  function setConversations(items) {
-    conversations.value = Array.isArray(items) ? items : []
-  }
-
   function clearConversationScopedState(options = {}) {
     const preserveChatHistory = Boolean(options?.preserveChatHistory)
     activeTurnId.value = ''
     activeTurn.value = null
     activeTurnCode.value = ''
-    activeTurnArtifacts.value = []
     activeTurnRelations.value = null
-    activeTurnTree.value = null
     finalTurnId.value = ''
-    turnsNextCursor.value = null
     generatedCode.value = ''
     pythonFileContent.value = ''
     userEditedCode.value = ''
@@ -2094,10 +1599,6 @@ export const useAppStore = defineStore('app', () => {
       clearActiveConversationUsage()
     }
     saveLocalConfig()
-  }
-
-  function setTurnViewEnabled(enabled) {
-    turnViewEnabled.value = Boolean(enabled)
   }
 
   function setActiveTurnId(turnId) {
@@ -2185,35 +1686,12 @@ export const useAppStore = defineStore('app', () => {
 
   function setActiveTurnRelations(payload) {
     activeTurnRelations.value = payload && typeof payload === 'object' ? { ...payload } : null
-    activeTurnArtifacts.value = Array.isArray(payload?.current?.tool_events)
-      ? payload.current.tool_events
-          .filter((event) => event && event.type === 'artifact' && event.data)
-          .map((event) => ({ ...event.data }))
-      : []
     hydrateArtifactsFromToolEvents(payload?.current?.tool_events)
     activeTurnArtifactRefreshKey.value += 1
   }
 
-  function refreshActiveTurnArtifacts() {
-    activeTurnArtifactRefreshKey.value += 1
-  }
-
-  function setActiveTurnTree(payload) {
-    activeTurnTree.value = payload && typeof payload === 'object' ? { ...payload } : null
-  }
-
   function setWorkspaceTurnTree(payload) {
     workspaceTurnTree.value = payload && typeof payload === 'object' ? { ...payload } : null
-  }
-
-  async function loadActiveTurn(turnId = activeTurnId.value) {
-    const conversationId = String(activeConversationId.value || '').trim()
-    const targetTurnId = String(turnId || '').trim()
-    if (!conversationId || !targetTurnId) return null
-    const turn = await apiService.v1GetTurn(conversationId, targetTurnId)
-    setActiveTurnId(targetTurnId)
-    setActiveTurnPayload(turn)
-    return turn
   }
 
   async function loadActiveTurnRelations(turnId = activeTurnId.value) {
@@ -2224,22 +1702,7 @@ export const useAppStore = defineStore('app', () => {
     setActiveTurnId(targetTurnId)
     setActiveTurnPayload(relations?.current || null)
     setActiveTurnRelations(relations)
-    await loadActiveTurnTree(conversationId, targetTurnId)
     return relations
-  }
-
-  async function loadActiveTurnTree(
-    conversationId = activeConversationId.value,
-    currentTurnId = activeTurnId.value,
-  ) {
-    const targetConversationId = String(conversationId || '').trim()
-    if (!targetConversationId) {
-      setActiveTurnTree(null)
-      return null
-    }
-    const payload = await apiService.v1GetTurnTree(targetConversationId, currentTurnId)
-    setActiveTurnTree(payload)
-    return payload
   }
 
   async function loadWorkspaceTurnTree(workspaceId = activeWorkspaceId.value) {
@@ -2258,23 +1721,24 @@ export const useAppStore = defineStore('app', () => {
     const targetTurnId = String(turnId || '').trim()
     if (!targetConversationId || !targetTurnId) return null
     await apiService.v1DeleteTurn(targetConversationId, targetTurnId)
+    const nextConversationStates = { ...(conversationStateById.value || {}) }
+    delete nextConversationStates[targetConversationId]
+    conversationStateById.value = nextConversationStates
     await fetchConversations()
     const isActiveConversation = targetConversationId === String(activeConversationId.value || '').trim()
     const conversationStillExists = conversations.value.some(
       (conversation) => String(conversation?.id || '').trim() === targetConversationId
     )
     if (isActiveConversation && conversationStillExists) {
-      await fetchConversationTurns({ reset: true })
+      await fetchConversationTurns()
     } else if (isActiveConversation) {
       const fallbackConversationId = String(conversations.value[0]?.id || '').trim()
       setActiveConversationId(fallbackConversationId)
       if (fallbackConversationId) {
-        await fetchConversationTurns({ reset: true })
+        await fetchConversationTurns()
       } else {
         clearConversationScopedState()
       }
-    } else if (conversationStillExists) {
-      await loadActiveTurnTree(targetConversationId, activeTurnId.value)
     }
     await loadWorkspaceTurnTree()
     return true
@@ -2303,16 +1767,6 @@ export const useAppStore = defineStore('app', () => {
     return loadActiveTurnRelations(nextTurnId)
   }
 
-  async function selectBranchChildTurn(turnId) {
-    const targetTurnId = String(turnId || '').trim()
-    if (!targetTurnId) return null
-    return loadActiveTurnRelations(targetTurnId)
-  }
-
-  async function markActiveTurnFinal() {
-    return markTurnFinal(activeTurnId.value)
-  }
-
   async function markTurnFinal(turnId, conversationId = activeConversationId.value) {
     const targetConversationId = String(conversationId || '').trim()
     const targetTurnId = String(turnId || '').trim()
@@ -2325,20 +1779,6 @@ export const useAppStore = defineStore('app', () => {
     }
     await loadWorkspaceTurnTree()
     return turn
-  }
-
-  async function rerunSelectedFinalTurn() {
-    const conversationId = String(activeConversationId.value || '').trim()
-    if (!conversationId) return null
-    const result = await apiService.v1RerunFinalTurn(conversationId)
-    const rerunTurnId = String(result?.turn_id || '').trim()
-    if (rerunTurnId) {
-      await fetchConversationTurns({ reset: true })
-      await loadActiveTurnRelations(rerunTurnId)
-      await loadWorkspaceTurnTree()
-      await fetchActiveConversationUsage(conversationId)
-    }
-    return result
   }
 
   function prependChatHistoryFromTurns(turns) {
@@ -2429,7 +1869,6 @@ export const useAppStore = defineStore('app', () => {
     const response = await workspaceService.list()
     const items = response?.workspaces || []
     workspaces.value = items
-    await fetchWorkspaceDeletionJobs()
     if (!activeWorkspaceId.value && items.length > 0) {
       const active = items.find((w) => w.is_active) || items[0]
       activeWorkspaceId.value = active.id
@@ -2439,24 +1878,8 @@ export const useAppStore = defineStore('app', () => {
       activeWorkspaceId.value = items[0]?.id || ''
       activeConversationId.value = ''
       chatHistory.value = []
-      turnsNextCursor.value = null
       clearLiveTokenUsage()
-      if (!activeWorkspaceId.value) {
-        setTerminalEnabled(false)
-      }
-      saveLocalConfig()
-    }
-
-    // Workspace-first guard: when user has no workspace, dataset selection must be cleared.
-    if (items.length === 0 && (dataFilePath.value || ingestedTableName.value || schemaFileId.value)) {
-      dataFilePath.value = ''
-      ingestedTableName.value = ''
-      ingestedColumns.value = []
       columnCatalog.value = []
-      profileData.value = null
-      schemaFileId.value = ''
-      isSchemaFileUploaded.value = false
-      setTerminalEnabled(false)
       saveLocalConfig()
     }
 
@@ -2468,6 +1891,7 @@ export const useAppStore = defineStore('app', () => {
     } else {
       activeWorkspaceSummary.value = null
       workspaceAIConfig.value = null
+      columnCatalog.value = []
     }
 
   }
@@ -2494,28 +1918,15 @@ export const useAppStore = defineStore('app', () => {
       workspaceAIConfig.value = null
       return null
     }
-    workspaceAIConfigLoading.value = true
-    try {
-      const config = await apiService.v1GetWorkspaceAIConfig(target)
-      if (target === activeWorkspaceId.value) workspaceAIConfig.value = config
-      return config
-    } finally {
-      workspaceAIConfigLoading.value = false
-    }
+    const config = await apiService.v1GetWorkspaceAIConfig(target)
+    if (target === activeWorkspaceId.value) workspaceAIConfig.value = config
+    return config
   }
 
   async function saveWorkspaceAIConfig(payload, workspaceId = activeWorkspaceId.value) {
     const target = String(workspaceId || '').trim()
     if (!target) throw new Error('Select a workspace before updating AI settings.')
     const config = await apiService.v1UpdateWorkspaceAIConfig(target, payload)
-    if (target === activeWorkspaceId.value) workspaceAIConfig.value = config
-    return config
-  }
-
-  async function resetWorkspaceAIConfig(workspaceId = activeWorkspaceId.value) {
-    const target = String(workspaceId || '').trim()
-    if (!target) throw new Error('Select a workspace before resetting AI settings.')
-    const config = await apiService.v1ResetWorkspaceAIConfig(target)
     if (target === activeWorkspaceId.value) workspaceAIConfig.value = config
     return config
   }
@@ -2530,7 +1941,6 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function activateWorkspace(workspaceId) {
-    if (workspaceDeletionJobs.value.some((job) => job.workspace_id === workspaceId)) return
     await workspaceService.activate(workspaceId)
     activeWorkspaceId.value = workspaceId
     workspaces.value = workspaces.value.map((workspace) => ({
@@ -2540,10 +1950,10 @@ export const useAppStore = defineStore('app', () => {
     conversations.value = []
     activeConversationId.value = ''
     chatHistory.value = []
-    turnsNextCursor.value = null
     clearLiveTokenUsage()
     activeWorkspaceSummary.value = null
     workspaceAIConfig.value = null
+    columnCatalog.value = []
     saveLocalConfig()
     await Promise.all([
       fetchActiveWorkspaceSummary(workspaceId),
@@ -2559,153 +1969,6 @@ export const useAppStore = defineStore('app', () => {
     }
     saveLocalConfig()
     return updated
-  }
-
-  async function clearWorkspaceDatabase(workspaceId) {
-    const result = await apiService.v1ClearWorkspaceDatabase(workspaceId)
-    if (activeWorkspaceId.value === workspaceId) {
-      dataFilePath.value = ''
-      ingestedTableName.value = ''
-      ingestedColumns.value = []
-      schemaFileId.value = ''
-      isSchemaFileUploaded.value = false
-      generatedCode.value = ''
-      pythonFileContent.value = ''
-      userEditedCode.value = ''
-      hasUserEditedCode.value = false
-      codeEditorSource.value = 'agent'
-      resultData.value = null
-      plotlyFigure.value = null
-      dataPaneError.value = ''
-      setDataframes([])
-      setFigures([])
-      tablePageOffsets.value = {}
-      setSelectedTableArtifact(workspaceId, '')
-      setSelectedFigureArtifact(workspaceId, '')
-      saveLocalConfig()
-    }
-    return result
-  }
-
-  function dispatchDatasetWorkspaceEvent(name, detail = null) {
-    if (typeof window === 'undefined') return
-    window.dispatchEvent(new CustomEvent(name, { detail }))
-  }
-
-  function applyDatasetSelectionFromIngestionJob(job) {
-    const items = Array.isArray(job?.items) ? job.items : []
-    const firstCompleted = items.find((item) => String(item?.status || '').toLowerCase() === 'completed')
-    if (!firstCompleted) return
-    const resolvedPath = String(firstCompleted?.source_path || '').trim()
-    const resolvedTableName = String(firstCompleted?.table_name || '').trim()
-    if (!resolvedPath && !resolvedTableName) return
-
-    setDataFilePath(resolvedPath)
-    setIngestedTableName(resolvedTableName)
-    setIngestedColumns([])
-    setSchemaFileId(resolvedPath || resolvedTableName)
-    dispatchDatasetWorkspaceEvent('dataset-switched', {
-      tableName: resolvedTableName || null,
-      dataPath: resolvedPath || null,
-    })
-  }
-
-  async function startDatasetIngestion(paths, options = {}) {
-    const workspaceId = String(options?.workspaceId || activeWorkspaceId.value || '').trim()
-    const sourcePaths = Array.isArray(paths)
-      ? paths.map((item) => String(item || '').trim()).filter(Boolean)
-      : []
-    if (!workspaceId || sourcePaths.length === 0) return null
-    if (workspaceId !== String(activeWorkspaceId.value || '').trim()) {
-      throw new Error('Activate the target workspace before importing datasets.')
-    }
-
-    const operationId = startBackgroundOperation({
-      id: String(options?.operationId || `dataset-ingestion-${Date.now()}`).trim(),
-      type: 'dataset-import',
-      title: sourcePaths.length === 1 ? 'Importing dataset' : 'Importing datasets',
-      message: 'Queueing dataset ingestion...',
-      priority: 90,
-    })
-    const notifyProgress = typeof options?.onProgress === 'function' ? options.onProgress : null
-    const notifyComplete = typeof options?.onComplete === 'function' ? options.onComplete : null
-    const notifyError = typeof options?.onError === 'function' ? options.onError : null
-
-    try {
-      const queued = await apiService.v1AddDatasetsBatch(workspaceId, sourcePaths)
-      const jobId = String(queued?.job_id || '').trim()
-      if (!jobId) {
-        throw new Error('Backend did not return an ingestion job.')
-      }
-      updateBackgroundOperation(operationId, {
-        message: 'Processing 0 of ? datasets',
-        progress: null,
-      })
-
-      const poll = async () => {
-        try {
-          const job = await apiService.v1GetDatasetIngestionJob(workspaceId, jobId)
-          const status = String(job?.status || '').trim().toLowerCase()
-          const completed = Number(job?.completed_count || 0)
-          const failed = Number(job?.failed_count || 0)
-          const total = Number(job?.total_count || 0)
-          const processed = completed + failed
-          const progress = total > 0 ? Math.round((processed / total) * 100) : null
-          const message = `Processed ${processed} of ${total || '?'} datasets`
-
-          updateBackgroundOperation(operationId, {
-            message,
-            progress,
-          })
-          if (notifyProgress) notifyProgress(job)
-
-          if (['completed', 'completed_with_errors', 'failed'].includes(status)) {
-            applyDatasetSelectionFromIngestionJob(job)
-            dispatchDatasetWorkspaceEvent('dataset-switched', {
-              workspaceId,
-              source: 'dataset-ingestion',
-            })
-            await fetchColumnCatalog({ force: true }).catch(() => {})
-            await fetchActiveWorkspaceSummary(workspaceId)
-            await fetchWorkspaceAIConfig(workspaceId).catch(() => {})
-
-            const failedCount = Number(job?.failed_count || 0)
-            const finalMessage = failedCount > 0
-              ? `Completed with ${failedCount} failed import${failedCount === 1 ? '' : 's'}.`
-              : 'Import complete.'
-            finishBackgroundOperation(operationId, {
-              status: status === 'failed' || failedCount > 0 ? 'failed' : 'complete',
-              title: failedCount > 0 ? 'Dataset import finished with errors' : 'Dataset import complete',
-              message: finalMessage,
-            })
-            if (notifyComplete) notifyComplete(job)
-            return
-          }
-
-          setTimeout(poll, 1500)
-        } catch (error) {
-          const message = String(error?.message || 'Failed to poll dataset ingestion.')
-          finishBackgroundOperation(operationId, {
-            status: 'failed',
-            title: 'Dataset import failed',
-            message,
-          })
-          if (notifyError) notifyError(error)
-        }
-      }
-
-      setTimeout(poll, 300)
-      return { jobId, operationId }
-    } catch (error) {
-      const message = String(error?.message || 'Failed to queue dataset import.')
-      finishBackgroundOperation(operationId, {
-        status: 'failed',
-        title: 'Dataset import failed',
-        message,
-      })
-      if (notifyError) notifyError(error)
-      throw error
-    }
   }
 
   async function fetchConversations() {
@@ -2762,12 +2025,11 @@ export const useAppStore = defineStore('app', () => {
     return conversationId
   }
 
-  async function fetchConversationTurns({ reset = true, preferLatest = false } = {}) {
+  async function fetchConversationTurns({ preferLatest = false } = {}) {
     const targetConversationId = normalizeConversationId(activeConversationId.value)
     if (!targetConversationId) return
     const cachedState = getConversationState(targetConversationId)
     if (
-      reset &&
       isConversationRunning(targetConversationId) &&
       Array.isArray(cachedState?.chatHistory) &&
       cachedState.chatHistory.length > 0
@@ -2776,48 +2038,31 @@ export const useAppStore = defineStore('app', () => {
       return
     }
     const preferredTurnId = String(activeTurnId.value || '').trim()
-    const response = await apiService.v1ListTurns(
-      targetConversationId,
-      5,
-      reset ? null : turnsNextCursor.value
-    )
+    const response = await apiService.v1ListTurns(targetConversationId, 5)
     const turns = response?.turns || []
-    if (reset) {
-      chatHistory.value = []
-      clearLiveTokenUsage()
-    }
+    chatHistory.value = []
+    clearLiveTokenUsage()
     prependChatHistoryFromTurns(turns)
-    if (reset) {
-      await fetchActiveConversationUsage(targetConversationId)
-    }
-    if (reset) {
-      const newestTurnId = String(turns[0]?.id || '').trim()
-      const targetTurnId = preferLatest ? newestTurnId : (preferredTurnId || newestTurnId)
-      if (targetTurnId) {
-        try {
-          await loadActiveTurnRelations(targetTurnId)
-        } catch (_error) {
-          if (newestTurnId && newestTurnId !== targetTurnId) {
-            await loadActiveTurnRelations(newestTurnId)
-          } else {
-            setActiveTurnId('')
-            setActiveTurnPayload(null)
-            setActiveTurnRelations(null)
-          }
+    await fetchActiveConversationUsage(targetConversationId)
+    const newestTurnId = String(turns[0]?.id || '').trim()
+    const targetTurnId = preferLatest ? newestTurnId : (preferredTurnId || newestTurnId)
+    if (targetTurnId) {
+      try {
+        await loadActiveTurnRelations(targetTurnId)
+      } catch (_error) {
+        if (newestTurnId && newestTurnId !== targetTurnId) {
+          await loadActiveTurnRelations(newestTurnId)
+        } else {
+          setActiveTurnId('')
+          setActiveTurnPayload(null)
+          setActiveTurnRelations(null)
         }
-      } else {
-        clearConversationScopedState()
       }
-      await loadFinalTurn(targetConversationId)
-    }
-    if (reset && turns.length === 0) {
+    } else {
       clearConversationScopedState()
     }
-    turnsNextCursor.value = response?.next_cursor || null
-    if (reset) {
-      syncActiveConversationState({ conversationId: targetConversationId })
-      setConversationState(targetConversationId, { hasLoadedTurns: true })
-    }
+    await loadFinalTurn(targetConversationId)
+    syncActiveConversationState({ conversationId: targetConversationId })
   }
 
   async function deleteConversationById(conversationId) {
@@ -2850,18 +2095,13 @@ export const useAppStore = defineStore('app', () => {
     clearConversationScopedState()
 
     if (fallbackConversationId) {
-      await fetchConversationTurns({ reset: true })
+      await fetchConversationTurns()
     } else {
       clearConversationScopedState()
     }
     await loadWorkspaceTurnTree()
 
     return targetId
-  }
-
-  async function deleteActiveConversation() {
-    if (!activeConversationId.value) return
-    await deleteConversationById(activeConversationId.value)
   }
 
   async function updateConversationTitle(title) {
@@ -2875,97 +2115,19 @@ export const useAppStore = defineStore('app', () => {
     return updated
   }
 
-  async function fetchWorkspaceDeletionJobs() {
-    const response = await workspaceService.listDeletionJobs()
-    workspaceDeletionJobs.value = response?.jobs || []
-    workspaceDeletionJobs.value.forEach((job) => {
-      if (job?.job_id) {
-        pollWorkspaceDeletionJob(job.job_id)
-      }
-    })
-  }
-
-  function upsertWorkspaceDeletionJob(job) {
-    const idx = workspaceDeletionJobs.value.findIndex((item) => item.job_id === job.job_id)
-    if (idx >= 0) {
-      workspaceDeletionJobs.value[idx] = job
-    } else {
-      workspaceDeletionJobs.value.push(job)
-    }
-  }
-
-  function removeWorkspaceDeletionJob(jobId) {
-    workspaceDeletionJobs.value = workspaceDeletionJobs.value.filter((job) => job.job_id !== jobId)
-  }
-
   async function deleteWorkspaceAsync(workspaceId) {
-    const job = await workspaceService.delete(workspaceId)
-    if (!workspaceService.isNative()) upsertWorkspaceDeletionJob(job)
-    const jobId = String(job?.job_id || '').trim()
-    if (jobId && !workspaceService.isNative()) {
-      startBackgroundOperation({
-        id: `workspace-deletion-${jobId}`,
-        type: 'workspace-delete',
-        title: 'Deleting workspace',
-        message: 'Workspace cleanup is running...',
-        priority: 65,
-      })
-    }
+    const result = await workspaceService.delete(workspaceId)
     setSelectedTableArtifact(workspaceId, '')
     setSelectedFigureArtifact(workspaceId, '')
     if (activeWorkspaceId.value === workspaceId) {
       activeWorkspaceId.value = ''
       activeConversationId.value = ''
       chatHistory.value = []
-      turnsNextCursor.value = null
       clearLiveTokenUsage()
       columnCatalog.value = []
-      profileData.value = null
       saveLocalConfig()
     }
-    if (!workspaceService.isNative()) pollWorkspaceDeletionJob(job.job_id)
-    return job
-  }
-
-  const deletionPollers = new Map()
-
-  function pollWorkspaceDeletionJob(jobId, timeoutMs = 300000) {
-    if (!jobId || deletionPollers.has(jobId)) return
-    const startedAt = Date.now()
-
-    const poll = async () => {
-      try {
-        const job = await apiService.v1GetWorkspaceDeletionJob(jobId)
-        upsertWorkspaceDeletionJob(job)
-        if (job.status === 'completed' || job.status === 'failed') {
-          deletionPollers.delete(jobId)
-          removeWorkspaceDeletionJob(jobId)
-          finishBackgroundOperation(`workspace-deletion-${jobId}`, {
-            status: job.status === 'failed' ? 'failed' : 'complete',
-            title: job.status === 'failed' ? 'Workspace deletion failed' : 'Workspace deleted',
-            message: job.status === 'failed' ? 'Workspace cleanup failed.' : 'Workspace cleanup finished.',
-          })
-          await fetchWorkspaces()
-          return
-        }
-
-        if (Date.now() - startedAt > timeoutMs) {
-          deletionPollers.delete(jobId)
-          return
-        }
-
-        const timer = setTimeout(poll, 2000)
-        deletionPollers.set(jobId, timer)
-      } catch (_error) {
-        deletionPollers.delete(jobId)
-      }
-    }
-
-    poll()
-  }
-
-  function trackWorkspaceDeletionJob(jobId) {
-    pollWorkspaceDeletionJob(jobId)
+    return result
   }
 
   function setGeneratedCode(code) {
@@ -3161,10 +2323,6 @@ export const useAppStore = defineStore('app', () => {
     return artifactId
   }
 
-  function setSelectedResultId(resultId) {
-    selectedResultId.value = String(resultId || '').trim()
-  }
-
   function removeResultArtifact(artifactId) {
     const normalizedArtifactId = String(artifactId || '').trim()
     if (!normalizedArtifactId) return
@@ -3175,14 +2333,8 @@ export const useAppStore = defineStore('app', () => {
       String(item?.artifact_id || item?.data?.artifact_id || '').trim() !== normalizedArtifactId
     ))
     scalars.value = scalars.value.filter((item) => String(item?.artifact_id || '').trim() !== normalizedArtifactId)
-    activeTurnArtifacts.value = activeTurnArtifacts.value.filter(
-      (item) => String(item?.artifact_id || '').trim() !== normalizedArtifactId,
-    )
     dataframeCount.value = dataframes.value.length
     figureCount.value = figures.value.length
-    if (selectedResultId.value.endsWith(`:${normalizedArtifactId}`)) {
-      selectedResultId.value = ''
-    }
   }
 
   function setDataframeCount(count) {
@@ -3312,14 +2464,6 @@ export const useAppStore = defineStore('app', () => {
     terminalOutput.value = output
   }
 
-  function setTerminalEnabled(enabled) {
-    terminalEnabled.value = !!enabled
-    if (!terminalEnabled.value && activeTab.value === 'terminal') {
-      activeTab.value = 'workspace'
-      workspacePane.value = 'code'
-    }
-  }
-
   function setRuntimeError(message) {
     runtimeError.value = String(message || '')
   }
@@ -3370,19 +2514,6 @@ export const useAppStore = defineStore('app', () => {
     const normalizedWorkspaceId = String(workspaceId || '').trim()
     if (!normalizedWorkspaceId) return 'missing'
     return normalizeWorkspaceRuntimeStatus(workspaceRuntimeStatusById.value?.[normalizedWorkspaceId] || 'missing')
-  }
-
-  function clearWorkspaceRuntimeStatus(workspaceId) {
-    const normalizedWorkspaceId = String(workspaceId || '').trim()
-    if (!normalizedWorkspaceId) return
-    if (!Object.prototype.hasOwnProperty.call(workspaceRuntimeStatusById.value, normalizedWorkspaceId)) {
-      ensuredRuntimeWorkspaceIds.delete(normalizedWorkspaceId)
-      return
-    }
-    const nextStatusByWorkspace = { ...workspaceRuntimeStatusById.value }
-    delete nextStatusByWorkspace[normalizedWorkspaceId]
-    workspaceRuntimeStatusById.value = nextStatusByWorkspace
-    ensuredRuntimeWorkspaceIds.delete(normalizedWorkspaceId)
   }
 
   function trimTerminalStream(text, maxChars = MAX_TERMINAL_STREAM_CHARS) {
@@ -3559,11 +2690,6 @@ export const useAppStore = defineStore('app', () => {
     return true
   }
 
-  function clearTerminalEntries() {
-    terminalEntries.value = []
-    terminalEntriesTrimmedCount.value = 0
-  }
-
   function removeTerminalEntry(entryId) {
     const targetId = String(entryId || '').trim()
     if (!targetId) return false
@@ -3572,7 +2698,6 @@ export const useAppStore = defineStore('app', () => {
       (entry) => String(entry?.id || '').trim() !== targetId,
     )
     if (terminalEntries.value.length === previousLength) return false
-    if (selectedResultId.value === `log:${targetId}`) selectedResultId.value = ''
     return true
   }
 
@@ -3643,27 +2768,8 @@ export const useAppStore = defineStore('app', () => {
   function setTerminalCwd(cwd) {
     terminalCwd.value = String(cwd || '')
   }
-  function toggleChatOverlay() {
-    isChatOverlayOpen.value = !isChatOverlayOpen.value
-    saveLocalConfig()
-  }
-  function setChatOverlayOpen(open) {
-    isChatOverlayOpen.value = !!open
-    saveLocalConfig()
-  }
-  function setChatOverlayWidth(widthFraction) {
-    if (widthFraction > 0.1 && widthFraction < 0.9) {
-      chatOverlayWidth.value = widthFraction
-      saveLocalConfig()
-    }
-  }
   function setSidebarCollapsed(collapsed) {
     isSidebarCollapsed.value = !!collapsed
-    saveLocalConfig()
-  }
-
-  function setHideShortcutsModal(hide) {
-    hideShortcutsModal.value = !!hide
     saveLocalConfig()
   }
 
@@ -3714,36 +2820,6 @@ export const useAppStore = defineStore('app', () => {
       createdAt: Number(payload?.createdAt || now),
       updatedAt: now,
     }
-  }
-
-  function startForegroundOperation(payload = {}) {
-    foregroundOperation.value = normalizeOperationPayload({
-      type: 'foreground',
-      title: 'Working',
-      ...payload,
-      status: 'running',
-      priority: Number(payload?.priority ?? 100),
-    })
-    return foregroundOperation.value.id
-  }
-
-  function updateForegroundOperation(payload = {}) {
-    if (!foregroundOperation.value) return ''
-    foregroundOperation.value = {
-      ...foregroundOperation.value,
-      ...payload,
-      progress: Number.isFinite(Number(payload?.progress))
-        ? Math.max(0, Math.min(100, Number(payload.progress)))
-        : foregroundOperation.value.progress,
-      updatedAt: Date.now(),
-    }
-    return foregroundOperation.value.id
-  }
-
-  function clearForegroundOperation(operationId = '') {
-    const id = String(operationId || '').trim()
-    if (id && String(foregroundOperation.value?.id || '') !== id) return
-    foregroundOperation.value = null
   }
 
   function startBackgroundOperation(payload = {}) {
@@ -3858,7 +2934,6 @@ export const useAppStore = defineStore('app', () => {
     activeConversationUsage.value = null
     conversationUsageById.value = {}
     currentQuestion.value = ''
-    currentExplanation.value = ''
     generatedCode.value = ''
     pythonFileContent.value = ''
     userEditedCode.value = ''
@@ -3871,7 +2946,6 @@ export const useAppStore = defineStore('app', () => {
     terminalOutput.value = ''
     terminalEntries.value = []
     terminalEntriesTrimmedCount.value = 0
-    terminalEnabled.value = false
     runtimeError.value = ''
     tableRowCount.value = 0
     tableWindowStart.value = 0
@@ -3887,27 +2961,14 @@ export const useAppStore = defineStore('app', () => {
     terminalConsentGranted.value = false
     terminalCwd.value = ''
     isCodeRunning.value = false
-    foregroundOperation.value = null
     backgroundOperations.value = []
-    schemaFileId.value = ''
-    isSchemaFileUploaded.value = false
     columnCatalog.value = []
-    profileData.value = null
-    historicalCodeBlocks.value = []
     workspaceRuntimeStatusById.value = {}
     ensuredRuntimeWorkspaceIds.clear()
     saveLocalConfig()
   }
 
-  function addHistoricalCodeBlock(code) {
-    if (code && code.trim()) {
-      historicalCodeBlocks.value.push(code)
-      saveLocalConfig()
-    }
-  }
-
-  function applyPreferencesResponse(prefs, options = {}) {
-    const preserveLocalSchemaContext = options?.preserveLocalSchemaContext === true
+  function applyPreferencesResponse(prefs) {
     const previousProvider = llmProvider.value
     if (typeof prefs?.llm_provider === 'string' && prefs.llm_provider.trim()) {
       llmProvider.value = prefs.llm_provider.trim().toLowerCase()
@@ -3960,57 +3021,12 @@ export const useAppStore = defineStore('app', () => {
         prefs.slow_request_warning_seconds
       )
     }
-    if (!preserveLocalSchemaContext && typeof prefs?.schema_context === 'string') {
-      schemaContext.value = prefs.schema_context
-    }
-    if (typeof prefs?.allow_schema_sample_values === 'boolean') {
-      allowSchemaSampleValues.value = prefs.allow_schema_sample_values
-    }
     if (typeof prefs?.allow_llm_data_samples === 'boolean') {
       allowLlmDataSamples.value = prefs.allow_llm_data_samples
-    }
-    if (typeof prefs?.terminal_risk_acknowledged === 'boolean') {
-      terminalConsentGranted.value = prefs.terminal_risk_acknowledged
-    }
-    if (typeof prefs?.plotly_theme_mode === 'string') {
-      const normalizedPlotlyThemeMode = prefs.plotly_theme_mode.trim().toLowerCase()
-      plotlyThemeMode.value = normalizedPlotlyThemeMode === 'hard' ? 'hard' : 'soft'
-    }
-    if (typeof prefs?.ui_theme === 'string') {
-      uiTheme.value = normalizeThemeId(prefs.ui_theme)
-    }
-    if (typeof prefs?.ui_font === 'string') {
-      uiFont.value = normalizeAppFontId(prefs.ui_font)
-    }
-    if (typeof prefs?.ui_code_font === 'string') {
-      uiCodeFont.value = normalizeCodeFontId(prefs.ui_code_font)
-    }
-    if (
-      typeof prefs?.chat_overlay_width === 'number' &&
-      prefs.chat_overlay_width > 0.1 &&
-      prefs.chat_overlay_width < 0.9
-    ) {
-      chatOverlayWidth.value = prefs.chat_overlay_width
-    }
-    if (typeof prefs?.is_sidebar_collapsed === 'boolean') {
-      isSidebarCollapsed.value = prefs.is_sidebar_collapsed
-    }
-    if (typeof prefs?.hide_shortcuts_modal === 'boolean') {
-      hideShortcutsModal.value = prefs.hide_shortcuts_modal
     }
     if (typeof prefs?.api_key_present === 'boolean') {
       apiKeyConfigured.value = prefs.api_key_present
     }
-    if (prefs?.active_workspace_id) {
-      activeWorkspaceId.value = prefs.active_workspace_id
-    }
-    if (prefs?.active_dataset_path) {
-      dataFilePath.value = prefs.active_dataset_path
-    }
-    if (prefs?.active_table_name) {
-      ingestedTableName.value = prefs.active_table_name
-    }
-
     const providerChanged = previousProvider !== llmProvider.value
     clearProviderModelSearchState()
     if (providerChanged) {
@@ -4018,11 +3034,6 @@ export const useAppStore = defineStore('app', () => {
     }
     mergeProviderModelOptions(llmProvider.value, [])
 
-    // Preferences may point to deleted/stale workspace IDs.
-    if (activeWorkspaceId.value && !workspaces.value.some((ws) => ws.id === activeWorkspaceId.value)) {
-      const active = workspaces.value.find((ws) => ws.is_active) || workspaces.value[0]
-      activeWorkspaceId.value = active?.id || ''
-    }
   }
 
   async function loadUserPreferences() {
@@ -4039,14 +3050,7 @@ export const useAppStore = defineStore('app', () => {
 
   return {
     // State
-    dataFilePath,
-    schemaFilePath,
-    schemaFileId,
-    isSchemaFileUploaded,
-    ingestedTableName,
-    ingestedColumns,
     columnCatalog,
-    profileData,
     llmProvider,
     availableProviders,
     selectedModel,
@@ -4056,9 +3060,7 @@ export const useAppStore = defineStore('app', () => {
     availableModels,
     providerMainModels,
     providerLiteModels,
-    providerModelSearchResults,
     providerModelSearchLoading,
-    providerModelSearchQuery,
     providerModelCatalogs,
     providerRequiresApiKey,
     apiKeyPresenceByProvider,
@@ -4066,9 +3068,7 @@ export const useAppStore = defineStore('app', () => {
     apiKey,
     apiKeyConfigured,
     schemaContext,
-    allowSchemaSampleValues,
     allowLlmDataSamples,
-    plotlyThemeMode,
     uiTheme,
     availableThemes,
     uiFont,
@@ -4082,32 +3082,21 @@ export const useAppStore = defineStore('app', () => {
     chatHistory,
     questionHistory,
     currentQuestion,
-    currentExplanation,
     liveTokenUsage,
     activeConversationUsage,
-    conversationUsageById,
     workspaces,
     activeWorkspaceSummary,
     workspaceAIConfig,
-    workspaceAIConfigLoading,
-    workspaceDeletionJobs,
     activeWorkspaceId,
     conversations,
     activeConversationId,
-    conversationStateById,
-    conversationRuns,
-    turnViewEnabled,
     activeTurnId,
     activeTurn,
     activeTurnCode,
-    activeTurnArtifacts,
     activeTurnRelations,
-    activeTurnTree,
     activeTurnArtifactRefreshKey,
     workspaceTurnTree,
     finalTurnId,
-    turnsNextCursor,
-    workspaceRuntimeStatusById,
     generatedCode,
     resultData,
     plotlyFigure,
@@ -4116,20 +3105,15 @@ export const useAppStore = defineStore('app', () => {
     scalars,
     promotedUserDataframes,
     promotedUserFigures,
-    selectedResultId,
     dataframeCount,
     tableRowCount,
     tableWindowStart,
     tableWindowEnd,
-    tablePageOffsets,
-    selectedTableArtifactsByWorkspace,
-    selectedFigureArtifactsByWorkspace,
     dataPaneError,
     figureCount,
     terminalOutput,
     terminalEntries,
     terminalEntriesTrimmedCount,
-    terminalEnabled,
     runtimeError,
     activeTab,
     workspacePane,
@@ -4139,10 +3123,7 @@ export const useAppStore = defineStore('app', () => {
     terminalHeight,
     terminalConsentGranted,
     terminalCwd,
-    isChatOverlayOpen,
-    chatOverlayWidth,
     isSidebarCollapsed,
-    hideShortcutsModal,
     isKeyboardShortcutsOpen,
     isCommandPaletteOpen,
     connectionFlowRequestId,
@@ -4153,15 +3134,10 @@ export const useAppStore = defineStore('app', () => {
     activeConversationIsLoading,
     runningConversationCount,
     isCodeRunning,
-    foregroundOperation,
-    backgroundOperations,
     activeBackgroundOperations,
     primaryBackgroundOperation,
-    historicalCodeBlocks,
 
     // Computed
-    hasDataFile,
-    hasSchemaFile,
     canAnalyze,
     hasWorkspace,
     workspaceReadiness,
@@ -4171,35 +3147,15 @@ export const useAppStore = defineStore('app', () => {
     openDataConnectionFlow,
 
     // Actions
-    saveLocalConfig,
     loadLocalConfig,
     flushLocalConfig,
-    clearLocalConfig,
     resetForAuthBoundary,
-    setDataFilePath,
-    setSchemaFilePath,
-    setSchemaFileId,
-    setIsSchemaFileUploaded,
-    setIngestedTableName,
-    setIngestedColumns,
-    clearActiveDatasetSelection,
-    handleDatasetRemoved,
     setColumnCatalog,
-    setProfileData,
     setApiKey,
-    setLlmProvider,
-    setSelectedLiteModel,
-    setSelectedCodingModel,
-    setSlowRequestWarningSeconds,
-    setProviderDisplayModels,
-    setEnabledModels,
-    setApiKeyConfigured,
     setSelectedModel,
     searchProviderModels,
     mergeProviderModelOptions,
     clearProviderModelSearchState,
-    setSchemaContext,
-    setAllowSchemaSampleValues,
     setUiTheme,
     setUiFont,
     setUiCodeFont,
@@ -4211,11 +3167,7 @@ export const useAppStore = defineStore('app', () => {
     updateLastMessageExplanation,
     setLastMessageCodeExplanation,
     setLastMessageAnalysisMetadata,
-    setLiveTokenUsage,
     setLiveTokenUsageForCurrentTurn,
-    clearLiveTokenUsage,
-    clearActiveConversationUsage,
-    setActiveConversationUsage,
     fetchActiveConversationUsage,
     syncLiveTokenUsageFromChatHistory,
     patchConversationState,
@@ -4226,56 +3178,31 @@ export const useAppStore = defineStore('app', () => {
     appendLastMessageToolCall,
     appendLastMessageToolProgress,
     appendLastMessageToolResult,
-    setLastMessageInterventionRequest,
-    setLastMessageInterventionResponse,
-    markLastMessageInterventionError,
     markLastMessageStreamStopped,
     setLastMessageCodeSnapshot,
     setLastMessageTurnId,
-    setWorkspaces,
-    setWorkspaceDeletionJobs,
-    setActiveWorkspaceId,
-    ensureWorkspaceRuntimeReady,
-    setConversations,
     setActiveConversationId,
     ensureActiveConversation,
-    setTurnViewEnabled,
-    setActiveTurnId,
-    setActiveTurnPayload,
-    setActiveTurnRelations,
-    refreshActiveTurnArtifacts,
-    setActiveTurnTree,
-    loadActiveTurn,
     loadActiveTurnRelations,
-    loadActiveTurnTree,
     loadWorkspaceTurnTree,
     deleteTurn,
     loadFinalTurn,
     goToPreviousTurn,
     goToNextTurn,
-    selectBranchChildTurn,
-    markActiveTurnFinal,
     markTurnFinal,
-    rerunSelectedFinalTurn,
     fetchWorkspaces,
     fetchActiveWorkspaceSummary,
     fetchWorkspaceAIConfig,
     saveWorkspaceAIConfig,
-    resetWorkspaceAIConfig,
     fetchColumnCatalog,
-    fetchWorkspaceDeletionJobs,
-    trackWorkspaceDeletionJob,
     createWorkspace,
     deleteWorkspaceAsync,
     activateWorkspace,
     renameWorkspace,
-    clearWorkspaceDatabase,
-    startDatasetIngestion,
     fetchConversations,
     createConversation,
     fetchConversationTurns,
     deleteConversationById,
-    deleteActiveConversation,
     updateConversationTitle,
     setGeneratedCode,
     setResultData,
@@ -4285,7 +3212,6 @@ export const useAppStore = defineStore('app', () => {
     setScalars,
     promoteUserRunTable,
     promoteUserRunFigure,
-    setSelectedResultId,
     removeResultArtifact,
     setDataframeCount,
     setTableViewport,
@@ -4300,30 +3226,22 @@ export const useAppStore = defineStore('app', () => {
     setDataPaneError,
     clearDataPaneError,
     setTerminalOutput,
-    setTerminalEnabled,
     setRuntimeError,
     setWorkspaceRuntimeStatus,
     getWorkspaceRuntimeStatus,
-    clearWorkspaceRuntimeStatus,
     appendTerminalEntry,
     updateTerminalEntry,
     removeTerminalEntry,
-    clearTerminalEntries,
     setActiveTab,
     setWorkspacePane,
     setDataPane,
-    selectDataPaneForArtifacts,
     revealArtifactsPane,
     setLeftPaneWidth,
     setTerminalHeight,
     toggleTerminal,
     setTerminalConsentGranted,
     setTerminalCwd,
-    toggleChatOverlay,
-    setChatOverlayOpen,
-    setChatOverlayWidth,
     setSidebarCollapsed,
-    setHideShortcutsModal,
     openKeyboardShortcuts,
     closeKeyboardShortcuts,
     openCommandPalette,
@@ -4331,15 +3249,11 @@ export const useAppStore = defineStore('app', () => {
     toggleCommandPalette,
     setEditorPosition,
     setEditorFocused,
+    applyPreferencesResponse,
     loadUserPreferences,
     setLoading,
-    startForegroundOperation,
-    updateForegroundOperation,
-    clearForegroundOperation,
     startBackgroundOperation,
-    updateBackgroundOperation,
     finishBackgroundOperation,
-    removeBackgroundOperation,
     isConversationRunning,
     setConversationRun,
     clearConversationRun,
@@ -4347,8 +3261,6 @@ export const useAppStore = defineStore('app', () => {
     abortConversationRun,
     setCodeRunning,
     resetSession,
-    fetchChatHistory,
-    addHistoricalCodeBlock,
     isSettingsOpen,
     settingsInitialTab,
     openSettings

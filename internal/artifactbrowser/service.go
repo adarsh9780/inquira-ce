@@ -13,7 +13,6 @@ import (
 type store interface {
 	GetArtifact(context.Context, string) (conversation.Artifact, error)
 	ListArtifacts(context.Context, string) ([]conversation.Artifact, error)
-	ListWorkspaceArtifacts(context.Context, string) ([]conversation.Artifact, error)
 	ArtifactPath(context.Context, string) (string, error)
 	DeleteArtifact(context.Context, string) error
 }
@@ -46,20 +45,6 @@ func (s *Service) ListTurn(ctx context.Context, conversationID, turnID, kind str
 	return s.summaries(ctx, filtered)
 }
 
-func (s *Service) ListWorkspace(ctx context.Context, workspaceID, kind string) (ListResponse, error) {
-	items, err := s.store.ListWorkspaceArtifacts(ctx, strings.TrimSpace(workspaceID))
-	if err != nil {
-		return ListResponse{}, err
-	}
-	filtered := items[:0]
-	for _, item := range items {
-		if item.WorkspaceID == strings.TrimSpace(workspaceID) && (strings.TrimSpace(kind) == "" || item.Kind == strings.TrimSpace(kind)) {
-			filtered = append(filtered, item)
-		}
-	}
-	return s.summaries(ctx, filtered)
-}
-
 func (s *Service) summaries(ctx context.Context, items []conversation.Artifact) (ListResponse, error) {
 	result := ListResponse{Artifacts: make([]Summary, 0, len(items))}
 	for _, item := range items {
@@ -85,14 +70,6 @@ func (s *Service) summaries(ctx context.Context, items []conversation.Artifact) 
 
 func (s *Service) MetadataForTurn(ctx context.Context, conversationID, turnID, artifactID string) (Metadata, error) {
 	artifact, err := s.owned(ctx, artifactID, "", conversationID, turnID)
-	if err != nil {
-		return Metadata{}, err
-	}
-	return s.metadata(ctx, artifact)
-}
-
-func (s *Service) MetadataForWorkspace(ctx context.Context, workspaceID, artifactID string) (Metadata, error) {
-	artifact, err := s.owned(ctx, artifactID, workspaceID, "", "")
 	if err != nil {
 		return Metadata{}, err
 	}
@@ -195,35 +172,10 @@ func (s *Service) DeleteForTurn(ctx context.Context, conversationID, turnID, art
 	return s.delete(ctx, artifact)
 }
 
-func (s *Service) DeleteForWorkspace(ctx context.Context, workspaceID, artifactID string) (DeleteResult, error) {
-	artifact, err := s.owned(ctx, artifactID, workspaceID, "", "")
-	if err != nil {
-		return DeleteResult{}, err
-	}
-	return s.delete(ctx, artifact)
-}
-
 func (s *Service) delete(ctx context.Context, artifact conversation.Artifact) (DeleteResult, error) {
 	err := s.store.DeleteArtifact(ctx, artifact.ID)
 	if err != nil {
 		return DeleteResult{}, err
 	}
 	return DeleteResult{ArtifactID: artifact.ID, Deleted: true}, nil
-}
-
-func (s *Service) Usage(ctx context.Context, workspaceID string) (Usage, error) {
-	items, err := s.store.ListWorkspaceArtifacts(ctx, workspaceID)
-	if err != nil {
-		return Usage{}, err
-	}
-	result := Usage{WorkspaceID: workspaceID, ByKind: map[string]int64{}}
-	for _, item := range items {
-		if item.WorkspaceID != workspaceID {
-			continue
-		}
-		result.ArtifactCount++
-		result.TotalBytes += item.ByteSize
-		result.ByKind[item.Kind] += item.ByteSize
-	}
-	return result, nil
 }

@@ -46,21 +46,12 @@ type fakeAgentGateway struct {
 	cancelRequestID string
 	cancelled       bool
 	cancelErr       error
-	intervention    InterventionResponse
-	interventionErr error
 }
 
 func (f *fakeAgentGateway) Cancel(_ context.Context, workspaceID, clientRequestID string) (bool, error) {
 	f.cancelWorkspace = workspaceID
 	f.cancelRequestID = clientRequestID
 	return f.cancelled, f.cancelErr
-}
-
-func (f *fakeAgentGateway) RespondIntervention(_ context.Context, interventionID string, selected []string) (InterventionResponse, error) {
-	if f.intervention.InterventionID == "" {
-		f.intervention = InterventionResponse{InterventionID: interventionID, Accepted: len(selected) > 0}
-	}
-	return f.intervention, f.interventionErr
 }
 
 func (f *fakeAgentGateway) Analyze(_ context.Context, request AgentWorkerRequest, emit func(analysisruntime.WorkerEvent)) (AgentWorkerResult, error) {
@@ -242,21 +233,6 @@ func TestCancelValidatesWorkspaceAndDelegatesToWorker(t *testing.T) {
 	gateway.cancelErr = errors.New("worker unavailable")
 	if _, err := service.Cancel(context.Background(), "workspace-1", "request-1"); appErrorCode(err) != "agent_cancel_failed" {
 		t.Fatalf("worker error = %v", err)
-	}
-}
-
-func TestRespondInterventionValidatesAndDelegatesToWorker(t *testing.T) {
-	gateway := &fakeAgentGateway{}
-	service, _, _, _ := newAgentService(t, gateway)
-	response, err := service.RespondIntervention(context.Background(), " intervention-1 ", []string{" approve "})
-	if err != nil || !response.Accepted || response.InterventionID != "intervention-1" {
-		t.Fatalf("response=%#v error=%v", response, err)
-	}
-	if _, err := service.RespondIntervention(context.Background(), "", nil); appErrorCode(err) != "intervention_required" {
-		t.Fatalf("blank intervention error = %v", err)
-	}
-	if _, err := service.RespondIntervention(context.Background(), "intervention-1", make([]string, 21)); appErrorCode(err) != "intervention_selection_invalid" {
-		t.Fatalf("oversized selection error = %v", err)
 	}
 }
 

@@ -39,11 +39,9 @@ test('turn tree exposes delete and final actions without unsupported moving cont
   assert.equal(treeActionsSource.includes('conversationId'), true)
 })
 
-test('frontend API and store expose turn edit and workspace tree calls', () => {
+test('frontend API and store expose the supported turn editing calls', () => {
   assert.equal(apiServiceSource.includes('async v1GetWorkspaceTurnTree(workspaceId)'), true)
-  assert.equal(apiServiceSource.includes('async v1DeleteTurn(conversationId, turnId)'), true)
-  assert.equal(apiServiceSource.includes('async v1MoveTurn(conversationId, turnId, parentTurnId)'), true)
-  assert.equal(apiServiceSource.includes('async v1ReorderTurns(conversationId, parentTurnId, turnIds)'), true)
+  assert.equal(apiServiceSource.includes('v1DeleteTurn(conversationId, turnId)'), true)
   assert.equal(storeSource.includes('async function loadWorkspaceTurnTree'), true)
   assert.equal(storeSource.includes('async function deleteTurn(turnId, conversationId = activeConversationId.value)'), true)
   assert.equal(storeSource.includes('async function moveTurn(turnId, parentTurnId, conversationId = activeConversationId.value)'), false)

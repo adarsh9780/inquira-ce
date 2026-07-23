@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('app store persists local session snapshots through the desktop state service', () => {
@@ -20,17 +20,10 @@ test('app store persists local session snapshots through the desktop state servi
   assert.equal(source.includes('active_turn_id: activeTurnId.value || \'\''), true)
   assert.equal(source.includes('enabled_models: Array.isArray(providerMainModels.value) ? [...providerMainModels.value] : []'), false)
   assert.equal(source.includes('terminal_open: !!isTerminalOpen.value'), true)
+  assert.equal(source.includes('terminal_consent_granted: !!terminalConsentGranted.value'), true)
   assert.equal(source.includes('if (typeof ui.terminal_open === \'boolean\')'), true)
-})
-
-test('local snapshot writer is compatible when Tauri file handle has no sync method', () => {
-  const servicePath = resolve(process.cwd(), 'src/services/localStateService.js')
-  const source = readFileSync(servicePath, 'utf-8')
-
-  assert.equal(source.includes("if (typeof file.sync === 'function')"), true)
-  assert.equal(source.includes('function snapshotPath(scope) {'), true)
-  assert.equal(source.includes('session_state_${key}.json'), true)
-  assert.equal(source.includes('normalizeScope(scope)'), true)
+  assert.equal(source.includes('if (typeof ui.terminal_consent_granted === \'boolean\')'), true)
+  assert.equal(source.includes('terminalConsentGranted.value = ui.terminal_consent_granted'), true)
 })
 
 test('app boot and unload flows load and flush local snapshot state', () => {
@@ -40,14 +33,19 @@ test('app boot and unload flows load and flush local snapshot state', () => {
   assert.equal(source.includes('await appStore.loadLocalConfig(userId)'), true)
   assert.equal(source.includes('appStore.resetForAuthBoundary()'), true)
   assert.equal(source.includes('void appStore.flushLocalConfig?.()'), true)
+  assert.equal(source.includes("window.addEventListener('beforeunload', handleAppUnload)"), true)
+  assert.equal(source.includes('e.preventDefault()'), false)
+  assert.equal(source.includes("e.returnValue = ''"), false)
 })
 
-test('terminal pane visibility changes are persisted to local snapshot', () => {
+test('terminal pane visibility and execution consent are persisted to local snapshot', () => {
   const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
   const source = readFileSync(storePath, 'utf-8')
 
   assert.equal(source.includes('function toggleTerminal() {'), true)
   assert.equal(source.includes('isTerminalOpen.value = !isTerminalOpen.value'), true)
+  assert.equal(source.includes('function setTerminalConsentGranted(granted) {'), true)
+  assert.equal(source.includes('terminalConsentGranted.value = !!granted'), true)
   assert.equal(source.includes('saveLocalConfig()'), true)
 })
 
@@ -67,22 +65,18 @@ test('local snapshot restore recovers model selections and flushes pending prefe
   assert.equal(source.includes('await syncPreferencesNow(targetUserId)'), true)
 })
 
-test('preference sync payload excludes enabled_models and keeps selected model only', () => {
+test('remote preference sync excludes local-only and unsupported fields', () => {
   const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
   const source = readFileSync(storePath, 'utf-8')
+  const start = source.indexOf('async function syncPreferencesNow(targetUserId) {')
+  const end = source.indexOf('async function loadLocalConfig(', start)
+  const syncBlock = source.slice(start, end)
 
-  assert.equal(source.includes('selected_model: selectedModel.value'), true)
-  assert.equal(source.includes('selected_coding_model: selectedModel.value'), true)
-  assert.equal(source.includes('enabled_models:'), false)
-})
-
-test('Go build uses the native local-state bridge and keeps legacy Tauri fallback isolated', () => {
-  const capPath = resolve(process.cwd(), '../src-tauri/capabilities/default.json')
-  const servicePath = resolve(process.cwd(), 'src/services/localStateService.js')
-  const service = readFileSync(servicePath, 'utf-8')
-
-  assert.equal(existsSync(capPath), false)
-  assert.equal(service.includes('app?.LoadLocalState'), true)
-  assert.equal(service.includes('app?.SaveLocalState'), true)
-  assert.equal(service.includes("BaseDirectory.AppData"), true)
+  assert.equal(syncBlock.includes('selected_model: selectedModel.value'), true)
+  assert.equal(syncBlock.includes('selected_coding_model: selectedModel.value'), true)
+  assert.equal(syncBlock.includes('enabled_models:'), false)
+  assert.equal(syncBlock.includes('schema_context:'), false)
+  assert.equal(syncBlock.includes('terminal_risk_acknowledged:'), false)
+  assert.equal(syncBlock.includes('active_workspace_id:'), false)
+  assert.equal(syncBlock.includes('ui_theme:'), false)
 })

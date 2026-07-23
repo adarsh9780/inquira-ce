@@ -314,7 +314,7 @@ func TestTurnsSupportBranchesAndAllocateUniqueSequencesConcurrently(t *testing.T
 	}
 }
 
-func TestConversationTreeMutationsAreTransactionalAndTrackFinalTurn(t *testing.T) {
+func TestConversationUpdatesAndTracksFinalTurn(t *testing.T) {
 	service, workspaceID, _, _ := newTestService(t)
 	ctx := context.Background()
 	conversation, err := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID, Title: "Before"})
@@ -328,9 +328,8 @@ func TestConversationTreeMutationsAreTransactionalAndTrackFinalTurn(t *testing.T
 
 	root, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, UserText: "root"})
 	left, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, ParentTurnID: &root.ID, UserText: "left"})
-	right, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, ParentTurnID: &root.ID, UserText: "right"})
 	leaf, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, ParentTurnID: &left.ID, UserText: "leaf"})
-	for _, turn := range []Turn{root, left, right, leaf} {
+	for _, turn := range []Turn{root, left, leaf} {
 		if _, err := service.CompleteTurn(ctx, CompleteTurnRequest{TurnID: turn.ID, AssistantText: "done"}); err != nil {
 			t.Fatal(err)
 		}
@@ -345,26 +344,6 @@ func TestConversationTreeMutationsAreTransactionalAndTrackFinalTurn(t *testing.T
 	stored, _ := service.GetConversation(ctx, conversation.ID)
 	if stored.FinalTurnID == nil || *stored.FinalTurnID != leaf.ID {
 		t.Fatalf("final turn = %#v", stored.FinalTurnID)
-	}
-
-	if _, err := service.MoveTurn(ctx, MoveTurnRequest{ConversationID: conversation.ID, TurnID: left.ID, ParentTurnID: &leaf.ID}); appErrorCode(err) != "turn_cycle" {
-		t.Fatalf("cycle error = %v", err)
-	}
-	if _, err := service.ReorderTurns(ctx, ReorderTurnsRequest{ConversationID: conversation.ID, ParentTurnID: &root.ID, TurnIDs: []string{right.ID}}); appErrorCode(err) != "turn_order_invalid" {
-		t.Fatalf("incomplete reorder error = %v", err)
-	}
-	other, _ := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID, Title: "other"})
-	foreignParent, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: other.ID, UserText: "foreign"})
-	if _, err := service.ReorderTurns(ctx, ReorderTurnsRequest{ConversationID: conversation.ID, ParentTurnID: &foreignParent.ID}); appErrorCode(err) != "turn_parent_not_found" {
-		t.Fatalf("foreign reorder parent error = %v", err)
-	}
-	ordered, err := service.ReorderTurns(ctx, ReorderTurnsRequest{ConversationID: conversation.ID, ParentTurnID: &root.ID, TurnIDs: []string{right.ID, left.ID}})
-	if err != nil || len(ordered) != 2 || ordered[0].ID != right.ID || ordered[0].SiblingOrder != 0 || ordered[1].ID != left.ID {
-		t.Fatalf("ReorderTurns() = %#v, %v", ordered, err)
-	}
-	moved, err := service.MoveTurn(ctx, MoveTurnRequest{ConversationID: conversation.ID, TurnID: right.ID, ParentTurnID: &left.ID})
-	if err != nil || moved.ParentTurnID == nil || *moved.ParentTurnID != left.ID {
-		t.Fatalf("MoveTurn() = %#v, %v", moved, err)
 	}
 }
 
@@ -417,38 +396,6 @@ func TestDeletingAnUnselectedBranchPreservesFinalTurn(t *testing.T) {
 	stored, _ := service.GetConversation(ctx, conversation.ID)
 	if stored.FinalTurnID == nil || *stored.FinalTurnID != selected.ID {
 		t.Fatalf("final turn changed after unrelated delete: %#v", stored.FinalTurnID)
-	}
-}
-
-func TestPrepareFinalRerunCreatesChildFromStoredCode(t *testing.T) {
-	service, workspaceID, _, _ := newTestService(t)
-	ctx := context.Background()
-	conversation, _ := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID})
-	root, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, UserText: "revenue"})
-	root, _ = service.CompleteTurn(ctx, CompleteTurnRequest{TurnID: root.ID, CodeSnapshot: "result = 42", AssistantText: "Forty two"})
-	_, _ = service.MarkFinalTurn(ctx, conversation.ID, root.ID)
-	prepared, err := service.PrepareFinalRerun(ctx, conversation.ID)
-	if err != nil || prepared.Code != "result = 42" || prepared.SourceTurn.ID != root.ID || prepared.Turn.ParentTurnID == nil || *prepared.Turn.ParentTurnID != root.ID || prepared.Turn.UserText != root.UserText {
-		t.Fatalf("PrepareFinalRerun() = %#v, %v", prepared, err)
-	}
-	stored, _ := service.GetConversation(ctx, conversation.ID)
-	if stored.FinalTurnID != nil {
-		t.Fatalf("final turn remained selected after gaining child: %#v", stored.FinalTurnID)
-	}
-}
-
-func TestPrepareFinalRerunRequiresFinalTurnWithCode(t *testing.T) {
-	service, workspaceID, _, _ := newTestService(t)
-	ctx := context.Background()
-	conversation, _ := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID})
-	if _, err := service.PrepareFinalRerun(ctx, conversation.ID); appErrorCode(err) != "final_turn_not_found" {
-		t.Fatalf("missing final error = %v", err)
-	}
-	root, _ := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: conversation.ID, UserText: "question"})
-	_, _ = service.CompleteTurn(ctx, CompleteTurnRequest{TurnID: root.ID, AssistantText: "answer"})
-	_, _ = service.MarkFinalTurn(ctx, conversation.ID, root.ID)
-	if _, err := service.PrepareFinalRerun(ctx, conversation.ID); appErrorCode(err) != "final_turn_code_missing" {
-		t.Fatalf("missing code error = %v", err)
 	}
 }
 

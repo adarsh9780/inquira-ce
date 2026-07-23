@@ -36,8 +36,6 @@ type repository interface {
 	RecoverInterruptedTurns(context.Context, string, string, string) (int, error)
 	CompleteTurn(context.Context, Turn) (Turn, error)
 	FailTurn(context.Context, Turn) (Turn, error)
-	MoveTurn(context.Context, string, string, *string, string) (Turn, error)
-	ReorderTurns(context.Context, string, *string, []string, string) ([]Turn, error)
 	SetFinalTurn(context.Context, string, string, string) (Turn, error)
 	DeleteTurnSubtree(context.Context, string, string, string) ([]string, error)
 	CreateArtifact(context.Context, Artifact) error
@@ -46,7 +44,6 @@ type repository interface {
 	ListConversationArtifacts(context.Context, string) ([]Artifact, error)
 	SetArtifactStatus(context.Context, string, string) error
 	DeleteArtifact(context.Context, string) error
-	ListWorkspaceArtifacts(context.Context, string) ([]Artifact, error)
 	Close() error
 }
 
@@ -262,72 +259,6 @@ func (s *Service) GetTurn(ctx context.Context, turnID string) (Turn, error) {
 	return turn, nil
 }
 
-func (s *Service) MoveTurn(ctx context.Context, request MoveTurnRequest) (Turn, error) {
-	cid := strings.TrimSpace(request.ConversationID)
-	tid := strings.TrimSpace(request.TurnID)
-	if cid == "" || tid == "" {
-		return Turn{}, apperror.New("turn_required", "Conversation and turn identities are required.")
-	}
-	parent := request.ParentTurnID
-	if parent != nil {
-		v := strings.TrimSpace(*parent)
-		if v == "" {
-			parent = nil
-		} else {
-			parent = &v
-		}
-	}
-	turn, err := s.repository.MoveTurn(ctx, cid, tid, parent, formatTime(s.now().UTC()))
-	switch {
-	case errors.Is(err, errTurnNotFound):
-		return Turn{}, apperror.New("turn_not_found", "Turn not found in this conversation.")
-	case errors.Is(err, errParentTurnNotFound):
-		return Turn{}, apperror.New("turn_parent_not_found", "Parent turn not found in this conversation.")
-	case errors.Is(err, errTurnCycle):
-		return Turn{}, apperror.New("turn_cycle", "A turn cannot be moved below itself or one of its descendants.")
-	case err != nil:
-		return Turn{}, apperror.Wrap("turn_move_failed", "Could not move the conversation turn.", err)
-	}
-	return turn, nil
-}
-
-func (s *Service) ReorderTurns(ctx context.Context, request ReorderTurnsRequest) ([]Turn, error) {
-	cid := strings.TrimSpace(request.ConversationID)
-	if cid == "" {
-		return nil, apperror.New("conversation_required", "Conversation identity is required.")
-	}
-	ids := make([]string, len(request.TurnIDs))
-	for i, id := range request.TurnIDs {
-		ids[i] = strings.TrimSpace(id)
-		if ids[i] == "" {
-			return nil, apperror.New("turn_order_invalid", "Turn order must contain every sibling exactly once.")
-		}
-	}
-	parent := request.ParentTurnID
-	if parent != nil {
-		v := strings.TrimSpace(*parent)
-		if v == "" {
-			parent = nil
-		} else {
-			parent = &v
-		}
-	}
-	turns, err := s.repository.ReorderTurns(ctx, cid, parent, ids, formatTime(s.now().UTC()))
-	if errors.Is(err, errConversationNotFound) {
-		return nil, apperror.New("conversation_not_found", "Conversation not found.")
-	}
-	if errors.Is(err, errParentTurnNotFound) {
-		return nil, apperror.New("turn_parent_not_found", "Parent turn not found in this conversation.")
-	}
-	if errors.Is(err, errTurnOrderInvalid) {
-		return nil, apperror.New("turn_order_invalid", "Turn order must contain every sibling exactly once.")
-	}
-	if err != nil {
-		return nil, apperror.Wrap("turn_reorder_failed", "Could not reorder conversation turns.", err)
-	}
-	return turns, nil
-}
-
 func (s *Service) MarkFinalTurn(ctx context.Context, conversationID, turnID string) (Turn, error) {
 	turn, err := s.repository.SetFinalTurn(ctx, strings.TrimSpace(conversationID), strings.TrimSpace(turnID), formatTime(s.now().UTC()))
 	switch {
@@ -356,30 +287,6 @@ func (s *Service) GetFinalTurn(ctx context.Context, conversationID string) (*Tur
 		return nil, err
 	}
 	return &turn, nil
-}
-
-func (s *Service) PrepareFinalRerun(ctx context.Context, conversationID string) (FinalRerun, error) {
-	owned, err := s.GetConversation(ctx, conversationID)
-	if err != nil {
-		return FinalRerun{}, err
-	}
-	if owned.FinalTurnID == nil {
-		return FinalRerun{}, apperror.New("final_turn_not_found", "Final turn not found.")
-	}
-	source, err := s.GetTurn(ctx, *owned.FinalTurnID)
-	if err != nil || source.ConversationID != owned.ID {
-		return FinalRerun{}, apperror.New("final_turn_not_found", "Final turn not found.")
-	}
-	code := strings.TrimSpace(source.CodeSnapshot)
-	if code == "" {
-		return FinalRerun{}, apperror.New("final_turn_code_missing", "Final turn has no stored code to rerun.")
-	}
-	metadata, _ := json.Marshal(map[string]string{"rerun_source_turn_id": source.ID})
-	child, err := s.CreateTurn(ctx, CreateTurnRequest{ConversationID: owned.ID, ParentTurnID: &source.ID, UserText: source.UserText, MetadataJSON: string(metadata)})
-	if err != nil {
-		return FinalRerun{}, err
-	}
-	return FinalRerun{Conversation: owned, SourceTurn: source, Turn: child, Code: code}, nil
 }
 
 func (s *Service) DeleteTurn(ctx context.Context, conversationID, turnID string) (DeleteTurnResult, error) {
@@ -583,18 +490,6 @@ func (s *Service) GetArtifact(ctx context.Context, artifactID string) (Artifact,
 		return Artifact{}, apperror.Wrap("artifact_read_failed", "Could not load artifact metadata.", err)
 	}
 	return artifact, nil
-}
-
-func (s *Service) ListWorkspaceArtifacts(ctx context.Context, workspaceID string) ([]Artifact, error) {
-	id := strings.TrimSpace(workspaceID)
-	if id == "" {
-		return nil, apperror.New("workspace_required", "Workspace identity is required.")
-	}
-	artifacts, err := s.repository.ListWorkspaceArtifacts(ctx, id)
-	if err != nil {
-		return nil, apperror.Wrap("artifact_list_failed", "Could not load workspace artifacts.", err)
-	}
-	return artifacts, nil
 }
 
 func (s *Service) DeleteArtifact(ctx context.Context, artifactID string) error {

@@ -68,6 +68,17 @@ export function getRegisteredCommands() {
   return Array.from(commandRegistry.values()).sort((left, right) => left.name.localeCompare(right.name))
 }
 
+function resolveDefaultTable(appStore) {
+  const summaryTable = (Array.isArray(appStore?.activeWorkspaceSummary?.table_names)
+    ? appStore.activeWorkspaceSummary.table_names
+    : []
+  ).map((name) => String(name || '').trim()).find(Boolean)
+  if (summaryTable) return summaryTable
+  const catalogItem = (Array.isArray(appStore?.columnCatalog) ? appStore.columnCatalog : [])
+    .find((item) => String(item?.table_name || '').trim())
+  return String(catalogItem?.table_name || '').trim() || null
+}
+
 export async function executeCommand(text, { appStore, apiService: api = null } = {}) {
   const parsed = parseCommand(text)
   if (!parsed) {
@@ -92,7 +103,7 @@ export async function executeCommand(text, { appStore, apiService: api = null } 
     text: parsed.text,
     name: parsed.name,
     raw_args: parsed.rawArgs,
-    default_table: String(appStore?.ingestedTableName || '').trim() || null,
+    default_table: resolveDefaultTable(appStore),
     conversation_id: String(appStore?.activeConversationId || '').trim() || null,
   })
 

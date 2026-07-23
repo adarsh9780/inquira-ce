@@ -26,24 +26,7 @@ test('chat tab relies on sidebar lifecycle controls for usable analysis sessions
   assert.equal(source.includes('title="Clear Conversation"'), false)
   assert.equal(source.includes('title="Delete Conversation"'), false)
   assert.equal(source.includes('await appStore.createConversation()'), false)
-  assert.equal(source.includes('await appStore.fetchConversationTurns({ reset: true })'), true)
+  assert.equal(source.includes('await appStore.fetchConversationTurns()'), true)
   assert.equal(source.includes('await appStore.clearActiveConversation()'), false)
   assert.equal(source.includes('await appStore.deleteActiveConversation()'), false)
-})
-
-test('critical workflow helper sets up workspace and dataset before higher-level interactions', () => {
-  const source = readFileSync(resolve(process.cwd(), 'e2e/support/criticalWorkflow.js'), 'utf-8')
-
-  assert.equal(source.includes('export async function setupCriticalWorkspace(page) {'), true)
-  assert.equal(source.includes('await createWorkspaceFromSettings(page, workspaceName)'), true)
-  assert.equal(source.includes("page.getByRole('dialog', { name: 'Workspaces' })"), true)
-  assert.equal(source.includes('await importDatasetFromNativePathBridge(page)'), true)
-  assert.equal(source.includes('await expect(page.getByText(datasetFileName, { exact: true }).first()).toBeAttached'), true)
-})
-
-test('manual code workflow uses an exact Code tab selector before editing the script', () => {
-  const source = readFileSync(resolve(process.cwd(), 'e2e/manual-code-execution.spec.js'), 'utf-8')
-
-  assert.equal(source.includes("getByRole('tab', { name: 'Code', exact: true })"), true)
-  assert.equal(source.includes("page.getByTitle('Run Code (R)').click()"), true)
 })

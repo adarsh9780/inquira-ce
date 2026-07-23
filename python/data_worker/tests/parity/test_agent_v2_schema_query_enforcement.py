@@ -7,27 +7,8 @@ from inquira_data_worker.agent_v2.coding_subagent import AnalysisOutput
 from inquira_data_worker.agent_v2.nodes import (
     _build_schema_search_queries,
     _normalize_broad_search_queries,
-    _sanitize_tool_plan,
     analysis_generate_code_node,
 )
-
-
-def test_sanitize_tool_plan_forces_single_word_schema_queries() -> None:
-    plan = _sanitize_tool_plan(
-        [
-            {
-                "tool": "search_schema",
-                "query": "The user has not specified which columns represent year",
-                "limit": 20,
-            }
-        ],
-        max_items=5,
-    )
-
-    assert plan
-    assert all(item.get("tool") == "search_schema" for item in plan)
-    assert all(" " not in str(item.get("query") or "") for item in plan)
-    assert "year" in [str(item.get("query") or "") for item in plan]
 
 
 def test_build_schema_search_queries_returns_keywords_not_sentences() -> None:

@@ -47,7 +47,7 @@
 
           <button
             @click="syncTableNameInCode"
-            title="Sync table name in code to current data file"
+            title="Sync table name in code to the active workspace"
             class="btn-icon"
           >
             <ArrowPathIcon class="h-4 w-4" />
@@ -123,14 +123,11 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
-import { useAuthStore } from '../../stores/authStore'
-import apiService from '../../services/apiService'
 import executionService from '../../services/executionService'
 import { toast } from '../../composables/useToast'
 import { buildExecutionViewModel } from '../../utils/executionViewModel'
 import { latestExpressionVariables, normalizeExecutionResponse } from '../../utils/runtimeExecution'
 import { persistExportFile } from '../../utils/exportFile'
-import { executionLogResultId } from '../../utils/unifiedResults'
 
 import { EditorView, basicSetup } from 'codemirror'
 import { Compartment, EditorState, Prec } from '@codemirror/state'
@@ -151,13 +148,10 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
-const authStore = useAuthStore()
 
 const editorContainer = ref(null)
 const isRunning = ref(false)
 const isGeneratingCode = ref(false)
-const databasePaths = ref(null)
-const settingsInfo = ref(null)
 const isMounted = ref(false)
 let lastRunBlockedToastAt = 0
 
@@ -166,10 +160,20 @@ let isUpdatingFromStore = false
 const editableCompartment = new Compartment()
 const visualThemeCompartment = new Compartment()
 
+const primaryWorkspaceTableName = computed(() => {
+  const summaryTable = (Array.isArray(appStore.activeWorkspaceSummary?.table_names)
+    ? appStore.activeWorkspaceSummary.table_names
+    : []
+  ).map((name) => String(name || '').trim()).find(Boolean)
+  if (summaryTable) return summaryTable
+  const catalogItem = (Array.isArray(appStore.columnCatalog) ? appStore.columnCatalog : [])
+    .find((item) => String(item?.table_name || '').trim())
+  return String(catalogItem?.table_name || '').trim()
+})
+
 const hasSelectedData = computed(() => {
-  const selectedPath = String(appStore.dataFilePath || '').trim()
-  const selectedTable = String(appStore.ingestedTableName || '').trim()
-  return Boolean(selectedPath || selectedTable)
+  return Number(appStore.activeWorkspaceSummary?.table_count || 0) > 0
+    || Boolean(primaryWorkspaceTableName.value)
 })
 
 function isSimpleIdentifier(value) {
@@ -234,16 +238,6 @@ function buildColumnCompletionOptions(query = '') {
     })
   })
 
-  const ingestedTable = String(appStore.ingestedTableName || '').trim()
-  const ingestedColumns = Array.isArray(appStore.ingestedColumns) ? appStore.ingestedColumns : []
-  ingestedColumns.forEach((item) => {
-    addOption({
-      tableName: ingestedTable,
-      columnName: item?.name || item?.column_name,
-      dtype: item?.dtype || item?.type,
-    })
-  })
-
   return options.slice(0, 120)
 }
 
@@ -280,36 +274,8 @@ function stampRunResults(items, runId, createdAt) {
   }))
 }
 
-async function fetchDatabasePaths() {
-  try {
-    databasePaths.value = await apiService.getDatabasePaths()
-  } catch (_error) {
-    databasePaths.value = null
-  }
-}
-
-async function fetchSettings() {
-  try {
-    settingsInfo.value = await apiService.getSettings()
-  } catch (_error) {
-    settingsInfo.value = null
-  }
-}
-
-function getTableName(path) {
-  const cleaned = String(path || '').trim()
-  if (!cleaned) return 'your_table'
-  const parts = cleaned.split(/[\\/]/)
-  const filename = parts[parts.length - 1] || 'your_table'
-  const withoutExt = filename.replace(/\.[^.]+$/, '')
-  return withoutExt.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase() || 'your_table'
-}
-
 const defaultCodeTemplate = computed(() => {
-  const originalFilepath = appStore.dataFilePath || '/path/to/your/data/file.csv'
-  const dbPath = databasePaths.value?.database_path
-  const backendTable = settingsInfo.value?.table_name || settingsInfo.value?.data_table_name || settingsInfo.value?.table || null
-  const tableName = backendTable || getTableName(originalFilepath)
+  const tableName = primaryWorkspaceTableName.value || 'your_table'
 
   return `import duckdb
 
@@ -379,9 +345,7 @@ async function syncTableNameInCode(silent = false) {
     if (!silent) toast.info('Select a dataset first')
     return
   }
-  await fetchSettings()
-  const backendTable = settingsInfo.value?.table_name || settingsInfo.value?.data_table_name || settingsInfo.value?.table || null
-  const tableName = backendTable || getTableName(appStore.dataFilePath || '')
+  const tableName = primaryWorkspaceTableName.value
 
   const current = appStore.pythonFileContent
   const updated = replaceTableNameInCode(current, tableName)
@@ -475,7 +439,6 @@ function startRunEntry(scopeLabel, code) {
     exitCode: 0,
   })
   if (entryId) {
-    appStore.setSelectedResultId(executionLogResultId(entryId))
     appStore.setDataPane('output')
   }
   return {
@@ -558,7 +521,6 @@ async function executeSnippet(code, successLine, options = {}) {
 
   if (normalized?.error) {
     appStore.setTerminalOutput(viewModel.output)
-    appStore.setSelectedResultId(executionLogResultId(effectiveRunEntryId))
     appStore.setDataPane('output')
     return {
       ok: false,
@@ -584,7 +546,6 @@ async function executeSnippet(code, successLine, options = {}) {
       scalarOutputs,
     })
   }
-  appStore.setSelectedResultId(executionLogResultId(effectiveRunEntryId))
   appStore.setDataPane('output')
   appStore.setTerminalOutput(viewModel.output)
   return {
@@ -622,7 +583,6 @@ async function runCode() {
       exitCode: 1,
       durationMs: Math.round(performance.now() - runMeta.startedAtMs),
     })
-    appStore.setSelectedResultId(executionLogResultId(runMeta.entryId))
     appStore.setDataPane('output')
   } finally {
     isRunning.value = false
@@ -665,7 +625,6 @@ async function runSelectedCode() {
       exitCode: 1,
       durationMs: Math.round(performance.now() - runMeta.startedAtMs),
     })
-    appStore.setSelectedResultId(executionLogResultId(runMeta.entryId))
     appStore.setDataPane('output')
   } finally {
     isRunning.value = false
@@ -847,7 +806,7 @@ async function downloadCode() {
       defaultFileName: filename,
       mimeType: 'text/x-python;charset=utf-8;',
       payload: bytes,
-      tauriFilters: [{ name: 'Python file', extensions: ['py'] }],
+      nativeFilters: [{ name: 'Python file', extensions: ['py'] }],
       browserFileTypes: [{ description: 'Python file', accept: { 'text/x-python': ['.py'] } }],
     })
     if (!exported) {
@@ -877,8 +836,6 @@ function isDefaultEditorContent(content) {
 onMounted(async () => {
   isMounted.value = true
   await nextTick()
-  await fetchSettings()
-  await fetchDatabasePaths()
 
   await initializeEditor()
 })
@@ -905,18 +862,6 @@ watch(() => appStore.isLoading, (loading) => {
 watch(() => appStore.pythonFileContent, () => {
   if (!isUpdatingFromStore && editor) {
     updateEditorContent()
-  }
-})
-
-watch(() => authStore.userId, async (newUserId, oldUserId) => {
-  if (newUserId !== oldUserId && newUserId) {
-    await fetchDatabasePaths()
-  }
-})
-
-watch(() => appStore.activeWorkspaceId, async () => {
-  if (appStore.columnCatalog.length > 0) {
-    appStore.setColumnCatalog([])
   }
 })
 

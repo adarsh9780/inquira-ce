@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestCurrentTermsBundlesRustLegalDocument(t *testing.T) {
+func TestCurrentTermsBundlesDesktopLegalDocument(t *testing.T) {
 	terms := CurrentTerms()
 	if terms.LastUpdated != "2026-06-07" {
 		t.Fatalf("last updated = %q", terms.LastUpdated)

@@ -6,8 +6,6 @@ import { resolve } from 'node:path'
 const ACTIVE_THEME_SURFACES = [
   'src/App.vue',
   'src/components/layout/UnifiedSidebar.vue',
-  'src/components/layout/sidebar/SidebarWorkspaces.vue',
-  'src/components/layout/sidebar/SidebarDatasets.vue',
   'src/components/chat/ChatInput.vue',
   'src/components/chat/ColumnSuggest.vue',
   'src/components/analysis/OutputTab.vue',

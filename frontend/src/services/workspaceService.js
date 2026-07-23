@@ -1,5 +1,3 @@
-import { apiService } from './apiService'
-
 function wailsApp() {
   if (typeof window === 'undefined') return null
   return window.go?.main?.App || null
@@ -13,58 +11,42 @@ function callWails(method, ...args) {
   return app[method](...args)
 }
 
-// Keep the copied browser/Tauri UI usable against the Python API while the
-// Wails executable moves workspace metadata to Go.
 export const workspaceService = {
   isNative() {
     return !!wailsApp()
   },
 
   list() {
-    if (this.isNative()) return callWails('ListWorkspaces')
-    return apiService.v1ListWorkspaces()
+    if (!this.isNative()) return Promise.resolve([])
+    return callWails('ListWorkspaces')
   },
 
   create(name, schemaContext = '') {
-    if (this.isNative()) {
-      return callWails('CreateWorkspace', {
-        name: String(name || ''),
-        schema_context: String(schemaContext || ''),
-      })
-    }
-    return apiService.v1CreateWorkspace(name, schemaContext)
+    return callWails('CreateWorkspace', {
+      name: String(name || ''),
+      schema_context: String(schemaContext || ''),
+    })
   },
 
   activate(workspaceId) {
-    if (this.isNative()) return callWails('ActivateWorkspace', String(workspaceId || ''))
-    return apiService.v1ActivateWorkspace(workspaceId)
+    return callWails('ActivateWorkspace', String(workspaceId || ''))
   },
 
   update(workspaceId, name, schemaContext = undefined) {
-    if (this.isNative()) {
-      const request = {
-        workspace_id: String(workspaceId || ''),
-        name: String(name || ''),
-      }
-      if (schemaContext !== undefined) request.schema_context = String(schemaContext || '')
-      return callWails('UpdateWorkspace', request)
+    const request = {
+      workspace_id: String(workspaceId || ''),
+      name: String(name || ''),
     }
-    return apiService.v1RenameWorkspace(workspaceId, name, schemaContext)
+    if (schemaContext !== undefined) request.schema_context = String(schemaContext || '')
+    return callWails('UpdateWorkspace', request)
   },
 
   summary(workspaceId) {
-    if (this.isNative()) return callWails('GetWorkspaceSummary', String(workspaceId || ''))
-    return apiService.v1GetWorkspaceSummary(workspaceId)
+    return callWails('GetWorkspaceSummary', String(workspaceId || ''))
   },
 
   delete(workspaceId) {
-    if (this.isNative()) return callWails('DeleteWorkspace', String(workspaceId || ''))
-    return apiService.v1DeleteWorkspace(workspaceId)
-  },
-
-  listDeletionJobs() {
-    if (this.isNative()) return Promise.resolve({ jobs: [] })
-    return apiService.v1ListWorkspaceDeletionJobs()
+    return callWails('DeleteWorkspace', String(workspaceId || ''))
   },
 }
 

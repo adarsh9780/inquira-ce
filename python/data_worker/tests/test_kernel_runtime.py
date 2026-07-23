@@ -19,7 +19,7 @@ def test_workspace_kernel_reuses_state_and_reads_catalog(tmp_path: Path) -> None
     async def scenario() -> None:
         catalog = tmp_path / "workspace.duckdb"
         create_catalog(catalog)
-        manager = WorkspaceKernelManager(idle_seconds=300)
+        manager = WorkspaceKernelManager()
         try:
             first = await manager.execute(
                 workspace_id="workspace-1",
@@ -52,7 +52,7 @@ def test_workspace_kernels_are_isolated_and_resettable(tmp_path: Path) -> None:
     async def scenario() -> None:
         catalog = tmp_path / "workspace.duckdb"
         create_catalog(catalog)
-        manager = WorkspaceKernelManager(idle_seconds=300)
+        manager = WorkspaceKernelManager()
         try:
             await manager.execute(
                 workspace_id="workspace-1", database_path=str(catalog), code="secret_value = 9",
@@ -79,7 +79,7 @@ def test_kernel_captures_streams_dataframe_results_and_full_artifacts(tmp_path: 
         create_catalog(catalog)
         artifact_dir = tmp_path / "artifacts"
         events: list[dict] = []
-        manager = WorkspaceKernelManager(idle_seconds=300)
+        manager = WorkspaceKernelManager()
         try:
             result = await manager.execute(
                 workspace_id="workspace-1",
@@ -121,7 +121,7 @@ def test_kernel_displays_and_captures_a_plotly_last_expression(tmp_path: Path) -
     async def scenario() -> None:
         catalog = tmp_path / "workspace.duckdb"
         create_catalog(catalog)
-        manager = WorkspaceKernelManager(idle_seconds=300)
+        manager = WorkspaceKernelManager()
         try:
             result = await manager.execute(
                 workspace_id="workspace-plotly",
@@ -151,7 +151,7 @@ def test_kernel_preserves_legacy_set_active_run_argument_order(tmp_path: Path) -
     async def scenario() -> None:
         catalog = tmp_path / "workspace.duckdb"
         create_catalog(catalog)
-        manager = WorkspaceKernelManager(idle_seconds=300)
+        manager = WorkspaceKernelManager()
         try:
             result = await manager.execute(
                 workspace_id="workspace-1",
@@ -177,7 +177,7 @@ def test_kernel_timeout_interrupts_execution_and_remains_usable(tmp_path: Path) 
     async def scenario() -> None:
         catalog = tmp_path / "workspace.duckdb"
         create_catalog(catalog)
-        manager = WorkspaceKernelManager(idle_seconds=300)
+        manager = WorkspaceKernelManager()
         try:
             timed_out = await manager.execute(
                 workspace_id="workspace-1", database_path=str(catalog),
@@ -202,7 +202,7 @@ def test_workspace_kernel_reconnects_when_catalog_is_atomically_replaced(tmp_pat
     async def scenario() -> None:
         catalog = tmp_path / "workspace.duckdb"
         create_catalog(catalog)
-        manager = WorkspaceKernelManager(idle_seconds=300)
+        manager = WorkspaceKernelManager()
         try:
             before = await manager.execute(
                 workspace_id="workspace-1",

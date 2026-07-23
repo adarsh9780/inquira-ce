@@ -9,10 +9,9 @@ from typing import Any, Callable
 
 from .langgraph_agent import LangGraphAnalysisAgent
 from .artifacts import inspect_parquet, query_parquet
-from .commands import CommandExecutionError, compile_command, list_command_definitions
+from .commands import CommandExecutionError, compile_command
 from .errors import AdapterError
 from .kernel import WorkspaceKernelManager
-from .interventions import InterventionBroker
 from .rpc import handle_request as handle_data_request
 from .schema_generation import SchemaGenerator
 
@@ -24,11 +23,10 @@ class ActiveAgentTask:
 
 
 class WorkerRuntime:
-    def __init__(self, *, idle_seconds: int = 1800) -> None:
-        self.kernels = WorkspaceKernelManager(idle_seconds=idle_seconds)
+    def __init__(self) -> None:
+        self.kernels = WorkspaceKernelManager()
         self.agent = LangGraphAnalysisAgent(kernels=self.kernels)
         self.schema_generator = SchemaGenerator()
-        self.interventions = InterventionBroker()
         self._agent_tasks: dict[str, ActiveAgentTask] = {}
 
     async def handle(
@@ -108,28 +106,10 @@ class WorkerRuntime:
                     "client_request_id": client_request_id,
                     "cancelled": cancelled,
                 }
-            elif method == "agent_intervention_respond":
-                intervention_id = _intervention_id(params)
-                selected = params.get("selected", [])
-                if not isinstance(selected, list) or len(selected) > 20 or not all(
-                    isinstance(item, str) and len(item) <= 200 for item in selected
-                ):
-                    raise RuntimeRequestError(
-                        "invalid_params", "Intervention selection is invalid."
-                    )
-                accepted = await self.interventions.submit_response(
-                    intervention_id, selected
-                )
-                response["result"] = {
-                    "intervention_id": intervention_id,
-                    "accepted": accepted,
-                }
             elif method == "schema_describe":
                 response["result"] = await self.schema_generator.generate(params)
             elif method == "command_compile":
                 response["result"] = compile_command(params)
-            elif method == "command_list":
-                response["result"] = {"commands": list_command_definitions()}
             elif method == "artifact_inspect":
                 response["result"] = await asyncio.to_thread(
                     inspect_parquet, _artifact_path(params)
@@ -176,8 +156,6 @@ class WorkerRuntime:
                     "workspace_id": workspace_id,
                     "interrupted": await self.kernels.interrupt(workspace_id),
                 }
-            elif method == "kernel_prune":
-                response["result"] = {"pruned": await self.kernels.prune_idle()}
             else:
                 raise RuntimeRequestError(
                     "method_not_found", f"RPC method {method} was not found."
@@ -207,7 +185,6 @@ class WorkerRuntime:
             task.cancel()
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
-        await self.interventions.close()
         await self.kernels.shutdown()
 
 
@@ -235,13 +212,6 @@ def _client_request_id(params: dict[str, Any], *, fallback: str = "") -> str:
     value = params.get("client_request_id", fallback)
     if not isinstance(value, str) or not value.strip() or len(value.strip()) > 128:
         raise RuntimeRequestError("invalid_params", "client_request_id is invalid.")
-    return value.strip()
-
-
-def _intervention_id(params: dict[str, Any]) -> str:
-    value = params.get("intervention_id")
-    if not isinstance(value, str) or not value.strip() or len(value.strip()) > 128:
-        raise RuntimeRequestError("invalid_params", "intervention_id is invalid.")
     return value.strip()
 
 

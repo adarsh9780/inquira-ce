@@ -13,11 +13,11 @@ test('app store requires a ready workspace and effective provider access for cha
   assert.equal(source.includes('return workspaceReadiness.value.ready'), true)
 })
 
-test('user preferences recover from stale active workspace ids', () => {
+test('workspace listing recovers from a stale locally restored workspace id', () => {
   const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
   const source = readFileSync(storePath, 'utf-8')
 
-  assert.equal(source.includes('Preferences may point to deleted/stale workspace IDs.'), true)
-  assert.equal(source.includes('!workspaces.value.some((ws) => ws.id === activeWorkspaceId.value)'), true)
-  assert.equal(source.includes('activeWorkspaceId.value = active?.id || \'\''), true)
+  assert.equal(source.includes('activeWorkspaceId.value && !items.some((ws) => ws.id === activeWorkspaceId.value)'), true)
+  assert.equal(source.includes('activeWorkspaceId.value = items[0]?.id || \'\''), true)
+  assert.equal(source.includes("activeConversationId.value = ''"), true)
 })

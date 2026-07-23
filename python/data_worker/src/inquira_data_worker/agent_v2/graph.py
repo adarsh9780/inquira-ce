@@ -1,4 +1,4 @@
-"""Agent v2 graph for external runtime service."""
+"""Agent v2 graph for the embedded local worker."""
 
 from __future__ import annotations
 
@@ -44,7 +44,6 @@ from .nodes import (
     route_node,
     route_to_next,
 )
-from .services.tracing import init_phoenix_tracing
 from .state import AgentOutput, AgentState, build_input_state
 
 
@@ -222,7 +221,6 @@ def _with_stream_event_emitter(fn):
 
 def build_graph(config: RunnableConfig) -> CompiledStateGraph:
     _ = config
-    init_phoenix_tracing()
     from langgraph.graph import END, START, StateGraph
 
     builder = StateGraph(AgentState, input_schema=RuntimeInput, output_schema=AgentOutput)

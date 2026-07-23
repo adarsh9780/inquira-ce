@@ -18,7 +18,6 @@ const manualChunkGroups = {
   'ui-icons': ['node_modules/@heroicons/vue/'],
   'ui-headless': ['node_modules/@headlessui/vue/'],
   'plotly-charts': ['node_modules/plotly.js-dist-min/'],
-  'axios-http': ['node_modules/axios/'],
   'utils': ['node_modules/markdown-it/', 'node_modules/dompurify/'],
 }
 
@@ -31,8 +30,6 @@ function manualChunks(id) {
   }
   return undefined
 }
-
-
 // https://vite.dev/config/
 export default defineConfig({
   envDir: '..',
@@ -42,9 +39,6 @@ export default defineConfig({
     vue(),
     tailwindcss()
   ],
-  esbuild: {
-    // drop: ['console', 'debugger']
-  },
   define: {
     global: 'globalThis',
     __APP_VERSION__: JSON.stringify(frontendVersion),
@@ -60,7 +54,6 @@ export default defineConfig({
       '@codemirror/commands',
       'vue',
       'pinia',
-      'axios',
       '@heroicons/vue',
       '@headlessui/vue',
       'markdown-it',
@@ -73,14 +66,6 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
       'Cross-Origin-Resource-Policy': 'cross-origin'
-    },
-    proxy: {
-      '/upload': 'http://127.0.0.1:8000',
-      '/analyze': 'http://127.0.0.1:8000',
-      '/execute': 'http://127.0.0.1:8000',
-      '/export': 'http://127.0.0.1:8000',
-      '/log': 'http://127.0.0.1:8000',
-      '/health': 'http://127.0.0.1:8000'
     }
   },
   preview: {

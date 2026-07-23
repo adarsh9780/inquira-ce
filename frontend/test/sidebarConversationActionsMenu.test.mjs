@@ -45,14 +45,3 @@ test('sidebar stale conversation deletion and hidden legal code stay removed', (
   assert.equal(sidebarSource.includes('v-if="false"'), false)
   assert.equal(sidebarSource.includes('Delete {{ selectedConversationIds.size }}'), false)
 })
-
-test('frontend ui audit records token, component, and stale-code findings', () => {
-  const auditSource = read('../docs/frontend-ui-audit.md')
-
-  assert.equal(auditSource.includes('text-white'), true)
-  assert.equal(auditSource.includes('bg-black/25'), true)
-  assert.equal(auditSource.includes('Floating action menus should be shared'), true)
-  assert.equal(auditSource.includes('Dropdown internals are duplicated'), true)
-  assert.equal(auditSource.includes('WorkspaceSwitcher.vue was re-checked'), true)
-  assert.equal(auditSource.includes('isRenamingWorkspace.value = true` twice'), false)
-})

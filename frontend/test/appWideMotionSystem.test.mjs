@@ -21,13 +21,12 @@ test('app motion primitives share intentional timing and reduced-motion behavior
 
 test('floating overlays animate from their anchor and are positioned before enter', () => {
   const headerDropdown = read('src/components/ui/HeaderDropdown.vue')
-  const multiSelect = read('src/components/ui/MultiSelectDropdown.vue')
   const modelSelector = read('src/components/ui/ModelSelector.vue')
   const floatingMenu = read('src/components/ui/FloatingActionMenu.vue')
   const floatingPosition = read('src/composables/useFloatingDropdown.js')
   const sharedDropdown = read('src/components/ui/dropdownShared.js')
 
-  for (const source of [headerDropdown, multiSelect]) {
+  for (const source of [headerDropdown]) {
     assert.match(source, /<Transition name="motion-popover" @before-enter="prepareFloatingPosition">/)
     assert.match(source, /function prepareFloatingPosition\(element\)/)
     assert.doesNotMatch(source, /duration-100 ease-out|duration-75 ease-in/)
@@ -47,7 +46,6 @@ test('dialogs, compact panels, disclosures, and toasts all have exit motion', ()
     'src/components/modals/ConfirmationModal.vue',
     'src/components/modals/KeyboardShortcutsModal.vue',
     'src/components/modals/TermsModal.vue',
-    'src/components/modals/WorkspaceRenameModal.vue',
     'src/components/modals/CommandPaletteModal.vue',
     'src/components/modals/ConversationTreeRulesModal.vue',
     'src/components/chat/TurnTreeNodeActions.vue',
@@ -59,18 +57,15 @@ test('dialogs, compact panels, disclosures, and toasts all have exit motion', ()
   }
 
   const popoverPaths = [
-    'src/components/WorkspaceSwitcher.vue',
     'src/components/layout/StatusBar.vue',
     'src/components/layout/UnifiedSidebar.vue',
     'src/components/analysis/table/DataTable.vue',
-    'src/components/layout/sidebar/SidebarWorkspaces.vue',
     'src/components/chat/ChatInput.vue',
   ]
   for (const path of popoverPaths) {
     assert.match(read(path), /<Transition name="motion-popover"/, path)
   }
 
-  assert.match(read('src/components/ui/DisclosureSection.vue'), /motion-disclosure-open/)
   assert.match(read('src/components/chat/ToolOutputPreview.vue'), /motion-disclosure-content/)
   assert.match(read('src/components/ui/ToastContainer.vue'), /<TransitionGroup name="motion-toast"/)
 })

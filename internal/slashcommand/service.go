@@ -26,21 +26,6 @@ type catalogSource interface {
 
 type compiler interface {
 	Compile(context.Context, CompileRequest) (CompiledCommand, error)
-	List(context.Context) (Catalog, error)
-}
-
-func (s *Service) List(ctx context.Context, workspaceID string) (Catalog, error) {
-	if strings.TrimSpace(workspaceID) == "" {
-		return Catalog{}, apperror.New("workspace_required", "Choose a workspace before loading commands.")
-	}
-	result, err := s.compiler.List(ctx)
-	if err != nil {
-		return Catalog{}, apperror.Wrap("command_catalog_failed", "Could not load workspace commands.", err)
-	}
-	if result.Commands == nil {
-		result.Commands = make([]Definition, 0)
-	}
-	return result, nil
 }
 
 type executor interface {

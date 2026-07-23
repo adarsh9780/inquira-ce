@@ -21,8 +21,9 @@ test('chat column autocomplete uses DuckDB quoted identifiers for special column
 
   assert.equal(source.includes('function buildColumnReference(tableName, columnName)'), true)
   assert.equal(source.includes('function collectColumnCandidates()'), true)
-  assert.equal(source.includes('appStore.ingestedColumns'), true)
-  assert.equal(source.includes('appStore.ingestedTableName'), true)
+  assert.equal(source.includes('appStore.columnCatalog'), true)
+  assert.equal(source.includes('appStore.ingestedColumns'), false)
+  assert.equal(source.includes('appStore.ingestedTableName'), false)
   assert.equal(source.includes('return `${table}.${quoteSqlIdentifier(column)}`'), true)
   assert.equal(source.includes('isSpecial: !isSimpleIdentifier(columnName)'), true)
   assert.equal(source.includes('selected.insertText'), true)

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 from langchain_core.messages import HumanMessage
 
-from inquira_data_worker.agent_v2.nodes import _get_model, analysis_assess_context_node
+from inquira_data_worker.agent_v2.nodes import _get_model
 from inquira_data_worker.agent_v2.router import decide_route
 
 
@@ -109,46 +109,6 @@ def test_get_model_uses_schema_token_budget_for_lite_path(monkeypatch) -> None:
     )
 
     assert int(captured.get("max_tokens") or 0) == 2048
-
-
-@pytest.mark.asyncio
-async def test_analysis_assess_context_uses_non_lite_model_path(monkeypatch) -> None:
-    captured: dict[str, object] = {}
-
-    class _FakePrompt:
-        def __or__(self, other):
-            return other
-
-    class _FakeModel:
-        def with_structured_output(self, _schema):
-            return object()
-
-    def fake_get_model(_config, *, lite):
-        captured["lite"] = lite
-        return _FakeModel()
-
-    async def fake_ainvoke(_chain, _payload):
-        return {"enough_context": True, "missing_context": [], "tool_plan": []}
-
-    monkeypatch.setattr("inquira_data_worker.agent_v2.nodes._get_model", fake_get_model)
-    monkeypatch.setattr("inquira_data_worker.agent_v2.nodes.ChatPromptTemplate.from_messages", lambda *_args, **_kwargs: _FakePrompt())
-    monkeypatch.setattr("inquira_data_worker.agent_v2.nodes._ainvoke_structured_chain", fake_ainvoke)
-
-    result = await analysis_assess_context_node(
-        {
-            "analysis_context": {
-                "messages": [HumanMessage(content="show top performers")],
-                "user_text": "show top performers",
-                "schema_summary": "orders(id, revenue)",
-                "table_names": ["orders"],
-            },
-            "known_columns": [],
-        },
-        {"configurable": {}},
-    )
-
-    assert captured.get("lite") is False
-    assert result.get("context_sufficiency", {}).get("enough_context") is True
 
 
 @pytest.mark.asyncio

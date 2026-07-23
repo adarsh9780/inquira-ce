@@ -114,7 +114,7 @@ onMounted(async () => {
       appStore.setActiveConversationId(appStore.conversations[0].id)
     }
     if (appStore.activeConversationId) {
-      await appStore.fetchConversationTurns({ reset: true })
+      await appStore.fetchConversationTurns()
     }
   } catch (error) {
     console.error('Failed to initialize workspace conversations:', error)
@@ -127,7 +127,7 @@ watch(
     if (!workspaceId) return
     await appStore.fetchConversations()
     if (appStore.activeConversationId) {
-      await appStore.fetchConversationTurns({ reset: true })
+      await appStore.fetchConversationTurns()
     }
   }
 )

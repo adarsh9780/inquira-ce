@@ -168,7 +168,7 @@ func TestDeletingLastWorkspaceLetsNextWorkspaceBecomeActive(t *testing.T) {
 	}
 }
 
-func TestWorkspaceAIConfigurationPersistsResolvesAndResetsOverrides(t *testing.T) {
+func TestWorkspaceAIConfigurationPersistsAndResolvesOverrides(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "inquira.db")
 	repository, err := OpenSQLite(path)
 	if err != nil {
@@ -231,14 +231,6 @@ func TestWorkspaceAIConfigurationPersistsResolvesAndResetsOverrides(t *testing.T
 	persisted, err := service.GetAIConfig(context.Background(), created.ID)
 	if err != nil || persisted.Overrides.MainModel == nil || *persisted.Overrides.MainModel != mainModel || !persisted.Readiness.ConfigurationReviewed {
 		t.Fatalf("persisted AI config = %#v, %v", persisted, err)
-	}
-	reset, err := service.ResetAIConfig(context.Background(), created.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if reset.Overrides.Provider != nil || reset.Overrides.MainModel != nil || reset.Overrides.CodingModel != nil ||
-		!reset.Overrides.AllowLLMDataSamples || !reset.Readiness.ConfigurationReviewed || reset.Effective.MainModel != "gpt-main" {
-		t.Fatalf("reset AI config = %#v", reset)
 	}
 }
 

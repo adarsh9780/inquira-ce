@@ -648,7 +648,7 @@ async function createConversation(workspaceId = appStore.activeWorkspaceId) {
     updateSidebarConversationCache(String(appStore.activeWorkspaceId || '').trim(), appStore.conversations)
     if (conversation?.id) {
       appStore.setActiveConversationId(conversation.id)
-      await appStore.fetchConversationTurns({ reset: true })
+      await appStore.fetchConversationTurns()
     }
   } catch (error) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to create conversation'))
@@ -673,7 +673,7 @@ async function selectConversation(workspaceId, id) {
       appStore.setWorkspacePane('chat')
       appStore.setActiveTab('workspace')
     }
-    await appStore.fetchConversationTurns({ reset: true, preferLatest: true })
+    await appStore.fetchConversationTurns({ preferLatest: true })
   } catch (error) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to load conversation'))
   }
@@ -829,7 +829,6 @@ async function confirmDelete() {
 onMounted(async () => {
   try {
     await appStore.fetchWorkspaces()
-    await appStore.fetchWorkspaceDeletionJobs()
     if (appStore.activeWorkspaceId) {
       await appStore.fetchConversations()
       updateSidebarConversationCache(appStore.activeWorkspaceId, appStore.conversations)

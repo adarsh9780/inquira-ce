@@ -4,11 +4,11 @@ This repository is the Go/Wails desktop application for Inquira. It keeps the
 existing Vue UI, uses Go for native application services, and runs ingestion,
 Jupyter, and the LangGraph analysis agent through one bundled Python worker.
 
-## First migrated product slice
+## Current architecture
 
 Model connection is handled natively by Go when the UI runs inside Wails:
 
-- model preferences and cached provider catalogs are stored in a migrated
+- model preferences and cached provider catalogs are stored in the local
   SQLite database under the user's Inquira data directory;
 - OpenAI, OpenRouter, and Anthropic API keys are verified before being stored in the OS
   keychain, and are never written to SQLite;
@@ -18,8 +18,8 @@ Model connection is handled natively by Go when the UI runs inside Wails:
 - model refresh failures retain the verified credential and fall back to the
   cached catalog.
 
-The Vue model-settings flow uses direct Wails bindings in the desktop build and
-retains its existing HTTP fallback for browser/Tauri development.
+The Vue model-settings flow communicates directly with Go through Wails
+bindings; there is no secondary HTTP application backend.
 
 On first Wails launch, Inquira now opens a focused model-connection flow before
 the workspace shell. Completion is persisted in SQLite only after a key-backed
@@ -27,11 +27,10 @@ provider is configured or an Ollama endpoint successfully returns models. The
 in-app Setup checklist uses the same native connection status and then guides
 the user to workspace and local-data setup.
 
-Workspace metadata is also native in the Wails build. Go now creates, lists,
-activates, renames, and deletes workspaces in the same migrated SQLite database.
+Workspace metadata is native as well. Go creates, lists,
+activates, renames, and deletes workspaces in the same SQLite database.
 The first workspace becomes active automatically, names are case-insensitively
-unique, and deleting the active workspace selects a remaining workspace. The
-browser/Tauri build retains its Python HTTP fallback.
+unique, and deleting the active workspace selects a remaining workspace.
 
 Workspace AI configuration is native as well. Application credentials remain
 in the OS keychain, while each workspace can persist provider, main, lite, and
@@ -98,8 +97,8 @@ pointers or application metadata.
 
 Native agent streams are also scoped by client request, workspace,
 conversation, turn, and run. Cancelling a request cannot stop a newer analysis
-in the same workspace. Tool progress and intervention responses use the same
-local Go-to-worker RPC boundary rather than the legacy HTTP service.
+in the same workspace. Tool progress uses the same local Go-to-worker RPC
+boundary.
 
 The consent-gated local terminal also runs natively in the Wails application.
 Go owns one interactive shell session per workspace, streams PTY data through
@@ -145,7 +144,7 @@ Workspace → Connections → Data runtime setup.
 
 ## Build
 
-Requirements for the first scaffold build are Go, Node.js, npm, and the Wails
+Requirements for the desktop build are Go, Node.js, npm, and the Wails
 v2 CLI. The build command downloads the pinned, target-specific UV release and
 embeds it into the native executable.
 
@@ -189,7 +188,7 @@ make test-live-provider
 
 ```text
 cmd/prepareuv/                 Build-time UV bundler
-frontend/                      Existing Inquira Vue UI
+frontend/                      Vue 3 desktop interface
 internal/appdirs/              Central application path resolution
 internal/connection/           Connection metadata, snapshots, refresh, and worker RPC
 internal/conversation/         SQLite conversation index and filesystem artifact heap

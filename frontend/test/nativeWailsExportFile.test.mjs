@@ -7,14 +7,13 @@ import { bytesToBase64 } from '../src/utils/exportEncoding.js'
 
 const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
-test('Wails exports use the native Go save dialog before legacy desktop and browser fallbacks', () => {
+test('Wails exports use the native Go save dialog', () => {
   const service = read('src/utils/exportFile.js')
   const goApp = read('../app.go')
 
   assert.equal(service.includes('app?.SaveExportFile'), true)
   assert.equal(service.includes('bytesToBase64'), true)
   assert.equal(service.includes('content_base64'), true)
-  assert.equal(service.indexOf('app?.SaveExportFile') < service.indexOf('window.__TAURI_INTERNALS__'), true)
   assert.equal(goApp.includes('func (a *App) SaveExportFile(request desktop.ExportRequest) (bool, error)'), true)
 })
 

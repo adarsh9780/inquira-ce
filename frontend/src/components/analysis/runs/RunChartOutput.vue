@@ -21,9 +21,7 @@ async function renderPlot() {
   const rawFigure = normalizePlotlyFigure(props.output?.data ?? props.output)
   if (!rawFigure || !plotContainer.value) return
   await nextTick()
-  const mode = String(appStore.plotlyThemeMode || '').toLowerCase() === PLOTLY_THEME_MODE.HARD
-    ? PLOTLY_THEME_MODE.HARD
-    : PLOTLY_THEME_MODE.SOFT
+  const mode = PLOTLY_THEME_MODE.SOFT
   const figure = applyPlotlyTheme(rawFigure, { mode, context: 'panel' }) || rawFigure
   const config = applyPlotlyConfigTheme({
     displayModeBar: true,
@@ -50,7 +48,7 @@ onMounted(() => {
   }
 })
 
-watch(() => [props.output, appStore.uiTheme, appStore.plotlyThemeMode], () => void renderPlot(), { deep: true })
+watch(() => [props.output, appStore.uiTheme], () => void renderPlot(), { deep: true })
 
 onUnmounted(() => {
   resizeObserver?.disconnect()

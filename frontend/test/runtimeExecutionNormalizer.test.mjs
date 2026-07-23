@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { latestExpressionVariables, normalizeExecutionResponse } from '../src/utils/runtimeExecution.js'
 
-test('normalizes stdout/stderr into legacy output field', () => {
+test('normalizes stdout and stderr into the compatibility output field', () => {
   const normalized = normalizeExecutionResponse({
     success: true,
     stdout: 'hello',

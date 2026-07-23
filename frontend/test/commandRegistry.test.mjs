@@ -54,7 +54,8 @@ test('executeCommand dispatches to backend endpoint with workspace context', asy
   const result = await executeCommand('/shape sales', {
     appStore: {
       activeWorkspaceId: 'ws-1',
-      ingestedTableName: 'sales',
+      activeWorkspaceSummary: { table_names: ['sales'] },
+      columnCatalog: [],
       activeConversationId: 'conv-1',
     },
     apiService: mockApiService,
@@ -73,7 +74,8 @@ test('executeCommand requires injected API client to avoid bundling api service 
     executeCommand('/shape sales', {
       appStore: {
         activeWorkspaceId: 'ws-1',
-        ingestedTableName: 'sales',
+        activeWorkspaceSummary: { table_names: ['sales'] },
+        columnCatalog: [],
       },
     }),
     /requires an API client/,

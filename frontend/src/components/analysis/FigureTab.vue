@@ -126,7 +126,6 @@ const exportMenuButtonRef = ref(null)
 const exportMenuPosition = ref({ x: 0, y: 0 })
 let listAbortController = null
 let figureAbortController = null
-const DEFAULT_PLOTLY_THEME_MODE = PLOTLY_THEME_MODE.SOFT
 
 const exportMenuItems = computed(() => [
   { id: 'png', label: 'PNG image (.png)' },
@@ -337,7 +336,7 @@ watch(() => appStore.dataPane, (pane) => {
 })
 
 watch(
-  () => [appStore.uiTheme, appStore.plotlyThemeMode],
+  () => appStore.uiTheme,
   async () => {
     if (!selectedFigure.value || appStore.dataPane !== 'figure') return
     await nextTick()
@@ -461,12 +460,6 @@ async function waitForContainer(retries = 10) {
   return false
 }
 
-function resolvePlotThemeMode() {
-  const appMode = String(appStore.plotlyThemeMode || '').trim().toLowerCase()
-  if (appMode === PLOTLY_THEME_MODE.HARD) return PLOTLY_THEME_MODE.HARD
-  return DEFAULT_PLOTLY_THEME_MODE
-}
-
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -489,7 +482,7 @@ async function renderPlot() {
     plotContainer.value.style.height = '100%'
 
     const rawFigureData = selectedFigure.value
-    const themeMode = resolvePlotThemeMode()
+    const themeMode = PLOTLY_THEME_MODE.SOFT
     const figureData = applyPlotlyTheme(rawFigureData, { mode: themeMode, context: 'panel' }) || rawFigureData
 
     const layout = {
@@ -557,7 +550,7 @@ async function downloadPng() {
       defaultFileName: filename,
       mimeType: 'image/png',
       payload: bytes,
-      tauriFilters: [{ name: 'PNG Image', extensions: ['png'] }],
+      nativeFilters: [{ name: 'PNG Image', extensions: ['png'] }],
       browserFileTypes: [{ description: 'PNG Image', accept: { 'image/png': ['.png'] } }]
     })
     if (exported) toast.success('Export complete', 'Chart saved as PNG.')
@@ -576,7 +569,7 @@ async function downloadHtml() {
 
   try {
     const rawFigureData = selectedFigure.value
-    const themeMode = resolvePlotThemeMode()
+    const themeMode = PLOTLY_THEME_MODE.SOFT
     const figureData = applyPlotlyTheme(rawFigureData, { mode: themeMode, context: 'export' }) || rawFigureData
     const plotlyConfig = applyPlotlyConfigTheme({}, { mode: themeMode })
     const chartTitle = String(selectedFigureMeta.value?.display_name || selectedFigureMeta.value?.logical_name || 'Chart Visualization')
@@ -619,7 +612,7 @@ async function downloadHtml() {
       defaultFileName: filename,
       mimeType: 'text/html',
       payload: bytes,
-      tauriFilters: [{ name: 'HTML File', extensions: ['html'] }],
+      nativeFilters: [{ name: 'HTML File', extensions: ['html'] }],
       browserFileTypes: [{ description: 'HTML File', accept: { 'text/html': ['.html'] } }]
     })
     if (exported) toast.success('Export complete', 'Chart saved as HTML.')

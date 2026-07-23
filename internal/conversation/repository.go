@@ -18,8 +18,6 @@ var (
 	errArtifactNotFound     = errors.New("artifact not found")
 	errTurnStateInvalid     = errors.New("turn state does not allow this operation")
 	errTurnNotLeaf          = errors.New("turn is not a leaf")
-	errTurnCycle            = errors.New("turn move would create a cycle")
-	errTurnOrderInvalid     = errors.New("turn order is invalid")
 )
 
 type SQLiteRepository struct {
@@ -297,132 +295,6 @@ func (r *SQLiteRepository) CreateTurn(ctx context.Context, turn Turn) (Turn, err
 		return Turn{}, err
 	}
 	return turn, nil
-}
-
-func (r *SQLiteRepository) MoveTurn(ctx context.Context, conversationID, turnID string, parentTurnID *string, updatedAt string) (Turn, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return Turn{}, err
-	}
-	defer tx.Rollback()
-	var oldParent sql.NullString
-	if err := tx.QueryRowContext(ctx, `SELECT parent_turn_id FROM turns WHERE id = ? AND conversation_id = ?`, turnID, conversationID).Scan(&oldParent); errors.Is(err, sql.ErrNoRows) {
-		return Turn{}, errTurnNotFound
-	} else if err != nil {
-		return Turn{}, err
-	}
-	if parentTurnID != nil {
-		if *parentTurnID == turnID {
-			return Turn{}, errTurnCycle
-		}
-		var parentConversation string
-		if err := tx.QueryRowContext(ctx, `SELECT conversation_id FROM turns WHERE id = ?`, *parentTurnID).Scan(&parentConversation); errors.Is(err, sql.ErrNoRows) || parentConversation != conversationID {
-			return Turn{}, errParentTurnNotFound
-		} else if err != nil {
-			return Turn{}, err
-		}
-		var descendant bool
-		if err := tx.QueryRowContext(ctx, `WITH RECURSIVE descendants(id) AS (SELECT id FROM turns WHERE parent_turn_id = ? UNION ALL SELECT t.id FROM turns t JOIN descendants d ON t.parent_turn_id = d.id) SELECT EXISTS(SELECT 1 FROM descendants WHERE id = ?)`, turnID, *parentTurnID).Scan(&descendant); err != nil {
-			return Turn{}, err
-		}
-		if descendant {
-			return Turn{}, errTurnCycle
-		}
-	}
-	var order int
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(sibling_order)+1,0) FROM turns WHERE conversation_id = ? AND parent_turn_id IS ? AND id <> ?`, conversationID, parentTurnID, turnID).Scan(&order); err != nil {
-		return Turn{}, err
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE turns SET parent_turn_id = ?, sibling_order = ?, updated_at = ? WHERE id = ?`, parentTurnID, order, updatedAt, turnID); err != nil {
-		return Turn{}, err
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE conversations SET final_turn_id = NULL, updated_at = ? WHERE id = ? AND final_turn_id IS ?`, updatedAt, conversationID, parentTurnID); err != nil {
-		return Turn{}, err
-	}
-	if oldParent.Valid {
-		_, err = tx.ExecContext(ctx, `WITH ordered AS (SELECT id, ROW_NUMBER() OVER (ORDER BY sibling_order,id)-1 AS n FROM turns WHERE conversation_id=? AND parent_turn_id=?) UPDATE turns SET sibling_order=(SELECT n FROM ordered WHERE ordered.id=turns.id) WHERE id IN (SELECT id FROM ordered)`, conversationID, oldParent.String)
-	} else {
-		_, err = tx.ExecContext(ctx, `WITH ordered AS (SELECT id, ROW_NUMBER() OVER (ORDER BY sibling_order,id)-1 AS n FROM turns WHERE conversation_id=? AND parent_turn_id IS NULL) UPDATE turns SET sibling_order=(SELECT n FROM ordered WHERE ordered.id=turns.id) WHERE id IN (SELECT id FROM ordered)`, conversationID)
-	}
-	if err != nil {
-		return Turn{}, err
-	}
-	if err := tx.Commit(); err != nil {
-		return Turn{}, err
-	}
-	return r.GetTurn(ctx, turnID)
-}
-
-func (r *SQLiteRepository) ReorderTurns(ctx context.Context, conversationID string, parentTurnID *string, turnIDs []string, updatedAt string) ([]Turn, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-	var conversationExists bool
-	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM conversations WHERE id=? AND status=?)`, conversationID, ConversationStatusActive).Scan(&conversationExists); err != nil {
-		return nil, err
-	}
-	if !conversationExists {
-		return nil, errConversationNotFound
-	}
-	if parentTurnID != nil {
-		var parentExists bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM turns WHERE id=? AND conversation_id=?)`, *parentTurnID, conversationID).Scan(&parentExists); err != nil {
-			return nil, err
-		}
-		if !parentExists {
-			return nil, errParentTurnNotFound
-		}
-	}
-	rows, err := tx.QueryContext(ctx, `SELECT id FROM turns WHERE conversation_id = ? AND parent_turn_id IS ? ORDER BY sibling_order,id`, conversationID, parentTurnID)
-	if err != nil {
-		return nil, err
-	}
-	existing := []string{}
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		existing = append(existing, id)
-	}
-	rows.Close()
-	if len(existing) != len(turnIDs) {
-		return nil, errTurnOrderInvalid
-	}
-	want := map[string]bool{}
-	for _, id := range existing {
-		want[id] = true
-	}
-	seen := map[string]bool{}
-	for _, id := range turnIDs {
-		if !want[id] || seen[id] {
-			return nil, errTurnOrderInvalid
-		}
-		seen[id] = true
-	}
-	for order, id := range turnIDs {
-		if _, err := tx.ExecContext(ctx, `UPDATE turns SET sibling_order=?, updated_at=? WHERE id=?`, order, updatedAt, id); err != nil {
-			return nil, err
-		}
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE conversations SET updated_at=? WHERE id=?`, updatedAt, conversationID); err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	result := make([]Turn, 0, len(turnIDs))
-	for _, id := range turnIDs {
-		turn, err := r.GetTurn(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, turn)
-	}
-	return result, nil
 }
 
 func (r *SQLiteRepository) SetFinalTurn(ctx context.Context, conversationID, turnID, updatedAt string) (Turn, error) {
@@ -703,15 +575,6 @@ func (r *SQLiteRepository) DeleteArtifact(ctx context.Context, id string) error 
 		return errArtifactNotFound
 	}
 	return nil
-}
-
-func (r *SQLiteRepository) ListWorkspaceArtifacts(ctx context.Context, workspaceID string) ([]Artifact, error) {
-	rows, err := r.db.QueryContext(ctx, artifactSelect+` WHERE a.workspace_id=? ORDER BY a.created_at,a.id`, workspaceID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanArtifacts(rows)
 }
 
 func (r *SQLiteRepository) Close() error { return r.db.Close() }

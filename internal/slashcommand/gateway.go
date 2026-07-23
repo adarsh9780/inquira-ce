@@ -19,9 +19,3 @@ func (g *WorkerGateway) Compile(ctx context.Context, request CompileRequest) (Co
 	err := g.transport.Call(ctx, "command_compile", request, &result)
 	return result, err
 }
-
-func (g *WorkerGateway) List(ctx context.Context) (Catalog, error) {
-	var result Catalog
-	err := g.transport.Call(ctx, "command_list", map[string]any{}, &result)
-	return result, err
-}

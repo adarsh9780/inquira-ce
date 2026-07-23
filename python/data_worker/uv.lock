@@ -292,8 +292,8 @@ dependencies = [
     { name = "duckdb" },
     { name = "ipykernel" },
     { name = "jupyter-client" },
-    { name = "langchain" },
     { name = "langchain-anthropic" },
+    { name = "langchain-core" },
     { name = "langchain-ollama" },
     { name = "langchain-openai" },
     { name = "langgraph" },
@@ -315,8 +315,8 @@ requires-dist = [
     { name = "duckdb", specifier = ">=1.1,<2" },
     { name = "ipykernel", specifier = ">=6.30,<8" },
     { name = "jupyter-client", specifier = ">=8.6,<9" },
-    { name = "langchain", specifier = ">=1.0.1,<2" },
     { name = "langchain-anthropic", specifier = ">=0.3,<2" },
+    { name = "langchain-core", specifier = ">=1.0,<2" },
     { name = "langchain-ollama", specifier = ">=1.0,<2" },
     { name = "langchain-openai", specifier = ">=1.0.1,<2" },
     { name = "langgraph", specifier = ">=1.0,<2" },
@@ -501,20 +501,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/02/49/9d1284d0dc65e2c757b74c6687b6d319b02f822ad039e5c512df9194d9dd/jupyter_core-5.9.1.tar.gz", hash = "sha256:4d09aaff303b9566c3ce657f580bd089ff5c91f5f89cf7d8846c3cdf465b5508", size = 89814 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e7/e7/80988e32bf6f73919a113473a604f5a8f09094de312b9d52b79c2df7612b/jupyter_core-5.9.1-py3-none-any.whl", hash = "sha256:ebf87fdc6073d142e114c72c9e29a9d7ca03fad818c5d300ce2adc1fb0743407", size = 29032 },
-]
-
-[[package]]
-name = "langchain"
-version = "1.3.14"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "langchain-core" },
-    { name = "langgraph" },
-    { name = "pydantic" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/29/68/a6dbad9c22df4087a0f9e79ddd46226c442b30128bfeee538d5889492a73/langchain-1.3.14.tar.gz", hash = "sha256:1b6696c72ba3bbbce54d745e0180742c9f6ece8bbc59ed5a46c3e20b9a435929", size = 645181 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/ec/0f942e78a621f8e3162ff1ed24284f469aaf51fb4607ee5831c626f2b2bc/langchain-1.3.14-py3-none-any.whl", hash = "sha256:4d10dbe91005952cddd56d0dc77aa108964da6bae90ab20063653957e901f782", size = 139560 },
 ]
 
 [[package]]

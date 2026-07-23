@@ -49,29 +49,10 @@ type ConversationUsage struct {
 	Usage          UsageSummary `json:"usage"`
 }
 
-type MoveTurnRequest struct {
-	ConversationID string  `json:"conversation_id"`
-	TurnID         string  `json:"turn_id"`
-	ParentTurnID   *string `json:"parent_turn_id"`
-}
-
-type ReorderTurnsRequest struct {
-	ConversationID string   `json:"conversation_id"`
-	ParentTurnID   *string  `json:"parent_turn_id"`
-	TurnIDs        []string `json:"turn_ids"`
-}
-
 type DeleteTurnResult struct {
 	ConversationID string   `json:"conversation_id"`
 	DeletedTurnIDs []string `json:"deleted_turn_ids"`
 	Deleted        bool     `json:"deleted"`
-}
-
-type FinalRerun struct {
-	Conversation Conversation `json:"conversation"`
-	SourceTurn   Turn         `json:"source_turn"`
-	Turn         Turn         `json:"turn"`
-	Code         string       `json:"code"`
 }
 
 type Turn struct {

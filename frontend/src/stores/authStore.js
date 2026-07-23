@@ -1,7 +1,5 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { apiService } from '../services/apiService'
-import { modelConnectionService } from '../services/modelConnectionService'
 
 const DEFAULT_LOCAL_USER = Object.freeze({
   user_id: 'local-user',
@@ -80,7 +78,6 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function setLocalState() {
-    apiService.setAuthToken('')
     applyProfile(localProfile())
   }
 
@@ -88,36 +85,18 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading.value = true
     clearError()
     try {
-      apiService.setAuthToken('')
-      if (modelConnectionService.isNative()) {
-        setLocalState()
-        return true
-      }
-      await checkAuth({ preserveSession: true })
-      return true
-    } catch (_initError) {
       setLocalState()
-      return false
+      return true
     } finally {
       initialSessionResolved.value = true
       isLoading.value = false
     }
   }
 
-  async function checkAuth({ preserveSession = false } = {}) {
-    try {
-      apiService.setAuthToken('')
-      const profile = await apiService.verifyAuth()
-      applyProfile(profile)
-      clearError()
-      return true
-    } catch (authError) {
-      setLocalState()
-      if (!preserveSession) {
-        error.value = String(authError?.message || 'Unable to verify the local session.')
-      }
-      return false
-    }
+  async function checkAuth() {
+    clearError()
+    setLocalState()
+    return true
   }
 
   async function sendMagicLink() {
@@ -129,22 +108,17 @@ export const useAuthStore = defineStore('auth', () => {
     clearError()
     isLoading.value = true
     try {
-      apiService.setAuthToken('')
-      await apiService.v1Logout().catch(() => ({ message: 'Local session cleared.' }))
       setLocalState()
       authFlowStage.value = 'local'
       authFlowMessage.value = 'Local workspace mode is active.'
       return true
-    } catch (logoutError) {
-      error.value = String(logoutError?.message || 'Unable to clear the local session right now.')
-      return false
     } finally {
       isLoading.value = false
     }
   }
 
   async function refreshPlan() {
-    return checkAuth({ preserveSession: true })
+    return checkAuth()
   }
 
   return {

@@ -3,24 +3,24 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('api service persists API key via v1 preferences secure endpoint', () => {
-  const servicePath = resolve(process.cwd(), 'src/services/apiService.js')
-  const contractPath = resolve(process.cwd(), 'src/services/contracts/v1Api.js')
-  const source = readFileSync(servicePath, 'utf-8')
-  const contract = readFileSync(contractPath, 'utf-8')
+test('provider credentials cross the Wails bridge and persist in the OS keychain', () => {
+  const service = readFileSync(
+    resolve(process.cwd(), 'src/services/modelConnectionService.js'),
+    'utf-8',
+  )
+  const goApp = readFileSync(resolve(process.cwd(), '../app.go'), 'utf-8')
+  const secrets = readFileSync(
+    resolve(process.cwd(), '../internal/modelconfig/secrets.go'),
+    'utf-8',
+  )
 
-  assert.equal(source.includes("v1SetApiKey(apiKeyOrPayload, provider = 'openrouter')"), true)
-  assert.equal(source.includes('if (apiKeyOrPayload && typeof apiKeyOrPayload === \'object\' && !Array.isArray(apiKeyOrPayload))'), true)
-  assert.equal(source.includes('return v1Api.preferences.setApiKey(apiKeyOrPayload)'), true)
-  assert.equal(source.includes('return v1Api.preferences.setApiKey({'), true)
-  assert.equal(contract.includes('setApiKey: (payload) =>'), true)
-  assert.equal(contract.includes('verifyKey: (provider, apiKey)'), true)
-  assert.equal(contract.includes('/api/v1/preferences/verify-key'), true)
-  assert.equal(source.includes('v1VerifyApiKey(provider, apiKey)'), true)
-  assert.equal(source.includes("v1DeleteApiKey(provider = 'openrouter')"), true)
-  assert.equal(source.includes('return v1Api.preferences.deleteApiKey(provider)'), true)
-  assert.equal(contract.includes('/api/v1/preferences/api-key'), true)
-  assert.equal(source.includes("const payload = apiKeyOrPayload && typeof apiKeyOrPayload === 'object' && !Array.isArray(apiKeyOrPayload)"), true)
-  assert.equal(source.includes('const response = await this.v1SetApiKey(payload, provider)'), true)
-  assert.equal(source.includes('Provider configuration saved.'), true)
+  assert.equal(service.includes("callWails('VerifyProviderAPIKey'"), true)
+  assert.equal(service.includes("callWails('SaveProviderConfiguration'"), true)
+  assert.equal(service.includes("callWails('DeleteProviderAPIKey'"), true)
+  assert.equal(goApp.includes('func (a *App) VerifyProviderAPIKey(provider, apiKey string)'), true)
+  assert.equal(goApp.includes('func (a *App) SaveProviderConfiguration(request modelconfig.SaveRequest)'), true)
+  assert.equal(goApp.includes('func (a *App) DeleteProviderAPIKey(provider string)'), true)
+  assert.equal(secrets.includes('keyring.Set('), true)
+  assert.equal(secrets.includes('keyring.Get('), true)
+  assert.equal(secrets.includes('keyring.Delete('), true)
 })

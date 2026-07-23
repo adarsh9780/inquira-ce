@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
-test('sidebar turn tree flow loads the full tree and restores state from selection', () => {
+test('workspace turn tree flow loads the full tree and restores state from selection', () => {
   const testDir = dirname(fileURLToPath(import.meta.url))
   const apiSource = readFileSync(resolve(testDir, '../src/services/apiService.js'), 'utf-8')
   const storeSource = readFileSync(resolve(testDir, '../src/stores/appStore.js'), 'utf-8')
@@ -12,10 +12,12 @@ test('sidebar turn tree flow loads the full tree and restores state from selecti
   const graphViewSource = readFileSync(resolve(testDir, '../src/components/chat/TurnTreeGraphView.vue'), 'utf-8')
   const treeActionsSource = readFileSync(resolve(testDir, '../src/components/chat/TurnTreeNodeActions.vue'), 'utf-8')
 
-  assert.equal(apiSource.includes('async v1GetTurnTree(conversationId, currentTurnId = null)'), true)
-  assert.equal(apiSource.includes("return axios.get(`/api/v1/conversations/${conversationId}/turn-tree`, { params })"), true)
-  assert.equal(storeSource.includes('function setActiveTurnTree(payload)'), true)
-  assert.equal(storeSource.includes('setActiveTurnTree(payload)'), true)
+  assert.equal(apiSource.includes('async v1GetWorkspaceTurnTree(workspaceId)'), true)
+  assert.equal(apiSource.includes("requireWailsMethod('ListConversationTurns')"), true)
+  assert.equal(apiSource.includes('const tree = nativeTurnTree('), true)
+  assert.equal(apiSource.includes('v1GetTurnTree'), false)
+  assert.equal(storeSource.includes('function setWorkspaceTurnTree(payload)'), true)
+  assert.equal(storeSource.includes('apiService.v1GetWorkspaceTurnTree(targetWorkspaceId)'), true)
   assert.equal(globalTreeSource.includes('appStore.loadWorkspaceTurnTree()'), true)
   assert.equal(globalTreeSource.includes(':current-parent-turn-id="appStore.activeTurnRelations?.parent?.id || \'\'"'), true)
   assert.equal(globalTreeSource.includes('@select="selectTurn"'), true)

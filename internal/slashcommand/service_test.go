@@ -27,17 +27,12 @@ func (f *fakeCatalog) Prepare(_ context.Context, workspaceID string) (datacatalo
 type fakeCompiler struct {
 	request CompileRequest
 	result  CompiledCommand
-	catalog Catalog
 	err     error
 }
 
 func (f *fakeCompiler) Compile(_ context.Context, request CompileRequest) (CompiledCommand, error) {
 	f.request = request
 	return f.result, f.err
-}
-
-func (f *fakeCompiler) List(_ context.Context) (Catalog, error) {
-	return f.catalog, f.err
 }
 
 type fakeExecutor struct {
@@ -166,17 +161,5 @@ func TestExecutePersistsCompilerFailureAndValidatesOwnership(t *testing.T) {
 	_, err = service.Execute(context.Background(), ExecuteRequest{WorkspaceID: "different", ConversationID: thread.ID, Text: "/help", RowLimit: 500}, nil)
 	if err == nil {
 		t.Fatal("workspace ownership mismatch was accepted")
-	}
-}
-
-func TestListReturnsNativeCommandCatalogAndValidatesWorkspace(t *testing.T) {
-	compiler := &fakeCompiler{catalog: Catalog{Commands: []Definition{{Name: "help", Usage: "/help"}}}}
-	service := NewService(nil, nil, compiler, nil)
-	result, err := service.List(context.Background(), "workspace-1")
-	if err != nil || len(result.Commands) != 1 || result.Commands[0].Name != "help" {
-		t.Fatalf("List() = %#v, %v", result, err)
-	}
-	if _, err := service.List(context.Background(), " "); err == nil {
-		t.Fatal("blank workspace was accepted")
 	}
 }

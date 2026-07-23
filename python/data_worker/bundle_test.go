@@ -19,7 +19,6 @@ func TestExtractWritesTheWorkerProjectAndIsRepeatable(t *testing.T) {
 		"src/inquira_data_worker/kernel.py",
 		"src/inquira_data_worker/langgraph_agent.py",
 		"src/inquira_data_worker/agent_v2/graph.py",
-		"src/inquira_data_worker/agent_v2/prompts/react_system.yaml",
 		"src/inquira_data_worker/rpc.py",
 		"src/inquira_data_worker/runtime.py",
 		"src/inquira_data_worker/commands.py",
@@ -29,6 +28,12 @@ func TestExtractWritesTheWorkerProjectAndIsRepeatable(t *testing.T) {
 		if err != nil || len(content) == 0 {
 			t.Fatalf("extracted %s: bytes=%d error=%v", relative, len(content), err)
 		}
+	}
+	if _, err := os.Stat(filepath.Join(
+		target,
+		"src/inquira_data_worker/agent_v2/prompts/react_system.yaml",
+	)); !os.IsNotExist(err) {
+		t.Fatalf("retired react prompt should not be bundled: %v", err)
 	}
 	if err := Extract(target); err != nil {
 		t.Fatalf("repeat Extract() error = %v", err)

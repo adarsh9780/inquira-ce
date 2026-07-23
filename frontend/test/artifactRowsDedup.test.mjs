@@ -1,24 +1,22 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import fs from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
-test('apiService deduplicates in-flight artifact row requests and supports per-caller abort', () => {
-  const __filename = fileURLToPath(import.meta.url)
-  const __dirname = path.dirname(__filename)
-  const filePath = path.resolve(__dirname, '..', 'src', 'services', 'apiService.js')
-  const source = fs.readFileSync(filePath, 'utf8')
+test('native artifact rows deduplicate in-flight requests and support per-caller abort', () => {
+  const source = readFileSync(
+    resolve(process.cwd(), 'src/services/apiService.js'),
+    'utf8',
+  )
 
   assert.equal(source.includes('const artifactRowsInFlight = new Map()'), true)
-  assert.equal(source.includes('const sortModelPayload = JSON.stringify(normalizedSortModel)'), true)
-  assert.equal(source.includes('const filterModelPayload = JSON.stringify(normalizedFilterModel)'), true)
-  assert.equal(source.includes('const requestKey = ['), true)
-  assert.equal(source.includes('sortModelPayload,'), true)
-  assert.equal(source.includes('filterModelPayload,'), true)
-  assert.equal(source.includes('normalizedSearchText,'), true)
-  assert.equal(source.includes('artifactRowsInFlight.get(requestKey)'), true)
-  assert.equal(source.includes('artifactRowsInFlight.set(requestKey, inFlight)'), true)
-  assert.equal(source.includes('artifactRowsInFlight.delete(requestKey)'), true)
-  assert.equal(source.includes('return withAbortSignal(inFlight, options?.signal || null)'), true)
+  assert.equal(source.includes('const sortModel = Array.isArray(options?.sortModel)'), true)
+  assert.equal(source.includes("const searchText = String(options?.searchText || '').trim()"), true)
+  assert.equal(source.includes('const key = ['), true)
+  assert.equal(source.includes('JSON.stringify(sortModel)'), true)
+  assert.equal(source.includes('JSON.stringify(filterModel)'), true)
+  assert.equal(source.includes('artifactRowsInFlight.get(key)'), true)
+  assert.equal(source.includes('artifactRowsInFlight.set(key, inFlight)'), true)
+  assert.equal(source.includes('artifactRowsInFlight.delete(key)'), true)
+  assert.equal(source.includes('return withAbortSignal(inFlight, options?.signal)'), true)
 })

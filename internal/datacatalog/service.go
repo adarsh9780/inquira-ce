@@ -180,28 +180,6 @@ func (s *Service) SummarizeWorkspace(ctx context.Context, workspaceID string) (w
 	return summary, nil
 }
 
-func (s *Service) FindDataset(ctx context.Context, workspaceID, sourcePath, tableName string) (Dataset, error) {
-	listed, err := s.ListDatasets(ctx, workspaceID)
-	if err != nil {
-		return Dataset{}, err
-	}
-	wanted := filepath.Clean(strings.TrimSpace(sourcePath))
-	wantedTable := strings.TrimSpace(tableName)
-	matches := make([]Dataset, 0, 1)
-	for _, dataset := range listed.Datasets {
-		if filepath.Clean(dataset.SourcePath) == wanted && (wantedTable == "" || dataset.TableName == wantedTable) {
-			matches = append(matches, dataset)
-		}
-	}
-	if len(matches) == 1 {
-		return matches[0], nil
-	}
-	if len(matches) > 1 {
-		return Dataset{}, apperror.New("dataset_selection_ambiguous", "Choose a specific table or sheet from this connection.")
-	}
-	return Dataset{}, apperror.New("dataset_not_found", "Dataset not found in this workspace.")
-}
-
 func (s *Service) GetSchema(ctx context.Context, workspaceID, tableName string) (DatasetSchema, error) {
 	catalog, err := s.Prepare(ctx, workspaceID)
 	if err != nil {
@@ -268,20 +246,6 @@ func (s *Service) SaveSchema(ctx context.Context, request SaveSchemaRequest) (Da
 		return DatasetSchema{}, apperror.Wrap("schema_save_failed", "Could not save dataset descriptions.", err)
 	}
 	return s.GetSchema(ctx, request.WorkspaceID, current.TableName)
-}
-
-func (s *Service) ListColumns(ctx context.Context, workspaceID string) (WorkspaceColumnsResponse, error) {
-	catalog, err := s.Prepare(ctx, workspaceID)
-	if err != nil {
-		return WorkspaceColumnsResponse{}, err
-	}
-	result := WorkspaceColumnsResponse{Columns: make([]WorkspaceColumn, 0)}
-	for _, table := range catalog.Tables {
-		for _, column := range table.Columns {
-			result.Columns = append(result.Columns, WorkspaceColumn{TableName: table.Name, ColumnName: column.Name, DataType: column.DataType})
-		}
-	}
-	return result, nil
 }
 
 func (s *Service) workspaceLock(id string) *sync.Mutex {

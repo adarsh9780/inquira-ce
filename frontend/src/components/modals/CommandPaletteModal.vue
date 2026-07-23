@@ -483,7 +483,7 @@ async function selectConversation(row) {
     appStore.setActiveConversationId(row.id)
     appStore.setWorkspacePane('chat')
     appStore.setActiveTab('workspace')
-    await appStore.fetchConversationTurns({ reset: true, preferLatest: true })
+    await appStore.fetchConversationTurns({ preferLatest: true })
     emit('close')
   } catch (error) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to load conversation'))
@@ -500,7 +500,7 @@ async function createConversationFromPalette() {
   }
   appStore.setWorkspacePane('chat')
   appStore.setActiveTab('workspace')
-  await appStore.fetchConversationTurns({ reset: true })
+  await appStore.fetchConversationTurns()
   emit('close')
 }
 

@@ -45,10 +45,6 @@ func TestNativeTerminalSessionIsScopedToItsWorkspace(t *testing.T) {
 	if response.Cwd != expectedCwd {
 		t.Fatalf("terminal cwd = %q, want %q", response.Cwd, expectedCwd)
 	}
-	paths, err := app.GetWorkspacePaths(created.ID)
-	if err != nil || !paths.TerminalEnabled {
-		t.Fatalf("workspace paths = %#v, %v", paths, err)
-	}
 	stopped, err := app.StopTerminalSession(response.SessionID)
 	if err != nil || !stopped.Stopped {
 		t.Fatalf("StopTerminalSession() = %#v, %v", stopped, err)

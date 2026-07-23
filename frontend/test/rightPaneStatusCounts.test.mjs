@@ -36,10 +36,9 @@ test('status bar renders pane count from canonical table/chart counts and keeps 
   assert.equal(source.includes('Number(appStore.figureCount || 0)'), true)
   assert.equal(source.includes('v-if="appStore.activeWorkspaceId && paneArtifactCountLabel"'), true)
   assert.equal(source.includes('v-if="appStore.activeWorkspaceId && tableViewportLabel"'), true)
-  assert.equal(source.includes('showArtifactUsageWarning'), true)
-  assert.equal(source.includes('artifactUsageWarningTitle'), true)
-  assert.equal(source.includes('ExclamationTriangleIcon'), true)
-  assert.equal(source.includes('subscribeWorkspaceArtifactUsage'), true)
+  assert.equal(source.includes('showArtifactUsageWarning'), false)
+  assert.equal(source.includes('artifactUsageWarningTitle'), false)
+  assert.equal(source.includes('subscribeWorkspaceArtifactUsage'), false)
 })
 
 test('figure renderer keeps a contextual artifact selector and export actions', () => {
@@ -66,13 +65,4 @@ test('app store keeps figureCount synchronized with setFigures output', () => {
 
   assert.equal(source.includes('figureCount.value = 0'), true)
   assert.equal(source.includes('figureCount.value = figures.value.length'), true)
-})
-
-test('api service exposes artifact usage summary endpoint helper', () => {
-  const apiPath = resolve(process.cwd(), 'src/services/apiService.js')
-  const source = readFileSync(apiPath, 'utf-8')
-
-  assert.equal(source.includes('async v1GetWorkspaceArtifactUsage(workspaceId, options = {})'), true)
-  assert.equal(source.includes('/api/v1/workspaces/${workspaceId}/artifacts/usage'), true)
-  assert.equal(source.includes('Artifact usage fetch failed'), true)
 })

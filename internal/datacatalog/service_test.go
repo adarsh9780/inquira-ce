@@ -293,22 +293,3 @@ func TestNativeDatasetAndSchemaContractsHideSnapshotPointersAndPersistOverrides(
 		t.Fatalf("unknown column error = %v", err)
 	}
 }
-
-func TestFindDatasetRequiresTableNameWhenAWorkbookHasMultipleSelectedSheets(t *testing.T) {
-	path := "/user/report.xlsx"
-	connections := connection.ListResponse{Connections: []connection.Connection{{
-		ID: "workbook", WorkspaceID: "workspace-1", Name: "Report", AdapterKind: connection.AdapterExcel,
-		SourcePath: path, Status: connection.StatusReady, Outputs: []connection.Output{
-			{SourceObjectID: "sheet:North", Name: "North", SnapshotPath: snapshot(t, "north")},
-			{SourceObjectID: "sheet:South", Name: "South", SnapshotPath: snapshot(t, "south")},
-		},
-	}}}
-	service := NewService(fakeWorkspaces{summary: workspace.Summary{ID: "workspace-1"}}, fakeConnections{response: connections}, &fakeCatalogGateway{}, t.TempDir())
-	if _, err := service.FindDataset(context.Background(), "workspace-1", path, ""); errorCode(err) != "dataset_selection_ambiguous" {
-		t.Fatalf("ambiguous workbook error = %v", err)
-	}
-	selected, err := service.FindDataset(context.Background(), "workspace-1", path, "report_south")
-	if err != nil || selected.TableName != "report_south" {
-		t.Fatalf("selected dataset = %#v, %v", selected, err)
-	}
-}

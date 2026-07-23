@@ -29,14 +29,6 @@ func (g *WorkerGateway) Cancel(ctx context.Context, workspaceID, clientRequestID
 	return result.Cancelled, err
 }
 
-func (g *WorkerGateway) RespondIntervention(ctx context.Context, interventionID string, selected []string) (InterventionResponse, error) {
-	var result InterventionResponse
-	err := g.transport.Call(ctx, "agent_intervention_respond", map[string]any{
-		"intervention_id": interventionID, "selected": selected,
-	}, &result)
-	return result, err
-}
-
 func (g *WorkerGateway) Analyze(
 	ctx context.Context,
 	request AgentWorkerRequest,

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('app store exposes pinia state/actions for live token usage updates', () => {
+test('app store exposes only the live token state and actions consumed by the UI', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf8')
 
   assert.equal(source.includes('const liveTokenUsage = ref(null)'), true)
@@ -20,15 +20,14 @@ test('app store exposes pinia state/actions for live token usage updates', () =>
   assert.equal(source.includes('function resolveLatestTokenUsageFromChatHistory(options = {})'), true)
   assert.equal(source.includes('function syncLiveTokenUsageFromChatHistory(options = {})'), true)
   assert.equal(source.includes('syncLiveTokenUsageFromChatHistory()'), true)
-  assert.equal(source.includes('chatHistory.value = history'), true)
   assert.equal(source.includes('liveTokenUsage,'), true)
   assert.equal(source.includes('activeConversationUsage,'), true)
-  assert.equal(source.includes('conversationUsageById,'), true)
-  assert.equal(source.includes('setLiveTokenUsage,'), true)
+  assert.equal(source.includes('conversationUsageById,'), false)
+  assert.equal(source.includes('setLiveTokenUsage,'), false)
   assert.equal(source.includes('setLiveTokenUsageForCurrentTurn,'), true)
-  assert.equal(source.includes('setActiveConversationUsage,'), true)
+  assert.equal(source.includes('setActiveConversationUsage,'), false)
   assert.equal(source.includes('fetchActiveConversationUsage,'), true)
-  assert.equal(source.includes('clearLiveTokenUsage,'), true)
+  assert.equal(source.includes('clearLiveTokenUsage,'), false)
 })
 
 test('chat input applies streamed token usage as current-turn cumulative delta', () => {

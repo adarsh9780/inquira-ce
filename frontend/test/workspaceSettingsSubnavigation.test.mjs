@@ -14,7 +14,7 @@ test('workspace settings separate General, Data sources, and AI without losing w
   assert.match(workspace, /\{ id: 'connections', label: 'Data sources' \}/)
   assert.match(workspace, /\{ id: 'ai', label: 'AI' \}/)
   assert.match(workspace, /v-show="activeWorkspaceSection === 'general'"/)
-  assert.match(workspace, /v-show="isNativeWorkspaceMetadata && activeWorkspaceSection === 'connections'"/)
+  assert.match(workspace, /v-show="activeWorkspaceSection === 'connections'"/)
   assert.match(workspace, /v-show="activeWorkspaceSection === 'ai'"/)
   assert.match(workspace, /props\.initialSection/)
   assert.match(workspace, /moveWorkspaceSection\(-1, \$event\)/)
@@ -35,12 +35,13 @@ test('workspace entry points deep-link to the relevant scoped tab', () => {
   assert.doesNotMatch(composer, /<ModelSelector/)
 })
 
-test('runtime status stays visible while maintenance actions remain secondary', () => {
+test('runtime status stays visible while workspace actions contain current controls', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
 
   assert.match(workspace, /\{\{ runtimeStatusLabel \}\}/)
   assert.match(workspace, /aria-label="Workspace actions"/)
-  assert.match(workspace, />Retry runtime</)
-  assert.match(workspace, />Reset runtime</)
+  assert.match(workspace, />Rename workspace</)
   assert.match(workspace, />Delete workspace</)
+  assert.doesNotMatch(workspace, />Retry runtime</)
+  assert.doesNotMatch(workspace, />Reset runtime</)
 })

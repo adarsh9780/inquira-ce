@@ -11,33 +11,19 @@ test('slash commands execute through the native Go bridge', () => {
   const api = read('src/services/apiService.js')
   const goApp = read('../app.go')
 
-  assert.match(api, /app\?\.ExecuteWorkspaceCommand/)
-  assert.match(api, /app\?\.ListWorkspaceCommands/)
+  assert.match(api, /requireWailsMethod\('ExecuteWorkspaceCommand'\)/)
   assert.match(goApp, /func \(a \*App\) ExecuteWorkspaceCommand/)
-  assert.match(goApp, /func \(a \*App\) ListWorkspaceCommands/)
 })
 
-test('Terms are bundled and loaded without FastAPI in Wails', () => {
+test('Terms are bundled and loaded through the native Go bridge', () => {
   const api = read('src/services/apiService.js')
   const goApp = read('../app.go')
 
-  assert.match(api, /app\?\.GetTermsAndConditions/)
+  assert.match(api, /requireWailsMethod\('GetTermsAndConditions'\)/)
   assert.match(goApp, /func \(a \*App\) GetTermsAndConditions/)
 })
 
-test('native artifact usage updates do not open an HTTP SSE stream', () => {
-  const api = read('src/services/apiService.js')
-  const method = api.slice(
-    api.indexOf('async subscribeWorkspaceArtifactUsage'),
-    api.indexOf('async v1Logout'),
-  )
-
-  assert.match(method, /v1GetWorkspaceArtifactUsage/)
-  assert.match(method, /nativeWailsApp/)
-  assert.doesNotMatch(method, /text\/event-stream[\s\S]*nativeWailsApp/)
-})
-
-test('desktop identity and window constraints match Rust version 0.5.35', () => {
+test('desktop identity and window constraints match release 0.5.35', () => {
   const config = JSON.parse(read('../wails.json'))
   const main = read('../main.go')
 

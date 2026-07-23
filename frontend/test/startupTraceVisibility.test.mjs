@@ -13,7 +13,7 @@ test('startup overlay shows a single status message and elapsed timing hint', ()
   assert.equal(source.includes('currentStartupElapsedLabel'), true)
 })
 
-test('app records startup stages for authenticated workspace and runtime progress', () => {
+test('app records startup stages for workspace progress', () => {
   const appPath = resolve(process.cwd(), 'src/App.vue')
   const source = readFileSync(appPath, 'utf-8')
 
@@ -21,6 +21,5 @@ test('app records startup stages for authenticated workspace and runtime progres
   assert.equal(source.includes("recordStartupStage('desktop'"), false)
   assert.equal(source.includes("recordStartupStage('auth'"), false)
   assert.equal(source.includes("recordStartupStage('workspace'"), true)
-  assert.equal(source.includes("recordStartupStage('runtime'"), true)
   assert.equal(source.includes('[STARTUP TRACE]'), true)
 })

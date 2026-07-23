@@ -13,7 +13,7 @@ test('workspace creation activates the new workspace centrally in the store', ()
   const end = source.indexOf('async function activateWorkspace(workspaceId) {', start)
   const block = source.slice(start, end)
 
-  assert.equal(block.includes('const ws = await apiService.v1CreateWorkspace(name, schemaContext)'), true)
+  assert.equal(block.includes('const ws = await workspaceService.create(name, schemaContext)'), true)
   assert.equal(block.includes('await activateWorkspace(ws.id)'), true)
   assert.equal(block.includes('await fetchWorkspaces()'), true)
 })
@@ -36,7 +36,6 @@ test('existing workspace summary supports inspect-first activation and active-on
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
   const settings = read('src/components/modals/SettingsModal.vue')
 
-  assert.equal(workspace.includes('const requiresWorkspaceActivation = computed(() => !isWorkspaceActive.value)'), true)
   assert.equal(workspace.includes("emit('select-workspace', id)"), true)
   assert.equal(workspace.includes("emit('activate-workspace', id)"), true)
   assert.equal(workspace.includes('v-if="isWorkspaceActive && !isEditingContext"'), true)
@@ -62,9 +61,7 @@ test('workspace activation updates active state immediately without waiting for 
 
 test('workspace launchers open the unified workspace settings surface without step routing', () => {
   const paths = [
-    'src/components/WorkspaceSwitcher.vue',
     'src/components/layout/UnifiedSidebar.vue',
-    'src/components/layout/sidebar/SidebarWorkspaces.vue',
   ]
 
   for (const path of paths) {

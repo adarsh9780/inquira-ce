@@ -97,7 +97,6 @@
                   :active-workspace-id="activeWorkspaceId"
                   :initial-section="workspaceInitialSection"
                   :workspaces="workspaceItems"
-                  @workspace-operation-change="setActiveWorkspaceOperation"
                   @select-workspace="selectWorkspace"
                   @activate-workspace="activateWorkspace"
                   @workspace-created="handleWorkspaceCreated"
@@ -125,7 +124,6 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useLLMConfig } from '../../composables/useLLMConfig'
 import { useAppStore } from '../../stores/appStore'
-import { toast } from '../../composables/useToast'
 import { filenameFromPath } from '../../utils/pathUtils'
 import LLMSettingsTab from './tabs/LLMSettingsTab.vue'
 import WorkspaceTab from './tabs/WorkspaceTab.vue'
@@ -161,8 +159,6 @@ const activeWorkspaceId = ref('')
 const workspaceInitialSection = ref('general')
 const currentPanel = ref('setup')
 const panelDirection = ref('forward')
-const activeWorkspaceOperation = ref('')
-const activeWorkspaceOperationMessage = ref('')
 const dialogRef = ref(null)
 const previouslyFocusedElement = ref(null)
 
@@ -264,7 +260,6 @@ function panelClass(panelId) {
 }
 
 function navigateTo(panel, direction = 'forward') {
-  if (notifyWorkspaceOperationBlocked()) return
   panelDirection.value = direction
   currentPanel.value = panel
   if (panel === 'workspace') {
@@ -273,19 +268,16 @@ function navigateTo(panel, direction = 'forward') {
 }
 
 function openLeafSection(section) {
-  if (notifyWorkspaceOperationBlocked()) return
   activeSection.value = section
   navigateTo(section, 'forward')
 }
 
 function openWorkspaceSection() {
-  if (notifyWorkspaceOperationBlocked()) return
   activeSection.value = 'workspace'
   navigateTo('workspace', 'forward')
 }
 
 function selectWorkspace(workspaceId) {
-  if (notifyWorkspaceOperationBlocked()) return
   const nextId = String(workspaceId || '').trim()
   if (!nextId) return
   if (activeWorkspaceId.value !== nextId) {
@@ -294,7 +286,6 @@ function selectWorkspace(workspaceId) {
 }
 
 async function activateWorkspace(workspaceId) {
-  if (notifyWorkspaceOperationBlocked()) return
   const nextId = String(workspaceId || '').trim()
   if (!nextId) return
   activeWorkspaceId.value = nextId
@@ -311,7 +302,6 @@ function handleWorkspaceCreated(payload) {
 }
 
 function closeModal() {
-  if (notifyWorkspaceOperationBlocked()) return
   emit('update:modelValue', false)
 }
 
@@ -337,27 +327,6 @@ function handleDialogKeydown(event) {
   }
 }
 
-function setActiveWorkspaceOperation(payload) {
-  if (!payload || payload.locked === false) {
-    activeWorkspaceOperation.value = ''
-    activeWorkspaceOperationMessage.value = ''
-    return
-  }
-  activeWorkspaceOperation.value = String(payload.operation || 'workspace').trim()
-  activeWorkspaceOperationMessage.value = String(payload.message || 'Workspace setup is still running.').trim()
-}
-
-function notifyWorkspaceOperationBlocked() {
-  if (!activeWorkspaceOperation.value) return false
-  if (activeSection.value === 'workspace') {
-    return true
-  }
-  toast.info(
-    'Workspace setup in progress',
-    activeWorkspaceOperationMessage.value || 'Wait for the current workspace setup step to finish.',
-  )
-  return true
-}
 </script>
 
 <style scoped>

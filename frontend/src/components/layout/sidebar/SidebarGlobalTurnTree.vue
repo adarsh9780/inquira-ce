@@ -86,7 +86,7 @@ async function selectTurn(payload) {
   try {
     if (targetConversationId !== appStore.activeConversationId) {
       appStore.setActiveConversationId(targetConversationId)
-      await appStore.fetchConversationTurns({ reset: true })
+      await appStore.fetchConversationTurns()
     }
     await appStore.loadActiveTurnRelations(targetTurnId)
     appStore.setActiveTab('workspace')

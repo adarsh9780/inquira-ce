@@ -92,13 +92,4 @@ describe('native analysis bridge', () => {
     expect(app.InterruptWorkspaceKernel).not.toHaveBeenCalled()
   })
 
-  it('submits intervention choices through the native worker binding', async () => {
-    const app = {
-      RespondAgentIntervention: vi.fn().mockResolvedValue({ intervention_id: 'intervention-1', accepted: true }),
-    }
-    window.go = { main: { App: app } }
-    const result = await apiService.v1RespondChatIntervention('intervention-1', ['approve'])
-    expect(app.RespondAgentIntervention).toHaveBeenCalledWith('intervention-1', ['approve'])
-    expect(result).toEqual({ intervention_id: 'intervention-1', accepted: true })
-  })
 })

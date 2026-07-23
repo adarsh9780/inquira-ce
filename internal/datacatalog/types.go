@@ -115,7 +115,3 @@ type WorkspaceColumn struct {
 	ColumnName string `json:"column_name"`
 	DataType   string `json:"dtype"`
 }
-
-type WorkspaceColumnsResponse struct {
-	Columns []WorkspaceColumn `json:"columns"`
-}

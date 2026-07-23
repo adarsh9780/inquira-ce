@@ -27,14 +27,12 @@ class KernelSession:
     client: Any
     status: str = "ready"
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
-    last_used: float = field(default_factory=time.monotonic)
 
 
 class WorkspaceKernelManager:
-    def __init__(self, *, idle_seconds: int = 1800) -> None:
+    def __init__(self) -> None:
         self._sessions: dict[str, KernelSession] = {}
         self._sessions_lock = asyncio.Lock()
-        self._idle_seconds = max(1, int(idle_seconds))
 
     @property
     def session_count(self) -> int:
@@ -56,7 +54,6 @@ class WorkspaceKernelManager:
         async with session.lock:
             session.status = "busy"
             await _emit(emit, {"type": "kernel_status", "status": "busy", "workspace_id": workspace_id})
-            session.last_used = time.monotonic()
             try:
                 await self._execute_request(
                     session,
@@ -126,7 +123,6 @@ class WorkspaceKernelManager:
                 raise
             finally:
                 session.status = "ready"
-                session.last_used = time.monotonic()
                 await _emit(emit, {"type": "kernel_status", "status": "ready", "workspace_id": workspace_id})
 
     async def status(self, workspace_id: str) -> str:
@@ -149,18 +145,6 @@ class WorkspaceKernelManager:
             return False
         await self._interrupt_session(session)
         return True
-
-    async def prune_idle(self) -> int:
-        cutoff = time.monotonic() - self._idle_seconds
-        async with self._sessions_lock:
-            stale_ids = [
-                workspace_id for workspace_id, session in self._sessions.items()
-                if session.last_used < cutoff and not session.lock.locked()
-            ]
-            sessions = [self._sessions.pop(workspace_id) for workspace_id in stale_ids]
-        for session in sessions:
-            await self._shutdown_session(session)
-        return len(sessions)
 
     async def shutdown(self) -> None:
         async with self._sessions_lock:

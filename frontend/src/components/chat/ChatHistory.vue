@@ -1,16 +1,5 @@
 <template>
   <div ref="chatContainer" class="space-y-4" style="min-height: 200px;" role="log" aria-live="polite" aria-relevant="additions" :aria-busy="appStore.activeConversationIsLoading">
-    <div v-if="!appStore.turnViewEnabled && appStore.activeConversationId && appStore.turnsNextCursor" class="flex justify-center">
-      <button
-        type="button"
-        class="text-xs px-3 py-1.5 rounded-full border transition-colors"
-        style="border-color: var(--color-border); background-color: var(--color-surface); color: var(--color-text-muted);"
-        @click="loadMoreTurns"
-      >
-        Load more
-      </button>
-    </div>
-
     <!-- Loading indicator for first message when no history yet -->
     <div v-if="appStore.activeConversationIsLoading && displayedChatHistory.length === 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
       <div class="analyzing-status">
@@ -65,14 +54,6 @@
           <div v-if="message.explanation" class="chat-markdown-content final-response-body max-w-none" style="color: var(--color-text-main);">
             <div v-html="renderMarkdown(message.explanation)"></div>
           </div>
-
-          <AgentIntervention
-            v-if="pendingIntervention(message)"
-            class="mt-3"
-            :intervention="pendingIntervention(message)"
-            :busy="isMessageInterventionBusy(message)"
-            @respond="(payload) => submitInterventionResponse(message, payload)"
-          />
 
           <div
             v-if="hasAnalysisDetails(message)"
@@ -214,14 +195,12 @@
 <script setup>
 import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
-import apiService from '../../services/apiService'
 import {
   DocumentDuplicateIcon,
   ChevronDownIcon,
   CodeBracketIcon,
 } from '@heroicons/vue/24/outline'
 import ToolActivityCard from './ToolActivityCard.vue'
-import AgentIntervention from './AgentIntervention.vue'
 import ChatAssistantMessage from './ChatAssistantMessage.vue'
 import ChatUserMessage from './ChatUserMessage.vue'
 import { toolOutputHasRenderableContent } from '../../utils/toolOutputPreview'
@@ -250,7 +229,6 @@ useChatScrollFollow()
 const chatContainer = ref(null)
 const scrollHost = ref(null)
 const end = ref(null)
-const pendingInterventionIds = ref(new Set())
 const expandedAnalysisMessageIds = ref(new Set())
 const SHOW_EPHEMERAL_TRACE = false
 const showScrollToBottomButton = ref(false)
@@ -288,10 +266,6 @@ function mapTurnToMessage(turn) {
 }
 
 const displayedChatHistory = computed(() => {
-  if (!appStore.turnViewEnabled) {
-    return Array.isArray(appStore.chatHistory) ? appStore.chatHistory : []
-  }
-
   const localHistory = Array.isArray(appStore.chatHistory) ? appStore.chatHistory : []
   if (appStore.activeConversationIsLoading && localHistory.length > 0) {
     const pendingMessage = localHistory[localHistory.length - 1]
@@ -604,12 +578,6 @@ function isToolActivityOutputCollapsed(message, activityIndex) {
     .some((nextActivity) => toolOutputHasRenderableContent(nextActivity))
 }
 
-function pendingIntervention(message) {
-  const intervention = message?.streamTrace?.intervention
-  if (!intervention || typeof intervention !== 'object') return null
-  return intervention
-}
-
 function reasoningRows(message) {
   if (hasFinalResponse(message)) return []
   return streamReasoningEvents(message)
@@ -849,7 +817,6 @@ function hasAssistantContent(message) {
   return Boolean(
     message?.explanation ||
     hasAnalysisDetails(message) ||
-    pendingIntervention(message) ||
     (SHOW_EPHEMERAL_TRACE && hasStreamTrace(message))
   )
 }
@@ -876,51 +843,6 @@ function shouldRenderCodeDetails(message) {
 function openCodePane() {
   appStore.setActiveTab('workspace')
   appStore.setWorkspacePane('code')
-}
-
-async function loadMoreTurns() {
-  try {
-    await appStore.fetchConversationTurns({ reset: false })
-  } catch (error) {
-    console.error('Failed to load more turns:', error)
-  }
-}
-
-function isInterventionBusy(interventionId) {
-  return pendingInterventionIds.value.has(String(interventionId || ''))
-}
-
-function isMessageInterventionBusy(message) {
-  const interventionId = String(message?.streamTrace?.intervention?.id || '')
-  if (!interventionId) return false
-  return isInterventionBusy(interventionId)
-}
-
-async function submitInterventionResponse(message, payload) {
-  const interventionId = String(payload?.id || '')
-  if (!interventionId || isInterventionBusy(interventionId)) return
-  pendingInterventionIds.value.add(interventionId)
-  try {
-    const selected = Array.isArray(payload?.selected) ? payload.selected.map((item) => String(item || '')) : []
-    const response = await apiService.v1RespondChatIntervention(interventionId, selected)
-    const accepted = Boolean(response?.accepted)
-    if (!accepted) {
-      throw new Error('Intervention response was rejected.')
-    }
-    if (message?.streamTrace?.intervention && String(message.streamTrace.intervention.id || '') === interventionId) {
-      message.streamTrace.intervention.selected = selected
-      message.streamTrace.intervention.status = 'submitted'
-      message.streamTrace.intervention.responded_at = new Date().toISOString()
-    }
-  } catch (error) {
-    console.error('Failed to submit intervention response:', error)
-    if (message?.streamTrace?.intervention && String(message.streamTrace.intervention.id || '') === interventionId) {
-      message.streamTrace.intervention.status = 'error'
-    }
-    toast.error('Intervention failed', 'Unable to send your response. Please try again.')
-  } finally {
-    pendingInterventionIds.value.delete(interventionId)
-  }
 }
 
 function resolveScrollHost() {
@@ -1045,7 +967,6 @@ watch(() => appStore.activeConversationId, () => {
 // Watch for loading state changes
 watch(() => appStore.activeConversationIsLoading, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) {
-    pendingInterventionIds.value.clear()
   }
   if (shouldAutoScroll) {
     nextTick(() => scrollToBottom())

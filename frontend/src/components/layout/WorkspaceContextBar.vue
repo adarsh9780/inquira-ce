@@ -177,7 +177,6 @@ const workspaceTableCount = computed(() => Math.max(
 const dataStateLabel = computed(() => {
   const count = workspaceTableCount.value
   if (count > 0) return `${count} table${count === 1 ? '' : 's'}`
-  if (appStore.hasDataFile) return 'Data attached'
   return 'No data'
 })
 

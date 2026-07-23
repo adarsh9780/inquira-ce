@@ -13,7 +13,7 @@ def test_runtime_rpc_manages_workspace_kernel_lifecycle(tmp_path: Path) -> None:
         catalog = tmp_path / "workspace.duckdb"
         connection = duckdb.connect(str(catalog))
         connection.close()
-        runtime = WorkerRuntime(idle_seconds=300)
+        runtime = WorkerRuntime()
         events: list[dict] = []
         try:
             pong = await runtime.handle(
@@ -61,10 +61,9 @@ def test_runtime_rpc_manages_workspace_kernel_lifecycle(tmp_path: Path) -> None:
 
     asyncio.run(scenario())
 
-
 def test_runtime_rpc_rejects_unsafe_or_missing_execution_params(tmp_path: Path) -> None:
     async def scenario() -> None:
-        runtime = WorkerRuntime(idle_seconds=300)
+        runtime = WorkerRuntime()
         try:
             response = await runtime.handle(
                 {
@@ -202,32 +201,18 @@ def test_runtime_rpc_cancels_an_active_agent_request_and_interrupts_its_workspac
     asyncio.run(scenario())
 
 
-def test_runtime_rpc_accepts_only_pending_intervention_responses() -> None:
+def test_runtime_rpc_does_not_expose_a_redundant_command_catalog_method() -> None:
     async def scenario() -> None:
         runtime = WorkerRuntime()
         try:
-            pending = await runtime.interventions.create_request(
-                workspace_id="workspace-1",
-                prompt="Continue?",
-                options=["approve", "deny"],
-                multi_select=False,
-                timeout_sec=10,
+            response = await runtime.handle(
+                {"id": "commands", "method": "command_list", "params": {}},
+                lambda _: None,
             )
-            response = await runtime.handle({
-                "id": "respond",
-                "method": "agent_intervention_respond",
-                "params": {"intervention_id": pending.id, "selected": ["approve", "deny"]},
-            }, lambda _: None)
-            decision = await runtime.interventions.await_response(pending.id, timeout_sec=1)
-            duplicate = await runtime.handle({
-                "id": "duplicate",
-                "method": "agent_intervention_respond",
-                "params": {"intervention_id": pending.id, "selected": ["deny"]},
-            }, lambda _: None)
         finally:
             await runtime.shutdown()
-        assert response["result"] == {"intervention_id": pending.id, "accepted": True}
-        assert decision == {"selected": ["approve"], "timed_out": False, "status": "submitted"}
-        assert duplicate["result"] == {"intervention_id": pending.id, "accepted": False}
+
+        assert response["result"] is None
+        assert response["error"]["code"] == "method_not_found"
 
     asyncio.run(scenario())

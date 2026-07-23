@@ -18,13 +18,3 @@ test('code execution appends output-style terminal entries (not command entries)
   assert.equal(source.includes('runId'), true)
   assert.equal(source.includes('appStore.updateTerminalEntry'), true)
 })
-
-test('terminal tab renders output entries without shell command prompt', () => {
-  const terminalPath = resolve(process.cwd(), 'src/components/analysis/TerminalTab.vue')
-  const source = readFileSync(terminalPath, 'utf-8')
-
-  assert.equal(source.includes("v-if=\"entry.kind !== 'output'\""), true)
-  assert.equal(source.includes('<template v-else>'), true)
-  assert.equal(source.includes("{{ entry.label || 'Output' }}"), true)
-  assert.equal(source.includes('appStore.clearTerminalEntries()'), true)
-})

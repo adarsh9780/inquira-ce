@@ -56,5 +56,5 @@ test('command palette is app-level, uses Cmd/Ctrl+K, and launches common command
   assert.equal(modal.includes('class="command-palette-initials"'), false)
   assert.equal(modal.includes('.command-palette-initials'), false)
   assert.equal(modal.includes('appStore.activateWorkspace(row.workspaceId)'), true)
-  assert.equal(modal.includes('appStore.fetchConversationTurns({ reset: true, preferLatest: true })'), true)
+  assert.equal(modal.includes('appStore.fetchConversationTurns({ preferLatest: true })'), true)
 })

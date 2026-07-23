@@ -910,7 +910,7 @@ async function downloadCsv() {
       defaultFileName: filename,
       mimeType: 'text/csv;charset=utf-8;',
       payload: bytes,
-      tauriFilters: [{ name: 'CSV File', extensions: ['csv'] }],
+      nativeFilters: [{ name: 'CSV File', extensions: ['csv'] }],
       browserFileTypes: [{ description: 'CSV File', accept: { 'text/csv': ['.csv'] } }]
     })
     if (!exported) {

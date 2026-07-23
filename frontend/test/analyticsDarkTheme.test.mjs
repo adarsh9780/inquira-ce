@@ -56,9 +56,10 @@ test('analytics surfaces have dedicated table and chart colors instead of generi
 
 test('charts and terminal refresh their embedded themes when appearance changes', () => {
   const figureSource = read('src/components/analysis/FigureTab.vue')
-  const terminalSource = read('src/components/analysis/TauriTerminalPane.vue')
+  const terminalSource = read('src/components/analysis/NativeTerminalPane.vue')
 
-  assert.equal(figureSource.includes('() => [appStore.uiTheme, appStore.plotlyThemeMode]'), true)
+  assert.equal(figureSource.includes('() => appStore.uiTheme'), true)
+  assert.equal(figureSource.includes('const themeMode = PLOTLY_THEME_MODE.SOFT'), true)
   assert.equal(figureSource.includes('await renderPlot()'), true)
   assert.equal(terminalSource.includes('function syncTerminalTheme()'), true)
   assert.equal(terminalSource.includes('terminal.options.theme = getTerminalVisualTheme()'), true)

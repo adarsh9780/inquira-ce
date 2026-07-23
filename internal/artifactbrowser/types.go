@@ -71,10 +71,3 @@ type DeleteResult struct {
 	ArtifactID string `json:"artifact_id"`
 	Deleted    bool   `json:"deleted"`
 }
-
-type Usage struct {
-	WorkspaceID   string           `json:"workspace_id"`
-	ArtifactCount int              `json:"artifact_count"`
-	TotalBytes    int64            `json:"total_bytes"`
-	ByKind        map[string]int64 `json:"by_kind"`
-}

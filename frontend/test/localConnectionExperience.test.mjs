@@ -26,7 +26,7 @@ test('native workspace data exposes local files and explicit Excel sheet selecti
   assert.doesNotMatch(workspaceTab, /Upload a dataset/)
 })
 
-test('connection service keeps Wails and legacy HTTP boundaries explicit', () => {
+test('connection service uses the Wails bridge for every connection operation', () => {
   const service = read('src/services/connectionService.js')
   assert.match(service, /DiscoverLocalConnection/)
   assert.match(service, /CreateLocalConnection/)
@@ -43,8 +43,7 @@ test('native file picker accepts modern Excel workbooks without claiming legacy 
 
 test('native workspace exposes an analysis catalog built from connection snapshots', () => {
   const app = read('../app.go')
-  const service = read('src/services/catalogService.js')
+  const service = read('src/services/apiService.js')
   assert.match(app, /PrepareWorkspaceCatalog/)
-  assert.match(service, /PrepareWorkspaceCatalog/)
-  assert.match(service, /workspaceId/)
+  assert.doesNotMatch(service, /v1BootstrapWorkspaceRuntime/)
 })

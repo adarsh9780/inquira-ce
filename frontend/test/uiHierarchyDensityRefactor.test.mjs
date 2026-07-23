@@ -20,14 +20,6 @@ test('layout defines elevated light surfaces for sidebar and active workspace pa
   assert.equal(appSource.includes('background-color: var(--color-sidebar-surface);'), true)
 })
 
-test('legacy dataset sidebar still keeps dataset naming helpers', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/components/layout/sidebar/SidebarDatasets.vue'), 'utf-8')
-
-  assert.equal(source.includes('function datasetFriendlyName(tableName) {'), true)
-  assert.equal(source.includes("/__\\d{6,}(?=__|$)/g"), true)
-  assert.equal(source.includes(':title="ds.table_name"'), true)
-})
-
 test('chat keeps composer pinned as footer and improves assistant readability', () => {
   const leftPaneSource = readFileSync(resolve(process.cwd(), 'src/components/layout/WorkspaceLeftPane.vue'), 'utf-8')
   const chatHistorySource = readFileSync(resolve(process.cwd(), 'src/components/chat/ChatHistory.vue'), 'utf-8')

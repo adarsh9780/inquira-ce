@@ -1,5 +1,3 @@
-import { v1Api } from './contracts/v1Api'
-
 function wailsApp() {
   if (typeof window === 'undefined') return null
   return window.go?.main?.App || null
@@ -13,8 +11,6 @@ function callWails(method, ...args) {
   return app[method](...args)
 }
 
-// Model setup is the first migrated vertical slice. Browser/Tauri development
-// keeps using the existing HTTP contract; the Wails executable calls Go directly.
 export const modelConnectionService = {
   isNative() {
     return !!wailsApp()
@@ -31,47 +27,36 @@ export const modelConnectionService = {
   },
 
   getPreferences(provider = null) {
-    if (this.isNative()) return callWails('GetModelPreferences', String(provider || ''))
-    return v1Api.preferences.get(provider)
+    return callWails('GetModelPreferences', String(provider || ''))
   },
 
   updatePreferences(payload) {
-    if (this.isNative()) return callWails('UpdateModelPreferences', payload || {})
-    return v1Api.preferences.update(payload)
+    return callWails('UpdateModelPreferences', payload || {})
   },
 
   refreshModels(payload) {
-    if (this.isNative()) return callWails('RefreshProviderModels', payload || {})
-    return v1Api.preferences.refreshModels(payload)
+    return callWails('RefreshProviderModels', payload || {})
   },
 
   searchModels(provider, query, limit = 25) {
-    if (this.isNative()) {
-      return callWails(
-        'SearchProviderModels',
-        String(provider || ''),
-        String(query || ''),
-        Number(limit || 25),
-      )
-    }
-    return v1Api.preferences.searchModels({ provider, query, limit })
+    return callWails(
+      'SearchProviderModels',
+      String(provider || ''),
+      String(query || ''),
+      Number(limit || 25),
+    )
   },
 
   verifyKey(provider, apiKey) {
-    if (this.isNative()) {
-      return callWails('VerifyProviderAPIKey', String(provider || ''), String(apiKey || ''))
-    }
-    return v1Api.preferences.verifyKey(provider, apiKey)
+    return callWails('VerifyProviderAPIKey', String(provider || ''), String(apiKey || ''))
   },
 
   setApiKey(payload) {
-    if (this.isNative()) return callWails('SaveProviderConfiguration', payload || {})
-    return v1Api.preferences.setApiKey(payload)
+    return callWails('SaveProviderConfiguration', payload || {})
   },
 
   deleteApiKey(provider = 'openrouter') {
-    if (this.isNative()) return callWails('DeleteProviderAPIKey', String(provider || 'openrouter'))
-    return v1Api.preferences.deleteApiKey(provider)
+    return callWails('DeleteProviderAPIKey', String(provider || 'openrouter'))
   },
 }
 

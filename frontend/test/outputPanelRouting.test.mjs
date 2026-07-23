@@ -36,13 +36,14 @@ test('runs renderer pairs code with text, table, and chart output in one block',
   assert.equal(source.includes('<RunChartOutput'), true)
 })
 
-test('manual runtime errors always select Runs', () => {
+test('manual runtime errors route to Runs without separate result selection state', () => {
   const source = readFileSync(
     resolve(process.cwd(), 'src/components/analysis/CodeTab.vue'),
     'utf-8',
   )
 
-  assert.equal(source.includes('appStore.setSelectedResultId(executionLogResultId(effectiveRunEntryId))'), true)
+  assert.equal(source.includes('appStore.setSelectedResultId'), false)
+  assert.equal(source.includes('executionLogResultId'), false)
   assert.equal(source.includes("appStore.setDataPane('output')"), true)
   assert.equal(source.includes('resultPaneForKind'), false)
 })

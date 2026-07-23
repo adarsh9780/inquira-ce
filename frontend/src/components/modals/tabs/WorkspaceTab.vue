@@ -63,10 +63,6 @@
 
       <div
         class="flex h-full min-w-0 flex-col space-y-3"
-        @dragenter.prevent="handleDropDragEnter"
-        @dragover.prevent="handleDropDragOver"
-        @dragleave.prevent="handleDropDragLeave"
-        @drop.prevent="handleDatasetDrop"
       >
         <header class="flex min-w-0 items-center justify-between gap-3 border-b border-[var(--color-border)] pb-2">
           <input
@@ -98,8 +94,6 @@
                 <Transition name="motion-popover">
                   <div v-if="workspaceActionsOpen" class="motion-popover-surface absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-[var(--color-border)] bg-[var(--color-base)] p-1 shadow-lg">
                     <button v-if="isWorkspaceActive" type="button" class="nav-tab w-full text-left" @click="runWorkspaceAction(startRename)">Rename workspace</button>
-                    <button v-if="isWorkspaceActive && !isNativeWorkspaceMetadata" type="button" class="nav-tab w-full text-left" :disabled="isRuntimeActionInProgress" @click="runWorkspaceAction(retryWorkspaceRuntime)">Retry runtime</button>
-                    <button v-if="isWorkspaceActive && !isNativeWorkspaceMetadata" type="button" class="nav-tab w-full text-left" :disabled="isRuntimeActionInProgress" @click="runWorkspaceAction(hardResetWorkspaceRuntime)">Reset runtime</button>
                     <button type="button" class="nav-tab w-full text-left text-[var(--color-danger)]" @click="runWorkspaceAction(requestDeleteWorkspace, activeWorkspace.id)">Delete workspace</button>
                   </div>
                 </Transition>
@@ -148,18 +142,9 @@
               <p v-else class="text-xs text-[var(--color-text-muted)]">No workspace context added yet.</p>
             </div>
           </WorkspaceContextSection>
-            <div v-if="!isNativeWorkspaceMetadata" class="border-t border-[var(--color-border)] pt-4">
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <h4 class="section-label">Runtime</h4>
-                  <p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ runtimeStatusMessage || runtimeStatusLabel }}</p>
-                </div>
-                <span class="text-[10px] text-[var(--color-text-muted)]">Maintenance is under •••</span>
-              </div>
-            </div>
           </div>
 
-          <div v-show="isNativeWorkspaceMetadata && activeWorkspaceSection === 'connections'" class="space-y-3" role="tabpanel" aria-label="Workspace data sources">
+          <div v-show="activeWorkspaceSection === 'connections'" class="space-y-3" role="tabpanel" aria-label="Workspace data sources">
             <section class="rounded-lg border p-4" :class="nativeRuntimeStatus.ready ? 'border-[var(--color-border)] bg-[var(--color-base-soft)]' : 'border-[var(--color-warning-border)] bg-[var(--color-warning-bg)]'">
               <div class="flex items-start justify-between gap-3">
                 <div>
@@ -381,53 +366,6 @@
             <WorkspaceAIConfigSection v-if="activeWorkspace?.id" :workspace-id="activeWorkspace.id" />
           </div>
 
-          <div v-show="!isNativeWorkspaceMetadata && activeWorkspaceSection === 'data'" role="tabpanel" aria-label="Workspace data settings">
-            <WorkspaceDatasetSection>
-            <div class="flex items-center justify-between gap-3">
-              <h4 class="section-label">Linked Datasets</h4>
-              <button v-if="isWorkspaceActive" type="button" class="text-lg font-semibold leading-none text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] disabled:cursor-not-allowed disabled:opacity-50" aria-label="Add dataset" title="Add dataset" :disabled="isDatasetIngesting || isDeletingDataset" @click="openDatasetPicker">+</button>
-            </div>
-
-            <button
-              v-if="isWorkspaceActive"
-              type="button"
-              class="w-full rounded-lg border border-dashed px-4 py-3 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-70"
-              :class="isDropActive ? 'border-[var(--color-accent-border)] bg-[var(--color-accent-soft)]' : 'border-[var(--color-border)] bg-[var(--color-base-soft)]/30 hover:bg-[var(--color-base-soft)]/70'"
-              :disabled="isDatasetIngesting || isDeletingDataset"
-              data-testid="workspace-import-datasets-dropzone"
-              @click="openDatasetPicker"
-            >
-              <p class="text-xs font-medium" :class="isDropActive ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'">{{ isDropActive ? 'Drop files to import them' : 'Drop files here or choose files' }}</p>
-              <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">CSV, TSV, Parquet, JSON, XLSX, and XLS</p>
-            </button>
-
-            <div v-if="isDatasetIngesting" class="rounded-lg px-4 py-3" :class="datasetIngestHasError ? 'bg-[var(--color-danger-bg)]' : 'bg-[var(--color-accent-soft)]'" aria-live="polite">
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0"><p class="truncate text-sm font-medium" :class="datasetIngestHasError ? 'text-[var(--color-danger)]' : 'text-[var(--color-accent)]'">{{ datasetIngestFilename || 'Selected dataset' }}</p><p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ datasetIngestStatusLabel }}</p></div>
-                <button v-if="datasetIngestHasError" type="button" class="btn-secondary px-2 py-1 text-xs" @click="retryLastDatasetIngestion">Retry</button>
-                <span v-else class="mt-0.5 h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-accent)]/40 border-t-[var(--color-accent)]"></span>
-              </div>
-            </div>
-
-            <div v-if="datasetEntries.length" class="space-y-2">
-              <div v-for="dataset in datasetEntries" :key="dataset.table_name" class="rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)] px-3 py-2.5">
-                <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0"><p class="truncate text-xs font-medium text-[var(--color-text-main)]">{{ dataset.filename }}</p><p class="mt-0.5 text-[10px] text-[var(--color-text-muted)]">{{ datasetMetadata(dataset) }}</p></div>
-                  <div class="flex shrink-0 items-center gap-1.5">
-                    <span class="rounded-full px-2 py-0.5 text-[9px] font-medium" :class="datasetSchemaStatusBadgeClass(dataset)">{{ datasetSchemaStatusLabel(dataset) }}</span>
-                    <template v-if="isWorkspaceActive">
-                      <button type="button" class="rounded p-1 text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]" title="Regenerate schema" :disabled="isDatasetIngesting || isDeletingDataset || isSchemaRegenerateSubmitting" @click="requestRegenerateDatasetSchema(dataset)">↻</button>
-                      <button type="button" class="rounded p-1 text-[var(--color-text-muted)] hover:text-[var(--color-danger)]" title="Remove dataset" :disabled="isDatasetIngesting || isDeletingDataset" @click="requestRemoveDataset(dataset)">×</button>
-                    </template>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div v-else-if="!isWorkspaceActive" class="rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-base-soft)]/20 py-6 text-center">
-              <p class="text-xs text-[var(--color-text-muted)]">Activate this workspace to add datasets.</p>
-            </div>
-            </WorkspaceDatasetSection>
-          </div>
         </div>
 
         <div v-else class="flex flex-1 flex-col items-center justify-center rounded-lg bg-[var(--color-base-soft)] px-5 py-8 text-center">
@@ -436,16 +374,6 @@
         </div>
       </div>
     </div>
-
-    <ConfirmationModal
-      :is-open="isDatasetDeleteDialogOpen"
-      title="Delete Dataset"
-      :message="datasetDeleteDialogMessage"
-      confirm-text="Delete"
-      cancel-text="Cancel"
-      @close="closeDatasetDeleteDialog"
-      @confirm="confirmRemoveDataset"
-    />
 
     <ConfirmationModal
       :is-open="isWorkspaceDeleteDialogOpen"
@@ -457,15 +385,6 @@
       @confirm="deleteWorkspace"
     />
 
-    <ConfirmationModal
-      :is-open="isSchemaRegenerateDialogOpen"
-      title="Regenerate Schema"
-      :message="schemaRegenerateDialogMessage"
-      confirm-text="Regenerate"
-      cancel-text="Cancel"
-      @close="closeSchemaRegenerateDialog"
-      @confirm="confirmRegenerateDatasetSchema"
-    />
   </section>
 </template>
 
@@ -475,29 +394,17 @@ const handledConnectionFlowRequestIds = new WeakMap()
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { stat } from '@tauri-apps/plugin-fs'
-import { apiService } from '../../../services/apiService'
 import { workspaceService } from '../../../services/workspaceService'
 import { connectionService } from '../../../services/connectionService'
 import { runtimeProvisionService } from '../../../services/runtimeProvisionService'
-import { previewService } from '../../../services/previewService'
-import { settingsWebSocket } from '../../../services/websocketService'
 import { useAppStore } from '../../../stores/appStore'
 import { toast } from '../../../composables/useToast'
 import WorkspaceAIConfigSection from './WorkspaceAIConfigSection.vue'
 import { extractApiErrorMessage } from '../../../utils/apiError'
-import {
-  datasetImportLabel,
-  filterSupportedDatasetPaths,
-  getDroppedDatasetPaths,
-  SUPPORTED_DATASET_EXTENSIONS,
-} from '../../../utils/datasetImport'
 import { filenameFromPath } from '../../../utils/pathUtils'
 import ConfirmationModal from '../ConfirmationModal.vue'
 import WorkspaceContextSection from './workspace/WorkspaceContextSection.vue'
-import WorkspaceDatasetSection from './workspace/WorkspaceDatasetSection.vue'
 import WorkspaceListPanel from './workspace/WorkspaceListPanel.vue'
-import { useWorkspaceDatasets } from '../../../composables/useWorkspaceDatasets'
 
 const props = defineProps({
   activeWorkspaceId: {
@@ -514,22 +421,15 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['select-workspace', 'activate-workspace', 'workspace-operation-change', 'workspace-created'])
+const emit = defineEmits(['select-workspace', 'activate-workspace', 'workspace-created'])
 
 const appStore = useAppStore()
-useWorkspaceDatasets()
 const isNativeWorkspaceMetadata = workspaceService.isNative()
-const workspaceSections = isNativeWorkspaceMetadata
-  ? [
-      { id: 'general', label: 'General' },
-      { id: 'connections', label: 'Data sources' },
-      { id: 'ai', label: 'AI' },
-    ]
-  : [
-      { id: 'general', label: 'General' },
-      { id: 'data', label: 'Data' },
-      { id: 'ai', label: 'AI' },
-    ]
+const workspaceSections = [
+  { id: 'general', label: 'General' },
+  { id: 'connections', label: 'Data sources' },
+  { id: 'ai', label: 'AI' },
+]
 const activeWorkspaceSection = ref('general')
 const nativeConnections = ref([])
 const pendingConnection = ref(null)
@@ -543,9 +443,6 @@ const runtimeProvisionError = ref('')
 const runtimeConfigurationOpen = ref(false)
 const runtimePlanSummary = ref('')
 const isWorkspaceTabMounted = ref(false)
-const lastHandledConnectionFlowRequestId = ref(
-  Number(handledConnectionFlowRequestIds.get(appStore) || 0),
-)
 const runtimeConfig = ref({
   mode: 'managed',
   pythonVersion: '3.12',
@@ -608,55 +505,20 @@ function moveWorkspaceSection(direction, event) {
 
 const workspaceSummaries = ref({})
 const workspaceDetail = ref(null)
-const datasetEntries = ref([])
-const datasetColumnCounts = ref({})
-const datasetFileSizes = ref({})
-const isDatasetIngesting = ref(false)
-const datasetIngestFilename = ref('')
-const datasetIngestMessage = ref('')
-const datasetIngestPercent = ref(null)
-const datasetIngestError = ref('')
-const lastSelectedDatasetPaths = ref([])
-const isDatasetDeleteDialogOpen = ref(false)
-const pendingRemovalDataset = ref(null)
-const isDeletingDataset = ref(false)
-const isSchemaRegenerateDialogOpen = ref(false)
-const pendingSchemaRegenerateDataset = ref(null)
-const isSchemaRegenerateSubmitting = ref(false)
 const isRenamingInline = ref(false)
 const renameValue = ref('')
 const renameInputRef = ref(null)
 const isWorkspaceDeleteDialogOpen = ref(false)
 const pendingWorkspaceDeletionId = ref('')
-const datasetDeletionPollers = new Map()
-const datasetIngestionPollers = new Map()
-const pendingSchemaReadyNotifications = new Set()
-let unsubscribeProgress = null
-let unsubscribeRuntimeError = null
-let unsubscribeRuntimeComplete = null
-let datasetSchemaPoller = null
-const isE2EMode = import.meta.env.VITE_E2E === '1'
 
 const isCreatingWorkspace = ref(false)
-const isCreatingWorkspaceRuntime = ref(false)
-const workspaceCreateMessage = ref('Saving the workspace name. You will add context next.')
-const runtimeProgressEntries = ref([])
-const runtimeProgressError = ref('')
-const runtimeActionMode = ref('')
-const isRetryingWorkspaceRuntime = ref(false)
-const isHardResettingWorkspaceRuntime = ref(false)
-const activeWorkspaceOperation = ref('')
-const activeWorkspaceOperationMessage = ref('')
 const setupWorkspaceName = ref('')
 const setupWorkspaceContext = ref('')
 const savedWorkspaceContext = ref('')
 const isSavingWorkspaceIdentity = ref(false)
-const isCheckingWorkspaceReadiness = ref(false)
 const isInlineCreating = ref(false)
 const isEditingContext = ref(false)
 const newWorkspaceInputRef = ref(null)
-const isDropActive = ref(false)
-const dropDepth = ref(0)
 
 function normalizeWorkspaceName(value) {
   return String(value || '').toUpperCase()
@@ -667,8 +529,6 @@ const workspaceCards = computed(() => {
   return items.map((workspace) => {
     const id = String(workspace?.id || '').trim()
     const name = String(workspace?.name || '').trim()
-    const duckdbPath = String(workspace?.duckdb_path || '').trim()
-    const filename = filenameFromPath(duckdbPath, 'workspace.duckdb')
     const summary = workspaceSummaries.value?.[id] || {}
     const conversationCount = Number(summary?.conversation_count || 0)
     const lastActive = String(workspace?.updated_at || '').trim()
@@ -676,7 +536,6 @@ const workspaceCards = computed(() => {
       ...workspace,
       id,
       name,
-      filename,
       conversationCount,
       lastActiveLabel: formatRelativeTime(lastActive),
     }
@@ -688,117 +547,34 @@ const isWorkspaceActive = computed(() => !!activeWorkspace.value && activeWorksp
 const selectedWorkspaceContext = computed(() => String(workspaceDetail.value?.schema_context ?? activeWorkspace.value?.schema_context ?? '').trim())
 const normalizedSetupWorkspaceContext = computed(() => String(setupWorkspaceContext.value || '').trim())
 const isWorkspaceContextDirty = computed(() => normalizedSetupWorkspaceContext.value !== String(savedWorkspaceContext.value || '').trim())
-const detailWorkspaceSelected = computed(() => Boolean(String(props.activeWorkspaceId || '').trim()))
-const requiresWorkspaceActivation = computed(() => !isWorkspaceActive.value)
-const detailCreatedAt = computed(() => formatCreatedDate(workspaceDetail.value?.created_at || activeWorkspace.value?.created_at))
-const detailConversationCount = computed(() => Number(workspaceDetail.value?.conversation_count || 0))
-const detailLastActive = computed(() => formatRelativeTime(workspaceDetail.value?.updated_at || activeWorkspace.value?.updated_at))
-const datasetIngestStatusLabel = computed(() => String(datasetIngestMessage.value || 'Processing dataset...').trim() || 'Processing dataset...')
-const datasetIngestHasError = computed(() => Boolean(String(datasetIngestError.value || '').trim()))
 const workspaceRuntimeStatus = computed(() => appStore.getWorkspaceRuntimeStatus(props.activeWorkspaceId))
 const workspaceRuntimeReady = computed(() => ['ready', 'busy'].includes(workspaceRuntimeStatus.value))
-const isRuntimeActionInProgress = computed(() => (
-  isCreatingWorkspaceRuntime.value || isRetryingWorkspaceRuntime.value || isHardResettingWorkspaceRuntime.value
-))
 const runtimeStatusTone = computed(() => {
-  if (runtimeProgressError.value) return 'danger'
+  if (workspaceRuntimeStatus.value === 'error') return 'danger'
   if (workspaceRuntimeReady.value) return 'success'
-  if (isRuntimeActionInProgress.value || ['starting', 'connecting'].includes(String(workspaceRuntimeStatus.value || ''))) {
+  if (['starting', 'connecting'].includes(String(workspaceRuntimeStatus.value || ''))) {
     return 'accent'
   }
   return 'muted'
 })
 const runtimeStatusLabel = computed(() => {
-  if (runtimeProgressError.value) return 'Runtime failed'
   if (workspaceRuntimeStatus.value === 'busy') return 'Runtime working'
   if (workspaceRuntimeStatus.value === 'ready') return 'Runtime ready'
-  if (isHardResettingWorkspaceRuntime.value) return 'Hard reset in progress'
-  if (isRetryingWorkspaceRuntime.value) return 'Retry in progress'
-  if (isCreatingWorkspaceRuntime.value) return 'Preparing runtime'
   if (workspaceRuntimeStatus.value === 'starting' || workspaceRuntimeStatus.value === 'connecting') return 'Starting runtime'
   if (workspaceRuntimeStatus.value === 'error') return 'Runtime needs attention'
   return 'Runtime not started'
 })
-const runtimeStatusMessage = computed(() => {
-  if (runtimeProgressError.value) return runtimeProgressError.value
-  const latestEntry = runtimeProgressEntries.value[runtimeProgressEntries.value.length - 1]
-  if (latestEntry?.message) return latestEntry.message
-  const fallback = readinessRuntimeDetail(workspaceRuntimeStatus.value)
-  return fallback === 'Runtime is connected' ? '' : fallback
-})
-const currentRuntimeProgressMessage = computed(() => {
-  const latestEntry = runtimeProgressEntries.value[runtimeProgressEntries.value.length - 1]
-  return String(latestEntry?.message || '').trim()
-})
-const workspaceReadinessItems = computed(() => {
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
-  const registeredName = String(activeWorkspace.value?.name || '').trim()
-  const context = String(resolveWorkspaceContext()).trim()
-  const registered = Boolean(workspaceId && registeredName)
-  const active = Boolean(workspaceId && String(appStore.activeWorkspaceId || '').trim() === workspaceId)
-  const runtimeStatus = String(workspaceRuntimeStatus.value || 'missing').trim()
-  const runtimeChecking = isCreatingWorkspaceRuntime.value || isCheckingWorkspaceReadiness.value || ['starting', 'connecting'].includes(runtimeStatus)
-
-  return [
-    {
-      id: 'workspace',
-      label: 'Workspace saved',
-      detail: registered ? registeredName : 'Waiting for workspace record',
-      state: registered ? 'done' : 'pending',
-    },
-    {
-      id: 'context',
-      label: 'Context saved',
-      detail: context ? 'Shared schema context is ready' : 'No shared context added',
-      state: registered ? 'done' : 'pending',
-    },
-    {
-      id: 'active',
-      label: 'Workspace active',
-      detail: active ? 'New datasets will attach here' : 'Waiting for active workspace',
-      state: active ? 'done' : 'pending',
-    },
-    {
-      id: 'runtime',
-      label: 'Runtime ready',
-      detail: readinessRuntimeDetail(runtimeStatus),
-      state: workspaceRuntimeReady.value ? 'done' : (runtimeChecking ? 'checking' : 'pending'),
-    },
-  ]
-})
-const workspaceReadinessDoneCount = computed(() => workspaceReadinessItems.value.filter((item) => item.state === 'done').length)
-const workspaceReadinessProgress = computed(() => Math.round((workspaceReadinessDoneCount.value / workspaceReadinessItems.value.length) * 100))
-const workspaceReadinessComplete = computed(() => workspaceReadinessDoneCount.value === workspaceReadinessItems.value.length)
-const workspaceReadinessTitle = computed(() => (
-  workspaceReadinessComplete.value
-    ? 'Ready for datasets'
-    : `${workspaceReadinessDoneCount.value} of ${workspaceReadinessItems.value.length} checks ready`
-))
-const workspaceReadinessSummary = computed(() => (
-  workspaceReadinessComplete.value
-    ? 'Workspace setup is saved, active, and connected. Upload datasets when you are ready.'
-    : 'Workspace setup is still settling. If the runtime stalls, retry it here before uploading data.'
-))
-const workspaceCreateTitle = computed(() => 'Creating workspace inside Settings...')
 const workspaceDeleteDialogMessage = computed(() => {
   const targetId = String(pendingWorkspaceDeletionId.value || props.activeWorkspaceId || '').trim()
   const target = workspaceCards.value.find((workspace) => workspace.id === targetId)
   const name = String(target?.name || 'this workspace').trim()
-  return `Are you sure you want to delete "${name}"? Cleanup will run in the background and cannot be undone.`
-})
-const datasetDeleteDialogMessage = computed(() => {
-  const filename = String(pendingRemovalDataset.value?.filename || '').trim()
-  return `Are you sure you want to delete "${filename || 'this dataset'}"? Dataset disappears immediately while storage cleanup continues in background.`
-})
-const schemaRegenerateDialogMessage = computed(() => {
-  const filename = String(pendingSchemaRegenerateDataset.value?.filename || '').trim()
-  return `Regenerated schema may differ from the current version because it is generated by the LLM. Continue regenerating "${filename || 'this dataset'}"?`
+  return `Are you sure you want to delete "${name}"? This cannot be undone.`
 })
 watch(
   () => props.initialSection,
   (section) => {
     const normalized = String(section || '').trim().toLowerCase()
-    const requested = isNativeWorkspaceMetadata && normalized === 'data' ? 'connections' : normalized
+    const requested = normalized === 'data' ? 'connections' : normalized
     activeWorkspaceSection.value = workspaceSections.some((item) => item.id === requested) ? requested : 'general'
   },
   { immediate: true },
@@ -822,8 +598,6 @@ watch(
   () => props.activeWorkspaceId,
   async () => {
     await loadWorkspaceDetail()
-    await loadWorkspaceDatasets()
-    await loadActiveDatasetDeletionJobs()
     syncSetupIdentity()
     await loadNativeConnections()
   },
@@ -847,16 +621,8 @@ watch(
 
 onMounted(async () => {
   isWorkspaceTabMounted.value = true
-  unsubscribeProgress = settingsWebSocket.subscribeProgress(handleSettingsProgressUpdate)
-  unsubscribeRuntimeError = settingsWebSocket.subscribeError(handleRuntimeSocketError)
-  unsubscribeRuntimeComplete = settingsWebSocket.subscribeComplete(handleRuntimeSocketComplete)
-  window.addEventListener('dataset-switched', handleExternalDatasetRefresh)
   document.addEventListener('pointerdown', handleWorkspaceActionsPointerDown)
-  if (isE2EMode) {
-    window.addEventListener('inquira:e2e-select-data-path', handleE2eDatasetSelection)
-  }
   await hydrateWorkspaceCards()
-  await loadActiveDatasetDeletionJobs()
   await loadNativeConnections()
   await loadNativeRuntimeStatus()
   syncSetupIdentity()
@@ -981,15 +747,27 @@ async function loadNativeConnections() {
   }
 }
 
+async function refreshNativeConnectionState(workspaceId) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  const refreshes = [loadNativeConnections()]
+  if (normalizedWorkspaceId && normalizedWorkspaceId === String(appStore.activeWorkspaceId || '').trim()) {
+    refreshes.push(
+      appStore.fetchActiveWorkspaceSummary(normalizedWorkspaceId),
+      appStore.fetchColumnCatalog({ force: true }),
+    )
+  }
+  await Promise.all(refreshes)
+}
+
 async function handlePendingConnectionFlowRequest() {
   const requestId = Math.max(0, Math.floor(Number(appStore.connectionFlowRequestId || 0)))
-  if (!requestId || requestId <= lastHandledConnectionFlowRequestId.value) return
+  const lastHandledRequestId = Number(handledConnectionFlowRequestIds.get(appStore) || 0)
+  if (!requestId || requestId <= lastHandledRequestId) return
   if (!isWorkspaceTabMounted.value || !isNativeWorkspaceMetadata || !isWorkspaceActive.value) return
 
   activeWorkspaceSection.value = 'connections'
   if (!nativeRuntimeStatus.value?.ready || runtimeProvisioning.value || connectionActionLoading.value) return
 
-  lastHandledConnectionFlowRequestId.value = requestId
   handledConnectionFlowRequestIds.set(appStore, requestId)
   await chooseConnectionFile()
 }
@@ -1078,7 +856,7 @@ async function createPendingConnection() {
     })
     pendingConnection.value = null
     sheetSearch.value = ''
-    await loadNativeConnections()
+    await refreshNativeConnectionState(workspaceId)
     toast.success('Connection created', 'The local snapshot is ready for analysis.')
   } catch (error) {
     connectionError.value = extractApiErrorMessage(error, 'Could not create the connection.')
@@ -1088,17 +866,18 @@ async function createPendingConnection() {
 }
 
 async function refreshNativeConnection(connectionId) {
+  const workspaceId = String(props.activeWorkspaceId || '').trim()
   const next = new Set(refreshingConnectionIds.value)
   next.add(connectionId)
   refreshingConnectionIds.value = next
   connectionError.value = ''
   try {
     await connectionService.refresh(connectionId)
-    await loadNativeConnections()
+    await refreshNativeConnectionState(workspaceId)
     toast.success('Connection refreshed', 'The local snapshot is up to date.')
   } catch (error) {
     connectionError.value = extractApiErrorMessage(error, 'Could not refresh the connection.')
-    await loadNativeConnections()
+    await refreshNativeConnectionState(workspaceId)
   } finally {
     const remaining = new Set(refreshingConnectionIds.value)
     remaining.delete(connectionId)
@@ -1107,11 +886,12 @@ async function refreshNativeConnection(connectionId) {
 }
 
 async function deleteNativeConnection(connectionId) {
+  const workspaceId = String(props.activeWorkspaceId || '').trim()
   connectionError.value = ''
   connectionActionLoading.value = true
   try {
     await connectionService.remove(connectionId)
-    await loadNativeConnections()
+    await refreshNativeConnectionState(workspaceId)
     toast.success('Connection deleted', 'The connection and its local snapshots were removed.')
   } catch (error) {
     connectionError.value = extractApiErrorMessage(error, 'Could not delete the connection.')
@@ -1134,45 +914,8 @@ function adapterKindLabel(kind) {
 
 onUnmounted(() => {
   isWorkspaceTabMounted.value = false
-  if (typeof unsubscribeProgress === 'function') {
-    unsubscribeProgress()
-    unsubscribeProgress = null
-  }
-  if (typeof unsubscribeRuntimeError === 'function') {
-    unsubscribeRuntimeError()
-    unsubscribeRuntimeError = null
-  }
-  if (typeof unsubscribeRuntimeComplete === 'function') {
-    unsubscribeRuntimeComplete()
-    unsubscribeRuntimeComplete = null
-  }
-  window.removeEventListener('dataset-switched', handleExternalDatasetRefresh)
   document.removeEventListener('pointerdown', handleWorkspaceActionsPointerDown)
-  if (isE2EMode) {
-    window.removeEventListener('inquira:e2e-select-data-path', handleE2eDatasetSelection)
-  }
-  clearWorkspaceOperation()
-  stopDatasetDeletionPollers()
-  stopDatasetIngestionPollers()
-  stopDatasetSchemaPolling()
 })
-
-function handleExternalDatasetRefresh() {
-  if (!isWorkspaceActive.value) return
-  void loadWorkspaceDatasets()
-}
-
-async function handleE2eDatasetSelection(event) {
-  if (!isE2EMode || !isWorkspaceActive.value) return
-  const detail = event?.detail || {}
-  const sourcePaths = [
-    ...(Array.isArray(detail.sourcePaths) ? detail.sourcePaths : []),
-    detail.sourcePath,
-    detail.filePath,
-    detail.fileName,
-  ].map((item) => String(item || '').trim()).filter(Boolean)
-  await startBatchDatasetIngestion(sourcePaths)
-}
 
 async function hydrateWorkspaceCards() {
   const ids = workspaceCards.value.map((workspace) => workspace.id).filter(Boolean)
@@ -1274,25 +1017,6 @@ async function saveWorkspaceContext() {
   }
 }
 
-async function ensureWorkspaceNamePersisted({ silent = false } = {}) {
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
-  const name = String(setupWorkspaceName.value || '').trim()
-  if (!workspaceId || !name) {
-    if (!silent) {
-      toast.error('Workspace name required', 'Enter a workspace name to continue.')
-    }
-    return false
-  }
-
-  const currentContext = resolveWorkspaceContext()
-  return ensureWorkspaceIdentityPersisted({
-    name,
-    context: currentContext,
-    silent,
-    successMessage: 'Workspace name updated.',
-  })
-}
-
 async function ensureWorkspaceContextPersisted({ silent = false } = {}) {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   const name = String(setupWorkspaceName.value || activeWorkspace.value?.name || '').trim()
@@ -1346,794 +1070,6 @@ async function ensureWorkspaceIdentityPersisted({
   }
 }
 
-async function loadWorkspaceDatasets() {
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
-  if (!workspaceId) {
-    datasetEntries.value = []
-    return
-  }
-  if (isNativeWorkspaceMetadata) {
-    datasetEntries.value = []
-    return
-  }
-  try {
-    const response = await apiService.v1ListDatasets(workspaceId)
-    const datasets = Array.isArray(response?.datasets) ? response.datasets : []
-    datasetEntries.value = datasets.map((item) => ({
-      table_name: String(item?.table_name || '').trim(),
-      source_path: String(item?.source_path || '').trim(),
-      row_count: Number.isFinite(Number(item?.row_count)) ? Number(item.row_count) : null,
-      file_type: String(item?.file_type || '').trim().toLowerCase(),
-      schema_status: String(item?.schema_status || 'queued').trim().toLowerCase(),
-      schema_error_message: String(item?.schema_error_message || '').trim(),
-      schema_updated_at: String(item?.schema_updated_at || '').trim(),
-      filename: formatFilename(item?.source_path || item?.table_name || ''),
-    })).filter((item) => item.table_name)
-    await enrichDatasetMetadata(workspaceId)
-    notifyReadyDatasetSchemas(datasetEntries.value)
-    syncDatasetSchemaPolling()
-  } catch (error) {
-    datasetEntries.value = []
-    stopDatasetSchemaPolling()
-    toast.error('Dataset Error', extractApiErrorMessage(error, 'Failed to load datasets.'))
-  }
-}
-
-function startDatasetIngest(path) {
-  const normalizedPath = String(path || '').trim()
-  isDatasetIngesting.value = true
-  datasetIngestFilename.value = formatFilename(normalizedPath)
-  datasetIngestMessage.value = 'Preparing dataset ingestion...'
-  datasetIngestPercent.value = null
-  datasetIngestError.value = ''
-}
-
-function appendRuntimeProgress(stage, message) {
-  const normalizedMessage = String(message || '').trim()
-  if (!normalizedMessage) return
-  const previous = runtimeProgressEntries.value[runtimeProgressEntries.value.length - 1]
-  if (previous?.message === normalizedMessage) return
-  runtimeProgressEntries.value = [
-    ...runtimeProgressEntries.value.slice(-7),
-    {
-      stage: String(stage || '').trim(),
-      message: normalizedMessage,
-    },
-  ]
-}
-
-function clearRuntimeProgress({ preserveError = false } = {}) {
-  runtimeProgressEntries.value = []
-  if (!preserveError) {
-    runtimeProgressError.value = ''
-  }
-}
-
-function resetRuntimeActionFlags() {
-  isCreatingWorkspaceRuntime.value = false
-  isRetryingWorkspaceRuntime.value = false
-  isHardResettingWorkspaceRuntime.value = false
-  runtimeActionMode.value = ''
-}
-
-function applyDatasetSelectionFromUpload(uploadResult, fallbackPath = '') {
-  const resolvedPath = String(uploadResult?.file_path || fallbackPath || '').trim()
-  const resolvedTableName = String(uploadResult?.table_name || '').trim()
-  const resolvedColumns = Array.isArray(uploadResult?.columns) ? uploadResult.columns : []
-  if (!resolvedPath && !resolvedTableName) return
-
-  appStore.setDataFilePath(resolvedPath)
-  appStore.setIngestedTableName(resolvedTableName)
-  appStore.setIngestedColumns(resolvedColumns)
-  appStore.setSchemaFileId(resolvedPath || resolvedTableName)
-
-  window.dispatchEvent(new CustomEvent('dataset-switched', {
-    detail: {
-      tableName: resolvedTableName || null,
-      dataPath: resolvedPath || null,
-    },
-  }))
-}
-
-function dispatchDatasetSchemaReady(dataset) {
-  const tableName = String(dataset?.table_name || '').trim()
-  if (!tableName) return
-  window.dispatchEvent(new CustomEvent('dataset-schema-ready', {
-    detail: {
-      workspaceId: String(props.activeWorkspaceId || '').trim() || null,
-      tableName,
-      dataPath: String(dataset?.source_path || '').trim() || null,
-    },
-  }))
-}
-
-function trackSchemaReadyNotificationsFromIngestionJob(job) {
-  const items = Array.isArray(job?.items) ? job.items : []
-  items.forEach((item) => {
-    if (String(item?.status || '').toLowerCase() !== 'completed') return
-    const tableName = String(item?.table_name || '').trim()
-    if (tableName) {
-      pendingSchemaReadyNotifications.add(tableName)
-    }
-  })
-}
-
-function notifyReadyDatasetSchemas(datasets) {
-  if (pendingSchemaReadyNotifications.size === 0) return
-  const entries = Array.isArray(datasets) ? datasets : []
-  entries.forEach((dataset) => {
-    const tableName = String(dataset?.table_name || '').trim()
-    if (!tableName || !pendingSchemaReadyNotifications.has(tableName)) return
-    const status = datasetSchemaStatusState(dataset)
-    if (status === 'ready') {
-      pendingSchemaReadyNotifications.delete(tableName)
-      appStore.finishBackgroundOperation(`schema-regeneration-${tableName}`, {
-        title: 'Schema ready',
-        message: `Schema is ready for ${formatFilename(tableName)}.`,
-      })
-      toast.success('Schema ready', `Schema is ready for ${formatFilename(tableName)}.`)
-      dispatchDatasetSchemaReady(dataset)
-    } else if (status === 'failed') {
-      pendingSchemaReadyNotifications.delete(tableName)
-      appStore.finishBackgroundOperation(`schema-regeneration-${tableName}`, {
-        status: 'failed',
-        title: 'Schema generation failed',
-        message: dataset?.schema_error_message || `Schema generation failed for ${formatFilename(tableName)}.`,
-      })
-      toast.error('Schema generation failed', dataset?.schema_error_message || `Schema generation failed for ${formatFilename(tableName)}.`)
-      dispatchDatasetSchemaReady(dataset)
-    }
-  })
-}
-
-function finishDatasetIngest() {
-  isDatasetIngesting.value = false
-  datasetIngestFilename.value = ''
-  datasetIngestMessage.value = ''
-  datasetIngestPercent.value = null
-  datasetIngestError.value = ''
-  lastSelectedDatasetPaths.value = []
-}
-
-function markDatasetIngestFailed(message) {
-  isDatasetIngesting.value = true
-  datasetIngestError.value = String(message || 'Failed to import dataset.').trim() || 'Failed to import dataset.'
-  datasetIngestMessage.value = datasetIngestError.value
-  datasetIngestPercent.value = 100
-}
-
-function handleSettingsProgressUpdate(data) {
-  if (!data || data.type !== 'progress') return
-  const stage = String(data?.stage || '').trim().toLowerCase()
-  if (stage.startsWith('workspace_runtime')) {
-    runtimeProgressError.value = ''
-    appendRuntimeProgress(stage, data?.message || '')
-    if (isCreatingWorkspace.value) {
-      isCreatingWorkspaceRuntime.value = true
-      workspaceCreateMessage.value = String(data?.message || '').trim() || 'Preparing workspace runtime...'
-    }
-    return
-  }
-  if (!isDatasetIngesting.value) return
-  const nextMessage = String(data?.message || '').trim()
-  if (nextMessage) {
-    datasetIngestMessage.value = nextMessage
-  }
-  const percent = Number(data?.progress)
-  if (Number.isFinite(percent) && percent >= 0 && percent <= 100) {
-    datasetIngestPercent.value = Math.round(percent)
-  }
-}
-
-function handleRuntimeSocketError(message) {
-  if (!isRuntimeActionInProgress.value && !isCreatingWorkspace.value) return
-  runtimeProgressError.value = String(message || 'Workspace runtime failed.').trim() || 'Workspace runtime failed.'
-  appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
-  resetRuntimeActionFlags()
-}
-
-function handleRuntimeSocketComplete(result) {
-  const workspaceId = String(result?.workspace_id || '').trim()
-  if (!workspaceId || workspaceId !== String(props.activeWorkspaceId || '').trim()) return
-  if (!isRuntimeActionInProgress.value && !isCreatingWorkspace.value) return
-  clearRuntimeProgress()
-  resetRuntimeActionFlags()
-}
-
-function setWorkspaceOperation(operation, message) {
-  const normalizedOperation = String(operation || '').trim()
-  const normalizedMessage = String(message || 'Workspace setup is still running.').trim()
-  activeWorkspaceOperation.value = normalizedOperation
-  activeWorkspaceOperationMessage.value = normalizedMessage
-  if (normalizedOperation && normalizedOperation !== 'ingest') {
-    appStore.startForegroundOperation({
-      id: `workspace-${normalizedOperation}`,
-      type: `workspace-${normalizedOperation}`,
-      title: 'Workspace operation',
-      message: normalizedMessage,
-      priority: 100,
-    })
-  }
-  emit('workspace-operation-change', {
-    locked: Boolean(normalizedOperation),
-    operation: normalizedOperation,
-    message: normalizedMessage,
-  })
-}
-
-function clearWorkspaceOperation() {
-  if (activeWorkspaceOperation.value && activeWorkspaceOperation.value !== 'ingest') {
-    appStore.clearForegroundOperation(`workspace-${activeWorkspaceOperation.value}`)
-  }
-  activeWorkspaceOperation.value = ''
-  activeWorkspaceOperationMessage.value = ''
-  emit('workspace-operation-change', { locked: false, operation: '', message: '' })
-}
-
-function notifyWorkspaceOperationBlocked() {
-  if (!activeWorkspaceOperation.value) return false
-  toast.info(
-    'Workspace setup in progress',
-    activeWorkspaceOperationMessage.value || 'Wait for the current workspace setup step to finish.',
-  )
-  return true
-}
-
-function readinessRuntimeDetail(status) {
-  const normalized = String(status || '').trim()
-  if (normalized === 'ready') return 'Runtime is connected'
-  if (normalized === 'busy') return 'Runtime is busy but available'
-  if (normalized === 'starting' || normalized === 'connecting') return 'Runtime is starting'
-  if (normalized === 'error') return 'Runtime needs attention'
-  return 'Runtime not prepared yet'
-}
-
-function readinessItemClass(item) {
-  const state = String(item?.state || '').trim()
-  if (state === 'done') return 'workspace-readiness-item-done'
-  if (state === 'checking') return 'workspace-readiness-item-checking'
-  return 'workspace-readiness-item-pending'
-}
-
-function readinessDotClass(item) {
-  const state = String(item?.state || '').trim()
-  if (state === 'done') return 'workspace-readiness-dot-done'
-  if (state === 'checking') return 'workspace-readiness-dot-checking'
-  return 'workspace-readiness-dot-pending'
-}
-
-async function refreshWorkspaceReadiness() {
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
-  if (!workspaceId || isCheckingWorkspaceReadiness.value) return
-  isCheckingWorkspaceReadiness.value = true
-  clearRuntimeProgress()
-  try {
-    const ready = await appStore.ensureWorkspaceRuntimeReady(workspaceId)
-    if (ready) {
-      toast.success('Workspace ready', 'Runtime is ready for dataset uploads.')
-    } else {
-      toast.error('Runtime not ready', String(appStore.runtimeError || 'Workspace runtime is still starting.'))
-    }
-  } catch (error) {
-    toast.error('Runtime check failed', extractApiErrorMessage(error, 'Failed to prepare workspace runtime.'))
-  } finally {
-    isCheckingWorkspaceReadiness.value = false
-  }
-}
-
-async function retryWorkspaceRuntime() {
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
-  if (!workspaceId || isRetryingWorkspaceRuntime.value || isHardResettingWorkspaceRuntime.value) return
-  clearRuntimeProgress()
-  runtimeActionMode.value = 'retry'
-  isRetryingWorkspaceRuntime.value = true
-  setWorkspaceOperation('runtime', 'Retrying the workspace runtime.')
-  appStore.clearWorkspaceRuntimeStatus(workspaceId)
-  try {
-    const response = await apiService.v1RetryWorkspaceRuntime(workspaceId)
-    await appStore.fetchWorkspaces()
-    if (!response?.reset) {
-      throw new Error('Workspace runtime retry did not finish successfully.')
-    }
-    appStore.setWorkspaceRuntimeStatus(workspaceId, 'ready')
-    clearRuntimeProgress()
-    toast.success('Runtime ready', 'Workspace runtime restarted successfully.')
-  } catch (error) {
-    runtimeProgressError.value = extractApiErrorMessage(error, 'Failed to retry workspace runtime.')
-    appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
-    appStore.setWorkspaceRuntimeStatus(workspaceId, 'error')
-    toast.error('Runtime retry failed', runtimeProgressError.value)
-  } finally {
-    isRetryingWorkspaceRuntime.value = false
-    runtimeActionMode.value = ''
-    clearWorkspaceOperation()
-  }
-}
-
-async function hardResetWorkspaceRuntime() {
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
-  if (!workspaceId || isRetryingWorkspaceRuntime.value || isHardResettingWorkspaceRuntime.value) return
-  clearRuntimeProgress()
-  runtimeActionMode.value = 'hard-reset'
-  isHardResettingWorkspaceRuntime.value = true
-  setWorkspaceOperation('runtime', 'Rebuilding the workspace runtime from scratch.')
-  appStore.clearWorkspaceRuntimeStatus(workspaceId)
-  try {
-    const response = await apiService.v1HardResetWorkspaceRuntime(workspaceId)
-    await appStore.fetchWorkspaces()
-    if (!response?.reset) {
-      throw new Error('Workspace hard reset did not finish successfully.')
-    }
-    appStore.setWorkspaceRuntimeStatus(workspaceId, 'ready')
-    clearRuntimeProgress()
-    toast.success('Runtime rebuilt', 'Workspace runtime was rebuilt from scratch.')
-  } catch (error) {
-    runtimeProgressError.value = extractApiErrorMessage(error, 'Failed to rebuild workspace runtime.')
-    appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
-    appStore.setWorkspaceRuntimeStatus(workspaceId, 'error')
-    toast.error('Hard reset failed', runtimeProgressError.value)
-  } finally {
-    isHardResettingWorkspaceRuntime.value = false
-    runtimeActionMode.value = ''
-    clearWorkspaceOperation()
-  }
-}
-
-function stopDatasetDeletionPollers() {
-  datasetDeletionPollers.forEach((timerId) => clearTimeout(timerId))
-  datasetDeletionPollers.clear()
-}
-
-function stopDatasetIngestionPollers() {
-  datasetIngestionPollers.forEach((timerId) => clearTimeout(timerId))
-  datasetIngestionPollers.clear()
-}
-
-function trackDatasetDeletionJob(workspaceId, jobId, datasetLabel, timeoutMs = 300000) {
-  const normalizedWorkspaceId = String(workspaceId || '').trim()
-  const normalizedJobId = String(jobId || '').trim()
-  if (!normalizedWorkspaceId || !normalizedJobId) return
-  if (datasetDeletionPollers.has(normalizedJobId)) return
-  const startedAt = Date.now()
-  const displayName = String(datasetLabel || '').trim() || 'dataset'
-  appStore.startBackgroundOperation({
-    id: `dataset-deletion-${normalizedJobId}`,
-    type: 'dataset-delete',
-    title: 'Deleting dataset',
-    message: `Cleaning up ${displayName}...`,
-    priority: 60,
-  })
-
-  const poll = async () => {
-    try {
-      const job = await apiService.v1GetDatasetDeletionJob(normalizedWorkspaceId, normalizedJobId)
-      const status = String(job?.status || '').trim().toLowerCase()
-      if (status === 'completed') {
-        datasetDeletionPollers.delete(normalizedJobId)
-        appStore.finishBackgroundOperation(`dataset-deletion-${normalizedJobId}`, {
-          title: 'Dataset deletion complete',
-          message: `"${displayName}" cleanup finished.`,
-        })
-        toast.success('Dataset deletion completed', `"${displayName}" cleanup finished.`)
-        return
-      }
-      if (status === 'failed') {
-        datasetDeletionPollers.delete(normalizedJobId)
-        const detail = String(job?.error_message || '').trim()
-        appStore.finishBackgroundOperation(`dataset-deletion-${normalizedJobId}`, {
-          status: 'failed',
-          title: 'Dataset deletion failed',
-          message: detail || `Background cleanup failed for "${displayName}".`,
-        })
-        toast.error('Dataset deletion failed', detail || `Background cleanup failed for "${displayName}".`)
-        return
-      }
-      if (Date.now() - startedAt > timeoutMs) {
-        datasetDeletionPollers.delete(normalizedJobId)
-        toast.info('Dataset cleanup still running', `Background cleanup for "${displayName}" is still in progress.`)
-        return
-      }
-      const timer = setTimeout(poll, 2000)
-      datasetDeletionPollers.set(normalizedJobId, timer)
-    } catch (_error) {
-      datasetDeletionPollers.delete(normalizedJobId)
-    }
-  }
-
-  poll()
-}
-
-function applyDatasetSelectionFromIngestionJob(job) {
-  const items = Array.isArray(job?.items) ? job.items : []
-  const firstCompleted = items.find((item) => String(item?.status || '').toLowerCase() === 'completed')
-  if (!firstCompleted) return
-  applyDatasetSelectionFromUpload({
-    file_path: firstCompleted.source_path || '',
-    table_name: firstCompleted.table_name || '',
-    columns: [],
-  }, firstCompleted.source_path || '')
-}
-
-function trackDatasetIngestionJob(workspaceId, jobId, timeoutMs = Infinity) {
-  const normalizedWorkspaceId = String(workspaceId || '').trim()
-  const normalizedJobId = String(jobId || '').trim()
-  if (!normalizedWorkspaceId || !normalizedJobId) return
-  if (datasetIngestionPollers.has(normalizedJobId)) return
-  const startedAt = Date.now()
-
-  const poll = async () => {
-    try {
-      const job = await apiService.v1GetDatasetIngestionJob(normalizedWorkspaceId, normalizedJobId)
-      const status = String(job?.status || '').trim().toLowerCase()
-      const completed = Number(job?.completed_count || 0)
-      const failed = Number(job?.failed_count || 0)
-      const total = Number(job?.total_count || 0)
-      if (total > 0) {
-        datasetIngestPercent.value = Math.round(((completed + failed) / total) * 100)
-      }
-      datasetIngestMessage.value = `Processed ${completed + failed} of ${total || '?'} datasets`
-
-      if (['completed', 'completed_with_errors', 'failed'].includes(status)) {
-        datasetIngestionPollers.delete(normalizedJobId)
-        applyDatasetSelectionFromIngestionJob(job)
-        trackSchemaReadyNotificationsFromIngestionJob(job)
-        await loadWorkspaceDatasets()
-        const failedCount = Number(job?.failed_count || 0)
-        datasetIngestPercent.value = 100
-        datasetIngestMessage.value = failedCount > 0
-          ? `Completed with ${failedCount} failed import${failedCount === 1 ? '' : 's'}.`
-          : 'Import complete.'
-        await new Promise((resolve) => setTimeout(resolve, 700))
-        finishDatasetIngest()
-        clearWorkspaceOperation()
-        if (status === 'failed' || failedCount > 0) {
-          toast.error('Dataset ingestion completed with errors', `${failedCount || 'Some'} file${failedCount === 1 ? '' : 's'} failed to import.`)
-        }
-        return
-      }
-
-      if (Date.now() - startedAt > timeoutMs) {
-        datasetIngestionPollers.delete(normalizedJobId)
-        finishDatasetIngest()
-        clearWorkspaceOperation()
-        toast.info('Dataset ingestion still running', 'Dataset import is still running in the background.')
-        return
-      }
-      const timer = setTimeout(poll, 1500)
-      datasetIngestionPollers.set(normalizedJobId, timer)
-    } catch (error) {
-      datasetIngestionPollers.delete(normalizedJobId)
-      finishDatasetIngest()
-      clearWorkspaceOperation()
-      toast.error('Dataset Error', extractApiErrorMessage(error, 'Failed to poll dataset ingestion.'))
-    }
-  }
-
-  poll()
-}
-
-async function startBatchDatasetIngestion(paths) {
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
-  const sourcePaths = Array.isArray(paths)
-    ? paths.map((item) => String(item || '').trim()).filter(Boolean)
-    : []
-  if (!workspaceId || sourcePaths.length === 0) return
-  if (requiresWorkspaceActivation.value) {
-    toast.info('Activate workspace first', 'Activate this workspace before importing datasets.')
-    return
-  }
-  const identityReady = await ensureWorkspaceNamePersisted({ silent: true })
-  if (!identityReady) return
-
-  startDatasetIngest(sourcePaths.length === 1 ? sourcePaths[0] : `${sourcePaths.length} selected files`)
-  lastSelectedDatasetPaths.value = [...sourcePaths]
-  datasetIngestFilename.value = datasetImportLabel(sourcePaths)
-  datasetIngestMessage.value = 'Queueing dataset ingestion...'
-  try {
-    await appStore.startDatasetIngestion(sourcePaths, {
-      workspaceId,
-      operationId: `workspace-tab-dataset-ingestion-${Date.now()}`,
-      onProgress: (job) => {
-        const completed = Number(job?.completed_count || 0)
-        const failed = Number(job?.failed_count || 0)
-        const total = Number(job?.total_count || 0)
-        if (total > 0) {
-          datasetIngestPercent.value = Math.round(((completed + failed) / total) * 100)
-        }
-        datasetIngestMessage.value = `Processed ${completed + failed} of ${total || '?'} datasets`
-      },
-      onComplete: async (job) => {
-        trackSchemaReadyNotificationsFromIngestionJob(job)
-        await loadWorkspaceDatasets()
-        const failedCount = Number(job?.failed_count || 0)
-        datasetIngestPercent.value = 100
-        datasetIngestMessage.value = failedCount > 0
-          ? `Completed with ${failedCount} failed import${failedCount === 1 ? '' : 's'}.`
-          : 'Import complete.'
-        await new Promise((resolve) => setTimeout(resolve, 700))
-        finishDatasetIngest()
-        if (failedCount > 0) {
-          toast.error('Dataset ingestion completed with errors', `${failedCount} file${failedCount === 1 ? '' : 's'} failed to import.`)
-        }
-      },
-      onError: (error) => {
-        markDatasetIngestFailed(extractApiErrorMessage(error, 'Failed to queue dataset import.'))
-      },
-    })
-  } catch (error) {
-    markDatasetIngestFailed(extractApiErrorMessage(error, 'Failed to queue dataset import.'))
-    toast.error('Dataset Error', extractApiErrorMessage(error, 'Failed to add datasets.'))
-  }
-}
-
-async function retryLastDatasetIngestion() {
-  const paths = Array.isArray(lastSelectedDatasetPaths.value)
-    ? lastSelectedDatasetPaths.value.map((item) => String(item || '').trim()).filter(Boolean)
-    : []
-  if (!paths.length) {
-    toast.info('Retry unavailable', 'Select files again to retry import.')
-    finishDatasetIngest()
-    return
-  }
-  await startBatchDatasetIngestion(paths)
-}
-
-async function loadActiveDatasetDeletionJobs() {
-  if (isNativeWorkspaceMetadata) return
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
-  if (!workspaceId) return
-  try {
-    const response = await apiService.v1ListDatasetDeletionJobs(workspaceId)
-    const jobs = Array.isArray(response?.jobs) ? response.jobs : []
-    jobs.forEach((job) => {
-      const jobId = String(job?.job_id || '').trim()
-      const label = formatFilename(job?.table_name || '')
-      trackDatasetDeletionJob(workspaceId, jobId, label)
-    })
-  } catch (_error) {
-    // Ignore hydration errors; explicit delete actions still start polling.
-  }
-}
-
-async function enrichDatasetMetadata(workspaceId) {
-  const columnCounts = {}
-  const fileSizes = {}
-
-  await Promise.all(
-    datasetEntries.value.map(async (dataset) => {
-      try {
-        const schema = await apiService.v1GetDatasetSchema(workspaceId, dataset.table_name)
-        const columns = Array.isArray(schema?.columns) ? schema.columns : []
-        columnCounts[dataset.table_name] = columns.length
-      } catch {
-        columnCounts[dataset.table_name] = null
-      }
-
-      try {
-        fileSizes[dataset.table_name] = await resolveDatasetFileSize(dataset.source_path)
-      } catch {
-        fileSizes[dataset.table_name] = null
-      }
-    }),
-  )
-
-  datasetColumnCounts.value = columnCounts
-  datasetFileSizes.value = fileSizes
-}
-
-async function resolveDatasetFileSize(path) {
-  const normalized = String(path || '').trim()
-  if (!normalized || normalized.startsWith('browser://')) return null
-  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) return null
-  const info = await stat(normalized)
-  const bytes = Number(info?.size || 0)
-  return Number.isFinite(bytes) && bytes > 0 ? bytes : null
-}
-
-function datasetRowCount(dataset) {
-  const value = Number(dataset?.row_count || 0)
-  return Number.isFinite(value) && value > 0 ? value.toLocaleString() : '?'
-}
-
-function datasetColumnCount(dataset) {
-  const value = Number(datasetColumnCounts.value?.[dataset?.table_name] || 0)
-  return Number.isFinite(value) && value > 0 ? value : '?'
-}
-
-function datasetFileSize(dataset) {
-  const bytes = Number(datasetFileSizes.value?.[dataset?.table_name] || 0)
-  if (!Number.isFinite(bytes) || bytes <= 0) return null
-  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${bytes} B`
-}
-
-function datasetMetadata(dataset) {
-  const segments = [
-    `${datasetRowCount(dataset)} rows`,
-    `${datasetColumnCount(dataset)} cols`,
-  ]
-  const sizeLabel = datasetFileSize(dataset)
-  if (sizeLabel) {
-    segments.push(sizeLabel)
-  }
-  return segments.join(' · ')
-}
-
-function requestRemoveDataset(dataset) {
-  if (!dataset || isDeletingDataset.value) return
-  pendingRemovalDataset.value = dataset
-  isDatasetDeleteDialogOpen.value = true
-}
-
-function closeDatasetDeleteDialog({ force = false } = {}) {
-  if (isDeletingDataset.value && !force) return
-  isDatasetDeleteDialogOpen.value = false
-  pendingRemovalDataset.value = null
-}
-
-async function confirmRemoveDataset() {
-  if (isDeletingDataset.value) return
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
-  const dataset = pendingRemovalDataset.value
-  const tableName = String(dataset?.table_name || '').trim()
-  const datasetLabel = String(dataset?.filename || formatFilename(tableName)).trim()
-  if (!workspaceId || !tableName) return
-  if (requiresWorkspaceActivation.value) {
-    toast.info('Activate workspace first', 'Activate this workspace before deleting datasets.')
-    return
-  }
-  isDeletingDataset.value = true
-  try {
-    const job = await apiService.v1DeleteDataset(workspaceId, tableName)
-    const deletedActiveDataset = appStore.handleDatasetRemoved(tableName)
-    previewService.clearSchemaCache()
-    window.dispatchEvent(new CustomEvent('dataset-switched', { detail: null }))
-    await loadWorkspaceDatasets()
-    closeDatasetDeleteDialog({ force: true })
-    const jobId = String(job?.job_id || '').trim()
-    if (jobId) {
-      toast.info(
-        'Dataset deletion started',
-        deletedActiveDataset
-          ? 'Dataset removed. Active selection cleared. Background cleanup started.'
-          : 'Dataset removed from workspace. Background cleanup started.',
-      )
-      trackDatasetDeletionJob(workspaceId, jobId, datasetLabel)
-    } else {
-      toast.success(
-        'Dataset removed',
-        deletedActiveDataset ? 'Dataset removed. Active selection cleared.' : 'Dataset removed from workspace.',
-      )
-    }
-  } catch (error) {
-    toast.error('Remove failed', extractApiErrorMessage(error, 'Failed to remove dataset.'))
-  } finally {
-    isDeletingDataset.value = false
-    if (!isDatasetDeleteDialogOpen.value) {
-      pendingRemovalDataset.value = null
-    }
-  }
-}
-
-function requestRegenerateDatasetSchema(dataset) {
-  if (!dataset || isSchemaRegenerateSubmitting.value) return
-  pendingSchemaRegenerateDataset.value = dataset
-  isSchemaRegenerateDialogOpen.value = true
-}
-
-function closeSchemaRegenerateDialog() {
-  if (isSchemaRegenerateSubmitting.value) return
-  isSchemaRegenerateDialogOpen.value = false
-  pendingSchemaRegenerateDataset.value = null
-}
-
-async function confirmRegenerateDatasetSchema() {
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
-  const dataset = pendingSchemaRegenerateDataset.value
-  const tableName = String(dataset?.table_name || '').trim()
-  if (!workspaceId || !tableName) return
-  if (requiresWorkspaceActivation.value) {
-    toast.info('Activate workspace first', 'Activate this workspace before generating schemas.')
-    return
-  }
-  const operationId = appStore.startBackgroundOperation({
-    id: `schema-regeneration-${tableName}`,
-    type: 'schema',
-    title: 'Regenerating schema',
-    message: `Schema generation queued for ${tableName}.`,
-    priority: 75,
-  })
-  try {
-    isSchemaRegenerateSubmitting.value = true
-    const schemaRegeneration = await apiService.v1EnqueueDatasetSchemaRegeneration(workspaceId, tableName)
-    await loadWorkspaceDatasets()
-    if (schemaRegeneration?.completed) {
-      appStore.finishBackgroundOperation(operationId, {
-        title: 'Schema regenerated',
-        message: `Schema updated for ${tableName}.`,
-      })
-      dispatchDatasetSchemaReady({ table_name: tableName, source_path: dataset?.source_path })
-      toast.success('Schema regenerated', `AI descriptions updated for ${tableName}.`)
-    } else {
-      appStore.updateBackgroundOperation(operationId, {
-        message: `Generating schema for ${tableName}...`,
-        progress: null,
-      })
-      toast.success('Schema regeneration queued', 'Schema generation will continue in the background.')
-    }
-  } catch (error) {
-    appStore.finishBackgroundOperation(operationId, {
-      status: 'failed',
-      title: 'Schema regeneration failed',
-      message: extractApiErrorMessage(error, 'Failed to queue schema regeneration.'),
-    })
-    toast.error('Schema regeneration failed', extractApiErrorMessage(error, 'Failed to queue schema regeneration.'))
-  } finally {
-    isSchemaRegenerateSubmitting.value = false
-    closeSchemaRegenerateDialog()
-  }
-}
-
-function handleDropDragEnter() {
-  if (!isWorkspaceActive.value) return
-  dropDepth.value += 1
-  isDropActive.value = true
-}
-
-function handleDropDragOver() {
-  if (!isWorkspaceActive.value) return
-  isDropActive.value = true
-}
-
-function handleDropDragLeave() {
-  dropDepth.value = Math.max(0, dropDepth.value - 1)
-  if (dropDepth.value === 0) {
-    isDropActive.value = false
-  }
-}
-
-async function handleDatasetDrop(event) {
-  dropDepth.value = 0
-  isDropActive.value = false
-  if (!isWorkspaceActive.value) return
-  const droppedPaths = getDroppedDatasetPaths(event?.dataTransfer?.files || [])
-  await ingestDroppedDatasetPaths(droppedPaths)
-}
-
-async function ingestDroppedDatasetPaths(paths) {
-  if (!isWorkspaceActive.value) return
-  const droppedPaths = filterSupportedDatasetPaths(paths)
-  if (droppedPaths.length === 0) {
-    toast.error('Unsupported Files', 'Drop CSV, TSV, Parquet, JSON, XLSX, or XLS files.')
-    return
-  }
-  await startBatchDatasetIngestion(droppedPaths)
-}
-
-async function openDatasetPicker() {
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
-  if (!workspaceId) return
-  if (requiresWorkspaceActivation.value) {
-    toast.info('Activate workspace first', 'Activate this workspace before importing datasets.')
-    return
-  }
-  try {
-    const { open } = await import('@tauri-apps/plugin-dialog')
-    const selected = await open({
-      multiple: true,
-      filters: [{ name: 'Data files', extensions: SUPPORTED_DATASET_EXTENSIONS }],
-    })
-    const selectedPaths = Array.isArray(selected)
-      ? selected.map((item) => String(item || '').trim()).filter(Boolean)
-      : [String(selected || '').trim()].filter(Boolean)
-    await startBatchDatasetIngestion(selectedPaths)
-  } catch (error) {
-    toast.error('Dataset Error', extractApiErrorMessage(error, 'Failed to add dataset.'))
-  }
-}
-
 async function startRename() {
   renameValue.value = String(activeWorkspace.value?.name || '').trim()
   isRenamingInline.value = true
@@ -2179,15 +1115,13 @@ async function saveRename() {
 
 
 function requestDeleteWorkspace(workspaceId) {
-  if (notifyWorkspaceOperationBlocked()) return
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return
   pendingWorkspaceDeletionId.value = normalizedWorkspaceId
   isWorkspaceDeleteDialogOpen.value = true
 }
 
-function closeWorkspaceDeleteDialog({ force = false } = {}) {
-  if (activeWorkspaceOperation.value === 'delete' && !force) return
+function closeWorkspaceDeleteDialog() {
   isWorkspaceDeleteDialogOpen.value = false
   pendingWorkspaceDeletionId.value = ''
 }
@@ -2195,23 +1129,17 @@ function closeWorkspaceDeleteDialog({ force = false } = {}) {
 async function deleteWorkspace() {
   const workspaceId = String(pendingWorkspaceDeletionId.value || props.activeWorkspaceId || '').trim()
   if (!workspaceId) return
-  setWorkspaceOperation('delete', 'Deleting workspace and starting background cleanup.')
   try {
     await appStore.deleteWorkspaceAsync(workspaceId)
-    closeWorkspaceDeleteDialog({ force: true })
+    closeWorkspaceDeleteDialog()
     await appStore.fetchWorkspaces()
     const fallbackId = String(appStore.activeWorkspaceId || workspaceCards.value[0]?.id || '').trim()
     if (fallbackId) {
       emit('select-workspace', fallbackId)
     }
-    toast.success(
-      isNativeWorkspaceMetadata ? 'Workspace deleted' : 'Workspace deletion started',
-      isNativeWorkspaceMetadata ? 'Workspace metadata was deleted.' : 'Workspace deletion is running in background.',
-    )
+    toast.success('Workspace deleted', 'Workspace metadata and local data were deleted.')
   } catch (error) {
     toast.error('Delete failed', extractApiErrorMessage(error, 'Failed to delete workspace.'))
-  } finally {
-    clearWorkspaceOperation()
   }
 }
 
@@ -2221,17 +1149,11 @@ async function createWorkspace() {
     toast.error('Workspace name required', 'Enter a workspace name to continue.')
     return
   }
-  let workspaceId = ''
   isCreatingWorkspace.value = true
-  isCreatingWorkspaceRuntime.value = false
-  clearRuntimeProgress()
-  runtimeActionMode.value = 'create'
-  workspaceCreateMessage.value = 'Saving the workspace name. You will add context next.'
-  setWorkspaceOperation('create', 'Creating workspace.')
   try {
     const context = ''
     const workspace = await appStore.createWorkspace(name, context)
-    workspaceId = String(workspace?.id || appStore.activeWorkspaceId || '').trim()
+    const workspaceId = String(workspace?.id || appStore.activeWorkspaceId || '').trim()
     if (!workspaceId) {
       throw new Error('Backend did not return a workspace id.')
     }
@@ -2243,79 +1165,17 @@ async function createWorkspace() {
     })
     isInlineCreating.value = false
     isEditingContext.value = true
-    isCreatingWorkspace.value = false
-    clearWorkspaceOperation()
   } catch (error) {
     toast.error('Create failed', extractApiErrorMessage(error, 'Failed to create workspace.'))
   } finally {
     isCreatingWorkspace.value = false
-    if (!workspaceId) {
-      isCreatingWorkspaceRuntime.value = false
-      runtimeActionMode.value = ''
-    }
-    workspaceCreateMessage.value = 'Saving the workspace name. You will add context next.'
-    clearWorkspaceOperation()
   }
-}
-
-function datasetSchemaStatusState(dataset) {
-  const persistedStatus = String(dataset?.schema_status || 'queued').trim().toLowerCase()
-  if (['queued', 'generating', 'ready', 'failed'].includes(persistedStatus)) {
-    return persistedStatus
-  }
-  return 'queued'
-}
-
-function datasetSchemaStatusLabel(dataset) {
-  const status = datasetSchemaStatusState(dataset)
-  if (status === 'generating') return 'Generating schema'
-  if (status === 'ready') return 'Schema ready'
-  if (status === 'failed') return 'Schema failed'
-  return 'Schema queued'
-}
-
-function datasetSchemaStatusBadgeClass(dataset) {
-  const status = datasetSchemaStatusState(dataset)
-  if (status === 'generating') return 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
-  if (status === 'ready') return 'bg-[var(--color-success-bg)] text-[var(--color-success)]'
-  if (status === 'failed') return 'bg-[var(--color-danger-bg)] text-[var(--color-danger)]'
-  return 'bg-[var(--color-base-muted)] text-[var(--color-text-muted)]'
-}
-
-function stopDatasetSchemaPolling() {
-  if (datasetSchemaPoller !== null) {
-    clearInterval(datasetSchemaPoller)
-    datasetSchemaPoller = null
-  }
-}
-
-function syncDatasetSchemaPolling() {
-  const shouldPoll = datasetEntries.value.some((dataset) => {
-    const status = datasetSchemaStatusState(dataset)
-    return status === 'queued' || status === 'generating'
-  })
-  if (!shouldPoll) {
-    stopDatasetSchemaPolling()
-    return
-  }
-  if (datasetSchemaPoller !== null) return
-  datasetSchemaPoller = setInterval(async () => {
-    await loadWorkspaceDatasets()
-  }, 1500)
 }
 
 function formatFilename(raw) {
   const value = String(raw || '').trim()
   if (!value) return 'dataset'
   return filenameFromPath(value, value)
-}
-
-function formatCreatedDate(raw) {
-  const value = String(raw || '').trim()
-  if (!value) return '—'
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return '—'
-  return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function formatRelativeTime(raw) {
@@ -2332,118 +1192,3 @@ function formatRelativeTime(raw) {
   return `${days}d ago`
 }
 </script>
-
-<style scoped>
-.workspace-readiness-card {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: 1rem;
-  padding: 1rem;
-  background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--color-accent) 14%, transparent), transparent 34%),
-    linear-gradient(135deg, color-mix(in srgb, var(--color-base-soft) 92%, var(--color-accent) 8%), var(--color-base));
-  box-shadow: 0 14px 34px color-mix(in srgb, var(--color-text-main) 8%, transparent);
-  transition:
-    border-color var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease),
-    box-shadow var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease),
-    transform var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease);
-}
-
-.workspace-readiness-card::before {
-  content: '';
-  position: absolute;
-  inset: -35% auto auto 54%;
-  height: 9rem;
-  width: 9rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-  filter: blur(22px);
-  pointer-events: none;
-}
-
-.workspace-readiness-card-ready {
-  border-color: color-mix(in srgb, var(--color-success) 36%, var(--color-border));
-}
-
-.workspace-readiness-card-pending {
-  border-color: color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
-}
-
-.workspace-readiness-item {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.625rem;
-  border: 1px solid var(--color-border);
-  border-radius: 0.75rem;
-  padding: 0.625rem;
-  background: color-mix(in srgb, var(--color-base) 72%, transparent);
-  transition:
-    border-color var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease),
-    background var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease),
-    transform var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease);
-}
-
-.workspace-readiness-item:hover {
-  transform: translateY(-1px);
-  background: color-mix(in srgb, var(--color-base) 88%, transparent);
-}
-
-.workspace-readiness-item-done {
-  border-color: color-mix(in srgb, var(--color-success) 28%, var(--color-border));
-}
-
-.workspace-readiness-item-checking {
-  border-color: color-mix(in srgb, var(--color-accent) 34%, var(--color-border));
-}
-
-.workspace-readiness-item-pending {
-  opacity: 0.82;
-}
-
-.workspace-readiness-dot {
-  display: inline-flex;
-  height: 1.5rem;
-  width: 1.5rem;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  transition:
-    background var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease),
-    color var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease),
-    transform var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease);
-}
-
-.workspace-readiness-dot-done {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-
-.workspace-readiness-dot-checking {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-}
-
-.workspace-readiness-dot-pending {
-  background: var(--color-base-muted);
-  color: var(--color-text-muted);
-}
-
-.node-success {
-  border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
-  background-color: color-mix(in srgb, var(--color-success) 5%, transparent);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--color-success) 15%, transparent);
-}
-.node-danger {
-  border-color: color-mix(in srgb, var(--color-danger) 30%, transparent);
-  background-color: color-mix(in srgb, var(--color-danger) 5%, transparent);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--color-danger) 15%, transparent);
-}
-.node-accent {
-  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
-  background-color: color-mix(in srgb, var(--color-accent) 5%, transparent);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--color-accent) 15%, transparent);
-}
-</style>

@@ -5,21 +5,18 @@ import test from 'node:test'
 
 const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
-test('workspace AI API keeps defaults overrides effective values and readiness separate', () => {
-  const contract = read('src/services/contracts/v1Api.js')
+test('native workspace AI keeps defaults overrides and effective values separate', () => {
   const store = read('src/stores/appStore.js')
+  const service = read('src/services/apiService.js')
 
-  assert.match(contract, /workspaces\/\$\{workspaceId\}\/ai-config/)
-  assert.match(contract, /ai-config\/overrides/)
   assert.match(store, /workspaceAIConfig/)
   assert.match(store, /fetchWorkspaceAIConfig/)
   assert.match(store, /saveWorkspaceAIConfig/)
-  assert.match(store, /resetWorkspaceAIConfig/)
   assert.doesNotMatch(store, /if \(workspaceService\.isNative\(\)\) \{\s*workspaceAIConfig\.value = null/)
-  assert.match(read('src/services/apiService.js'), /app\?\.GetWorkspaceAIConfig/)
+  assert.match(service, /requireWailsMethod\('GetWorkspaceAIConfig'\)/)
+  assert.match(service, /requireWailsMethod\('UpdateWorkspaceAIConfig'\)/)
   assert.match(read('../app.go'), /func \(a \*App\) GetWorkspaceAIConfig/)
   assert.match(read('../app.go'), /func \(a \*App\) UpdateWorkspaceAIConfig/)
-  assert.match(read('../app.go'), /func \(a \*App\) ResetWorkspaceAIConfig/)
 })
 
 test('workspace AI editor inherits application defaults and keeps privacy workspace scoped', () => {
@@ -42,7 +39,7 @@ test('native workspace settings expose the AI section selected by readiness acti
   const settings = read('src/components/modals/SettingsModal.vue')
   const store = read('src/stores/appStore.js')
 
-  assert.match(workspace, /const workspaceSections = isNativeWorkspaceMetadata[\s\S]*?\{ id: 'general', label: 'General' \}[\s\S]*?\{ id: 'connections', label: 'Data sources' \}[\s\S]*?\{ id: 'ai', label: 'AI' \}/)
+  assert.match(workspace, /const workspaceSections = \[[\s\S]*?\{ id: 'general', label: 'General' \}[\s\S]*?\{ id: 'connections', label: 'Data sources' \}[\s\S]*?\{ id: 'ai', label: 'AI' \}/)
   assert.match(workspace, /v-show="activeWorkspaceSection === 'ai'"/)
   assert.doesNotMatch(workspace, /!isNativeWorkspaceMetadata && activeWorkspaceSection === 'ai'/)
   assert.match(settings, /candidate === 'models' \|\| candidate === 'workspace-ai'/)
@@ -60,8 +57,9 @@ test('settings puts workspace models with workspace data and isolates credential
   assert.doesNotMatch(settings, /<span>Models<\/span>/)
   assert.ok(settings.indexOf('<span>Workspaces</span>') < settings.indexOf('<span>AI providers</span>'))
   assert.match(workspace, /<WorkspaceAIConfigSection/)
-  assert.match(workspace, /<WorkspaceDatasetSection>/)
-  assert.ok(workspace.indexOf('<WorkspaceAIConfigSection') < workspace.indexOf('<WorkspaceDatasetSection>'))
+  assert.match(workspace, /activeWorkspaceSection === 'connections'/)
+  assert.match(workspace, /activeWorkspaceSection === 'ai'/)
+  assert.ok(workspace.indexOf("activeWorkspaceSection === 'connections'") < workspace.indexOf("activeWorkspaceSection === 'ai'"))
   assert.match(connections, /API Credentials/)
   assert.match(connections, /:aria-expanded="applicationDefaultsOpen"/)
   assert.match(connections, /motion-disclosure-open/)

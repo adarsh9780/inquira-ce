@@ -22,7 +22,6 @@ type repository interface {
 	Delete(context.Context, string) error
 	GetAIConfig(context.Context, string) (aiConfigRecord, error)
 	SaveAIConfig(context.Context, aiConfigRecord, string) error
-	ResetAIConfig(context.Context, string, string) error
 	Close() error
 }
 
@@ -185,21 +184,6 @@ func (s *Service) UpdateAIConfig(ctx context.Context, workspaceID string, reques
 	record.ConfigurationReviewed = true
 	if err := s.repository.SaveAIConfig(ctx, record, formatTime(s.now().UTC())); err != nil {
 		return AIConfigResponse{}, apperror.Wrap("workspace_ai_update_failed", "Could not save workspace AI settings.", err)
-	}
-	return s.resolveAIConfig(ctx, record)
-}
-
-func (s *Service) ResetAIConfig(ctx context.Context, workspaceID string) (AIConfigResponse, error) {
-	record, err := s.aiRecord(ctx, workspaceID)
-	if err != nil {
-		return AIConfigResponse{}, err
-	}
-	if err := s.repository.ResetAIConfig(ctx, record.WorkspaceID, formatTime(s.now().UTC())); err != nil {
-		return AIConfigResponse{}, apperror.Wrap("workspace_ai_reset_failed", "Could not reset workspace AI settings.", err)
-	}
-	record, err = s.aiRecord(ctx, record.WorkspaceID)
-	if err != nil {
-		return AIConfigResponse{}, err
 	}
 	return s.resolveAIConfig(ctx, record)
 }

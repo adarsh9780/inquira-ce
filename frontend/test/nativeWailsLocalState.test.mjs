@@ -18,10 +18,9 @@ test('Wails session snapshots load and save through the native Go bridge', () =>
   assert.equal(read('../internal/localstate/repository.go').includes('type Snapshot = map[string]any'), true)
 })
 
-test('Wails snapshot failures remain best effort without falling through to Tauri files', () => {
+test('Wails snapshot failures remain best effort', () => {
   const service = read('src/services/localStateService.js')
 
-  assert.equal(service.indexOf('app?.LoadLocalState') < service.indexOf('if (!isTauriRuntime())'), true)
   assert.equal(service.includes("console.warn('Failed to load local state snapshot through Wails:'"), true)
   assert.equal(service.includes("console.warn('Failed to save local state snapshot through Wails:'"), true)
 })

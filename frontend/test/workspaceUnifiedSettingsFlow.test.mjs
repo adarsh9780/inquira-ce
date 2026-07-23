@@ -37,20 +37,16 @@ test('new workspace is created from an autofocus inline row and opens inline con
   assert.equal(workspace.includes('Quick create + Enter'), false)
 })
 
-test('active workspace summary saves context explicitly and accepts desktop file drops', () => {
+test('active workspace summary saves context and opens the native connection flow', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
-  const app = read('src/App.vue')
 
   assert.equal(workspace.includes('@click="saveWorkspaceContext"'), true)
-  assert.equal(workspace.includes('@click="saveWorkspaceContext"'), true)
   assert.equal(workspace.includes('async function saveWorkspaceContext()'), true)
-  assert.equal(workspace.includes('@drop.prevent="handleDatasetDrop"'), true)
-  assert.equal(app.includes("import('@tauri-apps/api/webview')"), true)
-  assert.equal(app.includes('getCurrentWebview().onDragDropEvent'), true)
-  assert.equal(app.includes('event?.payload?.paths || []'), true)
-  assert.equal(workspace.includes('filterSupportedDatasetPaths'), true)
-  assert.equal(workspace.includes('await startBatchDatasetIngestion(droppedPaths)'), true)
-  assert.equal(workspace.includes("filters: [{ name: 'Data files', extensions: SUPPORTED_DATASET_EXTENSIONS }]"), true)
+  assert.equal(workspace.includes('@click="chooseConnectionFile"'), true)
+  assert.equal(workspace.includes('connectionService.discover('), true)
+  assert.equal(workspace.includes('connectionService.create('), true)
+  assert.equal(workspace.includes('@drop.prevent="handleDatasetDrop"'), false)
+  assert.equal(workspace.includes('startBatchDatasetIngestion'), false)
 })
 
 test('selected summary exposes only activation until the workspace is active', () => {
@@ -77,7 +73,8 @@ test('selected summary puts actions in the header and uses context instead of du
   assert.equal(template.includes('<span class="section-label mb-1 block">Conversations</span>'), false)
   assert.equal(template.includes('<span class="section-label mb-1 block">Last Active</span>'), false)
   assert.equal(template.includes('flex min-w-0 items-center justify-between gap-3 border-b'), true)
-  assert.equal(template.includes('aria-label="Add dataset"'), true)
+  assert.equal(template.includes('Add data source'), true)
+  assert.equal(template.includes('@click="chooseConnectionFile"'), true)
   assert.equal(template.match(/@click="beginInlineCreate"/g)?.length, 2)
 })
 
@@ -95,7 +92,7 @@ test('settings sidebar keeps workspace ownership ahead of shared connections', (
   assert.equal(template.indexOf('<span>Appearance</span>') < template.indexOf('<span>Account</span>'), true)
 })
 
-test('active workspace summary clearly separates selection, saved context, and file import actions', () => {
+test('active workspace summary separates selection, saved context, and connection actions', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
   const template = workspace.slice(0, workspace.indexOf('<script setup>'))
 
@@ -107,10 +104,12 @@ test('active workspace summary clearly separates selection, saved context, and f
   assert.equal(workspace.includes('const isWorkspaceContextDirty = computed('), true)
   assert.equal(template.includes(':disabled="isSavingWorkspaceIdentity || !isWorkspaceContextDirty"'), true)
   assert.equal(template.includes("isWorkspaceContextDirty ? 'Unsaved changes' : 'Saved'"), true)
-  assert.equal(template.includes('data-testid="workspace-import-datasets-dropzone"'), true)
+  assert.equal(template.includes('data-testid="workspace-import-datasets-dropzone"'), false)
   assert.equal(template.includes('v-if="isWorkspaceActive"'), true)
-  assert.equal(template.includes(':disabled="isDatasetIngesting || isDeletingDataset"'), true)
-  assert.equal(template.includes('data-testid="workspace-import-datasets-header"'), false)
-  assert.equal(template.includes('data-testid="workspace-import-datasets-empty"'), false)
-  assert.equal(template.match(/CSV, TSV, Parquet, JSON, XLSX, and XLS/g)?.length, 1)
+  assert.equal(template.includes('Add data source'), true)
+  assert.equal(template.includes('No data sources yet'), true)
+  assert.equal(template.includes('CSV, Parquet, or Excel'), true)
+  assert.equal(workspace.includes('pendingConnection'), true)
+  assert.equal(workspace.includes('nativeConnections'), true)
+  assert.equal(workspace.includes('isDatasetIngesting'), false)
 })

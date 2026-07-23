@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('backend connection state stays internal while the status bar surfaces engine state', () => {
+test('native worker connection state stays internal while the status bar surfaces engine state', () => {
   const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
   const statusBarSource = readFileSync(
     resolve(process.cwd(), 'src/components/layout/StatusBar.vue'),
@@ -15,30 +15,11 @@ test('backend connection state stays internal while the status bar surfaces engi
     existsSync(resolve(process.cwd(), 'src/components/ui/ConnectionStatusIndicator.vue')),
     false,
   )
-  assert.equal(statusBarSource.includes('settingsWebSocket.subscribeWorkspaceRuntimeStatus'), true)
   assert.equal(statusBarSource.includes('workspaceRuntimeStatusMeta'), true)
   assert.equal(statusBarSource.includes('Engine {{ workspaceRuntimeStatusMeta.label.toLowerCase() }}'), true)
   assert.equal(statusBarSource.includes("label: 'Disconnected'"), false)
   assert.equal(statusBarSource.includes('data-websocket-status'), false)
   assert.equal(statusBarSource.includes('{{ wsConnectionMeta.label }}'), false)
-})
-
-test('frontend connection services omit HTTP readiness polling and legacy websocket APIs', () => {
-  const apiSource = readFileSync(resolve(process.cwd(), 'src/services/apiService.js'), 'utf-8')
-  const websocketSource = readFileSync(
-    resolve(process.cwd(), 'src/services/websocketService.js'),
-    'utf-8',
-  )
-
-  assert.equal(apiSource.includes('waitForBackendReady'), false)
-  assert.equal(apiSource.includes('async healthCheck()'), false)
-  assert.equal(websocketSource.includes('onProgress(callback)'), false)
-  assert.equal(websocketSource.includes('onComplete(callback)'), false)
-  assert.equal(websocketSource.includes('onError(callback)'), false)
-  assert.equal(websocketSource.includes('startSettingsSave('), false)
-  assert.equal(websocketSource.includes('testHandleMessage('), false)
-  assert.equal(websocketSource.includes('maxReconnectAttempts'), false)
-  assert.equal(websocketSource.includes('scheduleReconnect()'), true)
 })
 
 test('obsolete connection and standalone feature utilities stay removed', () => {

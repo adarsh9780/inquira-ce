@@ -261,7 +261,7 @@ def test_agent_execution_auto_captures_all_declared_jupyter_outputs(tmp_path: Pa
     async def scenario() -> None:
         database = tmp_path / "workspace.duckdb"
         _catalog(database)
-        kernels = WorkspaceKernelManager(idle_seconds=300)
+        kernels = WorkspaceKernelManager()
         try:
             agent = LangGraphAnalysisAgent(kernels=kernels, graph=MultiOutputGraph())
             result = await agent.analyze({

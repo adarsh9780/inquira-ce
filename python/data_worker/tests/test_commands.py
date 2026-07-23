@@ -121,7 +121,7 @@ def test_runtime_compiles_and_executes_command_in_workspace_kernel(tmp_path: Pat
     asyncio.run(scenario())
 
 
-def test_every_rust_slash_command_compiles_and_executes_against_duckdb() -> None:
+def test_every_desktop_slash_command_compiles_and_executes_against_duckdb() -> None:
     connection = duckdb.connect()
     connection.execute(
         """

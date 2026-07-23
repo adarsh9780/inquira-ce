@@ -7,24 +7,22 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const source = fs.readFileSync(path.join(root, 'src/services/apiService.js'), 'utf8')
 
-test('turn-tree mutations use native Wails bindings when available', () => {
+test('supported turn-tree mutations use native Wails bindings', () => {
   for (const method of [
-    'UpdateConversation', 'DeleteConversationTurn', 'MoveConversationTurn',
-    'ReorderConversationTurns', 'GetFinalConversationTurn',
-    'MarkFinalConversationTurn', 'RerunFinalConversationTurn',
+    'UpdateConversation', 'DeleteConversationTurn', 'GetFinalConversationTurn',
+    'MarkFinalConversationTurn',
   ]) {
-    assert.match(source, new RegExp(`app\\?\\.${method}|app\\.${method}`))
+    assert.match(source, new RegExp(`requireWailsMethod\\('${method}'\\)`))
   }
   assert.match(source, /item\.final_turn_id/)
 })
 
-test('artifact list, metadata, paging, usage, and delete use native Wails bindings', () => {
+test('active turn artifacts, paging, usage, and deletion use native Wails bindings', () => {
   for (const method of [
-    'ListWorkspaceArtifacts', 'ListTurnArtifactSummaries',
-    'GetWorkspaceArtifactMetadata', 'GetTurnArtifactMetadata',
+    'ListTurnArtifactSummaries', 'GetTurnArtifactMetadata',
     'GetWorkspaceArtifactRows', 'GetTurnArtifactRows',
-    'GetWorkspaceArtifactUsage', 'DeleteWorkspaceArtifact', 'DeleteTurnArtifact',
+    'DeleteTurnArtifact',
   ]) {
-    assert.match(source, new RegExp(`app\\?\\.${method}|app\\.${method}`))
+    assert.match(source, new RegExp(`['\"]${method}['\"]`))
   }
 })

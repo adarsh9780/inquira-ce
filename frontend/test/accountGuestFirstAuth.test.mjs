@@ -22,13 +22,11 @@ test('auth store is local-only in CE', () => {
 
   assert.equal(source.includes("user_id: 'local-user'"), true)
   assert.equal(source.includes("auth_provider: 'local'"), true)
-  assert.equal(source.includes('apiService.setAuthToken(\'\')'), true)
   assert.equal(source.includes(removedProviderAction), false)
   assert.equal(source.includes(removedProviderFlag), false)
   assert.equal(source.includes(removedLoopbackCommand), false)
   assert.equal(source.includes(removedCallbackEvent), false)
   assert.equal(source.includes('exchangeCodeForSession'), false)
-  assert.equal(source.includes('window.__TAURI_INTERNALS__'), false)
 })
 
 test('account tab shows local workspace state without sign-in actions', () => {

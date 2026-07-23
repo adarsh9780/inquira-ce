@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('app store maps legacy code/chat tabs into workspace pane routing', () => {
+test('app store maps persisted code and chat tabs into workspace pane routing', () => {
   const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
   const source = readFileSync(storePath, 'utf-8')
 

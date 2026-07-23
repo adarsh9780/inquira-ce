@@ -22,17 +22,3 @@ test('chat input consumes live token events and does not fall back to non-stream
   assert.equal(source.includes("appStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, payload?.status || 'missing')"), true)
   assert.equal(source.includes('await refreshRuntimeStatusAfterExplicitWork(appStore.activeWorkspaceId)'), true)
 })
-
-test('v1AnalyzeStream always uses stream endpoint without local non-stream fallback', () => {
-  const servicePath = resolve(process.cwd(), 'src/services/apiService.js')
-  const source = readFileSync(servicePath, 'utf-8')
-
-  assert.equal(source.includes('if (!isStreamingEnabled()) {'), false)
-  assert.equal(source.includes('disableStreamingForUnsupportedStatus(response.status)'), false)
-  assert.equal(source.includes('${v1Api.chat.stream}'), true)
-  assert.equal(source.includes('isSseTransportError(error)'), true)
-  assert.equal(source.includes("stage: 'stream_recovery'"), true)
-  assert.equal(source.includes('return v1Api.chat.analyze(payload)'), true)
-  assert.equal(source.includes("evt.event === 'token' && events.length > 1"), true)
-  assert.equal(source.includes('await new Promise((resolve) => setTimeout(resolve, 0))'), true)
-})

@@ -69,22 +69,6 @@
         <div v-if="appStore.activeWorkspaceId && tableViewportLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded font-medium tabular-nums" :class="artifactCountClass">
           <span>{{ tableViewportLabel }}</span>
         </div>
-        <div
-          v-if="showArtifactUsageWarning"
-          class="flex items-center px-1.5 py-0.5 text-[var(--color-warning)]"
-          :title="artifactUsageWarningTitle"
-          aria-label="Artifact usage warning"
-        >
-          <ExclamationTriangleIcon class="w-3.5 h-3.5" />
-        </div>
-        <div
-          v-if="showWorkspaceResourceWarning"
-          class="flex items-center px-1.5 py-0.5 text-[var(--color-warning)]"
-          :title="workspaceResourceWarningTitle"
-          aria-label="Workspace cleanup recommendation"
-        >
-          <ExclamationTriangleIcon class="w-3.5 h-3.5" />
-        </div>
       </template>
     </div>
 
@@ -196,15 +180,13 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { useAuthStore } from '../../stores/authStore'
 import apiService from '../../services/apiService'
-import { settingsWebSocket } from '../../services/websocketService'
 import { formatUsageCompact, formatUsageTooltip, normalizeUsage } from '../../utils/usageFormat'
 import {
   BellIcon,
   CommandLineIcon,
-  ExclamationTriangleIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
-import { toast, useToast } from '../../composables/useToast'
+import { useToast } from '../../composables/useToast'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -218,24 +200,7 @@ const {
 // --- Workspace Status Management ---
 const workspaceRuntimeStatus = computed(() => appStore.activeWorkspaceRuntimeStatus)
 
-const isWebSocketConnected = ref(false)
-let unsubscribeWebSocketConnection = null
-let unsubscribeWorkspaceRuntimeStatus = null
-let artifactUsageStreamAbortController = null
-let artifactUsageReconnectTimer = null
-let workspaceResourceRecommendationTimer = null
-const lastWorkspaceResourceRecommendationKey = ref('')
 const notificationsPanelOpen = ref(false)
-const artifactUsage = ref({
-  duckdbBytes: 0,
-  duckdbWarningThresholdBytes: 1024 * 1024 * 1024,
-  figureCount: 0,
-  figureWarningThresholdCount: 20,
-  duckdbWarning: false,
-  figureWarning: false,
-  warning: false,
-})
-const workspaceResourceRecommendation = ref(null)
 
 const unreadNotificationBadge = computed(() => {
   const count = Number(unreadNotificationCount.value || 0)
@@ -358,226 +323,6 @@ const artifactCountClass = computed(() => {
   return 'bg-[var(--color-surface)] text-[var(--color-text-muted)] border border-[var(--color-border)]'
 })
 
-const showArtifactUsageWarning = computed(() => {
-  return Boolean(appStore.activeWorkspaceId && appStore.hasWorkspace && artifactUsage.value.warning)
-})
-
-const artifactUsageWarningTitle = computed(() => {
-  const details = []
-  if (artifactUsage.value.duckdbWarning) {
-    details.push(
-      `Turn artifacts: ${formatBytes(artifactUsage.value.duckdbBytes)} (limit ${formatBytes(artifactUsage.value.duckdbWarningThresholdBytes)})`
-    )
-  }
-  if (artifactUsage.value.figureWarning) {
-    details.push(
-      `Charts saved: ${Number(artifactUsage.value.figureCount || 0)} (limit ${Number(artifactUsage.value.figureWarningThresholdCount || 20)})`
-    )
-  }
-  if (!details.length) return 'Turn artifact usage is within safe limits.'
-  return `Turn artifact usage warning. ${details.join(' | ')}. Delete unused artifacts to avoid performance issues.`
-})
-
-const workspaceResourceCandidates = computed(() => {
-  const candidates = workspaceResourceRecommendation.value?.candidates
-  return Array.isArray(candidates) ? candidates : []
-})
-
-const showWorkspaceResourceWarning = computed(() => {
-  return workspaceResourceCandidates.value.length > 0
-})
-
-const workspaceResourceWarningTitle = computed(() => {
-  const count = workspaceResourceCandidates.value.length
-  if (count <= 0) return 'Workspace resource usage is within safe limits.'
-  const names = workspaceResourceCandidates.value
-    .map((candidate) => String(candidate?.workspace_name || candidate?.workspace_id || '').trim())
-    .filter(Boolean)
-    .slice(0, 3)
-  const label = count === 1 ? 'workspace' : 'workspaces'
-  return `Consider closing ${count} idle ${label}: ${names.join(', ')}`
-})
-
-function updateWebSocketStatus(connected) {
-  const status = settingsWebSocket.getConnectionStatus()
-  const shouldMonitor = Boolean(status.isPersistentMode || status.lastConnectionAttempt)
-  isWebSocketConnected.value = shouldMonitor ? connected : false
-}
-
-function setupWebSocketMonitoring() {
-  if (typeof unsubscribeWebSocketConnection === 'function') {
-    unsubscribeWebSocketConnection()
-    unsubscribeWebSocketConnection = null
-  }
-  updateWebSocketStatus(settingsWebSocket.isConnected)
-  unsubscribeWebSocketConnection = settingsWebSocket.onConnection((connected) => {
-    updateWebSocketStatus(connected)
-  })
-  if (typeof unsubscribeWorkspaceRuntimeStatus === 'function') {
-    unsubscribeWorkspaceRuntimeStatus()
-    unsubscribeWorkspaceRuntimeStatus = null
-  }
-  unsubscribeWorkspaceRuntimeStatus = settingsWebSocket.subscribeWorkspaceRuntimeStatus(({ workspaceId, status }) => {
-    const normalizedWorkspaceId = String(workspaceId || '').trim()
-    if (!normalizedWorkspaceId) return
-    appStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, status)
-    if (normalizedWorkspaceId !== String(appStore.activeWorkspaceId || '').trim()) return
-    if (['ready', 'busy', 'starting'].includes(status)) {
-      appStore.setRuntimeError('')
-    }
-  })
-}
-
-function resetArtifactUsage() {
-  artifactUsage.value = {
-    duckdbBytes: 0,
-    duckdbWarningThresholdBytes: 1024 * 1024 * 1024,
-    figureCount: 0,
-    figureWarningThresholdCount: 20,
-    duckdbWarning: false,
-    figureWarning: false,
-    warning: false,
-  }
-}
-
-function formatBytes(bytes) {
-  const value = Math.max(0, Number(bytes || 0))
-  if (value < 1024) return `${value} B`
-  if (value < 1024 ** 2) return `${(value / 1024).toFixed(1)} KB`
-  if (value < 1024 ** 3) return `${(value / (1024 ** 2)).toFixed(1)} MB`
-  return `${(value / (1024 ** 3)).toFixed(2)} GB`
-}
-
-function isUnauthorizedError(error) {
-  const status = Number(error?.response?.status ?? error?.status ?? 0)
-  if (status === 401) return true
-  return String(error?.message || '').includes('401')
-}
-
-async function handleUnauthorizedPollingError() {
-  stopArtifactUsageStream()
-  settingsWebSocket.setWorkspaceRuntimeStatusWorkspace('')
-  appStore.setRuntimeError('Background auth check failed. Reconnecting your session...')
-  if (authStore.isAuthenticated) {
-    await authStore.checkAuth({ preserveSession: true })
-  }
-  scheduleArtifactUsageReconnect()
-}
-
-function applyArtifactUsageSnapshot(payload) {
-  artifactUsage.value = {
-    duckdbBytes: Math.max(0, Number(payload?.duckdb_bytes || 0)),
-    duckdbWarningThresholdBytes: Math.max(1, Number(payload?.duckdb_warning_threshold_bytes || 1024 * 1024 * 1024)),
-    figureCount: Math.max(0, Number(payload?.figure_count || 0)),
-    figureWarningThresholdCount: Math.max(1, Number(payload?.figure_warning_threshold_count || 20)),
-    duckdbWarning: Boolean(payload?.duckdb_warning),
-    figureWarning: Boolean(payload?.figure_warning),
-    warning: Boolean(payload?.warning),
-  }
-}
-
-async function startArtifactUsageStream() {
-  if (!authStore.isAuthenticated) {
-    resetArtifactUsage()
-    return
-  }
-  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
-  if (!workspaceId || !appStore.hasWorkspace) {
-    resetArtifactUsage()
-    return
-  }
-  stopArtifactUsageStream()
-  artifactUsageStreamAbortController = new AbortController()
-  const streamController = artifactUsageStreamAbortController
-  try {
-    await apiService.subscribeWorkspaceArtifactUsage(workspaceId, {
-      signal: streamController.signal,
-      onEvent: (event) => {
-        if (event?.event !== 'snapshot') return
-        applyArtifactUsageSnapshot(event.data)
-      },
-    })
-    if (!streamController.signal.aborted) {
-      scheduleArtifactUsageReconnect()
-    }
-  } catch (error) {
-    if (error?.name === 'AbortError') return
-    if (isUnauthorizedError(error)) {
-      await handleUnauthorizedPollingError()
-      return
-    }
-    resetArtifactUsage()
-    scheduleArtifactUsageReconnect()
-  }
-}
-
-function scheduleArtifactUsageReconnect(delayMs = 3000) {
-  if (artifactUsageReconnectTimer) clearTimeout(artifactUsageReconnectTimer)
-  artifactUsageReconnectTimer = setTimeout(() => {
-    artifactUsageReconnectTimer = null
-    if (!document.hidden) {
-      void startArtifactUsageStream()
-    }
-  }, Math.max(0, Number(delayMs || 0)))
-}
-
-function stopArtifactUsageStream() {
-  if (artifactUsageReconnectTimer) {
-    clearTimeout(artifactUsageReconnectTimer)
-    artifactUsageReconnectTimer = null
-  }
-  artifactUsageStreamAbortController?.abort()
-  artifactUsageStreamAbortController = null
-}
-
-function workspaceResourceRecommendationKey(payload) {
-  const candidates = Array.isArray(payload?.candidates) ? payload.candidates : []
-  return candidates
-    .map((candidate) => `${candidate?.workspace_id || ''}:${candidate?.idle_seconds || 0}`)
-    .sort()
-    .join('|')
-}
-
-async function refreshWorkspaceResourceRecommendation({ notify = false } = {}) {
-  if (!authStore.isAuthenticated) {
-    workspaceResourceRecommendation.value = null
-    lastWorkspaceResourceRecommendationKey.value = ''
-    return
-  }
-  try {
-    const payload = await apiService.v1GetWorkspaceResourceRecommendation()
-    workspaceResourceRecommendation.value = payload
-    const candidates = Array.isArray(payload?.candidates) ? payload.candidates : []
-    const key = workspaceResourceRecommendationKey(payload)
-    if (notify && candidates.length > 0 && key && key !== lastWorkspaceResourceRecommendationKey.value) {
-      toast.warning('Workspace cleanup suggested', workspaceResourceWarningTitle.value)
-      lastWorkspaceResourceRecommendationKey.value = key
-    }
-    if (candidates.length === 0) {
-      lastWorkspaceResourceRecommendationKey.value = ''
-    }
-  } catch (_error) {
-    workspaceResourceRecommendation.value = null
-  }
-}
-
-function startWorkspaceResourceRecommendationPolling() {
-  stopWorkspaceResourceRecommendationPolling()
-  void refreshWorkspaceResourceRecommendation({ notify: true })
-  workspaceResourceRecommendationTimer = setInterval(() => {
-    if (!document.hidden) {
-      void refreshWorkspaceResourceRecommendation({ notify: true })
-    }
-  }, 60000)
-}
-
-function stopWorkspaceResourceRecommendationPolling() {
-  if (workspaceResourceRecommendationTimer) {
-    clearInterval(workspaceResourceRecommendationTimer)
-    workspaceResourceRecommendationTimer = null
-  }
-}
-
 async function refreshWorkspaceRuntimeStatusFromApi(workspaceId, fallbackStatus = 'missing') {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return 'missing'
@@ -638,52 +383,33 @@ function handleStatusBarEscape(event) {
   }
 }
 
-function syncWorkspaceRealtimeSubscriptions() {
+function syncWorkspaceStatus() {
   const workspaceId = String(appStore.activeWorkspaceId || '').trim()
   if (!authStore.isAuthenticated || !workspaceId || !appStore.hasWorkspace) {
-    settingsWebSocket.setWorkspaceRuntimeStatusWorkspace('')
-    stopArtifactUsageStream()
     appStore.setWorkspaceRuntimeStatus(workspaceId, 'missing')
-    resetArtifactUsage()
     return
   }
 
   const currentStatus = appStore.getWorkspaceRuntimeStatus(workspaceId)
-  settingsWebSocket.setWorkspaceRuntimeStatusWorkspace(workspaceId)
   void refreshWorkspaceRuntimeStatusFromApi(workspaceId, currentStatus)
-  void startArtifactUsageStream()
 }
 
 // Named handler so we can remove the exact same reference on unmount
 function handleVisibilityChange() {
   if (!document.hidden && authStore.isAuthenticated && appStore.activeWorkspaceId && appStore.hasWorkspace) {
-    syncWorkspaceRealtimeSubscriptions()
+    syncWorkspaceStatus()
   }
 }
 
 // Lifecycle and Watchers
 onMounted(() => {
-  setupWebSocketMonitoring()
-  syncWorkspaceRealtimeSubscriptions()
-  startWorkspaceResourceRecommendationPolling()
+  syncWorkspaceStatus()
   document.addEventListener('visibilitychange', handleVisibilityChange)
   document.addEventListener('pointerdown', handleGlobalPointerDown)
   document.addEventListener('keydown', handleStatusBarEscape)
 })
 
 onUnmounted(() => {
-  settingsWebSocket.setWorkspaceRuntimeStatusWorkspace('')
-  stopArtifactUsageStream()
-  stopWorkspaceResourceRecommendationPolling()
-  resetArtifactUsage()
-  if (typeof unsubscribeWorkspaceRuntimeStatus === 'function') {
-    unsubscribeWorkspaceRuntimeStatus()
-    unsubscribeWorkspaceRuntimeStatus = null
-  }
-  if (typeof unsubscribeWebSocketConnection === 'function') {
-    unsubscribeWebSocketConnection()
-    unsubscribeWebSocketConnection = null
-  }
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   document.removeEventListener('pointerdown', handleGlobalPointerDown)
   document.removeEventListener('keydown', handleStatusBarEscape)
@@ -692,27 +418,13 @@ onUnmounted(() => {
 watch([() => appStore.activeWorkspaceId, () => appStore.hasWorkspace, () => authStore.isAuthenticated], ([newId, hasWorkspace, isAuthenticated]) => {
   const normalizedWorkspaceId = String(newId || '').trim()
   if (isAuthenticated && newId && hasWorkspace) {
-    syncWorkspaceRealtimeSubscriptions()
+    syncWorkspaceStatus()
   } else {
-    settingsWebSocket.setWorkspaceRuntimeStatusWorkspace('')
-    stopArtifactUsageStream()
-    workspaceResourceRecommendation.value = null
     appStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, 'missing')
-    resetArtifactUsage()
   }
-})
-
-watch(() => isWebSocketConnected.value, () => {
-  syncWorkspaceRealtimeSubscriptions()
 })
 
 watch(() => authStore.isAuthenticated, (authenticated) => {
-  if (authenticated) {
-    startWorkspaceResourceRecommendationPolling()
-  } else {
-    stopWorkspaceResourceRecommendationPolling()
-    workspaceResourceRecommendation.value = null
-    lastWorkspaceResourceRecommendationKey.value = ''
-  }
+  if (authenticated) syncWorkspaceStatus()
 })
 </script>

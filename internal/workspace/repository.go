@@ -289,21 +289,6 @@ func (r *SQLiteRepository) SaveAIConfig(ctx context.Context, record aiConfigReco
 	return err
 }
 
-func (r *SQLiteRepository) ResetAIConfig(ctx context.Context, workspaceID, updatedAt string) error {
-	record, err := r.GetAIConfig(ctx, workspaceID)
-	if err != nil {
-		return err
-	}
-	record.Provider = nil
-	record.MainModel = nil
-	record.LiteModel = nil
-	record.CodingModel = nil
-	record.Temperature = nil
-	record.MaxTokens = nil
-	record.TopP = nil
-	return r.SaveAIConfig(ctx, record, updatedAt)
-}
-
 func (r *SQLiteRepository) Close() error { return r.db.Close() }
 
 type scanner interface {

@@ -28,7 +28,7 @@ test('sidebar exposes compact workspace utilities and simple project conversatio
   assert.equal(sidebarSource.includes('<SidebarConversations'), false)
   assert.equal(sidebarSource.includes('v-for="conv in visibleConversationsForSidebar(workspace)"'), true)
   assert.equal(sidebarSource.includes('visibleConversationsForSidebar(workspace)'), true)
-  assert.equal(sidebarSource.includes('appStore.fetchConversationTurns({ reset: true, preferLatest: true })'), true)
+  assert.equal(sidebarSource.includes('appStore.fetchConversationTurns({ preferLatest: true })'), true)
   assert.equal(sidebarSource.includes('conversation?.last_turn_at || conversation?.updated_at || conversation?.created_at'), true)
   assert.equal(sidebarSource.includes("return 'Run'"), true)
   assert.equal(sidebarSource.includes('formatCompactRelativeTimestamp(conversationTimestampValue(conversation))'), true)
@@ -50,7 +50,7 @@ test('activating a conversation returns the shell to workspace chat', () => {
   assert.equal(globalTreeSource.includes('appStore.setActiveConversationId(targetConversationId)'), true)
   assert.equal(globalTreeSource.includes("appStore.setActiveTab('workspace')"), true)
   assert.equal(globalTreeSource.includes("appStore.setWorkspacePane?.('chat')"), true)
-  assert.equal(globalTreeSource.includes('await appStore.fetchConversationTurns({ reset: true })'), true)
+  assert.equal(globalTreeSource.includes('await appStore.fetchConversationTurns()'), true)
 })
 
 test('selecting a workspace row returns the shell to workspace chat', () => {

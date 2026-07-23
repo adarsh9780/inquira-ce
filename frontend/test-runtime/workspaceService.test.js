@@ -25,7 +25,6 @@ describe('workspaceService Wails bridge', () => {
     await workspaceService.update('workspace-1', 'Finance', 'Updated context')
     await workspaceService.summary('workspace-1')
     await workspaceService.delete('workspace-1')
-    const deletionJobs = await workspaceService.listDeletionJobs()
 
     expect(app.ListWorkspaces).toHaveBeenCalledOnce()
     expect(app.CreateWorkspace).toHaveBeenCalledWith({
@@ -44,6 +43,5 @@ describe('workspaceService Wails bridge', () => {
     })
     expect(app.GetWorkspaceSummary).toHaveBeenCalledWith('workspace-1')
     expect(app.DeleteWorkspace).toHaveBeenCalledWith('workspace-1')
-    expect(deletionJobs).toEqual({ jobs: [] })
   })
 })

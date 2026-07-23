@@ -50,7 +50,6 @@ type modelSource interface {
 type agentGateway interface {
 	Analyze(context.Context, AgentWorkerRequest, func(analysisruntime.WorkerEvent)) (AgentWorkerResult, error)
 	Cancel(context.Context, string, string) (bool, error)
-	RespondIntervention(context.Context, string, []string) (InterventionResponse, error)
 }
 
 type runStore interface {
@@ -85,32 +84,6 @@ func (s *Service) Cancel(ctx context.Context, workspaceID, clientRequestID strin
 		return false, apperror.Wrap("agent_cancel_failed", "Could not cancel the running analysis.", err)
 	}
 	return cancelled, nil
-}
-
-func (s *Service) RespondIntervention(ctx context.Context, interventionID string, selected []string) (InterventionResponse, error) {
-	interventionID = strings.TrimSpace(interventionID)
-	if interventionID == "" {
-		return InterventionResponse{}, apperror.New("intervention_required", "Intervention identity is required.")
-	}
-	if len(interventionID) > 128 || len(selected) > 20 {
-		return InterventionResponse{}, apperror.New("intervention_selection_invalid", "The intervention response is invalid.")
-	}
-	normalized := make([]string, 0, len(selected))
-	for _, item := range selected {
-		value := strings.TrimSpace(item)
-		if value == "" {
-			continue
-		}
-		if utf8.RuneCountInString(value) > 200 {
-			return InterventionResponse{}, apperror.New("intervention_selection_invalid", "The intervention response is invalid.")
-		}
-		normalized = append(normalized, value)
-	}
-	response, err := s.agent.RespondIntervention(ctx, interventionID, normalized)
-	if err != nil {
-		return InterventionResponse{}, apperror.Wrap("intervention_response_failed", "Could not submit the intervention response.", err)
-	}
-	return response, nil
 }
 
 func (s *Service) Analyze(ctx context.Context, request AnalyzeRequest, emit func(analysisruntime.WorkerEvent)) (AnalyzeResult, error) {

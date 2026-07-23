@@ -170,7 +170,6 @@ import executionService from '../../services/executionService'
 import { executeCommand, getRegisteredCommands, isCommand } from '../../services/commandRegistry'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { inferTableNameFromDataPath } from '../../utils/chatBootstrap'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import { modelSupportsImages, SUPPORTED_CHAT_IMAGE_TYPES } from '../../utils/modelCapabilities'
 import ColumnSuggest from './ColumnSuggest.vue'
@@ -187,6 +186,16 @@ import { ArrowUpIcon, MicrophoneIcon, StopIcon } from '@heroicons/vue/24/solid'
 
 const appStore = useAppStore()
 const effectiveWorkspaceModel = computed(() => appStore.workspaceAIConfig?.effective?.main_model || appStore.selectedModel)
+const primaryWorkspaceTableName = computed(() => {
+  const summaryTable = (Array.isArray(appStore.activeWorkspaceSummary?.table_names)
+    ? appStore.activeWorkspaceSummary.table_names
+    : []
+  ).map((name) => String(name || '').trim()).find(Boolean)
+  if (summaryTable) return summaryTable
+  const catalogItem = (Array.isArray(appStore.columnCatalog) ? appStore.columnCatalog : [])
+    .find((item) => String(item?.table_name || '').trim())
+  return String(catalogItem?.table_name || '').trim()
+})
 const { formatAttachmentSize } = useChatAttachments()
 useChatAutocomplete()
 useVoiceInput()
@@ -217,7 +226,7 @@ const showCommandSuggestions = computed(() => commandSuggestions.value.length > 
 const showColumnSuggestions = computed(() => columnSuggestions.value.length > 0)
 const imageAttachmentsSupported = computed(() => modelSupportsImages(effectiveWorkspaceModel.value))
 const composerPlaceholder = computed(() => {
-  const tableName = String(appStore.ingestedTableName || '').trim()
+  const tableName = primaryWorkspaceTableName.value
   return tableName ? `Ask about ${tableName}…` : 'Ask about your data…'
 })
 const canSend = computed(() =>
@@ -556,16 +565,6 @@ function collectColumnCandidates() {
     addCandidate(item?.table_name, item?.column_name, item?.dtype)
   })
 
-  const activeTable = String(appStore.ingestedTableName || '').trim()
-  const ingestedItems = Array.isArray(appStore.ingestedColumns) ? appStore.ingestedColumns : []
-  ingestedItems.forEach((item) => {
-    addCandidate(
-      activeTable,
-      item?.name || item?.column_name,
-      item?.dtype || item?.type || ''
-    )
-  })
-
   return merged
 }
 
@@ -858,42 +857,6 @@ function handleKeydown(event) {
   }
 }
 
-function isBrowserVirtualPath(path) {
-  const normalized = String(path || '').toLowerCase()
-  return normalized.startsWith('browser://') || normalized.startsWith('browser:/') || normalized.startsWith('/browser:/')
-}
-
-async function ensureWorkspaceDatasetReady(workspaceId) {
-  if (!workspaceId || !appStore.dataFilePath) return
-  const tableName = (
-    appStore.ingestedTableName ||
-    inferTableNameFromDataPath(appStore.dataFilePath)
-  ).trim()
-  if (!tableName) {
-    throw new Error('Dataset sync failed: missing selected table name.')
-  }
-
-  if (isBrowserVirtualPath(appStore.dataFilePath)) {
-    const columns = (Array.isArray(appStore.ingestedColumns) ? appStore.ingestedColumns : []).map((col) => ({
-      ...col,
-      samples: appStore.allowSchemaSampleValues && Array.isArray(col?.samples) ? col.samples : []
-    }))
-    await apiService.v1SyncBrowserDataset(workspaceId, {
-      table_name: tableName,
-      columns,
-      row_count: null,
-      allow_sample_values: appStore.allowSchemaSampleValues
-    })
-    return
-  }
-
-  try {
-    await apiService.v1AddDataset(workspaceId, appStore.dataFilePath)
-  } catch (_error) {
-    throw new Error('Dataset sync failed: selected file could not be attached to workspace.')
-  }
-}
-
 function applyCommandResultToStore(commandResult) {
   const payload = commandResult?.result && typeof commandResult.result === 'object'
     ? commandResult.result
@@ -1086,7 +1049,6 @@ async function handleSlashCommand(questionText) {
     })
     appStore.addChatMessage(questionText, 'Running command...', { conversationId: requestConversationId })
     commandMessageCreated = true
-    await ensureWorkspaceDatasetReady(workspaceId)
     const result = await executeCommand(questionText, { appStore, apiService, executionService })
     const persistedConversationId = String(result?.conversation_id || '').trim()
     if (
@@ -1334,14 +1296,6 @@ async function handleSubmit() {
           }
           if (evt.event === 'tool_result' && evt.data?.call_id) {
             appStore.appendLastMessageToolResult(evt.data, localMessageId, { conversationId: requestConversationId })
-            return
-          }
-          if (evt.event === 'intervention_request' && evt.data?.id) {
-            appStore.setLastMessageInterventionRequest(evt.data, localMessageId, { conversationId: requestConversationId })
-            return
-          }
-          if (evt.event === 'intervention_response' && evt.data?.id) {
-            appStore.setLastMessageInterventionResponse(evt.data, localMessageId, { conversationId: requestConversationId })
             return
           }
           if (evt.event === 'error') {
@@ -1663,11 +1617,7 @@ watch(() => appStore.currentQuestion, async (nextQuestion) => {
   void updateAutocompleteSuggestions()
 })
 
-watch(() => appStore.ingestedTableName, () => {
-  void updateAutocompleteSuggestions()
-})
-
-watch(() => appStore.ingestedColumns, () => {
+watch(() => appStore.columnCatalog, () => {
   void updateAutocompleteSuggestions()
 }, { deep: true })
 </script>

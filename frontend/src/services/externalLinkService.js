@@ -1,5 +1,3 @@
-import { invoke } from '@tauri-apps/api/core'
-
 function wailsApp() {
   if (typeof window === 'undefined') return null
   return window.go?.main?.App || null
@@ -40,17 +38,6 @@ export async function openExternalUrl(rawUrl) {
     } catch (error) {
       console.error('❌ Failed to open external URL via Go desktop command:', error)
       return false
-    }
-  }
-
-  const isTauriDesktop = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
-
-  if (isTauriDesktop) {
-    try {
-      await invoke('open_external_url', { url })
-      return true
-    } catch (error) {
-      console.error('❌ Failed to open external URL via desktop command:', error)
     }
   }
 

@@ -9,14 +9,12 @@ from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, Tool
 from langchain_core.prompts import ChatPromptTemplate
 
 from inquira_data_worker.agent_v2.nodes import (
-    _ASSESS_CONTEXT_PROMPT,
     _CONTEXT_ENRICHMENT_TOOL_PROMPT,
     _build_context_enrichment_user_prompt,
     _deterministic_context_prefetch_tools,
     _score_schema_context_confidence,
     _is_recoverable_structured_output_error,
     finalize_node,
-    analysis_assess_context_node,
     analysis_collect_context_node,
     analysis_prepare_sample_to_next,
     analysis_prepare_sample_tool_node,
@@ -749,16 +747,6 @@ async def test_analysis_retry_decider_routes_non_retriable_to_failure() -> None:
     }
     result = await analysis_retry_decider_node(state, {"configurable": {}})
     assert result.get("retry_target") == "analysis_finalize_failure"
-
-
-def test_assess_context_prompt_escapes_literal_tool_examples() -> None:
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", _ASSESS_CONTEXT_PROMPT),
-            ("human", "User question: {user_text}"),
-        ]
-    )
-    assert "tool" not in prompt.input_variables
 
 
 @pytest.mark.asyncio
@@ -1581,45 +1569,6 @@ async def test_analysis_validate_result_skips_explanation_model_for_retryable_re
     result = await analysis_validate_result_node(state, {"configurable": {}})
     assert result.get("retry_target") == "analysis_generate_code"
     assert "another attempt" not in str(result.get("result_explanation") or "").lower()
-
-
-@pytest.mark.asyncio
-async def test_analysis_assess_context_falls_back_when_length_limit_error(monkeypatch) -> None:
-    class _LengthErr(Exception):
-        pass
-
-    async def fake_invoke(*_args, **_kwargs):
-        raise _LengthErr("Could not parse response content as the length limit was reached")
-
-    monkeypatch.setattr("inquira_data_worker.agent_v2.nodes._ainvoke_structured_chain", fake_invoke)
-
-    class _FakeChain:
-        def __or__(self, _other):
-            return self
-
-        def with_structured_output(self, _schema):
-            return self
-
-    class _FakeModel:
-        def with_structured_output(self, _schema):
-            return _FakeChain()
-
-    monkeypatch.setattr("inquira_data_worker.agent_v2.nodes._get_model", lambda *_args, **_kwargs: _FakeModel())
-    monkeypatch.setattr("inquira_data_worker.agent_v2.nodes.ChatPromptTemplate.from_messages", lambda *_args, **_kwargs: _FakeChain())
-
-    state = {
-        "analysis_context": {
-            "messages": [HumanMessage(content="give me top 10 batsman")],
-            "user_text": "give me top 10 batsman",
-            "schema_summary": "x" * 5000,
-            "table_names": ["table_a"],
-        },
-        "known_columns": [],
-    }
-    result = await analysis_assess_context_node(state, {"configurable": {}})
-    assert isinstance(result.get("tool_plan"), list)
-    assert result.get("tool_plan")
-    assert result.get("tool_plan")[0].get("tool") == "search_schema"
 
 
 def test_analysis_validate_to_next_routes_to_failure_after_retry_cap() -> None:

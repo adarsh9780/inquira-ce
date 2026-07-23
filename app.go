@@ -58,15 +58,6 @@ type App struct {
 	initErr       error
 }
 
-type RerunFinalResult struct {
-	Conversation conversation.Conversation     `json:"conversation"`
-	Turn         conversation.Turn             `json:"turn"`
-	Answer       string                        `json:"answer"`
-	Code         string                        `json:"code"`
-	Execution    analysisruntime.ExecuteResult `json:"execution"`
-	Artifacts    []conversation.Artifact       `json:"artifacts"`
-}
-
 // NewApp creates a new App application struct
 func NewApp() *App {
 	app := &App{desktop: desktop.New(), saveDialog: runtime.SaveFileDialog}
@@ -478,9 +469,6 @@ func (a *App) RestartDesktopApp() error {
 	return nil
 }
 
-// ApplicationPaths exposes the resolved local directories for diagnostics.
-func (a *App) ApplicationPaths() appdirs.Paths { return a.paths }
-
 func (a *App) GetModelPreferences(provider string) (modelconfig.PreferencesResponse, error) {
 	service, err := a.modelService()
 	if err != nil {
@@ -609,14 +597,6 @@ func (a *App) UpdateWorkspaceAIConfig(workspaceID string, request workspace.AICo
 	return service.UpdateAIConfig(a.appContext(), workspaceID, request)
 }
 
-func (a *App) ResetWorkspaceAIConfig(workspaceID string) (workspace.AIConfigResponse, error) {
-	service, err := a.workspaceService()
-	if err != nil {
-		return workspace.AIConfigResponse{}, err
-	}
-	return service.ResetAIConfig(a.appContext(), workspaceID)
-}
-
 func (a *App) DeleteWorkspace(workspaceID string) (workspace.DeletionResult, error) {
 	service, err := a.workspaceService()
 	if err != nil {
@@ -667,14 +647,6 @@ func (a *App) UpdateConversation(conversationID, title string) (conversation.Con
 	return service.UpdateConversation(a.appContext(), conversationID, title)
 }
 
-func (a *App) CreateConversationTurn(request conversation.CreateTurnRequest) (conversation.Turn, error) {
-	service, err := a.conversationService()
-	if err != nil {
-		return conversation.Turn{}, err
-	}
-	return service.CreateTurn(a.appContext(), request)
-}
-
 func (a *App) ListConversationTurns(conversationID string) ([]conversation.Turn, error) {
 	service, err := a.conversationService()
 	if err != nil {
@@ -715,22 +687,6 @@ func (a *App) DeleteConversationTurn(conversationID, turnID string) (conversatio
 	return service.DeleteTurn(a.appContext(), conversationID, turnID)
 }
 
-func (a *App) MoveConversationTurn(request conversation.MoveTurnRequest) (conversation.Turn, error) {
-	service, err := a.conversationService()
-	if err != nil {
-		return conversation.Turn{}, err
-	}
-	return service.MoveTurn(a.appContext(), request)
-}
-
-func (a *App) ReorderConversationTurns(request conversation.ReorderTurnsRequest) ([]conversation.Turn, error) {
-	service, err := a.conversationService()
-	if err != nil {
-		return nil, err
-	}
-	return service.ReorderTurns(a.appContext(), request)
-}
-
 func (a *App) GetFinalConversationTurn(conversationID string) (*conversation.Turn, error) {
 	service, err := a.conversationService()
 	if err != nil {
@@ -747,97 +703,12 @@ func (a *App) MarkFinalConversationTurn(conversationID, turnID string) (conversa
 	return service.MarkFinalTurn(a.appContext(), conversationID, turnID)
 }
 
-func (a *App) RerunFinalConversationTurn(conversationID string) (RerunFinalResult, error) {
-	conversations, err := a.conversationService()
-	if err != nil {
-		return RerunFinalResult{}, err
-	}
-	prepared, err := conversations.PrepareFinalRerun(a.appContext(), conversationID)
-	if err != nil {
-		return RerunFinalResult{}, err
-	}
-	analysis, err := a.analysisService()
-	if err != nil {
-		return RerunFinalResult{}, err
-	}
-	execution, err := analysis.Execute(a.appContext(), analysisruntime.ExecuteRequest{
-		ConversationID: prepared.Conversation.ID,
-		TurnID:         prepared.Turn.ID,
-		Code:           prepared.Code,
-		TimeoutSeconds: 360,
-	}, func(event analysisruntime.WorkerEvent) {
-		runtime.EventsEmit(a.appContext(), "agent-runtime-event", event)
-	})
-	if err != nil {
-		return RerunFinalResult{}, err
-	}
-	turn, err := conversations.GetTurn(a.appContext(), prepared.Turn.ID)
-	if err != nil {
-		return RerunFinalResult{}, err
-	}
-	if turn.Status == conversation.TurnStatusCompleted {
-		if _, err := conversations.MarkFinalTurn(a.appContext(), prepared.Conversation.ID, turn.ID); err != nil {
-			return RerunFinalResult{}, err
-		}
-	}
-	updatedConversation, err := conversations.GetConversation(a.appContext(), prepared.Conversation.ID)
-	if err != nil {
-		return RerunFinalResult{}, err
-	}
-	return RerunFinalResult{
-		Conversation: updatedConversation,
-		Turn:         turn,
-		Answer:       prepared.SourceTurn.AssistantText,
-		Code:         prepared.Code,
-		Execution:    execution,
-		Artifacts:    execution.Artifacts,
-	}, nil
-}
-
-func (a *App) CompleteConversationTurn(request conversation.CompleteTurnRequest) (conversation.Turn, error) {
-	service, err := a.conversationService()
-	if err != nil {
-		return conversation.Turn{}, err
-	}
-	return service.CompleteTurn(a.appContext(), request)
-}
-
-func (a *App) FailConversationTurn(request conversation.FailTurnRequest) (conversation.Turn, error) {
-	service, err := a.conversationService()
-	if err != nil {
-		return conversation.Turn{}, err
-	}
-	return service.FailTurn(a.appContext(), request)
-}
-
-func (a *App) ListTurnArtifacts(turnID string) ([]conversation.Artifact, error) {
-	service, err := a.conversationService()
-	if err != nil {
-		return nil, err
-	}
-	return service.ListArtifacts(a.appContext(), turnID)
-}
-
-func (a *App) ListWorkspaceArtifacts(workspaceID, kind string) (artifactbrowser.ListResponse, error) {
-	service, err := a.artifactService()
-	if err != nil {
-		return artifactbrowser.ListResponse{}, err
-	}
-	return service.ListWorkspace(a.appContext(), workspaceID, kind)
-}
 func (a *App) ListTurnArtifactSummaries(conversationID, turnID, kind string) (artifactbrowser.ListResponse, error) {
 	service, err := a.artifactService()
 	if err != nil {
 		return artifactbrowser.ListResponse{}, err
 	}
 	return service.ListTurn(a.appContext(), conversationID, turnID, kind)
-}
-func (a *App) GetWorkspaceArtifactMetadata(workspaceID, artifactID string) (artifactbrowser.Metadata, error) {
-	service, err := a.artifactService()
-	if err != nil {
-		return artifactbrowser.Metadata{}, err
-	}
-	return service.MetadataForWorkspace(a.appContext(), workspaceID, artifactID)
 }
 func (a *App) GetTurnArtifactMetadata(conversationID, turnID, artifactID string) (artifactbrowser.Metadata, error) {
 	service, err := a.artifactService()
@@ -860,20 +731,6 @@ func (a *App) GetTurnArtifactRows(conversationID, turnID, artifactID string, req
 	}
 	return service.RowsForTurn(a.appContext(), conversationID, turnID, artifactID, request)
 }
-func (a *App) GetWorkspaceArtifactUsage(workspaceID string) (artifactbrowser.Usage, error) {
-	service, err := a.artifactService()
-	if err != nil {
-		return artifactbrowser.Usage{}, err
-	}
-	return service.Usage(a.appContext(), workspaceID)
-}
-func (a *App) DeleteWorkspaceArtifact(workspaceID, artifactID string) (artifactbrowser.DeleteResult, error) {
-	service, err := a.artifactService()
-	if err != nil {
-		return artifactbrowser.DeleteResult{}, err
-	}
-	return service.DeleteForWorkspace(a.appContext(), workspaceID, artifactID)
-}
 func (a *App) DeleteTurnArtifact(conversationID, turnID, artifactID string) (artifactbrowser.DeleteResult, error) {
 	service, err := a.artifactService()
 	if err != nil {
@@ -888,16 +745,6 @@ func (a *App) DeleteConversation(conversationID string) (conversation.DeleteResu
 		return conversation.DeleteResult{}, err
 	}
 	return service.DeleteConversation(a.appContext(), conversationID)
-}
-
-func (a *App) ExecuteConversationCode(request analysisruntime.ExecuteRequest) (analysisruntime.ExecuteResult, error) {
-	service, err := a.analysisService()
-	if err != nil {
-		return analysisruntime.ExecuteResult{}, err
-	}
-	return service.Execute(a.appContext(), request, func(event analysisruntime.WorkerEvent) {
-		runtime.EventsEmit(a.appContext(), "analysis-runtime-event", event)
-	})
 }
 
 func (a *App) RunManualCode(request manualanalysis.RunRequest) (manualanalysis.RunResult, error) {
@@ -920,14 +767,6 @@ func (a *App) ExecuteWorkspaceCommand(request slashcommand.ExecuteRequest) (slas
 	})
 }
 
-func (a *App) ListWorkspaceCommands(workspaceID string) (slashcommand.Catalog, error) {
-	service, err := a.slashCommandService()
-	if err != nil {
-		return slashcommand.Catalog{}, err
-	}
-	return service.List(a.appContext(), workspaceID)
-}
-
 func (a *App) AnalyzeQuestion(request analysisagent.AnalyzeRequest) (analysisagent.AnalyzeResult, error) {
 	service, err := a.agentService()
 	if err != nil {
@@ -946,36 +785,12 @@ func (a *App) CancelAgentAnalysis(workspaceID, clientRequestID string) (bool, er
 	return service.Cancel(a.appContext(), workspaceID, clientRequestID)
 }
 
-func (a *App) RespondAgentIntervention(interventionID string, selected []string) (analysisagent.InterventionResponse, error) {
-	service, err := a.agentService()
-	if err != nil {
-		return analysisagent.InterventionResponse{}, err
-	}
-	return service.RespondIntervention(a.appContext(), interventionID, selected)
-}
-
 func (a *App) GetWorkspaceKernelStatus(workspaceID string) (analysisruntime.KernelStatus, error) {
 	service, err := a.analysisService()
 	if err != nil {
 		return analysisruntime.KernelStatus{}, err
 	}
 	return service.Status(a.appContext(), workspaceID)
-}
-
-func (a *App) ResetWorkspaceKernel(workspaceID string) (bool, error) {
-	service, err := a.analysisService()
-	if err != nil {
-		return false, err
-	}
-	return service.Reset(a.appContext(), workspaceID)
-}
-
-func (a *App) InterruptWorkspaceKernel(workspaceID string) (bool, error) {
-	service, err := a.analysisService()
-	if err != nil {
-		return false, err
-	}
-	return service.Interrupt(a.appContext(), workspaceID)
 }
 
 func (a *App) PrepareWorkspaceCatalog(workspaceID string) (datacatalog.Catalog, error) {
@@ -992,14 +807,6 @@ func (a *App) ListWorkspaceDatasets(workspaceID string) (datacatalog.DatasetList
 		return datacatalog.DatasetListResponse{}, err
 	}
 	return service.ListDatasets(a.appContext(), workspaceID)
-}
-
-func (a *App) SelectWorkspaceDataset(workspaceID, sourcePath, tableName string) (datacatalog.Dataset, error) {
-	service, err := a.catalogService()
-	if err != nil {
-		return datacatalog.Dataset{}, err
-	}
-	return service.FindDataset(a.appContext(), workspaceID, sourcePath, tableName)
 }
 
 func (a *App) GetWorkspaceDatasetSchema(workspaceID, tableName string) (datacatalog.DatasetSchema, error) {
@@ -1044,37 +851,6 @@ func (a *App) RegenerateWorkspaceDatasetSchema(request schemageneration.Regenera
 		return schemageneration.RegenerateResult{}, err
 	}
 	return service.Regenerate(a.appContext(), request)
-}
-
-func (a *App) ListWorkspaceColumns(workspaceID string) (datacatalog.WorkspaceColumnsResponse, error) {
-	service, err := a.catalogService()
-	if err != nil {
-		return datacatalog.WorkspaceColumnsResponse{}, err
-	}
-	return service.ListColumns(a.appContext(), workspaceID)
-}
-
-type WorkspacePaths struct {
-	WorkspaceDirectory string `json:"workspace_dir"`
-	DuckDBPath         string `json:"duckdb_path"`
-	TerminalEnabled    bool   `json:"terminal_enabled"`
-}
-
-func (a *App) GetWorkspacePaths(workspaceID string) (WorkspacePaths, error) {
-	service, err := a.workspaceService()
-	if err != nil {
-		return WorkspacePaths{}, err
-	}
-	summary, err := service.Summary(a.appContext(), workspaceID)
-	if err != nil {
-		return WorkspacePaths{}, err
-	}
-	directory := filepath.Join(a.paths.DataDir, "workspaces", summary.ID)
-	return WorkspacePaths{
-		WorkspaceDirectory: directory,
-		DuckDBPath:         filepath.Join(directory, "workspace.duckdb"),
-		TerminalEnabled:    true,
-	}, nil
 }
 
 func (a *App) StartTerminalSession(request terminalruntime.StartRequest) (terminalruntime.StartResponse, error) {

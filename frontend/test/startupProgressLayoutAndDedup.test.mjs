@@ -26,11 +26,11 @@ test('startup progress deduplicates repeated stage messages', () => {
   assert.equal(source.includes('current?.scope === scope && current?.canonicalMessage === canonicalMessage'), true)
 })
 
-test('desktop startup consumes native backend-status events for live progress', () => {
+test('desktop startup polls the native Go startup state for live progress', () => {
   const appPath = resolve(process.cwd(), 'src/App.vue')
   const source = readFileSync(appPath, 'utf-8')
 
-  assert.equal(source.includes('async function subscribeDesktopStartupEvents(onMessage)'), true)
-  assert.equal(source.includes("listen('backend-status'"), true)
-  assert.equal(source.includes('const stopDesktopStatusListener = await subscribeDesktopStartupEvents'), true)
+  assert.equal(source.includes('async function readDesktopStartupState()'), true)
+  assert.equal(source.includes('wailsApp()?.GetStartupState'), true)
+  assert.equal(source.includes('const state = await readDesktopStartupState()'), true)
 })

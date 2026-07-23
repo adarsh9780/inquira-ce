@@ -29,9 +29,6 @@ func (f *fakeStore) GetArtifact(_ context.Context, id string) (conversation.Arti
 func (f *fakeStore) ListArtifacts(context.Context, string) ([]conversation.Artifact, error) {
 	return f.artifacts, nil
 }
-func (f *fakeStore) ListWorkspaceArtifacts(context.Context, string) ([]conversation.Artifact, error) {
-	return f.artifacts, nil
-}
 func (f *fakeStore) ArtifactPath(context.Context, string) (string, error) { return f.path, nil }
 func (f *fakeStore) DeleteArtifact(_ context.Context, id string) error    { f.deleted = id; return nil }
 
@@ -84,15 +81,22 @@ func TestArtifactBrowserReadsFigurePayloadPagesRowsAndChecksOwnership(t *testing
 	store := &fakeStore{artifacts: []conversation.Artifact{artifact}, path: path}
 	gateway := &fakeGateway{rows: RowsResult{RowCount: 1, Rows: []map[string]any{{"id": float64(1)}}}}
 	service := NewService(store, gateway)
-	metadata, err := service.MetadataForWorkspace(context.Background(), "w1", "a1")
+	metadata, err := service.MetadataForTurn(context.Background(), "c1", "t1", "a1")
 	if err != nil || metadata.Payload == nil {
-		t.Fatalf("MetadataForWorkspace()=%#v,%v", metadata, err)
+		t.Fatalf("MetadataForTurn()=%#v,%v", metadata, err)
 	}
-	if _, err := service.MetadataForWorkspace(context.Background(), "other", "a1"); errorCode(err) != "artifact_not_found" {
+	if _, err := service.MetadataForTurn(context.Background(), "other", "t1", "a1"); errorCode(err) != "artifact_not_found" {
 		t.Fatalf("ownership error=%v", err)
 	}
 	store.artifacts[0].Kind = "dataframe"
 	store.artifacts[0].PayloadFormat = "parquet"
+	workspaceRows, err := service.RowsForWorkspace(context.Background(), "w1", "a1", RowsRequest{Offset: 0, Limit: 10})
+	if err != nil || workspaceRows.ArtifactID != "a1" || len(workspaceRows.Rows) != 1 {
+		t.Fatalf("RowsForWorkspace()=%#v,%v", workspaceRows, err)
+	}
+	if _, err := service.RowsForWorkspace(context.Background(), "other", "a1", RowsRequest{Offset: 0, Limit: 10}); errorCode(err) != "artifact_not_found" {
+		t.Fatalf("workspace ownership error=%v", err)
+	}
 	rows, err := service.RowsForTurn(context.Background(), "c1", "t1", "a1", RowsRequest{Offset: 0, Limit: 10})
 	if err != nil || rows.ArtifactID != "a1" || len(rows.Rows) != 1 {
 		t.Fatalf("RowsForTurn()=%#v,%v", rows, err)

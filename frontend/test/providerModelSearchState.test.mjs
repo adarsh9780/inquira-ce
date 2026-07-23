@@ -21,13 +21,19 @@ test('app store keeps provider-scoped search cache and merged model ordering', (
 test('app store clears stale search cache on provider change and preferences apply', () => {
   const path = resolve(process.cwd(), 'src/stores/appStore.js')
   const source = readFileSync(path, 'utf-8')
+  const configSource = readFileSync(
+    resolve(process.cwd(), 'src/composables/useLLMConfig.js'),
+    'utf-8',
+  )
 
   assert.equal(source.includes('function clearProviderModelSearchState()'), true)
   assert.equal(source.includes('providerModelSearchResults.value = {}'), true)
-  assert.equal(source.includes('setLlmProvider(provider) {'), true)
-  assert.equal(source.includes('clearProviderModelSearchState()'), true)
   assert.equal(source.includes('const providerChanged = previousProvider !== llmProvider.value'), true)
+  assert.equal(source.includes('clearProviderModelSearchState()'), true)
   assert.equal(source.includes('mergeProviderModelOptions(llmProvider.value, [])'), true)
+  assert.equal(configSource.includes('store.llmProvider = normalized'), true)
+  assert.equal(configSource.includes('store.clearProviderModelSearchState()'), true)
+  assert.equal(configSource.includes('store.mergeProviderModelOptions(normalized, [])'), true)
 })
 
 test('searchProviderModels enforces provider-local search and query threshold', () => {

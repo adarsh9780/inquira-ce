@@ -29,12 +29,3 @@ test('FigureTab renders artifact load errors inside the centered empty state ins
   assert.equal(source.includes(":description=\"artifactListError || 'Ask AI for a chart, or promote one from Runs.'\""), true)
   assert.equal(source.includes("v-else-if=\"artifactListError\""), false)
 })
-
-test('apiService exposes turn artifact metadata route used by FigureTab', () => {
-  const apiServicePath = resolve(process.cwd(), 'src/services/apiService.js')
-  const source = readFileSync(apiServicePath, 'utf-8')
-
-  assert.equal(source.includes('async v1GetTurnArtifactMetadata(conversationId, turnId, artifactId, options = {})'), true)
-  assert.equal(source.includes('/api/v1/conversations/${conversationId}/turns/${turnId}/artifacts/${artifactId}'), true)
-  assert.equal(source.includes('Turn artifact metadata fetch failed'), true)
-})

@@ -45,7 +45,6 @@ const readinessItems = computed(() => {
   const state = appStore.workspaceReadiness.state
   const hasWorkspace = state !== 'no_workspace'
   const hasData = Number(appStore.activeWorkspaceSummary?.table_count || 0) > 0
-    || Boolean(String(appStore.dataFilePath || '').trim())
   const hasConnection = modelConnectionReady.value
   const configured = Boolean(appStore.workspaceAIConfig?.readiness?.ready)
   const steps = [

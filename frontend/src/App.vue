@@ -160,12 +160,8 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
 import { useAppStore } from './stores/appStore'
 import { useAuthStore } from './stores/authStore'
-import { settingsWebSocket } from './services/websocketService'
-import { previewService } from './services/previewService'
 import { apiService } from './services/apiService'
 import { modelConnectionService } from './services/modelConnectionService'
 import { themeService } from './services/themeService'
@@ -174,7 +170,6 @@ import { toast } from './composables/useToast'
 import { extractApiErrorMessage } from './utils/apiError'
 import { normalizeThemeId } from './constants/themes'
 import { normalizeAppFontId, normalizeCodeFontId } from './constants/fonts'
-import { filterSupportedDatasetPaths, getDroppedDatasetPaths, SUPPORTED_DATASET_EXTENSIONS } from './utils/datasetImport'
 import { matchShortcut } from './utils/keyboardShortcuts'
 import logo from './assets/favicon.svg'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
@@ -195,10 +190,6 @@ function wailsApp() {
 }
 const authStore = useAuthStore()
 
-const workspaceRuntimeStatus = reactive({
-  active: false,
-  message: '',
-})
 const appBootstrap = reactive({
   active: false,
   ready: false,
@@ -215,7 +206,6 @@ const modelOnboarding = reactive({
   required: false,
   status: null,
 })
-const wsUnsubscribers = ref([])
 const lastRuntimeErrorToast = ref('')
 const activeSnapshotUserId = ref('')
 const startupFailure = ref('')
@@ -230,8 +220,6 @@ const applyingFontPreference = ref(false)
 const hasLoadedCodeFontPreference = ref(false)
 const applyingCodeFontPreference = ref(false)
 let startupClockTimer = null
-let unsubscribeAppNativeDragDrop = null
-const isE2EMode = import.meta.env.VITE_E2E === '1'
 
 const STARTUP_SCOPE_LABELS = {
   workspace: 'Workspace',
@@ -327,12 +315,6 @@ function closeCurrentDesktopStartupStage() {
 }
 
 const currentStartupStage = computed(() => {
-  if (workspaceRuntimeStatus.active) {
-    return {
-      scope: 'runtime',
-      message: String(workspaceRuntimeStatus.message || '').trim() || 'Preparing workspace runtime...',
-    }
-  }
   return {
     scope: 'workspace',
     message: String(appBootstrap.message || '').trim() || 'Loading your workspace...',
@@ -344,13 +326,10 @@ const startupOverlayActive = computed(() => {
 })
 
 const blockingOverlayActive = computed(() => {
-  return Boolean(startupOverlayActive.value || appStore.foregroundOperation)
+  return startupOverlayActive.value
 })
 
 const currentStartupElapsedLabel = computed(() => {
-  if (appStore.foregroundOperation) {
-    return String(appStore.foregroundOperation.message || 'Please wait for this operation to finish.')
-  }
   const current = startupTimeline.value[startupTimeline.value.length - 1]
   if (!current) return 'Waiting for first startup checkpoint...'
   const elapsed = (current.endedAt || startupClock.value) - current.startedAt
@@ -387,29 +366,18 @@ const desktopStartupTimelineEntries = computed(() => {
 })
 
 const startupOverlayTitle = computed(() => {
-  if (appStore.foregroundOperation) {
-    return String(appStore.foregroundOperation.title || 'Working')
-  }
   return 'Loading your workspace.'
 })
 
 const startupOverlayMessage = computed(() => {
-  if (appStore.foregroundOperation) {
-    return String(appStore.foregroundOperation.message || 'Please wait for this operation to finish.')
-  }
   return String(appBootstrap.message || '').trim() || 'Restoring your account, workspace, and runtime state.'
 })
 
 const startupOverlayHint = computed(() => {
-  if (workspaceRuntimeStatus.active) {
-    return 'Workspace environment work now stays visible inside the app shell instead of appearing as a detached dialog.'
-  }
   return 'Authentication finishes first, then the authenticated workspace restore runs as its own separate phase.'
 })
 
 const startupOverlayPill = computed(() => {
-  if (appStore.foregroundOperation) return 'Foreground task'
-  if (appBootstrap.active) return 'Workspace restore'
   return 'Workspace restore'
 })
 
@@ -461,93 +429,22 @@ function applyDocumentCodeFont(fontId) {
   document.documentElement.setAttribute('data-code-font', normalized)
 }
 
-async function startGlobalDatasetImport(paths, source = 'drop') {
-  if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) {
-    toast.error('Workspace Required', 'Create or select a workspace before importing datasets.')
-    return
-  }
-  const sourcePaths = filterSupportedDatasetPaths(paths)
-  if (sourcePaths.length === 0) {
-    toast.error('Unsupported Files', 'Use CSV, TSV, Parquet, JSON, XLSX, or XLS files.')
-    return
-  }
-  try {
-    await appStore.startDatasetIngestion(sourcePaths, {
-      operationId: `global-dataset-${source}-${Date.now()}`,
-    })
-    toast.info('Dataset import started', 'Progress is shown in the status bar.')
-  } catch (error) {
-    toast.error('Dataset Error', error?.message || 'Failed to start dataset import.')
-  }
-}
-
-async function openGlobalDatasetPicker() {
-  if (wailsApp()) {
-    appStore.openDataConnectionFlow()
-    return
-  }
-  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
-    appStore.openDataConnectionFlow()
-    return
-  }
-  if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) {
-    toast.error('Workspace Required', 'Create or select a workspace before importing datasets.')
-    return
-  }
-  try {
-    const { open } = await import('@tauri-apps/plugin-dialog')
-    const selected = await open({
-      multiple: true,
-      filters: [{ name: 'Data files', extensions: SUPPORTED_DATASET_EXTENSIONS }],
-    })
-    const selectedPaths = Array.isArray(selected)
-      ? selected.map((item) => String(item || '').trim()).filter(Boolean)
-      : [String(selected || '').trim()].filter(Boolean)
-    if (selectedPaths.length === 0) return
-    await startGlobalDatasetImport(selectedPaths, 'picker')
-  } catch (error) {
-    toast.error('Dataset Error', error?.message || 'Failed to open dataset picker.')
-  }
+function openGlobalDatasetPicker() {
+  appStore.openDataConnectionFlow()
 }
 
 function handleAppDatasetDragOver(event) {
   if (event.defaultPrevented) return
-  const paths = getDroppedDatasetPaths(event?.dataTransfer?.files || [])
-  if (paths.length === 0) return
+  if (!event?.dataTransfer?.types?.includes?.('Files')) return
   event.preventDefault()
 }
 
 function handleAppDatasetDrop(event) {
   if (event.defaultPrevented) return
   const files = Array.from(event?.dataTransfer?.files || [])
-  const paths = getDroppedDatasetPaths(files)
-  if (wailsApp() && files.length > 0) {
-    event.preventDefault()
-    appStore.openDataConnectionFlow()
-    return
-  }
-  if (paths.length === 0 && files.length > 0 && (typeof window === 'undefined' || !window.__TAURI_INTERNALS__)) {
-    event.preventDefault()
-    toast.error('Desktop Only', 'Local dataset drops are only available in the desktop app.')
-    return
-  }
-  if (paths.length === 0) return
+  if (files.length === 0) return
   event.preventDefault()
-  void startGlobalDatasetImport(paths, 'drop')
-}
-
-async function subscribeAppNativeDatasetDrops() {
-  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) return
-  try {
-    const { getCurrentWebview } = await import('@tauri-apps/api/webview')
-    unsubscribeAppNativeDragDrop = await getCurrentWebview().onDragDropEvent((event) => {
-      const type = String(event?.payload?.type || '').trim()
-      if (type !== 'drop') return
-      void startGlobalDatasetImport(event?.payload?.paths || [], 'native-drop')
-    })
-  } catch {
-    unsubscribeAppNativeDragDrop = null
-  }
+  appStore.openDataConnectionFlow()
 }
 
 function handleGlobalShortcuts(event) {
@@ -619,20 +516,7 @@ async function readDesktopStartupState() {
       }
     }
   }
-  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
-    return { ready: true, error: '', message: '' }
-  }
-
-  try {
-    return await invoke('get_startup_state')
-  } catch (error) {
-    console.warn('⚠️ Failed to read desktop startup state from Tauri:', error)
-    return {
-      ready: false,
-      error: 'Could not read desktop service startup state. Restart the app or open the logs for details.',
-      message: '',
-    }
-  }
+  return { ready: true, error: '', message: '' }
 }
 
 async function invokeDesktopRecovery(command) {
@@ -644,15 +528,7 @@ async function invokeDesktopRecovery(command) {
     await wailsApp().OpenStartupLogs()
     return
   }
-  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
-    startupRecoveryMessage.value = 'Desktop recovery actions are only available in the installed app.'
-    return
-  }
-  try {
-    await invoke(command)
-  } catch (error) {
-    startupRecoveryMessage.value = String(error?.message || error || 'Recovery action failed.')
-  }
+  startupRecoveryMessage.value = 'Desktop recovery actions are only available in the installed app.'
 }
 
 async function restartDesktopApp() {
@@ -674,29 +550,6 @@ async function copyStartupDiagnostics() {
   }
 }
 
-async function subscribeDesktopStartupEvents(onMessage) {
-  if (wailsApp()?.GetStartupState) return () => {}
-  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
-    return () => {}
-  }
-
-  try {
-    const unlisten = await listen('backend-status', (event) => {
-      const payload = String(event?.payload || '').trim()
-      if (!payload || payload.toLowerCase() === 'ready') return
-      onMessage(payload)
-    })
-    return () => {
-      try {
-        unlisten()
-      } catch (_error) {}
-    }
-  } catch (error) {
-    console.warn('⚠️ Failed to subscribe to desktop startup status events:', error)
-    return () => {}
-  }
-}
-
 async function waitForDesktopStartupReady() {
   desktopStartup.active = true
   desktopStartup.ready = false
@@ -706,41 +559,32 @@ async function waitForDesktopStartupReady() {
   recordDesktopStartupStage(desktopStartup.message)
 
   const pollDelayMs = 250
-  const stopDesktopStatusListener = await subscribeDesktopStartupEvents((message) => {
-    desktopStartup.message = message
-    recordDesktopStartupStage(message)
-  })
-
-  try {
-    while (true) {
-      const state = await readDesktopStartupState()
-      const message = String(state?.message || '').trim()
-      if (message) {
-        desktopStartup.message = message
-        recordDesktopStartupStage(desktopStartup.message)
-      }
-      desktopStartup.error = String(state?.error || '').trim()
-
-      if (desktopStartup.error) {
-        closeCurrentDesktopStartupStage()
-        startupFailure.value = desktopStartup.error
-        desktopStartup.active = false
-        desktopStartup.ready = false
-        return false
-      }
-
-      if (state?.ready) {
-        closeCurrentDesktopStartupStage()
-        desktopStartup.active = false
-        desktopStartup.ready = true
-        desktopStartup.message = ''
-        return true
-      }
-
-      await new Promise((resolve) => window.setTimeout(resolve, pollDelayMs))
+  while (true) {
+    const state = await readDesktopStartupState()
+    const message = String(state?.message || '').trim()
+    if (message) {
+      desktopStartup.message = message
+      recordDesktopStartupStage(desktopStartup.message)
     }
-  } finally {
-    stopDesktopStatusListener()
+    desktopStartup.error = String(state?.error || '').trim()
+
+    if (desktopStartup.error) {
+      closeCurrentDesktopStartupStage()
+      startupFailure.value = desktopStartup.error
+      desktopStartup.active = false
+      desktopStartup.ready = false
+      return false
+    }
+
+    if (state?.ready) {
+      closeCurrentDesktopStartupStage()
+      desktopStartup.active = false
+      desktopStartup.ready = true
+      desktopStartup.message = ''
+      return true
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, pollDelayMs))
   }
 }
 
@@ -754,32 +598,10 @@ async function handleAuthenticated(userData) {
 
   if (activeSnapshotUserId.value !== userId) {
     appStore.resetForAuthBoundary()
-    previewService.clearSchemaCache()
     activeSnapshotUserId.value = userId
     await appStore.loadLocalConfig(userId)
   }
 
-  if (modelConnectionService.isNative()) {
-    appBootstrap.active = false
-    appBootstrap.ready = true
-    appBootstrap.message = ''
-    return
-  }
-
-  // Establish persistent WebSocket connection
-  if (isE2EMode) {
-    void settingsWebSocket.connectPersistent(userId).catch((wsError) => {
-      console.error('❌ Failed to establish persistent WebSocket connection:', wsError)
-    })
-  } else {
-    try {
-      await settingsWebSocket.connectPersistent(userId)
-    } catch (wsError) {
-      console.error('❌ Failed to establish persistent WebSocket connection:', wsError)
-    }
-  }
-
-  // Load v1 workspace/chat state
   try {
     appBootstrap.message = 'Loading your account...'
     await appStore.loadUserPreferences()
@@ -789,12 +611,10 @@ async function handleAuthenticated(userData) {
       appBootstrap.message = 'Loading workspace history...'
       await appStore.fetchConversations()
       if (appStore.activeConversationId) {
-        await appStore.fetchConversationTurns({ reset: true })
+        await appStore.fetchConversationTurns()
       }
     }
-    console.debug('Loaded v1 workspace state for authenticated user')
-    if (!isE2EMode) {
-    }
+    console.debug('Loaded workspace state for local user')
   } catch (error) {
     console.error('Failed to load v1 workspace state:', error)
   } finally {
@@ -826,10 +646,6 @@ function handleModelOnboardingComplete(status) {
   modelOnboarding.status = status
   modelOnboarding.required = false
   appStore.openSettings('workspace-general')
-}
-
-function handleAuthClose() {
-  console.debug('Auth modal closed without authentication')
 }
 
 watch(
@@ -903,32 +719,6 @@ onMounted(async () => {
   document.addEventListener('dragover', handleAppDatasetDragOver)
   document.addEventListener('drop', handleAppDatasetDrop)
   window.addEventListener('inquira:open-dataset-picker', handleOpenDatasetPickerRequest)
-  void subscribeAppNativeDatasetDrops()
-  wsUnsubscribers.value.push(
-    settingsWebSocket.subscribeProgress((data) => {
-      const stage = String(data?.stage || '')
-      if (!stage.startsWith('workspace_runtime')) return
-      workspaceRuntimeStatus.active = true
-      workspaceRuntimeStatus.message = data?.message || 'Preparing workspace runtime...'
-    }),
-  )
-  wsUnsubscribers.value.push(
-    settingsWebSocket.subscribeComplete((result) => {
-      if (!result || !result.workspace_id) return
-      workspaceRuntimeStatus.active = false
-      workspaceRuntimeStatus.message = ''
-    }),
-  )
-  wsUnsubscribers.value.push(
-    settingsWebSocket.subscribeError((message) => {
-      if (!authStore.isAuthenticated) return
-      appStore.setRuntimeError(message || 'Workspace runtime bootstrap failed.')
-      if (!workspaceRuntimeStatus.active) return
-      workspaceRuntimeStatus.active = false
-      workspaceRuntimeStatus.message = message || ''
-    }),
-  )
-
   const startupOk = await waitForDesktopStartupReady()
   if (!startupOk) {
     return
@@ -946,16 +736,7 @@ watch(
   () => appBootstrap.message,
   (message) => {
     if (!appBootstrap.active) return
-    if (workspaceRuntimeStatus.active) return
     recordStartupStage('workspace', message)
-  },
-)
-
-watch(
-  () => workspaceRuntimeStatus.message,
-  (message) => {
-    if (!workspaceRuntimeStatus.active) return
-    recordStartupStage('runtime', message)
   },
 )
 
@@ -993,24 +774,15 @@ watch(
     desktopStartup.error = ''
     desktopStartupTimeline.value = []
     appStore.resetForAuthBoundary()
-    previewService.clearSchemaCache()
-    if (settingsWebSocket.isPersistentMode) {
-      settingsWebSocket.disconnectPersistent()
-    }
     lastRuntimeErrorToast.value = ''
     appStore.setRuntimeError('')
   }
 )
 
-// Warn user about data loss on refresh/close when data is loaded
-function handleBeforeUnload(e) {
+function handleAppUnload() {
   void appStore.flushLocalConfig?.()
-  if (appStore.dataFilePath) {
-    e.preventDefault()
-    e.returnValue = '' // Required for Chrome
-  }
 }
-window.addEventListener('beforeunload', handleBeforeUnload)
+window.addEventListener('beforeunload', handleAppUnload)
 
 // Cleanup on unmount
 onUnmounted(() => {
@@ -1023,20 +795,7 @@ onUnmounted(() => {
   document.removeEventListener('dragover', handleAppDatasetDragOver)
   document.removeEventListener('drop', handleAppDatasetDrop)
   window.removeEventListener('inquira:open-dataset-picker', handleOpenDatasetPickerRequest)
-  if (typeof unsubscribeAppNativeDragDrop === 'function') {
-    unsubscribeAppNativeDragDrop()
-    unsubscribeAppNativeDragDrop = null
-  }
-  window.removeEventListener('beforeunload', handleBeforeUnload)
-  // Disconnect persistent WebSocket connection
-  if (settingsWebSocket.isPersistentMode) {
-    console.debug('🧹 Cleaning up persistent WebSocket connection')
-    settingsWebSocket.disconnectPersistent()
-  }
-  wsUnsubscribers.value.forEach((fn) => {
-    try { fn() } catch (_error) { }
-  })
-  wsUnsubscribers.value = []
+  window.removeEventListener('beforeunload', handleAppUnload)
 })
 </script>
 

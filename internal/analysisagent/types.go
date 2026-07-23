@@ -44,11 +44,6 @@ type AgentWorkerRequest struct {
 	Attachments       []ImageAttachment                `json:"attachments,omitempty"`
 }
 
-type InterventionResponse struct {
-	InterventionID string `json:"intervention_id"`
-	Accepted       bool   `json:"accepted"`
-}
-
 type ConversationContext struct {
 	Turns []ContextTurn `json:"turns"`
 }

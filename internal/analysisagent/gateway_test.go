@@ -10,10 +10,9 @@ import (
 )
 
 type fakeTransport struct {
-	method        string
-	request       AgentWorkerRequest
-	cancelParams  map[string]any
-	interventions map[string]any
+	method       string
+	request      AgentWorkerRequest
+	cancelParams map[string]any
 }
 
 func (f *fakeTransport) Call(_ context.Context, method string, params, result any) error {
@@ -26,10 +25,6 @@ func (f *fakeTransport) Call(_ context.Context, method string, params, result an
 		})) = struct {
 			Cancelled bool `json:"cancelled"`
 		}{Cancelled: values["workspace_id"] == "workspace-1" && values["client_request_id"] == "request-1"}
-	}
-	if method == "agent_intervention_respond" {
-		f.interventions = values
-		*(result.(*InterventionResponse)) = InterventionResponse{InterventionID: "intervention-1", Accepted: true}
 	}
 	return nil
 }
@@ -72,16 +67,5 @@ func TestWorkerGatewayCancelsWorkspaceAgent(t *testing.T) {
 	}
 	if transport.cancelParams["client_request_id"] != "request-1" {
 		t.Fatalf("cancel params = %#v", transport.cancelParams)
-	}
-}
-
-func TestWorkerGatewayRespondsToInterventionThroughWorkerRPC(t *testing.T) {
-	transport := &fakeTransport{}
-	response, err := NewWorkerGateway(transport).RespondIntervention(context.Background(), "intervention-1", []string{"approve"})
-	if err != nil || !response.Accepted || response.InterventionID != "intervention-1" {
-		t.Fatalf("response=%#v method=%q error=%v", response, transport.method, err)
-	}
-	if transport.method != "agent_intervention_respond" || transport.interventions["intervention_id"] != "intervention-1" {
-		t.Fatalf("intervention params = %#v", transport.interventions)
 	}
 }

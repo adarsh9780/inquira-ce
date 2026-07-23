@@ -51,23 +51,6 @@ _GENERAL_CHAT_PROMPT = (
 _RESULT_EXPLANATION_PROMPT = (
     Path(__file__).parent / "prompts" / "result_explanation_system.yaml"
 ).read_text(encoding="utf-8")
-_ASSESS_CONTEXT_PROMPT = (
-    "You decide whether the agent has enough schema/data context to generate executable analysis code.\n"
-    "Return strict JSON with fields:\n"
-    "- enough_context: boolean\n"
-    "- missing_context: string[] (short gaps)\n"
-    "- tool_plan: list of tool actions, each with a very short explanation string.\n"
-    "- progress_message: one short user-facing sentence describing what you just decided.\n"
-    "Allowed tool actions:\n"
-    "- {{tool: \"search_schema\", query: string, table_name?: string, limit?: int, explanation: string}}\n"
-    "- {{tool: \"scan_schema_chunks\", query: string, table_name?: string, limit?: int, explanation: string}}\n"
-    "- {{tool: \"sample_data\", table_name?: string, limit?: int, explanation: string}}\n"
-    "- {{tool: \"bash\", command: string, explanation: string}}\n"
-    "Keep tool_plan empty when enough_context=true.\n"
-    "For search_schema and scan_schema_chunks, query must be a single keyword token (no spaces).\n"
-    "Start with 1-3 broad keyword queries, then narrow only after seeing matches.\n"
-    "If search_schema results are weak, include scan_schema_chunks to inspect schema metadata in chunks."
-)
 _CONTEXT_ENRICHMENT_TOOL_PROMPT = (
     "You are a schema context-gathering assistant for Python data analysis.\n"
     "Decide whether there is enough schema/data context to generate executable analysis code.\n"
@@ -107,26 +90,6 @@ class ResultExplanation(BaseModel):
 
     result_explanation: str | None = None
     code_explanation: str | None = None
-    progress_message: str | None = None
-
-
-class AnalysisToolPlanItem(BaseModel):
-    model_config = ConfigDict(extra="forbid", json_schema_extra=openai_strict_json_schema)
-
-    tool: str
-    query: str | None = None
-    table_name: str | None = None
-    limit: int | None = None
-    command: str | None = None
-    explanation: str | None = None
-
-
-class AnalysisContextAssessment(BaseModel):
-    model_config = ConfigDict(extra="forbid", json_schema_extra=openai_strict_json_schema)
-
-    enough_context: bool = False
-    missing_context: list[str] = Field(default_factory=list)
-    tool_plan: list[AnalysisToolPlanItem] = Field(default_factory=list)
     progress_message: str | None = None
 
 
@@ -556,78 +519,6 @@ def _extract_schema_query_keywords(value: Any, *, max_items: int = 6) -> list[st
         if len(keywords) >= max(1, int(max_items)):
             break
     return keywords
-
-
-def _sanitize_tool_plan(raw: Any, *, max_items: int = 5) -> list[dict[str, Any]]:
-    if not isinstance(raw, list):
-        return []
-    accepted: list[dict[str, Any]] = []
-    seen: set[str] = set()
-
-    def _append_action(action: dict[str, Any]) -> None:
-        key = _safe_json_dumps(action)
-        if key in seen:
-            return
-        seen.add(key)
-        accepted.append(action)
-
-    for item in raw:
-        if not isinstance(item, dict):
-            continue
-        tool = str(item.get("tool") or "").strip().lower()
-        if tool not in {"search_schema", "scan_schema_chunks", "sample_data", "bash"}:
-            continue
-        if tool in {"search_schema", "scan_schema_chunks"}:
-            query = str(item.get("query") or "").strip()
-            explanation = str(item.get("explanation") or "").strip()
-            if not query:
-                continue
-            keyword_queries = _extract_schema_query_keywords(query, max_items=3)
-            if not keyword_queries:
-                continue
-            if str(item.get("table_name") or "").strip():
-                normalized_table_name = str(item.get("table_name") or "").strip()
-            else:
-                normalized_table_name = ""
-            normalized_limit = max(1, min(50, int(item.get("limit") or 20)))
-            for keyword in keyword_queries:
-                normalized: dict[str, Any] = {
-                    "tool": tool,
-                    "query": keyword,
-                    "limit": normalized_limit,
-                }
-                if explanation:
-                    normalized["explanation"] = explanation
-                if normalized_table_name:
-                    normalized["table_name"] = normalized_table_name
-                _append_action(normalized)
-                if len(accepted) >= max_items:
-                    break
-            if len(accepted) >= max_items:
-                break
-            continue
-        elif tool == "sample_data":
-            normalized: dict[str, Any] = {"tool": tool}
-            explanation = str(item.get("explanation") or "").strip()
-            if str(item.get("table_name") or "").strip():
-                normalized["table_name"] = str(item.get("table_name") or "").strip()
-            normalized["limit"] = max(1, min(20, int(item.get("limit") or 5)))
-            if explanation:
-                normalized["explanation"] = explanation
-            _append_action(normalized)
-        elif tool == "bash":
-            normalized = {"tool": tool}
-            command = str(item.get("command") or "").strip()
-            explanation = str(item.get("explanation") or "").strip()
-            if not command:
-                continue
-            normalized["command"] = command
-            if explanation:
-                normalized["explanation"] = explanation
-            _append_action(normalized)
-        if len(accepted) >= max_items:
-            break
-    return accepted
 
 
 def _sanitize_structured_tool_calls(raw: Any, *, max_items: int = 5) -> list[dict[str, Any]]:
@@ -2780,48 +2671,6 @@ async def analysis_runtime_tools_node(state: dict[str, Any], config: RunnableCon
     )
 
 
-def _fallback_context_assessment(
-    *,
-    user_text: str,
-    known_columns: list[dict[str, Any]],
-    table_names: list[str],
-) -> dict[str, Any]:
-    text = str(user_text or "").strip()
-    if not text:
-        return {
-            "context_sufficiency": {"enough_context": bool(known_columns), "missing_context": ["user question text"]},
-            "tool_plan": [],
-        }
-
-    tokens = re.findall(r"[a-zA-Z0-9_]{3,}", text.lower())
-    token_queries: list[str] = []
-    seen: set[str] = set()
-    for token in tokens:
-        if token in seen:
-            continue
-        seen.add(token)
-        token_queries.append(token)
-        if len(token_queries) >= 3:
-            break
-
-    missing_context: list[str] = []
-    if not known_columns:
-        missing_context.append("relevant column names and types")
-    if not table_names:
-        missing_context.append("candidate tables")
-
-    if not token_queries:
-        return {
-            "context_sufficiency": {"enough_context": bool(known_columns), "missing_context": missing_context},
-            "tool_plan": [],
-        }
-
-    return {
-        "context_sufficiency": {"enough_context": False, "missing_context": missing_context or ["schema details"]},
-        "tool_plan": [{"tool": "search_schema", "query": query, "limit": 20} for query in token_queries],
-    }
-
-
 def _emit_agent_status(
     *,
     step: str,
@@ -3058,80 +2907,6 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
         "runtime_tool_stage": "",
         "retry_feedback": "",
     }
-
-
-async def analysis_assess_context_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-    analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
-    messages = list(analysis_context.get("messages") or [])
-    user_text = str(analysis_context.get("user_text") or "")
-    known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
-    table_names = _normalize_table_names(analysis_context.get("table_names"), max_items=16)
-    schema_summary = _truncate_text(str(analysis_context.get("schema_summary") or ""), limit=1800)
-    conversation_memory = _truncate_text(str(analysis_context.get("conversation_memory") or ""), limit=1200)
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", _ASSESS_CONTEXT_PROMPT),
-            (
-                "human",
-                (
-                    "User question: {user_text}\n\n"
-                    "Conversation memory summary:\n{conversation_memory}\n\n"
-                    "Schema summary:\n{schema_summary}\n\n"
-                    "Known columns: {known_columns_json}\n\n"
-                    "Prior retry feedback: {retry_feedback}\n\n"
-                    "Messages window size: {message_count}"
-                ),
-            ),
-        ]
-    )
-    model = _get_model(config, lite=False)
-    try:
-        output = await _ainvoke_provider_structured_chain(
-            prompt,
-            model,
-            AnalysisContextAssessment,
-            {
-                "user_text": _truncate_text(user_text, limit=400),
-                "conversation_memory": conversation_memory or "none",
-                "schema_summary": schema_summary,
-                "known_columns_json": _safe_json_dumps(known_columns[:20]),
-                "retry_feedback": _truncate_text(str(state.get("retry_feedback") or ""), limit=400),
-                "message_count": len(messages),
-            },
-        )
-        if isinstance(output, AnalysisContextAssessment):
-            assessed = output
-        else:
-            assessed = AnalysisContextAssessment.model_validate(output)
-        _emit_llm_progress("context_assessment", assessed)
-    except Exception as exc:
-        # Structured parsing may fail when provider truncates response (length finish).
-        if "LengthFinishReasonError" not in type(exc).__name__ and "length limit" not in str(exc).lower():
-            raise
-        fallback = _fallback_context_assessment(
-            user_text=user_text,
-            known_columns=known_columns,
-            table_names=table_names,
-        )
-        return fallback
-
-    tool_plan = _sanitize_tool_plan([item.model_dump() for item in assessed.tool_plan], max_items=5)
-    return {
-        "context_sufficiency": {
-            "enough_context": bool(assessed.enough_context),
-            "missing_context": [str(item).strip() for item in (assessed.missing_context or []) if str(item).strip()][:6],
-        },
-        "tool_plan": tool_plan,
-    }
-
-
-def analysis_assess_to_next(state: dict[str, Any]) -> str:
-    sufficiency = state.get("context_sufficiency") if isinstance(state.get("context_sufficiency"), dict) else {}
-    enough_context = bool(sufficiency.get("enough_context"))
-    tool_plan = state.get("tool_plan") if isinstance(state.get("tool_plan"), list) else []
-    if enough_context or not tool_plan:
-        return "analysis_generate_code"
-    return "analysis_enrich_context"
 
 
 async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
@@ -3743,11 +3518,6 @@ def analysis_guard_to_next(state: dict[str, Any]) -> str:
     return "analysis_execute_code"
 
 
-async def analysis_execute_code_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-    # Deprecated shim kept for compatibility with older imports. Active graph uses the custom tool executor path.
-    return await analysis_request_execute_tool_node(state, config)
-
-
 def analysis_execute_to_next(state: dict[str, Any]) -> str:
     execution = state.get("execution_result") if isinstance(state.get("execution_result"), dict) else {}
     if bool(execution.get("success")):
@@ -4022,31 +3792,6 @@ async def analysis_finalize_failure_node(state: dict[str, Any], config: Runnable
         "metadata": state.get("metadata") or {"is_safe": True, "is_relevant": True},
         "messages": [AIMessage(content=result_explanation)],
         "last_error": retry_feedback or runtime_error,
-        "known_columns": _normalize_known_columns(state.get("known_columns") or []),
-        "run_id": str(state.get("run_id") or ""),
-    }
-
-
-async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-    _ = config
-    # Deprecated shim retained only for backwards compatibility; active graph does not route here.
-    text = (
-        "The legacy react_loop execution path is disabled. "
-        "Use the structured custom-tool analysis graph path."
-    )
-    return {
-        "route": "analysis",
-        "final_code": "",
-        "final_explanation": text,
-        "result_explanation": text,
-        "code_explanation": "",
-        "final_execution": None,
-        "final_artifacts": [],
-        "final_executed_code": "",
-        "output_contract": [],
-        "metadata": {"is_safe": True, "is_relevant": True},
-        "messages": [AIMessage(content=text)],
-        "last_error": text,
         "known_columns": _normalize_known_columns(state.get("known_columns") or []),
         "run_id": str(state.get("run_id") or ""),
     }

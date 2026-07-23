@@ -3,23 +3,6 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('preview service accepts table override for schema loads', () => {
-  const servicePath = resolve(process.cwd(), 'src/services/previewService.js')
-  const source = readFileSync(servicePath, 'utf-8')
-
-  assert.equal(source.includes('loadSchema(filepath, forceRefresh = false, tableNameOverride = null)'), true)
-  assert.equal(source.includes('tableNameOverride ||'), true)
-  assert.equal(source.includes('clearSchemaCache()'), true)
-})
-
-test('api service exposes v1 regenerate schema endpoint for workspace datasets', () => {
-  const servicePath = resolve(process.cwd(), 'src/services/apiService.js')
-  const source = readFileSync(servicePath, 'utf-8')
-
-  assert.equal(source.includes('async v1RegenerateDatasetSchema(workspaceId, tableName, payload = {})'), true)
-  assert.equal(source.includes('/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema/regenerate'), true)
-})
-
 test('schema editor derives dataset options from workspace tables and does not require source_path for selection', () => {
   const schemaEditorPath = resolve(process.cwd(), 'src/components/preview/SchemaEditorTab.vue')
   const source = readFileSync(schemaEditorPath, 'utf-8')

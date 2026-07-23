@@ -34,7 +34,7 @@ test('workspace listing no longer bootstraps runtimes as a side effect', () => {
   const selectConversationBlock = extractBlock(
     source,
     'function setActiveConversationId(conversationId) {',
-    'function setTurnViewEnabled(enabled) {',
+    'function setActiveTurnId(turnId) {',
   )
   const fetchConversationsBlock = extractBlock(
     source,
@@ -43,7 +43,7 @@ test('workspace listing no longer bootstraps runtimes as a side effect', () => {
   )
   const fetchTurnsBlock = extractBlock(
     source,
-    'async function fetchConversationTurns({ reset = true, preferLatest = false } = {}) {',
+    'async function fetchConversationTurns({ preferLatest = false } = {}) {',
     'async function deleteConversationById(conversationId) {',
   )
 
@@ -57,18 +57,16 @@ test('workspace listing no longer bootstraps runtimes as a side effect', () => {
   assert.equal(appSource.includes('await appStore.ensureWorkspaceRuntimeReady(appStore.activeWorkspaceId)'), false)
 })
 
-test('workspace creation and mounted panes do not warm runtimes implicitly', () => {
+test('workspace creation and connection setup do not warm analysis runtimes implicitly', () => {
   const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue')
   const source = readFileSync(tabPath, 'utf-8')
   const chatInput = readFileSync(resolve(process.cwd(), 'src/components/chat/ChatInput.vue'), 'utf-8')
   const codeTab = readFileSync(resolve(process.cwd(), 'src/components/analysis/CodeTab.vue'), 'utf-8')
-  const uploadBlock = extractBlock(
-    source,
-    'async function startBatchDatasetIngestion(paths) {',
-    'async function retryLastDatasetIngestion() {',
-  )
-  assert.equal(uploadBlock.includes('await appStore.ensureWorkspaceRuntimeReady(workspaceId)'), false)
-  assert.equal(uploadBlock.includes('await appStore.startDatasetIngestion(sourcePaths'), true)
+
+  assert.equal(source.includes('ensureWorkspaceRuntimeReady('), false)
+  assert.equal(source.includes('connectionService.create('), true)
+  assert.equal(source.includes('startBatchDatasetIngestion'), false)
+  assert.equal(source.includes('startDatasetIngestion'), false)
   assert.equal(source.includes('async function warmWorkspaceRuntimeInBackground(workspaceId)'), false)
   assert.equal(source.includes('void warmWorkspaceRuntimeInBackground(workspaceId)'), false)
   assert.equal(chatInput.includes('void appStore.fetchColumnCatalog({ force: true })'), false)
@@ -81,7 +79,7 @@ test('column catalog path uses saved schema metadata without runtime bootstrap',
   const catalogBlock = extractBlock(
     source,
     'async function fetchColumnCatalog({ force = false } = {}) {',
-    'async function ensureWorkspaceRuntimeReady(workspaceId = activeWorkspaceId.value) {',
+    'function clearConversationScopedState(options = {}) {',
   )
   assert.equal(catalogBlock.includes('ensureWorkspaceRuntimeReady('), false)
   assert.equal(catalogBlock.includes('apiService.getWorkspaceColumns(workspaceId)'), false)

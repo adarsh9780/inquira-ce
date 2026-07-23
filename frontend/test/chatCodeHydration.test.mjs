@@ -12,11 +12,3 @@ test('chat response hydrates editor content directly from code/current_code payl
   assert.equal(source.includes('finalStatePatch.pythonFileContent = finalCode'), true)
   assert.equal(source.includes('applyConversationResultState(requestConversationId, finalStatePatch'), true)
 })
-
-test('v1 analyze helper returns payload directly without double-unwrapping .data', () => {
-  const servicePath = resolve(process.cwd(), 'src/services/apiService.js')
-  const source = readFileSync(servicePath, 'utf-8')
-
-  assert.equal(source.includes('return v1Api.chat.analyze(payload)'), true)
-  assert.equal(source.includes('v1Api.chat.analyze(payload).then((res) => res.data)'), false)
-})

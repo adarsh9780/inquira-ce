@@ -49,14 +49,3 @@ type ExecuteResult struct {
 	ConversationID string          `json:"conversation_id"`
 	TurnID         string          `json:"turn_id"`
 }
-
-type Definition struct {
-	Name        string `json:"name"`
-	Usage       string `json:"usage"`
-	Description string `json:"description"`
-	Category    string `json:"category"`
-}
-
-type Catalog struct {
-	Commands []Definition `json:"commands"`
-}
