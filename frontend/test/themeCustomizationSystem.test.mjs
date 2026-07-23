@@ -35,11 +35,11 @@ test('app runtime applies html data-theme and persists changes via theme service
   assert.equal(source.includes('function applyDocumentTheme(themeId) {'), true)
   assert.equal(source.includes("document.documentElement.setAttribute('data-theme', normalized)"), true)
   assert.equal(source.includes('watch('), true)
-  assert.equal(source.includes('() => appStore.uiTheme'), true)
+  assert.equal(source.includes('() => preferencesStore.uiTheme'), true)
   assert.equal(source.includes('void themeService.saveThemePreference(normalized)'), true)
   assert.equal(source.includes('const [storedTheme, storedFont, storedCodeFont] = await Promise.all(['), true)
   assert.equal(source.includes('themeService.loadThemePreference(),'), true)
-  assert.equal(source.includes('appStore.setUiTheme(storedTheme, { persist: false })'), true)
+  assert.equal(source.includes('preferencesStore.setUiTheme(storedTheme, { persist: false })'), true)
 })
 
 test('app store snapshot and preference sync include ui_theme', () => {
@@ -51,7 +51,7 @@ test('app store snapshot and preference sync include ui_theme', () => {
   assert.equal(source.includes('if (typeof ui.ui_theme === \'string\' && ui.ui_theme.trim()) {'), true)
   assert.equal(source.includes('uiTheme.value = normalizeThemeId(ui.ui_theme)'), true)
   assert.equal(source.includes('function setUiTheme(themeId, options = {}) {'), true)
-  assert.equal(source.includes('if (options?.persist !== false) {'), true)
+  assert.equal(source.includes('if (options.persist !== false) persistChange?.()'), true)
 })
 
 test('settings modal exposes appearance section and appearance tab updates app theme', () => {
@@ -64,9 +64,9 @@ test('settings modal exposes appearance section and appearance tab updates app t
   assert.equal(modalSource.includes("panelClass('appearance')"), true)
   assert.equal(modalSource.includes('<AppearanceTab />'), true)
 
-  assert.equal(tabSource.includes('const activeTheme = computed(() => appStore.uiTheme)'), true)
-  assert.equal(tabSource.includes('const themes = computed(() => appStore.availableThemes)'), true)
-  assert.equal(tabSource.includes('appStore.setUiTheme(themeId)'), true)
+  assert.equal(tabSource.includes('const activeTheme = computed(() => preferencesStore.uiTheme)'), true)
+  assert.equal(tabSource.includes('const themes = computed(() => preferencesStore.availableThemes)'), true)
+  assert.equal(tabSource.includes('preferencesStore.setUiTheme(themeId)'), true)
 })
 
 test('style sheet declares theme presets and shared token aliases', () => {

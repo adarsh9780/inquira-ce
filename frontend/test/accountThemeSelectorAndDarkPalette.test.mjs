@@ -11,13 +11,13 @@ test('appearance tab owns theme selection wired to app store theme state', () =>
   const source = read('src/components/modals/tabs/AppearanceTab.vue')
 
   assert.equal(source.includes("import HeaderDropdown from '../../ui/HeaderDropdown.vue'"), true)
-  assert.equal(source.includes("import { useAppStore } from '../../../stores/appStore'"), true)
-  assert.equal(source.includes('const appStore = useAppStore()'), true)
-  assert.equal(source.includes('const activeTheme = computed(() => appStore.uiTheme)'), true)
-  assert.equal(source.includes('const themes = computed(() => appStore.availableThemes)'), true)
+  assert.equal(source.includes("import { usePreferencesStore } from '../../../stores/preferencesStore'"), true)
+  assert.equal(source.includes('const preferencesStore = usePreferencesStore()'), true)
+  assert.equal(source.includes('const activeTheme = computed(() => preferencesStore.uiTheme)'), true)
+  assert.equal(source.includes('const themes = computed(() => preferencesStore.availableThemes)'), true)
   assert.equal(source.includes('v-for="theme in themes"'), true)
   assert.equal(source.includes('function selectTheme(themeId) {'), true)
-  assert.equal(source.includes('appStore.setUiTheme(themeId)'), true)
+  assert.equal(source.includes('preferencesStore.setUiTheme(themeId)'), true)
 })
 
 test('midnight dark theme keeps brand accent while using deep slate surfaces', () => {

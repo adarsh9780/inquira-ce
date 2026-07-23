@@ -42,11 +42,13 @@ import '@xterm/xterm/css/xterm.css'
 import { ArrowPathIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { useAppStore } from '../../stores/appStore'
 import { useUiStore } from '../../stores/uiStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
 import { toast } from '../../composables/useToast'
 import nativeTerminalService from '../../services/nativeTerminalService'
 
 const appStore = useAppStore()
 const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
 const terminalHostRef = ref(null)
 const sessionId = ref('')
 const sessionCwd = ref('')
@@ -228,7 +230,7 @@ watch(
 )
 
 watch(
-  () => [appStore.uiTheme, appStore.uiCodeFont],
+  () => [preferencesStore.uiTheme, preferencesStore.uiCodeFont],
   async () => {
     await nextTick()
     syncTerminalTheme()

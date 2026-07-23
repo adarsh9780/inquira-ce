@@ -5,7 +5,7 @@
 <script setup>
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import Plotly from 'plotly.js-dist-min'
-import { useAppStore } from '../../../stores/appStore'
+import { usePreferencesStore } from '../../../stores/preferencesStore'
 import { normalizePlotlyFigure } from '../../../utils/figurePayload'
 import { applyPlotlyConfigTheme, applyPlotlyTheme, PLOTLY_THEME_MODE } from '../../../utils/plotlyTheme'
 
@@ -13,7 +13,7 @@ const props = defineProps({
   output: { type: Object, required: true },
 })
 
-const appStore = useAppStore()
+const preferencesStore = usePreferencesStore()
 const plotContainer = ref(null)
 let resizeObserver = null
 
@@ -48,7 +48,7 @@ onMounted(() => {
   }
 })
 
-watch(() => [props.output, appStore.uiTheme], () => void renderPlot(), { deep: true })
+watch(() => [props.output, preferencesStore.uiTheme], () => void renderPlot(), { deep: true })
 
 onUnmounted(() => {
   resizeObserver?.disconnect()

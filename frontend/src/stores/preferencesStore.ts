@@ -1,11 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { DEFAULT_THEME_ID, THEME_OPTIONS } from '../constants/themes'
+import { DEFAULT_THEME_ID, THEME_OPTIONS, normalizeThemeId } from '../constants/themes'
 import {
   APP_FONT_OPTIONS,
   CODE_FONT_OPTIONS,
   DEFAULT_APP_FONT_ID,
   DEFAULT_CODE_FONT_ID,
+  normalizeAppFontId,
+  normalizeCodeFontId,
 } from '../constants/fonts'
 
 const DEFAULT_MODELS = [
@@ -16,6 +18,7 @@ const DEFAULT_MODELS = [
 ]
 
 export const usePreferencesStore = defineStore('preferences', () => {
+  let persistChange: (() => void) | null = null
   const llmProvider = ref('openrouter')
   const availableProviders = ref(['openrouter', 'openai', 'anthropic', 'ollama'])
   const selectedModel = ref('google/gemini-2.5-flash')
@@ -41,6 +44,35 @@ export const usePreferencesStore = defineStore('preferences', () => {
   const availableFonts = ref(APP_FONT_OPTIONS.map((font) => ({ ...font })))
   const uiCodeFont = ref(DEFAULT_CODE_FONT_ID)
   const availableCodeFonts = ref(CODE_FONT_OPTIONS.map((font) => ({ ...font })))
+
+  function configurePersistence(handler: (() => void) | null) {
+    persistChange = handler
+  }
+
+  function setApiKey(key: unknown) {
+    apiKey.value = String(key || '')
+  }
+
+  function setUiTheme(themeId: unknown, options: { persist?: boolean } = {}) {
+    const normalized = normalizeThemeId(themeId)
+    if (uiTheme.value === normalized) return
+    uiTheme.value = normalized
+    if (options.persist !== false) persistChange?.()
+  }
+
+  function setUiFont(fontId: unknown, options: { persist?: boolean } = {}) {
+    const normalized = normalizeAppFontId(fontId)
+    if (uiFont.value === normalized) return
+    uiFont.value = normalized
+    if (options.persist !== false) persistChange?.()
+  }
+
+  function setUiCodeFont(fontId: unknown, options: { persist?: boolean } = {}) {
+    const normalized = normalizeCodeFontId(fontId)
+    if (uiCodeFont.value === normalized) return
+    uiCodeFont.value = normalized
+    if (options.persist !== false) persistChange?.()
+  }
 
   return {
     llmProvider,
@@ -68,5 +100,10 @@ export const usePreferencesStore = defineStore('preferences', () => {
     availableFonts,
     uiCodeFont,
     availableCodeFonts,
+    configurePersistence,
+    setApiKey,
+    setUiTheme,
+    setUiFont,
+    setUiCodeFont,
   }
 })

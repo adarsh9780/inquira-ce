@@ -735,6 +735,7 @@ export const useAppStore = defineStore('app', () => {
     scheduleLocalSnapshotSave()
   }
   uiStore.configurePersistence(saveLocalConfig)
+  preferencesStore.configurePersistence(saveLocalConfig)
 
   function scheduleLocalSnapshotSave() {
     const targetUserId = resolveSnapshotUserId()
@@ -879,7 +880,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setApiKey(key) {
-    apiKey.value = key
+    preferencesStore.setApiKey(key)
   }
 
   function setSelectedModel(model) {
@@ -931,30 +932,15 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setUiTheme(themeId, options = {}) {
-    const normalized = normalizeThemeId(themeId)
-    if (uiTheme.value === normalized) return
-    uiTheme.value = normalized
-    if (options?.persist !== false) {
-      saveLocalConfig()
-    }
+    preferencesStore.setUiTheme(themeId, options)
   }
 
   function setUiFont(fontId, options = {}) {
-    const normalized = normalizeAppFontId(fontId)
-    if (uiFont.value === normalized) return
-    uiFont.value = normalized
-    if (options?.persist !== false) {
-      saveLocalConfig()
-    }
+    preferencesStore.setUiFont(fontId, options)
   }
 
   function setUiCodeFont(fontId, options = {}) {
-    const normalized = normalizeCodeFontId(fontId)
-    if (uiCodeFont.value === normalized) return
-    uiCodeFont.value = normalized
-    if (options?.persist !== false) {
-      saveLocalConfig()
-    }
+    preferencesStore.setUiCodeFont(fontId, options)
   }
 
 

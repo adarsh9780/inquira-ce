@@ -109,24 +109,24 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useAppStore } from '../../../stores/appStore'
+import { usePreferencesStore } from '../../../stores/preferencesStore'
 import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 
-const appStore = useAppStore()
+const preferencesStore = usePreferencesStore()
 
-const activeTheme = computed(() => appStore.uiTheme)
-const themes = computed(() => appStore.availableThemes)
-const activeFont = computed(() => appStore.uiFont)
-const activeCodeFont = computed(() => appStore.uiCodeFont)
+const activeTheme = computed(() => preferencesStore.uiTheme)
+const themes = computed(() => preferencesStore.availableThemes)
+const activeFont = computed(() => preferencesStore.uiFont)
+const activeCodeFont = computed(() => preferencesStore.uiCodeFont)
 const appFontOptions = computed(() => {
-  const options = Array.isArray(appStore.availableFonts) ? appStore.availableFonts : []
+  const options = Array.isArray(preferencesStore.availableFonts) ? preferencesStore.availableFonts : []
   return options.map((font) => ({
     value: font.id,
     label: font.label,
   }))
 })
 const codeFontOptions = computed(() => {
-  const options = Array.isArray(appStore.availableCodeFonts) ? appStore.availableCodeFonts : []
+  const options = Array.isArray(preferencesStore.availableCodeFonts) ? preferencesStore.availableCodeFonts : []
   return options.map((font) => ({
     value: font.id,
     label: font.label,
@@ -134,15 +134,15 @@ const codeFontOptions = computed(() => {
 })
 
 function selectTheme(themeId) {
-  appStore.setUiTheme(themeId)
+  preferencesStore.setUiTheme(themeId)
 }
 
 function selectFont(fontId) {
-  appStore.setUiFont(fontId)
+  preferencesStore.setUiFont(fontId)
 }
 
 function selectCodeFont(fontId) {
-  appStore.setUiCodeFont(fontId)
+  preferencesStore.setUiCodeFont(fontId)
 }
 </script>
 

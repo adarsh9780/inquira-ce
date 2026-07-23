@@ -163,6 +163,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useAppStore } from './stores/appStore'
 import { useAuthStore } from './stores/authStore'
 import { useUiStore } from './stores/uiStore'
+import { usePreferencesStore } from './stores/preferencesStore'
 import { apiService } from './services/apiService'
 import { modelConnectionService } from './services/modelConnectionService'
 import { themeService } from './services/themeService'
@@ -185,6 +186,7 @@ import FirstRunModelOnboarding from './components/onboarding/FirstRunModelOnboar
 
 const appStore = useAppStore()
 const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
 
 function wailsApp() {
   if (typeof window === 'undefined') return null
@@ -651,7 +653,7 @@ function handleModelOnboardingComplete(status) {
 }
 
 watch(
-  () => appStore.uiTheme,
+  () => preferencesStore.uiTheme,
   (themeId) => {
     const normalized = normalizeThemeId(themeId)
     applyDocumentTheme(normalized)
@@ -662,7 +664,7 @@ watch(
 )
 
 watch(
-  () => appStore.uiFont,
+  () => preferencesStore.uiFont,
   (fontId) => {
     const normalized = normalizeAppFontId(fontId)
     applyDocumentFont(normalized)
@@ -673,7 +675,7 @@ watch(
 )
 
 watch(
-  () => appStore.uiCodeFont,
+  () => preferencesStore.uiCodeFont,
   (fontId) => {
     const normalized = normalizeCodeFontId(fontId)
     applyDocumentCodeFont(normalized)
@@ -694,9 +696,9 @@ onMounted(async () => {
         fontService.loadAppFontPreference(),
         fontService.loadCodeFontPreference(),
       ])
-      appStore.setUiTheme(storedTheme, { persist: false })
-      appStore.setUiFont(storedFont, { persist: false })
-      appStore.setUiCodeFont(storedCodeFont, { persist: false })
+      preferencesStore.setUiTheme(storedTheme, { persist: false })
+      preferencesStore.setUiFont(storedFont, { persist: false })
+      preferencesStore.setUiCodeFont(storedCodeFont, { persist: false })
       applyDocumentTheme(storedTheme)
       applyDocumentFont(storedFont)
       applyDocumentCodeFont(storedCodeFont)

@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col h-full">
-    <Teleport to="#workspace-right-pane-toolbar-center" v-if="isMounted && appStore.dataPane === 'figure'">
+    <Teleport to="#workspace-right-pane-toolbar-center" v-if="isMounted && uiStore.dataPane === 'figure'">
       <div v-if="figureDropdownOptions.length > 0" class="flex min-w-[11rem] max-w-full items-center" style="width: clamp(11rem, 28vw, 19rem);">
         <HeaderDropdown
           id="figure-select"
@@ -13,7 +13,7 @@
       </div>
     </Teleport>
 
-    <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && appStore.dataPane === 'figure'">
+    <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && uiStore.dataPane === 'figure'">
       <div class="flex min-w-0 items-center justify-end w-full gap-3">
         <div class="flex min-w-0 items-center space-x-3 text-sm">
           <span
@@ -92,6 +92,8 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
+import { useUiStore } from '../../stores/uiStore'
 import Plotly from 'plotly.js-dist-min'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
@@ -108,6 +110,8 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
+const preferencesStore = usePreferencesStore()
+const uiStore = useUiStore()
 
 const plotContainer = ref(null)
 let ro = null
@@ -324,7 +328,7 @@ watch(selectedArtifactId, (artifactId) => {
 })
 
 // Re-render when the Figure pane becomes visible after being hidden by v-show
-watch(() => appStore.dataPane, (pane) => {
+watch(() => uiStore.dataPane, (pane) => {
   if (pane === 'figure' && appStore.activeConversationId && appStore.activeTurnId && appStore.hasWorkspace) {
     void loadActiveTurnFigureArtifacts()
   }
@@ -336,9 +340,9 @@ watch(() => appStore.dataPane, (pane) => {
 })
 
 watch(
-  () => appStore.uiTheme,
+  () => preferencesStore.uiTheme,
   async () => {
-    if (!selectedFigure.value || appStore.dataPane !== 'figure') return
+    if (!selectedFigure.value || uiStore.dataPane !== 'figure') return
     await nextTick()
     await renderPlot()
   },
