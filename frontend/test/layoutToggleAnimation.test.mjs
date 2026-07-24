@@ -48,6 +48,6 @@ test('sidebar icons keep fixed sizing during collapse/expand', () => {
   assert.equal(sidebarSource.includes('class="sidebar-brand-row justify-between px-3"'), true)
   assert.equal(sidebarSource.includes('transition: all var(--motion-duration-slow) var(--motion-ease-emphasized)'), false)
   assert.equal(sidebarSource.includes('will-change: max-width, opacity, margin-left;'), true)
-  assert.equal(sidebarSource.includes("appStore.activeTab === 'workspace' ? 'scale-110' : ''"), false)
-  assert.equal(sidebarSource.includes("appStore.activeTab === 'schema-editor' ? 'scale-110' : ''"), false)
+  assert.equal(sidebarSource.includes("uiStore.activeTab === 'workspace' ? 'scale-110' : ''"), false)
+  assert.equal(sidebarSource.includes("uiStore.activeTab === 'schema-editor' ? 'scale-110' : ''"), false)
 })

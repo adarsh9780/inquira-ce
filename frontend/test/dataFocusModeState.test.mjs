@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('app store no longer persists alternate workspace layout modes', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf-8')
+  const source = readFileSync(resolve(process.cwd(), 'src/stores/artifactStore.ts'), 'utf-8')
 
   assert.equal(source.includes('workspaceLayoutMode'), false)
   assert.equal(source.includes('workspace_layout_mode'), false)

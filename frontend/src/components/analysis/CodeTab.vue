@@ -7,7 +7,7 @@
             type="button"
             class="rounded-md px-2.5 py-1 text-xs font-medium leading-4 transition-colors"
             :style="codeSourceButtonStyle('agent')"
-            :aria-pressed="appStore.codeEditorSource === 'agent'"
+            :aria-pressed="executionStore.codeEditorSource === 'agent'"
             title="Use agent generated code"
             @click="selectCodeSource('agent')"
           >
@@ -17,7 +17,7 @@
             type="button"
             class="rounded-md px-2.5 py-1 text-xs font-medium leading-4 transition-colors"
             :style="codeSourceButtonStyle('user')"
-            :aria-pressed="appStore.codeEditorSource === 'user'"
+            :aria-pressed="executionStore.codeEditorSource === 'user'"
             title="Use your edited code"
             @click="selectCodeSource('user')"
           >
@@ -77,7 +77,7 @@
 
           <button
             @click="downloadCode"
-            :disabled="!appStore.pythonFileContent"
+            :disabled="!executionStore.pythonFileContent"
             class="btn-icon"
             title="Download code"
           >
@@ -104,7 +104,7 @@
       </div>
 
       <div
-        v-if="!appStore.pythonFileContent.trim() && !isGeneratingCode"
+        v-if="!executionStore.pythonFileContent.trim() && !isGeneratingCode"
         class="pointer-events-none absolute inset-0 flex items-center justify-center"
       >
         <div class="text-center text-[var(--color-text-muted)]">
@@ -122,8 +122,14 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useAppStore } from '../../stores/appStore'
 import { useUiStore } from '../../stores/uiStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
+import { useArtifactStore } from '../../stores/artifactStore'
+import { useExecutionStore } from '../../stores/executionStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useConversationStore } from '../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import executionService from '../../services/executionService'
 import { toast } from '../../composables/useToast'
 import { buildExecutionViewModel } from '../../utils/executionViewModel'
@@ -148,8 +154,14 @@ import {
   CodeBracketIcon,
 } from '@heroicons/vue/24/outline'
 
-const appStore = useAppStore()
 const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
 
 const editorContainer = ref(null)
 const isRunning = ref(false)
@@ -163,18 +175,18 @@ const editableCompartment = new Compartment()
 const visualThemeCompartment = new Compartment()
 
 const primaryWorkspaceTableName = computed(() => {
-  const summaryTable = (Array.isArray(appStore.activeWorkspaceSummary?.table_names)
-    ? appStore.activeWorkspaceSummary.table_names
+  const summaryTable = (Array.isArray(workspaceStore.activeWorkspaceSummary?.table_names)
+    ? workspaceStore.activeWorkspaceSummary.table_names
     : []
   ).map((name) => String(name || '').trim()).find(Boolean)
   if (summaryTable) return summaryTable
-  const catalogItem = (Array.isArray(appStore.columnCatalog) ? appStore.columnCatalog : [])
+  const catalogItem = (Array.isArray(workspaceStore.columnCatalog) ? workspaceStore.columnCatalog : [])
     .find((item) => String(item?.table_name || '').trim())
   return String(catalogItem?.table_name || '').trim()
 })
 
 const hasSelectedData = computed(() => {
-  return Number(appStore.activeWorkspaceSummary?.table_count || 0) > 0
+  return Number(workspaceStore.activeWorkspaceSummary?.table_count || 0) > 0
     || Boolean(primaryWorkspaceTableName.value)
 })
 
@@ -230,7 +242,7 @@ function buildColumnCompletionOptions(query = '') {
     seen.add(fullColumn)
   }
 
-  const columns = Array.isArray(appStore.columnCatalog) ? appStore.columnCatalog : []
+  const columns = Array.isArray(workspaceStore.columnCatalog) ? workspaceStore.columnCatalog : []
 
   columns.forEach((item) => {
     addOption({
@@ -349,14 +361,14 @@ async function syncTableNameInCode(silent = false) {
   }
   const tableName = primaryWorkspaceTableName.value
 
-  const current = appStore.pythonFileContent
+  const current = executionStore.pythonFileContent
   const updated = replaceTableNameInCode(current, tableName)
   if (updated !== current) {
-    appStore.noteUserEditedCode(updated, { baselineCode: current })
+    executionStore.noteUserEditedCode(updated, { baselineCode: current })
     updateEditorContent()
     if (!silent) toast.success('Synced table name in code')
   } else if (isDefaultEditorContent(current.trim())) {
-    appStore.noteUserEditedCode(defaultCodeTemplate.value, { baselineCode: current })
+    executionStore.noteUserEditedCode(defaultCodeTemplate.value, { baselineCode: current })
     updateEditorContent()
     if (!silent) toast.success('Refreshed code template with new table name')
   } else if (!silent) {
@@ -364,17 +376,17 @@ async function syncTableNameInCode(silent = false) {
   }
 }
 
-const canRunCode = computed(() => appStore.pythonFileContent.trim() && !isRunning.value && !appStore.isCodeRunning)
+const canRunCode = computed(() => executionStore.pythonFileContent.trim() && !isRunning.value && !executionStore.isCodeRunning)
 const canUndo = computed(() => editor && editor.state && editor.state.undoDepth > 0)
 const canRedo = computed(() => editor && editor.state && editor.state.redoDepth > 0)
 const showCodeSourceToggle = computed(() => {
-  const generated = String(appStore.generatedCode || appStore.activeTurnCode || '')
-  const edited = String(appStore.userEditedCode || appStore.pythonFileContent || '')
-  return Boolean(generated && appStore.hasUserEditedCode && edited !== generated)
+  const generated = String(executionStore.generatedCode || conversationStore.activeTurnCode || '')
+  const edited = String(executionStore.userEditedCode || executionStore.pythonFileContent || '')
+  return Boolean(generated && executionStore.hasUserEditedCode && edited !== generated)
 })
 
 function codeSourceButtonStyle(source) {
-  const active = appStore.codeEditorSource === source
+  const active = executionStore.codeEditorSource === source
   if (active) {
     return {
       backgroundColor: 'var(--color-surface)',
@@ -390,12 +402,12 @@ function codeSourceButtonStyle(source) {
 }
 
 function selectCodeSource(source) {
-  if (source === appStore.codeEditorSource) return
-  appStore.setCodeEditorSource(source)
+  if (source === executionStore.codeEditorSource) return
+  executionStore.setCodeEditorSource(source)
 }
 
 function executionInProgress() {
-  return isRunning.value || appStore.isCodeRunning
+  return isRunning.value || executionStore.isCodeRunning
 }
 
 function notifyExecutionInProgress() {
@@ -427,11 +439,11 @@ function createRunId() {
 
 function startRunEntry(scopeLabel, code) {
   const runId = createRunId()
-  const entryId = appStore.appendTerminalEntry({
+  const entryId = executionStore.appendTerminalEntry({
     kind: 'output',
     source: 'analysis',
     origin: 'user',
-    conversationId: String(appStore.activeConversationId || ''),
+    conversationId: String(conversationStore.activeConversationId || ''),
     label: scopeLabel,
     command: String(code || ''),
     runId,
@@ -495,7 +507,7 @@ async function executeSnippet(code, successLine, options = {}) {
     kind: 'output',
     source: 'analysis',
     origin: 'user',
-    conversationId: String(appStore.activeConversationId || ''),
+    conversationId: String(conversationStore.activeConversationId || ''),
     runId: effectiveRunId,
     status,
     stdout: outputStdout,
@@ -510,9 +522,9 @@ async function executeSnippet(code, successLine, options = {}) {
   }
   let effectiveRunEntryId = runEntryId
   if (runEntryId) {
-    appStore.updateTerminalEntry(runEntryId, runEntryPayload)
+    executionStore.updateTerminalEntry(runEntryId, runEntryPayload)
   } else {
-    effectiveRunEntryId = appStore.appendTerminalEntry({
+    effectiveRunEntryId = executionStore.appendTerminalEntry({
       kind: 'output',
       source: 'analysis',
       label: 'Code run',
@@ -522,7 +534,7 @@ async function executeSnippet(code, successLine, options = {}) {
   }
 
   if (normalized?.error) {
-    appStore.setTerminalOutput(viewModel.output)
+    executionStore.setTerminalOutput(viewModel.output)
     uiStore.setDataPane('output')
     return {
       ok: false,
@@ -540,7 +552,7 @@ async function executeSnippet(code, successLine, options = {}) {
   const chartOutputs = stampRunResults(viewModel.figures.slice(0, 1), effectiveRunId, createdAt)
   const scalarOutputs = stampRunResults(viewModel.scalars.slice(0, 1), effectiveRunId, createdAt)
   if (effectiveRunEntryId) {
-    appStore.updateTerminalEntry(effectiveRunEntryId, {
+    executionStore.updateTerminalEntry(effectiveRunEntryId, {
       hasTableOutput: tableOutputs.length > 0,
       hasChartOutput: chartOutputs.length > 0,
       tableOutputs,
@@ -549,7 +561,7 @@ async function executeSnippet(code, successLine, options = {}) {
     })
   }
   uiStore.setDataPane('output')
-  appStore.setTerminalOutput(viewModel.output)
+  executionStore.setTerminalOutput(viewModel.output)
   return {
     ok: true,
     execTime,
@@ -565,19 +577,19 @@ async function runCode() {
     return
   }
   isRunning.value = true
-  appStore.setCodeRunning(true)
+  executionStore.setCodeRunning(true)
   uiStore.setActiveTab('output')
-  appStore.setTerminalOutput('Running code...')
-  const runMeta = startRunEntry('Code run', appStore.pythonFileContent)
+  executionStore.setTerminalOutput('Running code...')
+  const runMeta = startRunEntry('Code run', executionStore.pythonFileContent)
   try {
-    await executeSnippet(appStore.pythonFileContent, 'Code executed successfully!', {
+    await executeSnippet(executionStore.pythonFileContent, 'Code executed successfully!', {
       runEntryId: runMeta.entryId,
       runId: runMeta.runId,
     })
   } catch (error) {
     const errorMessage = error.response?.data?.detail || error.message || 'Code execution failed'
-    appStore.setTerminalOutput(`Error: ${errorMessage}`)
-    appStore.updateTerminalEntry(runMeta.entryId, {
+    executionStore.setTerminalOutput(`Error: ${errorMessage}`)
+    executionStore.updateTerminalEntry(runMeta.entryId, {
       status: 'error',
       runId: runMeta.runId,
       stdout: '',
@@ -588,7 +600,7 @@ async function runCode() {
     uiStore.setDataPane('output')
   } finally {
     isRunning.value = false
-    appStore.setCodeRunning(false)
+    executionStore.setCodeRunning(false)
   }
 }
 
@@ -604,7 +616,7 @@ async function runSelectedCode() {
   }
 
   isRunning.value = true
-  appStore.setCodeRunning(true)
+  executionStore.setCodeRunning(true)
   const runMeta = startRunEntry('Selection run', selectedCode)
 
   try {
@@ -618,8 +630,8 @@ async function runSelectedCode() {
     )
   } catch (error) {
     const errorMessage = error.response?.data?.detail || error.message || 'Code execution failed'
-    appStore.setTerminalOutput(`Error: ${errorMessage}`)
-    appStore.updateTerminalEntry(runMeta.entryId, {
+    executionStore.setTerminalOutput(`Error: ${errorMessage}`)
+    executionStore.updateTerminalEntry(runMeta.entryId, {
       status: 'error',
       runId: runMeta.runId,
       stdout: '',
@@ -630,7 +642,7 @@ async function runSelectedCode() {
     uiStore.setDataPane('output')
   } finally {
     isRunning.value = false
-    appStore.setCodeRunning(false)
+    executionStore.setCodeRunning(false)
   }
 }
 
@@ -683,7 +695,7 @@ const customKeymap = [
 
 function updateEditorContent() {
   if (editor && !isUpdatingFromStore) {
-    const content = appStore.pythonFileContent
+    const content = executionStore.pythonFileContent
     const currentContent = editor.state.doc.toString()
     if (currentContent !== content) {
       isUpdatingFromStore = true
@@ -757,7 +769,7 @@ async function initializeEditor() {
         const content = update.state.doc.toString()
         const previousContent = update.startState.doc.toString()
         isUpdatingFromStore = true
-        appStore.noteUserEditedCode(content, { baselineCode: previousContent })
+        executionStore.noteUserEditedCode(content, { baselineCode: previousContent })
         setTimeout(() => {
           isUpdatingFromStore = false
         }, 10)
@@ -788,7 +800,7 @@ async function initializeEditor() {
   ]
 
   const state = EditorState.create({
-    doc: appStore.pythonFileContent,
+    doc: executionStore.pythonFileContent,
     extensions,
   })
 
@@ -800,7 +812,7 @@ async function initializeEditor() {
 
 async function downloadCode() {
   try {
-    const code = appStore.pythonFileContent || '# No code in editor'
+    const code = executionStore.pythonFileContent || '# No code in editor'
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
     const filename = `python_code_${timestamp}.py`
     const bytes = new TextEncoder().encode(code)
@@ -846,13 +858,13 @@ onUnmounted(() => {
   if (editor) editor.destroy()
 })
 
-watch(() => appStore.generatedCode, (newCode) => {
-  if (newCode && appStore.codeEditorSource === 'agent' && !appStore.hasUserEditedCode) {
-    appStore.setPythonFileContent(newCode)
+watch(() => executionStore.generatedCode, (newCode) => {
+  if (newCode && executionStore.codeEditorSource === 'agent' && !executionStore.hasUserEditedCode) {
+    executionStore.setPythonFileContent(newCode)
     updateEditorContent()
     isGeneratingCode.value = false
     uiStore.setLoading(false)
-    appStore.setCodeRunning(false)
+    executionStore.setCodeRunning(false)
   }
 })
 
@@ -861,13 +873,13 @@ watch(() => uiStore.isLoading, (loading) => {
   syncEditorEditability()
 })
 
-watch(() => appStore.pythonFileContent, () => {
+watch(() => executionStore.pythonFileContent, () => {
   if (!isUpdatingFromStore && editor) {
     updateEditorContent()
   }
 })
 
-watch(() => appStore.uiCodeFont, () => {
+watch(() => preferencesStore.uiCodeFont, () => {
   syncEditorTheme()
 })
 </script>

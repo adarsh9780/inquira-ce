@@ -24,12 +24,24 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useAppStore } from '../../../stores/appStore'
 import { useUiStore } from '../../../stores/uiStore'
+import { usePreferencesStore } from '../../../stores/preferencesStore'
+import { useArtifactStore } from '../../../stores/artifactStore'
+import { useExecutionStore } from '../../../stores/executionStore'
+import { useWorkspaceStore } from '../../../stores/workspaceStore'
+import { useConversationStore } from '../../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../../composables/useArtifactPresentation'
 import { modelConnectionService } from '../../../services/modelConnectionService'
 
-const appStore = useAppStore()
 const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
 const modelConnectionReady = ref(false)
 
 onMounted(async () => {
@@ -38,22 +50,22 @@ onMounted(async () => {
     modelConnectionReady.value = Boolean(status?.connection_ready)
   } catch (_error) {
     modelConnectionReady.value = Boolean(
-      !appStore.providerRequiresApiKey || appStore.selectedProviderApiKeyPresent,
+      !preferencesStore.providerRequiresApiKey || preferencesStore.selectedProviderApiKeyPresent,
     )
   }
 })
 
 const readinessItems = computed(() => {
-  const state = appStore.workspaceReadiness.state
+  const state = workspaceActivation.workspaceReadiness.state
   const hasWorkspace = state !== 'no_workspace'
-  const hasData = Number(appStore.activeWorkspaceSummary?.table_count || 0) > 0
+  const hasData = Number(workspaceStore.activeWorkspaceSummary?.table_count || 0) > 0
   const hasConnection = modelConnectionReady.value
-  const configured = Boolean(appStore.workspaceAIConfig?.readiness?.ready)
+  const configured = Boolean(workspaceStore.workspaceAIConfig?.readiness?.ready)
   const steps = [
     { key: 'connection', label: 'AI provider', description: hasConnection ? 'The application provider is connected.' : 'Connect a provider once for all workspaces.', complete: hasConnection, actionLabel: 'Connect provider', action: () => uiStore.openSettings('connections') },
     { key: 'workspace', label: 'Workspace', description: hasWorkspace ? 'An active workspace is selected.' : 'Create a place for your data and conversations.', complete: hasWorkspace, actionLabel: 'Create workspace', action: () => uiStore.openSettings('workspace-general') },
     { key: 'configuration', label: 'Workspace AI', description: configured ? 'Models and privacy are configured.' : 'Review workspace models and data-sharing permission.', complete: configured, actionLabel: 'Review', action: () => uiStore.openSettings('workspace-ai') },
-    { key: 'data', label: 'Data sources', description: hasData ? 'Workspace data is prepared.' : 'Add a local data source to analyze.', complete: hasData, actionLabel: 'Add data', action: () => appStore.openDataConnectionFlow() },
+    { key: 'data', label: 'Data sources', description: hasData ? 'Workspace data is prepared.' : 'Add a local data source to analyze.', complete: hasData, actionLabel: 'Add data', action: () => workspaceActivation.openDataConnectionFlow() },
   ]
   const firstIncomplete = steps.findIndex((step) => !step.complete)
   return steps.map((step, index) => ({ ...step, index: index + 1, current: index === firstIncomplete }))

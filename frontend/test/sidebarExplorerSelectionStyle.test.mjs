@@ -13,7 +13,7 @@ test('sidebar renders minimal explorer style with compact brand active highlight
     'utf-8',
   )
   assert.equal(unifiedSource.includes('Workspace explorer'), false)
-  assert.equal(unifiedSource.includes(':active="appStore.activeConversationId === conv.id"'), true)
+  assert.equal(unifiedSource.includes(':active="conversationStore.activeConversationId === conv.id"'), true)
   assert.equal(rowSource.includes("active ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]'"), true)
   assert.equal(unifiedSource.includes('sidebar-workspace-row-active'), true)
   assert.equal(unifiedSource.includes("bg-emerald-50 text-emerald-800"), false)

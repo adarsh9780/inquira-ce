@@ -21,8 +21,8 @@
     <TurnTreeGraphView
       v-else
       :conversations="conversations"
-      :current-turn-id="appStore.activeTurnId"
-      :current-parent-turn-id="appStore.activeTurnRelations?.parent?.id || ''"
+      :current-turn-id="conversationStore.activeTurnId"
+      :current-parent-turn-id="conversationStore.activeTurnRelations?.parent?.id || ''"
       :variant="variant"
       empty-label="No conversation turns yet."
       @select="selectTurn"
@@ -45,7 +45,9 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { ExclamationCircleIcon } from '@heroicons/vue/24/outline'
-import { useAppStore } from '../../../stores/appStore'
+import { useUiStore } from '../../../stores/uiStore'
+import { useWorkspaceStore } from '../../../stores/workspaceStore'
+import { useConversationStore } from '../../../stores/conversationStore'
 import { toast } from '../../../composables/useToast'
 import { extractApiErrorMessage } from '../../../utils/apiError'
 import TurnTreeGraphView from '../../chat/TurnTreeGraphView.vue'
@@ -56,22 +58,24 @@ defineProps({
   variant: { type: String, default: 'sidebar' },
 })
 
-const appStore = useAppStore()
+const uiStore = useUiStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
 const isLoading = ref(false)
 const rulesDialogOpen = ref(false)
 const deleteDialogOpen = ref(false)
 const pendingDeletePayload = ref(null)
 
 const conversations = computed(() => {
-  const raw = appStore.workspaceTurnTree?.conversations
+  const raw = conversationStore.workspaceTurnTree?.conversations
   return Array.isArray(raw) ? raw : []
 })
 
 async function refreshTree() {
-  if (!appStore.activeWorkspaceId) return
+  if (!workspaceStore.activeWorkspaceId) return
   isLoading.value = true
   try {
-    await appStore.loadWorkspaceTurnTree()
+    await conversationStore.loadWorkspaceTurnTree()
   } catch (error) {
     toast.error('Tree load failed', extractApiErrorMessage(error, 'Unable to load conversation tree.'))
   } finally {
@@ -84,13 +88,13 @@ async function selectTurn(payload) {
   const targetTurnId = String(payload?.turnId || '').trim()
   if (!targetConversationId || !targetTurnId) return
   try {
-    if (targetConversationId !== appStore.activeConversationId) {
-      appStore.setActiveConversationId(targetConversationId)
-      await appStore.fetchConversationTurns()
+    if (targetConversationId !== conversationStore.activeConversationId) {
+      conversationStore.setActiveConversationId(targetConversationId)
+      await conversationStore.fetchConversationTurns()
     }
-    await appStore.loadActiveTurnRelations(targetTurnId)
-    appStore.setActiveTab('workspace')
-    appStore.setWorkspacePane?.('chat')
+    await conversationStore.loadActiveTurnRelations(targetTurnId)
+    uiStore.setActiveTab('workspace')
+    uiStore.setWorkspacePane?.('chat')
   } catch (error) {
     toast.error('Turn load failed', extractApiErrorMessage(error, 'Unable to open this turn.'))
   }
@@ -98,7 +102,7 @@ async function selectTurn(payload) {
 
 async function markTurnFinal(payload) {
   try {
-    await appStore.markTurnFinal(payload?.turnId, payload?.conversationId)
+    await conversationStore.markTurnFinal(payload?.turnId, payload?.conversationId)
     toast.success('Final turn updated', 'This turn is now marked final.')
   } catch (error) {
     toast.error('Final turn failed', extractApiErrorMessage(error, 'Unable to mark final turn.'))
@@ -119,7 +123,7 @@ async function confirmDeleteTurn() {
   const payload = pendingDeletePayload.value
   closeDeleteDialog()
   try {
-    await appStore.deleteTurn(payload?.turnId, payload?.conversationId)
+    await conversationStore.deleteTurn(payload?.turnId, payload?.conversationId)
     toast.success('Turn deleted', 'The turn was removed from the tree.')
   } catch (error) {
     toast.error('Delete failed', extractApiErrorMessage(error, 'Unable to delete this turn.'))
@@ -130,7 +134,7 @@ onMounted(() => {
   void refreshTree()
 })
 
-watch(() => appStore.activeWorkspaceId, () => {
+watch(() => workspaceStore.activeWorkspaceId, () => {
   void refreshTree()
 })
 </script>

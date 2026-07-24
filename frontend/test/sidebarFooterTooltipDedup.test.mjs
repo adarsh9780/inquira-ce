@@ -10,7 +10,7 @@ test('sidebar offers accessible brand collapse, settings, and profile entry poin
   assert.equal(source.includes('title="Profile Settings"'), true)
   assert.equal(source.includes("uiStore.isSidebarCollapsed ? 'Expand sidebar' : 'Inquira'"), true)
   assert.equal(source.includes('title="Collapse sidebar"'), true)
-  assert.equal(source.includes("{{ appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar' }}"), false)
+  assert.equal(source.includes("{{ uiStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar' }}"), false)
   assert.equal(source.includes('title="API Keys"'), false)
   assert.equal(source.includes('title="Search"'), false)
   assert.equal(source.includes('title="Terms & Conditions"'), false)

@@ -1,7 +1,7 @@
 <template>
-  <div ref="chatContainer" class="space-y-4" style="min-height: 200px;" role="log" aria-live="polite" aria-relevant="additions" :aria-busy="appStore.activeConversationIsLoading">
+  <div ref="chatContainer" class="space-y-4" style="min-height: 200px;" role="log" aria-live="polite" aria-relevant="additions" :aria-busy="executionStore.isConversationRunning(conversationStore.activeConversationId)">
     <!-- Loading indicator for first message when no history yet -->
-    <div v-if="appStore.activeConversationIsLoading && displayedChatHistory.length === 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
+    <div v-if="executionStore.isConversationRunning(conversationStore.activeConversationId) && displayedChatHistory.length === 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
       <div class="analyzing-status">
         <div class="analyzing-spinner" aria-hidden="true"></div>
         <span class="analyzing-status-text">Analyzing your question...</span>
@@ -164,7 +164,7 @@
     </div>
 
     <!-- Loading indicator when analyzing - shown below last message -->
-    <div v-if="appStore.activeConversationIsLoading && displayedChatHistory.length > 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
+    <div v-if="executionStore.isConversationRunning(conversationStore.activeConversationId) && displayedChatHistory.length > 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
       <div class="analyzing-status">
         <div class="analyzing-spinner" aria-hidden="true"></div>
         <span class="analyzing-status-text">Analyzing your question...</span>
@@ -194,8 +194,14 @@
 
 <script setup>
 import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue'
-import { useAppStore } from '../../stores/appStore'
 import { useUiStore } from '../../stores/uiStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
+import { useArtifactStore } from '../../stores/artifactStore'
+import { useExecutionStore } from '../../stores/executionStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useConversationStore } from '../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import {
   DocumentDuplicateIcon,
   ChevronDownIcon,
@@ -225,8 +231,14 @@ DOMPurify.addHook('afterSanitizeAttributes', function(node) {
 })
 
 
-const appStore = useAppStore()
 const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
 useChatScrollFollow()
 const chatContainer = ref(null)
 const scrollHost = ref(null)
@@ -268,23 +280,23 @@ function mapTurnToMessage(turn) {
 }
 
 const displayedChatHistory = computed(() => {
-  const localHistory = Array.isArray(appStore.chatHistory) ? appStore.chatHistory : []
-  if (appStore.activeConversationIsLoading && localHistory.length > 0) {
+  const localHistory = Array.isArray(conversationStore.chatHistory) ? conversationStore.chatHistory : []
+  if (executionStore.isConversationRunning(conversationStore.activeConversationId) && localHistory.length > 0) {
     const pendingMessage = localHistory[localHistory.length - 1]
     const pendingId = String(pendingMessage?.id || '').trim()
-    const activeId = String(appStore.activeTurnId || '').trim()
+    const activeId = String(conversationStore.activeTurnId || '').trim()
     if (!activeId || pendingId !== activeId) {
       return [pendingMessage]
     }
   }
 
-  const activeTurnId = String(appStore.activeTurnId || '').trim()
+  const activeTurnId = String(conversationStore.activeTurnId || '').trim()
   if (activeTurnId) {
     const existing = localHistory.find((message) => String(message?.id || '').trim() === activeTurnId)
     if (existing) return [existing]
   }
 
-  const syntheticMessage = mapTurnToMessage(appStore.activeTurn)
+  const syntheticMessage = mapTurnToMessage(conversationStore.activeTurn)
   return syntheticMessage ? [syntheticMessage] : []
 })
 
@@ -885,7 +897,7 @@ function updateScrollState(options = {}) {
 }
 
 function scrollToBottom(options = {}) {
-  const resolvedBehavior = String(options?.behavior || '').trim() || (appStore.activeConversationIsLoading ? 'auto' : 'smooth')
+  const resolvedBehavior = String(options?.behavior || '').trim() || (executionStore.isConversationRunning(conversationStore.activeConversationId) ? 'auto' : 'smooth')
   const force = options?.force === true
   const hardAlign = options?.hardAlign === true
   nextTick(() => {
@@ -961,13 +973,13 @@ watch([() => displayedChatHistory.value.length, lastMessageId], ([newLength], [o
   }
 })
 
-watch(() => appStore.activeConversationId, () => {
+watch(() => conversationStore.activeConversationId, () => {
   shouldAutoScroll = true
   nextTick(() => scrollToBottom())
 })
 
 // Watch for loading state changes
-watch(() => appStore.activeConversationIsLoading, (isLoading, wasLoading) => {
+watch(() => executionStore.isConversationRunning(conversationStore.activeConversationId), (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) {
   }
   if (shouldAutoScroll) {

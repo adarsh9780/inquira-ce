@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('app store does not expose a remote Plotly theme preference', () => {
-  const path = resolve(process.cwd(), 'src/stores/appStore.js')
+  const path = resolve(process.cwd(), 'src/stores/preferencesStore.ts')
   const source = readFileSync(path, 'utf-8')
 
   assert.equal(source.includes('plotlyThemeMode'), false)

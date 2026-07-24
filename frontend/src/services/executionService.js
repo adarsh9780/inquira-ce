@@ -1,18 +1,20 @@
 import { executionApi } from '../api/execution.ts'
-import { useAppStore } from '../stores/appStore'
+import { useWorkspaceStore } from '../stores/workspaceStore'
+import { useConversationStore } from '../stores/conversationStore'
 import { extractApiErrorMessage } from '../utils/apiError'
 import { mapExecutionServiceResponse } from '../utils/executionServiceMapper'
 
 class ExecutionService {
     async executePython(code) {
         try {
-            const appStore = useAppStore()
+            const workspaceStore = useWorkspaceStore()
+            const conversationStore = useConversationStore()
             const response = await executionApi.runCode({
                 code,
                 timeout: 60,
-                workspaceId: appStore.activeWorkspaceId || null,
-                conversationId: appStore.activeConversationId || '',
-                parentTurnId: appStore.activeTurnId || '',
+                workspaceId: workspaceStore.activeWorkspaceId || null,
+                conversationId: conversationStore.activeConversationId || '',
+                parentTurnId: conversationStore.activeTurnId || '',
             })
             return mapExecutionServiceResponse(response)
         } catch (err) {

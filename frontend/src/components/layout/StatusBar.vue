@@ -11,7 +11,7 @@
         <span class="truncate">{{ tokenUsageSummaryLabel }}</span>
       </div>
 
-      <div v-if="appStore.activeWorkspaceId" class="flex h-full items-center gap-1.5 px-1">
+      <div v-if="workspaceStore.activeWorkspaceId" class="flex h-full items-center gap-1.5 px-1">
         <span
           v-if="workspaceRuntimeStatusMeta.showSpinner"
           class="inline-block h-2 w-2 shrink-0 animate-spin rounded-full border-[1.5px] border-[var(--color-border)] border-t-[var(--color-text-main)]"
@@ -23,11 +23,11 @@
         </span>
       </div>
 
-      <template v-if="appStore.isEditorFocused">
+      <template v-if="uiStore.isEditorFocused">
         <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
         <div class="flex items-center tabular-nums text-[var(--color-text-muted)] tracking-tight gap-1 px-1">
-          <span>Ln {{ appStore.editorLine }},</span>
-          <span>Col {{ appStore.editorCol }}</span>
+          <span>Ln {{ uiStore.editorLine }},</span>
+          <span>Col {{ uiStore.editorCol }}</span>
         </div>
       </template>
     </div>
@@ -62,11 +62,11 @@
           <span class="truncate">{{ primaryBackgroundOperationLabel }}</span>
           <span v-if="backgroundOperationCountLabel" class="shrink-0 text-[var(--color-text-sub)]">{{ backgroundOperationCountLabel }}</span>
         </div>
-        <div v-if="appStore.activeWorkspaceId && paneArtifactCountLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded font-medium tabular-nums"
+        <div v-if="workspaceStore.activeWorkspaceId && paneArtifactCountLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded font-medium tabular-nums"
              :class="artifactCountClass">
           <span>{{ paneArtifactCountLabel }}</span>
         </div>
-        <div v-if="appStore.activeWorkspaceId && tableViewportLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded font-medium tabular-nums" :class="artifactCountClass">
+        <div v-if="workspaceStore.activeWorkspaceId && tableViewportLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded font-medium tabular-nums" :class="artifactCountClass">
           <span>{{ tableViewportLabel }}</span>
         </div>
       </template>
@@ -177,9 +177,14 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useAppStore } from '../../stores/appStore'
-import { useArtifactStore } from '../../stores/artifactStore'
 import { useUiStore } from '../../stores/uiStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
+import { useArtifactStore } from '../../stores/artifactStore'
+import { useExecutionStore } from '../../stores/executionStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useConversationStore } from '../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import { useAuthStore } from '../../stores/authStore'
 import { workspaceApi } from '../../api/workspaces'
 import { formatUsageCompact, formatUsageTooltip, normalizeUsage } from '../../utils/usageFormat'
@@ -190,9 +195,14 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useToast } from '../../composables/useToast'
 
-const appStore = useAppStore()
-const artifactStore = useArtifactStore()
 const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
 const authStore = useAuthStore()
 const {
   notificationHistory,
@@ -202,7 +212,7 @@ const {
 } = useToast()
 
 // --- Workspace Status Management ---
-const workspaceRuntimeStatus = computed(() => appStore.activeWorkspaceRuntimeStatus)
+const workspaceRuntimeStatus = computed(() => executionStore.getWorkspaceRuntimeStatus(workspaceStore.activeWorkspaceId))
 
 const notificationsPanelOpen = ref(false)
 
@@ -213,10 +223,10 @@ const unreadNotificationBadge = computed(() => {
 })
 
 const tokenUsageSource = computed(() => {
-  const summary = appStore.activeConversationUsage && typeof appStore.activeConversationUsage === 'object'
-    ? appStore.activeConversationUsage
+  const summary = conversationStore.activeConversationUsage && typeof conversationStore.activeConversationUsage === 'object'
+    ? conversationStore.activeConversationUsage
     : null
-  return summary?.usage || appStore.liveTokenUsage
+  return summary?.usage || conversationStore.liveTokenUsage
 })
 
 const hasTokenUsage = computed(() => Boolean(normalizeUsage(tokenUsageSource.value)))
@@ -224,13 +234,13 @@ const hasTokenUsage = computed(() => Boolean(normalizeUsage(tokenUsageSource.val
 const tokenUsageSummaryLabel = computed(() => formatUsageCompact(tokenUsageSource.value))
 
 const tokenUsageHoverLabel = computed(() => {
-  const summary = appStore.activeConversationUsage && typeof appStore.activeConversationUsage === 'object'
-    ? appStore.activeConversationUsage
+  const summary = conversationStore.activeConversationUsage && typeof conversationStore.activeConversationUsage === 'object'
+    ? conversationStore.activeConversationUsage
     : null
   return formatUsageTooltip(tokenUsageSource.value, summary)
 })
 
-const primaryBackgroundOperation = computed(() => appStore.primaryBackgroundOperation)
+const primaryBackgroundOperation = computed(() => executionStore.primaryBackgroundOperation)
 
 const primaryBackgroundOperationIsRunning = computed(() => {
   const status = String(primaryBackgroundOperation.value?.status || '')
@@ -238,12 +248,12 @@ const primaryBackgroundOperationIsRunning = computed(() => {
 })
 
 const backgroundOperationCountLabel = computed(() => {
-  const count = Number(appStore.activeBackgroundOperations?.length || 0)
+  const count = Number(executionStore.activeBackgroundOperations?.length || 0)
   return count > 1 ? `+${count - 1}` : ''
 })
 
 const primaryBackgroundOperationLabel = computed(() => {
-  const runningChats = Number(appStore.runningConversationCount || 0)
+  const runningChats = Number(executionStore.runningConversationCount || 0)
   if (runningChats > 1) return `${runningChats} conversations running`
   const operation = primaryBackgroundOperation.value
   if (!operation) return ''
@@ -260,7 +270,7 @@ const primaryBackgroundOperationTitle = computed(() => {
   if (!operation) return ''
   const title = String(operation.title || 'Background task').trim()
   const message = String(operation.message || '').trim()
-  const count = Number(appStore.activeBackgroundOperations?.length || 0)
+  const count = Number(executionStore.activeBackgroundOperations?.length || 0)
   return [
     title,
     message,
@@ -291,10 +301,10 @@ const workspaceRuntimeStatusMeta = computed(() => {
 
 const tableViewportLabel = computed(() => {
   if (uiStore.dataPane !== 'table') return null
-  const total = Number(appStore.tableRowCount || 0)
+  const total = Number(artifactStore.tableRowCount || 0)
   if (total <= 0) return null
-  const start = Math.max(0, Number(appStore.tableWindowStart || 0))
-  const end = Math.max(0, Number(appStore.tableWindowEnd || 0))
+  const start = Math.max(0, Number(artifactStore.tableWindowStart || 0))
+  const end = Math.max(0, Number(artifactStore.tableWindowEnd || 0))
   if (start > 0 && end > 0) {
     return `${total.toLocaleString()} rows - Showing ${start.toLocaleString()}-${end.toLocaleString()} of ${total.toLocaleString()}`
   }
@@ -305,16 +315,16 @@ const tableViewportLabel = computed(() => {
 const paneArtifactCountLabel = computed(() => {
   if (uiStore.dataPane === 'table') {
     const n = Math.max(
-      Number(appStore.dataframeCount || 0),
-      Number(Array.isArray(appStore.dataframes) ? appStore.dataframes.length : 0)
+      Number(artifactStore.dataframeCount || 0),
+      Number(Array.isArray(artifactStore.dataframes) ? artifactStore.dataframes.length : 0)
     )
     if (n <= 0) return null
     return `${n} table${n === 1 ? '' : 's'} saved`
   }
   if (uiStore.dataPane === 'figure') {
     const n = Math.max(
-      Number(appStore.figureCount || 0),
-      Number(Array.isArray(appStore.figures) ? appStore.figures.length : 0)
+      Number(artifactStore.figureCount || 0),
+      Number(Array.isArray(artifactStore.figures) ? artifactStore.figures.length : 0)
     )
     if (n <= 0) return null
     return `${n} chart${n === 1 ? '' : 's'} saved`
@@ -333,10 +343,10 @@ async function refreshWorkspaceRuntimeStatusFromApi(workspaceId, fallbackStatus 
   try {
     const payload = await workspaceApi.runtimeStatus(normalizedWorkspaceId)
     const status = String(payload?.status || '').trim().toLowerCase() || fallbackStatus
-    appStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, status)
+    executionStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, status)
     return status
   } catch (_error) {
-    appStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, fallbackStatus)
+    executionStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, fallbackStatus)
     return fallbackStatus
   }
 }
@@ -388,19 +398,19 @@ function handleStatusBarEscape(event) {
 }
 
 function syncWorkspaceStatus() {
-  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
-  if (!authStore.isAuthenticated || !workspaceId || !appStore.hasWorkspace) {
-    appStore.setWorkspaceRuntimeStatus(workspaceId, 'missing')
+  const workspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
+  if (!authStore.isAuthenticated || !workspaceId || !workspaceStore.hasWorkspace) {
+    executionStore.setWorkspaceRuntimeStatus(workspaceId, 'missing')
     return
   }
 
-  const currentStatus = appStore.getWorkspaceRuntimeStatus(workspaceId)
+  const currentStatus = executionStore.getWorkspaceRuntimeStatus(workspaceId)
   void refreshWorkspaceRuntimeStatusFromApi(workspaceId, currentStatus)
 }
 
 // Named handler so we can remove the exact same reference on unmount
 function handleVisibilityChange() {
-  if (!document.hidden && authStore.isAuthenticated && appStore.activeWorkspaceId && appStore.hasWorkspace) {
+  if (!document.hidden && authStore.isAuthenticated && workspaceStore.activeWorkspaceId && workspaceStore.hasWorkspace) {
     syncWorkspaceStatus()
   }
 }
@@ -419,12 +429,12 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleStatusBarEscape)
 })
 
-watch([() => appStore.activeWorkspaceId, () => appStore.hasWorkspace, () => authStore.isAuthenticated], ([newId, hasWorkspace, isAuthenticated]) => {
+watch([() => workspaceStore.activeWorkspaceId, () => workspaceStore.hasWorkspace, () => authStore.isAuthenticated], ([newId, hasWorkspace, isAuthenticated]) => {
   const normalizedWorkspaceId = String(newId || '').trim()
   if (isAuthenticated && newId && hasWorkspace) {
     syncWorkspaceStatus()
   } else {
-    appStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, 'missing')
+    executionStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, 'missing')
   }
 })
 

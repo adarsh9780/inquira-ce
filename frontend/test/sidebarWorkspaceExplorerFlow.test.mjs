@@ -23,5 +23,5 @@ test('sidebar lists workspace conversations while the context bar owns active co
   assert.equal(contextSource.includes('data-workspace-context-bar'), true)
   assert.equal(contextSource.includes('{{ activeWorkspaceName }}'), true)
   assert.equal(contextSource.includes('data-action="add-data"'), true)
-  assert.equal(contextSource.includes('appStore.openDataConnectionFlow()'), true)
+  assert.equal(contextSource.includes('workspaceActivation.openDataConnectionFlow()'), true)
 })

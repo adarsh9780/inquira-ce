@@ -39,7 +39,7 @@ test('collapsed sidebar rows keep a stable fixed-size icon rail', () => {
   assert.ok(styleSource.includes('--size-sidebar-inline-icon: 1rem;'))
   assert.ok(styleSource.includes('--size-sidebar-rail-control: 2.1875rem;'))
   assert.ok(styleSource.includes('--size-sidebar-rail-glyph: 1.5rem;'))
-  assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'justify-center' : 'justify-start'"), false)
+  assert.equal(sidebarSource.includes("uiStore.isSidebarCollapsed ? 'justify-center' : 'justify-start'"), false)
   assert.equal(sidebarSource.includes('transition: all var(--motion-duration-slow) var(--motion-ease-emphasized)'), false)
 })
 
@@ -48,7 +48,7 @@ test('conversation ellipsis menu is restored on the sidebar conversation list', 
   const rowSource = readFileSync(resolve(process.cwd(), 'src/components/layout/sidebar/SidebarConversationRow.vue'), 'utf-8')
   const menuSource = readFileSync(resolve(process.cwd(), 'src/components/layout/sidebar/SidebarConversationActionsMenu.vue'), 'utf-8')
 
-  assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'hidden' :"), false)
+  assert.equal(sidebarSource.includes("uiStore.isSidebarCollapsed ? 'hidden' :"), false)
   assert.equal(sidebarSource.includes('<SidebarConversationRow'), true)
   assert.equal(menuSource.includes('data-conversation-actions-menu'), true)
   assert.equal(rowSource.includes('EllipsisHorizontalIcon'), true)

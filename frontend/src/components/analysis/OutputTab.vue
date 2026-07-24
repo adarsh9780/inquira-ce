@@ -2,7 +2,7 @@
   <div class="flex h-full min-h-0 flex-col overflow-hidden">
     <Teleport
       to="#workspace-right-pane-toolbar-center"
-      v-if="isMounted && appStore.dataPane === 'output' && executionItems.length > 0"
+      v-if="isMounted && uiStore.dataPane === 'output' && executionItems.length > 0"
     >
       <nav class="flex items-center gap-1" aria-label="Run history navigation" data-run-navigator>
         <button
@@ -41,7 +41,7 @@
 
     <Teleport
       to="#workspace-right-pane-toolbar-right"
-      v-if="isMounted && appStore.dataPane === 'output' && focusedRunId"
+      v-if="isMounted && uiStore.dataPane === 'output' && focusedRunId"
     >
       <div class="flex items-center gap-2">
         <button
@@ -59,7 +59,7 @@
     </Teleport>
 
     <p
-      v-if="appStore.terminalEntriesTrimmedCount > 0 && !focusedRunId"
+      v-if="executionStore.terminalEntriesTrimmedCount > 0 && !focusedRunId"
       class="shrink-0 px-1 py-1 text-[11px]"
       style="color: var(--color-text-muted);"
     >
@@ -233,7 +233,14 @@
 
 <script setup>
 import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
-import { useAppStore } from '../../stores/appStore'
+import { useUiStore } from '../../stores/uiStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
+import { useArtifactStore } from '../../stores/artifactStore'
+import { useExecutionStore } from '../../stores/executionStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useConversationStore } from '../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import { buildUserRunItems } from '../../utils/unifiedResults'
 import AppEmptyState from '../ui/AppEmptyState.vue'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
@@ -252,7 +259,14 @@ import {
 
 const INLINE_TEXT_LIMIT = 4_000
 const RunChartOutput = defineAsyncComponent(() => import('./runs/RunChartOutput.vue'))
-const appStore = useAppStore()
+const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
 const isMounted = ref(false)
 const selectedRunId = ref('')
 const focusedRunId = ref('')
@@ -263,8 +277,8 @@ onMounted(() => {
 })
 
 const executionItems = computed(() => buildUserRunItems({
-  terminalEntries: appStore.terminalEntries,
-  conversationId: appStore.activeConversationId,
+  terminalEntries: executionStore.terminalEntries,
+  conversationId: conversationStore.activeConversationId,
 }))
 
 const selectedRunIndex = computed(() => (
@@ -340,7 +354,7 @@ function deleteRun(execution) {
   const currentIndex = executionItems.value.findIndex((item) => item.id === execution.id)
   const fallback = executionItems.value[currentIndex - 1] || executionItems.value[currentIndex + 1] || null
   selectedRunId.value = fallback?.id || ''
-  appStore.removeTerminalEntry(execution.entryId)
+  executionStore.removeTerminalEntry(execution.entryId)
   if (focusedRunId.value === execution.id) focusedRunId.value = ''
 }
 
@@ -410,11 +424,11 @@ function historySummary(execution) {
 }
 
 function promoteTable(execution, table, index) {
-  appStore.promoteUserRunTable(table, { runId: execution.runId, outputId: table.id, index })
+  artifactPresentation.promoteUserRunTable(table, { runId: execution.runId, outputId: table.id, index })
 }
 
 function promoteChart(execution, chart, index) {
-  appStore.promoteUserRunFigure(chart, { runId: execution.runId, outputId: chart.id, index })
+  artifactPresentation.promoteUserRunFigure(chart, { runId: execution.runId, outputId: chart.id, index })
 }
 
 function formatTimestamp(raw) {

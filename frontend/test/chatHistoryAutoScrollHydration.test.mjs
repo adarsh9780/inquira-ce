@@ -8,7 +8,7 @@ test('chat history scroll logic restores auto-scroll for hydrated conversations'
   const source = readFileSync(chatHistoryPath, 'utf-8')
 
   assert.equal(source.includes('const previousLength = Number.isFinite(oldLength) ? oldLength : 0'), true)
-  assert.equal(source.includes('watch(() => appStore.activeConversationId, () => {'), true)
+  assert.equal(source.includes('watch(() => conversationStore.activeConversationId, () => {'), true)
   assert.equal(source.includes('shouldAutoScroll = true'), true)
   assert.equal(source.includes('nextTick(() => scrollToBottom())'), true)
 })

@@ -160,10 +160,14 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { useAppStore } from './stores/appStore'
 import { useAuthStore } from './stores/authStore'
 import { useUiStore } from './stores/uiStore'
 import { usePreferencesStore } from './stores/preferencesStore'
+import { useWorkspaceStore } from './stores/workspaceStore'
+import { useConversationStore } from './stores/conversationStore'
+import { useExecutionStore } from './stores/executionStore'
+import { useSessionSnapshot } from './composables/useSessionSnapshot'
+import { useWorkspaceActivation } from './composables/useWorkspaceActivation'
 import { modelConnectionService } from './services/modelConnectionService'
 import { themeService } from './services/themeService'
 import { fontService } from './services/fontService'
@@ -183,9 +187,14 @@ import CommandPaletteModal from './components/modals/CommandPaletteModal.vue'
 import KeyboardShortcutsModal from './components/modals/KeyboardShortcutsModal.vue'
 import FirstRunModelOnboarding from './components/onboarding/FirstRunModelOnboarding.vue'
 
-const appStore = useAppStore()
 const uiStore = useUiStore()
 const preferencesStore = usePreferencesStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const executionStore = useExecutionStore()
+const sessionSnapshot = useSessionSnapshot()
+const workspaceActivation = useWorkspaceActivation()
+sessionSnapshot.configurePersistence()
 
 function wailsApp() {
   if (typeof window === 'undefined') return null
@@ -433,7 +442,7 @@ function applyDocumentCodeFont(fontId) {
 }
 
 function openGlobalDatasetPicker() {
-  appStore.openDataConnectionFlow()
+  workspaceActivation.openDataConnectionFlow()
 }
 
 function handleAppDatasetDragOver(event) {
@@ -447,7 +456,7 @@ function handleAppDatasetDrop(event) {
   const files = Array.from(event?.dataTransfer?.files || [])
   if (files.length === 0) return
   event.preventDefault()
-  appStore.openDataConnectionFlow()
+  workspaceActivation.openDataConnectionFlow()
 }
 
 function handleGlobalShortcuts(event) {
@@ -503,7 +512,7 @@ function handleGlobalShortcuts(event) {
 }
 
 function handleOpenDatasetPickerRequest() {
-  appStore.openDataConnectionFlow()
+  workspaceActivation.openDataConnectionFlow()
 }
 
 async function readDesktopStartupState() {
@@ -600,21 +609,21 @@ async function handleAuthenticated(userData) {
   appBootstrap.message = 'Loading your account...'
 
   if (activeSnapshotUserId.value !== userId) {
-    appStore.resetForAuthBoundary()
+    sessionSnapshot.reset()
     activeSnapshotUserId.value = userId
-    await appStore.loadLocalConfig(userId)
+    await sessionSnapshot.load(userId)
   }
 
   try {
     appBootstrap.message = 'Loading your account...'
-    await appStore.loadUserPreferences()
+    await preferencesStore.loadUserPreferences()
     appBootstrap.message = 'Selecting your workspace...'
-    await appStore.fetchWorkspaces()
-    if (appStore.activeWorkspaceId) {
+    await workspaceStore.fetchWorkspaces()
+    if (workspaceStore.activeWorkspaceId) {
       appBootstrap.message = 'Loading workspace history...'
-      await appStore.fetchConversations()
-      if (appStore.activeConversationId) {
-        await appStore.fetchConversationTurns()
+      await conversationStore.fetchConversations(workspaceStore.activeWorkspaceId)
+      if (conversationStore.activeConversationId) {
+        await conversationStore.fetchConversationTurns()
       }
     }
     console.debug('Loaded workspace state for local user')
@@ -752,7 +761,7 @@ watch(
 )
 
 watch(
-  () => appStore.runtimeError,
+  () => executionStore.runtimeError,
   (message) => {
     if (!authStore.isAuthenticated) return
     const normalized = String(message || '').trim()
@@ -776,20 +785,20 @@ watch(
     desktopStartup.message = ''
     desktopStartup.error = ''
     desktopStartupTimeline.value = []
-    appStore.resetForAuthBoundary()
+    sessionSnapshot.reset()
     lastRuntimeErrorToast.value = ''
-    appStore.setRuntimeError('')
+    executionStore.setRuntimeError('')
   }
 )
 
 function handleAppUnload() {
-  void appStore.flushLocalConfig?.()
+  void sessionSnapshot.flush()
 }
 window.addEventListener('beforeunload', handleAppUnload)
 
 // Cleanup on unmount
 onUnmounted(() => {
-  void appStore.flushLocalConfig?.()
+  void sessionSnapshot.flush()
   if (startupClockTimer) {
     window.clearInterval(startupClockTimer)
     startupClockTimer = null

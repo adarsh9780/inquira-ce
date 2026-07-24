@@ -25,7 +25,7 @@ test('app registers global shortcuts for command palette, sidebar, settings, and
   assert.equal(appSource.includes("uiStore.setActiveTab('schema-editor')"), true)
   assert.equal(appSource.includes("uiStore.openSettings('setup')"), true)
   assert.equal(appSource.includes('uiStore.setSidebarCollapsed(!uiStore.isSidebarCollapsed)'), true)
-  assert.equal(appSource.includes('appStore.openKeyboardShortcuts()'), false)
+  assert.equal(appSource.includes('uiStore.openKeyboardShortcuts()'), false)
   assert.equal(appSource.includes('<KeyboardShortcutsModal'), true)
   assert.equal(appSource.includes('uiStore.toggleCommandPalette()'), true)
   assert.equal(appSource.includes('CommandPaletteModal'), true)

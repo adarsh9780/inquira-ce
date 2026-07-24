@@ -449,14 +449,28 @@ import FloatingActionMenu from '../../ui/FloatingActionMenu.vue'
 import ConfirmationModal from '../ConfirmationModal.vue'
 import { modelConnectionService } from '../../../services/modelConnectionService'
 import { useLLMConfig } from '../../../composables/useLLMConfig'
-import { useAppStore } from '../../../stores/appStore'
+import { useUiStore } from '../../../stores/uiStore'
+import { usePreferencesStore } from '../../../stores/preferencesStore'
+import { useArtifactStore } from '../../../stores/artifactStore'
+import { useExecutionStore } from '../../../stores/executionStore'
+import { useWorkspaceStore } from '../../../stores/workspaceStore'
+import { useConversationStore } from '../../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../../composables/useArtifactPresentation'
 import { useAuthStore } from '../../../stores/authStore'
 import { toast } from '../../../composables/useToast'
 import { openExternalUrl } from '../../../services/externalLinkService'
 
 const emit = defineEmits(['close-request'])
 
-const appStore = useAppStore()
+const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
 const authStore = useAuthStore()
 const llm = useLLMConfig()
 
@@ -684,8 +698,8 @@ async function saveConfiguration() {
     return
   }
 
-  if (typeof appStore.applyPreferencesResponse === 'function') {
-    appStore.applyPreferencesResponse(result.response)
+  if (typeof preferencesStore.applyPreferencesResponse === 'function') {
+    preferencesStore.applyPreferencesResponse(result.response)
   }
   toast.success('Configuration saved', 'Configuration saved')
 }

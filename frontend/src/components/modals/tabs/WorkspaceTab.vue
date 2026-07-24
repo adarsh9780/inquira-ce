@@ -40,7 +40,7 @@
               <p class="min-w-0 flex-1 truncate text-xs font-medium text-[var(--color-text-main)]">{{ workspace.name || 'Untitled workspace' }}</p>
               <div class="flex shrink-0 items-center gap-1.5">
                 <span v-if="workspace.id === activeWorkspaceId" class="rounded-full bg-[var(--color-accent-soft)] px-1.5 py-0.5 text-[9px] text-[var(--color-accent)]">Selected</span>
-                <span v-if="workspace.id === appStore.activeWorkspaceId" class="rounded-full bg-[var(--color-success-bg)] px-1.5 py-0.5 text-[9px] text-[var(--color-success)]">Active</span>
+                <span v-if="workspace.id === workspaceStore.activeWorkspaceId" class="rounded-full bg-[var(--color-success-bg)] px-1.5 py-0.5 text-[9px] text-[var(--color-success)]">Active</span>
                 <button
                   type="button"
                   class="rounded p-1 text-[var(--color-text-muted)] opacity-40 transition-all hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger)] focus-visible:opacity-100 group-hover:opacity-100"
@@ -394,10 +394,17 @@ const handledConnectionFlowRequestIds = new WeakMap()
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { workspaceService } from '../../../services/workspaceService'
+import { workspaceApi } from '../../../api/workspaces'
 import { connectionService } from '../../../services/connectionService'
 import { runtimeProvisionService } from '../../../services/runtimeProvisionService'
-import { useAppStore } from '../../../stores/appStore'
+import { useUiStore } from '../../../stores/uiStore'
+import { usePreferencesStore } from '../../../stores/preferencesStore'
+import { useArtifactStore } from '../../../stores/artifactStore'
+import { useExecutionStore } from '../../../stores/executionStore'
+import { useWorkspaceStore } from '../../../stores/workspaceStore'
+import { useConversationStore } from '../../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../../composables/useArtifactPresentation'
 import { toast } from '../../../composables/useToast'
 import WorkspaceAIConfigSection from './WorkspaceAIConfigSection.vue'
 import { extractApiErrorMessage } from '../../../utils/apiError'
@@ -423,8 +430,15 @@ const props = defineProps({
 
 const emit = defineEmits(['select-workspace', 'activate-workspace', 'workspace-created'])
 
-const appStore = useAppStore()
-const isNativeWorkspaceMetadata = workspaceService.isNative()
+const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
+const isNativeWorkspaceMetadata = workspaceApi.isAvailable()
 const workspaceSections = [
   { id: 'general', label: 'General' },
   { id: 'connections', label: 'Data sources' },
@@ -543,11 +557,11 @@ const workspaceCards = computed(() => {
 })
 
 const activeWorkspace = computed(() => workspaceCards.value.find((workspace) => workspace.id === String(props.activeWorkspaceId || '').trim()) || null)
-const isWorkspaceActive = computed(() => !!activeWorkspace.value && activeWorkspace.value.id === String(appStore.activeWorkspaceId || '').trim())
+const isWorkspaceActive = computed(() => !!activeWorkspace.value && activeWorkspace.value.id === String(workspaceStore.activeWorkspaceId || '').trim())
 const selectedWorkspaceContext = computed(() => String(workspaceDetail.value?.schema_context ?? activeWorkspace.value?.schema_context ?? '').trim())
 const normalizedSetupWorkspaceContext = computed(() => String(setupWorkspaceContext.value || '').trim())
 const isWorkspaceContextDirty = computed(() => normalizedSetupWorkspaceContext.value !== String(savedWorkspaceContext.value || '').trim())
-const workspaceRuntimeStatus = computed(() => appStore.getWorkspaceRuntimeStatus(props.activeWorkspaceId))
+const workspaceRuntimeStatus = computed(() => executionStore.getWorkspaceRuntimeStatus(props.activeWorkspaceId))
 const workspaceRuntimeReady = computed(() => ['ready', 'busy'].includes(workspaceRuntimeStatus.value))
 const runtimeStatusTone = computed(() => {
   if (workspaceRuntimeStatus.value === 'error') return 'danger'
@@ -606,7 +620,7 @@ watch(
 
 watch(
   [
-    () => Number(appStore.connectionFlowRequestId || 0),
+    () => Number(uiStore.connectionFlowRequestId || 0),
     () => isWorkspaceActive.value,
     () => Boolean(nativeRuntimeStatus.value?.ready),
     () => runtimeProvisioning.value,
@@ -750,25 +764,25 @@ async function loadNativeConnections() {
 async function refreshNativeConnectionState(workspaceId) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   const refreshes = [loadNativeConnections()]
-  if (normalizedWorkspaceId && normalizedWorkspaceId === String(appStore.activeWorkspaceId || '').trim()) {
+  if (normalizedWorkspaceId && normalizedWorkspaceId === String(workspaceStore.activeWorkspaceId || '').trim()) {
     refreshes.push(
-      appStore.fetchActiveWorkspaceSummary(normalizedWorkspaceId),
-      appStore.fetchColumnCatalog({ force: true }),
+      workspaceStore.fetchActiveWorkspaceSummary(normalizedWorkspaceId),
+      workspaceStore.fetchColumnCatalog({ force: true }),
     )
   }
   await Promise.all(refreshes)
 }
 
 async function handlePendingConnectionFlowRequest() {
-  const requestId = Math.max(0, Math.floor(Number(appStore.connectionFlowRequestId || 0)))
-  const lastHandledRequestId = Number(handledConnectionFlowRequestIds.get(appStore) || 0)
+  const requestId = Math.max(0, Math.floor(Number(uiStore.connectionFlowRequestId || 0)))
+  const lastHandledRequestId = Number(handledConnectionFlowRequestIds.get(workspaceStore) || 0)
   if (!requestId || requestId <= lastHandledRequestId) return
   if (!isWorkspaceTabMounted.value || !isNativeWorkspaceMetadata || !isWorkspaceActive.value) return
 
   activeWorkspaceSection.value = 'connections'
   if (!nativeRuntimeStatus.value?.ready || runtimeProvisioning.value || connectionActionLoading.value) return
 
-  handledConnectionFlowRequestIds.set(appStore, requestId)
+  handledConnectionFlowRequestIds.set(workspaceStore, requestId)
   await chooseConnectionFile()
 }
 
@@ -927,7 +941,7 @@ async function hydrateWorkspaceCards() {
   await Promise.all(
     ids.map(async (workspaceId) => {
       try {
-        const summary = await workspaceService.summary(workspaceId)
+        const summary = await workspaceApi.summary(workspaceId)
         summaries[workspaceId] = summary
       } catch {
         summaries[workspaceId] = {}
@@ -988,7 +1002,7 @@ async function loadWorkspaceDetail() {
     return
   }
   try {
-    workspaceDetail.value = await workspaceService.summary(workspaceId)
+    workspaceDetail.value = await workspaceApi.summary(workspaceId)
   } catch {
     workspaceDetail.value = null
   } finally {
@@ -1051,8 +1065,8 @@ async function ensureWorkspaceIdentityPersisted({
 
   isSavingWorkspaceIdentity.value = true
   try {
-    await appStore.renameWorkspace(workspaceId, normalizedName, context)
-    await appStore.fetchWorkspaces()
+    await workspaceStore.renameWorkspace(workspaceId, normalizedName, context)
+    await workspaceStore.fetchWorkspaces()
     await loadWorkspaceDetail()
     if (!silent) {
       toast.success('Workspace saved', successMessage)
@@ -1101,8 +1115,8 @@ async function saveRename() {
     return
   }
   try {
-    await appStore.renameWorkspace(workspaceId, name, resolveWorkspaceContext())
-    await appStore.fetchWorkspaces()
+    await workspaceStore.renameWorkspace(workspaceId, name, resolveWorkspaceContext())
+    await workspaceStore.fetchWorkspaces()
     isRenamingInline.value = false
     renameValue.value = ''
     toast.success('Workspace renamed', 'Workspace name updated.')
@@ -1130,10 +1144,10 @@ async function deleteWorkspace() {
   const workspaceId = String(pendingWorkspaceDeletionId.value || props.activeWorkspaceId || '').trim()
   if (!workspaceId) return
   try {
-    await appStore.deleteWorkspaceAsync(workspaceId)
+    await workspaceActivation.deleteWorkspace(workspaceId)
     closeWorkspaceDeleteDialog()
-    await appStore.fetchWorkspaces()
-    const fallbackId = String(appStore.activeWorkspaceId || workspaceCards.value[0]?.id || '').trim()
+    await workspaceStore.fetchWorkspaces()
+    const fallbackId = String(workspaceStore.activeWorkspaceId || workspaceCards.value[0]?.id || '').trim()
     if (fallbackId) {
       emit('select-workspace', fallbackId)
     }
@@ -1152,12 +1166,12 @@ async function createWorkspace() {
   isCreatingWorkspace.value = true
   try {
     const context = ''
-    const workspace = await appStore.createWorkspace(name, context)
-    const workspaceId = String(workspace?.id || appStore.activeWorkspaceId || '').trim()
+    const workspace = await workspaceActivation.createWorkspace(name, context)
+    const workspaceId = String(workspace?.id || workspaceStore.activeWorkspaceId || '').trim()
     if (!workspaceId) {
       throw new Error('Backend did not return a workspace id.')
     }
-    await appStore.fetchWorkspaces()
+    await workspaceStore.fetchWorkspaces()
     emit('workspace-created', {
       workspaceId,
       name,

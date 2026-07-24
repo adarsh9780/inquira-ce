@@ -91,7 +91,7 @@
                 type="button"
                 class="command-palette-row command-palette-conversation-row"
                 :class="[
-                  row.id === appStore.activeConversationId ? 'command-palette-row-active' : '',
+                  row.id === conversationStore.activeConversationId ? 'command-palette-row-active' : '',
                   row.paletteIndex === activeIndex ? 'command-palette-row-highlighted' : '',
                 ]"
                 :disabled="Boolean(selectingConversationId)"
@@ -101,7 +101,7 @@
                 <span class="min-w-0 flex-1">
                   <span class="flex min-w-0 items-center gap-2">
                     <span class="truncate text-[13px] font-semibold text-[var(--color-text-main)]">{{ row.title }}</span>
-                    <span v-if="row.id === appStore.activeConversationId" class="command-palette-pill command-palette-pill-active">Active</span>
+                    <span v-if="row.id === conversationStore.activeConversationId" class="command-palette-pill command-palette-pill-active">Active</span>
                     <span class="command-palette-pill" :class="row.isRunning ? 'command-palette-pill-running' : ''">
                       {{ row.statusLabel }}
                     </span>
@@ -111,7 +111,7 @@
                     <span v-if="row.lastActiveLabel" :title="row.lastActiveTitle">{{ row.lastActiveLabel }}</span>
                   </span>
                 </span>
-                <CheckIcon v-if="row.id === appStore.activeConversationId" class="h-4 w-4 shrink-0 text-[var(--color-accent)]" />
+                <CheckIcon v-if="row.id === conversationStore.activeConversationId" class="h-4 w-4 shrink-0 text-[var(--color-accent)]" />
               </button>
             </section>
           </div>
@@ -142,8 +142,14 @@ import {
   ShareIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
-import { useAppStore } from '../../stores/appStore'
 import { useUiStore } from '../../stores/uiStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
+import { useArtifactStore } from '../../stores/artifactStore'
+import { useExecutionStore } from '../../stores/executionStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useConversationStore } from '../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import { conversationApi } from '../../api/conversations'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
@@ -157,8 +163,14 @@ const props = defineProps({
 })
 const emit = defineEmits(['close'])
 
-const appStore = useAppStore()
 const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
 const query = ref('')
 const loading = ref(false)
 const loadError = ref('')
@@ -173,7 +185,7 @@ const normalizedQuery = computed(() => String(query.value || '').trim().toLowerC
 const platform = typeof navigator !== 'undefined' ? navigator.platform : ''
 
 const workspaceItems = computed(() => (
-  Array.isArray(appStore.workspaces) ? appStore.workspaces : []
+  Array.isArray(workspaceStore.workspaces) ? workspaceStore.workspaces : []
 ))
 
 function shortcutText(shortcutId) {
@@ -270,18 +282,18 @@ const commandActions = computed(() => [
     icon: FolderOpenIcon,
     run: () => {
       emit('close')
-      appStore.openDataConnectionFlow()
+      workspaceActivation.openDataConnectionFlow()
     },
   },
   {
     type: 'action',
     id: 'new-conversation',
     title: 'New Conversation',
-    subtitle: appStore.hasWorkspace ? 'Start a fresh conversation in the active workspace.' : 'Select or create a workspace first.',
+    subtitle: workspaceStore.hasWorkspace ? 'Start a fresh conversation in the active workspace.' : 'Select or create a workspace first.',
     keywords: 'new conversation chat thread',
-    statusLabel: appStore.hasWorkspace ? '' : 'Workspace required',
+    statusLabel: workspaceStore.hasWorkspace ? '' : 'Workspace required',
     icon: PencilSquareIcon,
-    disabled: !appStore.hasWorkspace,
+    disabled: !workspaceStore.hasWorkspace,
     run: createConversationFromPalette,
   },
 ])
@@ -309,7 +321,7 @@ const allConversationRows = computed(() => {
     if (!workspaceId) continue
     const conversations = Array.isArray(conversationsByWorkspace.value?.[workspaceId])
       ? conversationsByWorkspace.value[workspaceId]
-      : (workspaceId === String(appStore.activeWorkspaceId || '').trim() && Array.isArray(appStore.conversations) ? appStore.conversations : [])
+      : (workspaceId === String(workspaceStore.activeWorkspaceId || '').trim() && Array.isArray(conversationStore.conversations) ? conversationStore.conversations : [])
     const workspaceName = String(workspace?.name || 'Untitled workspace').trim() || 'Untitled workspace'
 
     for (const conversation of conversations) {
@@ -317,8 +329,8 @@ const allConversationRows = computed(() => {
       if (!id) continue
       const createdAt = conversation?.created_at
       const lastActiveAt = conversationTimestampValue(conversation)
-      const run = appStore.getConversationRun(id)
-      const isRunning = appStore.isConversationRunning(id)
+      const run = executionStore.getConversationRun(id)
+      const isRunning = executionStore.isConversationRunning(id)
       rows.push({
         type: 'conversation',
         id,
@@ -436,7 +448,7 @@ async function loadConversations() {
   loadError.value = ''
   try {
     if (workspaceItems.value.length === 0) {
-      await appStore.fetchWorkspaces()
+      await workspaceStore.fetchWorkspaces()
     }
     const workspaces = workspaceItems.value
     const entries = {}
@@ -449,8 +461,8 @@ async function loadConversations() {
         entries[workspaceId] = Array.isArray(response?.conversations) ? response.conversations : []
       } catch (_error) {
         failedCount += 1
-        entries[workspaceId] = workspaceId === String(appStore.activeWorkspaceId || '').trim() && Array.isArray(appStore.conversations)
-          ? appStore.conversations
+        entries[workspaceId] = workspaceId === String(workspaceStore.activeWorkspaceId || '').trim() && Array.isArray(conversationStore.conversations)
+          ? conversationStore.conversations
           : []
       }
     }))
@@ -470,16 +482,16 @@ async function selectConversation(row) {
   if (!row?.id || selectingConversationId.value) return
   selectingConversationId.value = row.id
   try {
-    if (row.workspaceId !== String(appStore.activeWorkspaceId || '').trim()) {
-      await appStore.activateWorkspace(row.workspaceId)
-      await appStore.fetchConversations()
-    } else if (!Array.isArray(appStore.conversations) || appStore.conversations.length === 0) {
-      await appStore.fetchConversations()
+    if (row.workspaceId !== String(workspaceStore.activeWorkspaceId || '').trim()) {
+      await workspaceActivation.activateWorkspace(row.workspaceId)
+      await conversationStore.fetchConversations()
+    } else if (!Array.isArray(conversationStore.conversations) || conversationStore.conversations.length === 0) {
+      await conversationStore.fetchConversations()
     }
-    appStore.setActiveConversationId(row.id)
+    conversationStore.setActiveConversationId(row.id)
     uiStore.setWorkspacePane('chat')
     uiStore.setActiveTab('workspace')
-    await appStore.fetchConversationTurns({ preferLatest: true })
+    await conversationStore.fetchConversationTurns({ preferLatest: true })
     emit('close')
   } catch (error) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to load conversation'))
@@ -489,14 +501,14 @@ async function selectConversation(row) {
 }
 
 async function createConversationFromPalette() {
-  if (!appStore.hasWorkspace) return
-  const conversation = await appStore.createConversation()
+  if (!workspaceStore.hasWorkspace) return
+  const conversation = await conversationStore.createConversation(workspaceStore.activeWorkspaceId)
   if (conversation?.id) {
-    appStore.setActiveConversationId(conversation.id)
+    conversationStore.setActiveConversationId(conversation.id)
   }
   uiStore.setWorkspacePane('chat')
   uiStore.setActiveTab('workspace')
-  await appStore.fetchConversationTurns()
+  await conversationStore.fetchConversationTurns()
   emit('close')
 }
 

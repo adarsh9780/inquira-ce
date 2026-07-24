@@ -26,7 +26,7 @@ test('runs render one selected notebook block with compact history navigation', 
   assert.equal(source.includes('Open in Tables'), true)
   assert.equal(source.includes('Open in Charts'), true)
   assert.equal(source.includes('aria-label="Delete run"'), true)
-  assert.equal(source.includes('appStore.removeTerminalEntry(execution.entryId)'), true)
+  assert.equal(source.includes('executionStore.removeTerminalEntry(execution.entryId)'), true)
   assert.equal(source.includes('Open full output'), true)
   assert.equal(source.includes('focusedRunId'), true)
   assert.equal(source.includes('text-[11px] font-mono leading-4'), true)

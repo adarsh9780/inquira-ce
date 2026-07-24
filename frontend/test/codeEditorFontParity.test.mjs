@@ -12,7 +12,7 @@ test('code editor uses the selected offline-safe mono token and semantic editor 
   assert.equal(codeTabSource.includes("getPropertyValue('--font-mono')"), true)
   assert.equal(codeTabSource.includes('const visualThemeCompartment = new Compartment()'), true)
   assert.equal(codeTabSource.includes('effects: visualThemeCompartment.reconfigure(buildEditorThemeExtension())'), true)
-  assert.equal(codeTabSource.includes('watch(() => appStore.uiCodeFont, () => {'), true)
+  assert.equal(codeTabSource.includes('watch(() => preferencesStore.uiCodeFont, () => {'), true)
   assert.equal(codeTabSource.includes("'.cm-scroller': { fontFamily: editorMonoFont, backgroundColor: 'var(--color-base)' }"), true)
   assert.equal(codeTabSource.includes("backgroundColor: 'var(--color-surface)'"), true)
   assert.equal(codeTabSource.includes("borderRight: '1px solid var(--color-border)'"), true)

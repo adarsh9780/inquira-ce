@@ -3,13 +3,13 @@
     <div class="flex-1 min-w-0 flex flex-col">
       <div class="chat-scroll-shell flex-1 min-h-0 overflow-y-auto" style="background-color: var(--color-base);" data-chat-scroll-container>
         <WorkspaceReadinessJourney
-          v-if="!appStore.workspaceReadiness.ready"
-          :state="appStore.workspaceReadiness.state"
+          v-if="!workspaceActivation.workspaceReadiness.ready"
+          :state="workspaceActivation.workspaceReadiness.state"
           @primary-action="handleReadinessAction"
         />
 
         <section
-          v-else-if="appStore.chatHistory.length === 0"
+          v-else-if="conversationStore.chatHistory.length === 0"
           class="mx-auto flex h-full w-full max-w-2xl flex-col justify-center px-5 py-10"
           aria-labelledby="chat-starter-title"
         >
@@ -52,12 +52,26 @@
 
 <script setup>
 import { onMounted, watch } from 'vue'
-import { useAppStore } from '../../stores/appStore'
+import { useUiStore } from '../../stores/uiStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
+import { useArtifactStore } from '../../stores/artifactStore'
+import { useExecutionStore } from '../../stores/executionStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useConversationStore } from '../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import ChatHistory from './ChatHistory.vue'
 import WorkspaceReadinessJourney from './WorkspaceReadinessJourney.vue'
 import { ArrowRightIcon } from '@heroicons/vue/24/outline'
 
-const appStore = useAppStore()
+const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
 
 const starterActions = [
   {
@@ -83,38 +97,38 @@ const starterActions = [
 ]
 
 function selectStarter(prompt) {
-  appStore.currentQuestion = String(prompt || '')
+  conversationStore.currentQuestion = String(prompt || '')
 }
 
 function handleReadinessAction() {
-  const state = appStore.workspaceReadiness.state
+  const state = workspaceActivation.workspaceReadiness.state
   if (state === 'no_workspace') {
-    appStore.openSettings('workspace-general')
+    uiStore.openSettings('workspace-general')
     return
   }
   if (state === 'no_data') {
-    appStore.openDataConnectionFlow()
+    workspaceActivation.openDataConnectionFlow()
     return
   }
   if (state === 'model_connection_required') {
-    appStore.openSettings('connections')
+    uiStore.openSettings('connections')
     return
   }
   if (state === 'workspace_configuration_required') {
-    appStore.openSettings('workspace-ai')
+    uiStore.openSettings('workspace-ai')
   }
 }
 
 onMounted(async () => {
   try {
-    await appStore.fetchWorkspaces()
-    if (!appStore.activeWorkspaceId) return
-    await appStore.fetchConversations()
-    if (!appStore.activeConversationId && appStore.conversations.length > 0) {
-      appStore.setActiveConversationId(appStore.conversations[0].id)
+    await workspaceStore.fetchWorkspaces()
+    if (!workspaceStore.activeWorkspaceId) return
+    await conversationStore.fetchConversations()
+    if (!conversationStore.activeConversationId && conversationStore.conversations.length > 0) {
+      conversationStore.setActiveConversationId(conversationStore.conversations[0].id)
     }
-    if (appStore.activeConversationId) {
-      await appStore.fetchConversationTurns()
+    if (conversationStore.activeConversationId) {
+      await conversationStore.fetchConversationTurns()
     }
   } catch (error) {
     console.error('Failed to initialize workspace conversations:', error)
@@ -122,12 +136,12 @@ onMounted(async () => {
 })
 
 watch(
-  () => appStore.activeWorkspaceId,
+  () => workspaceStore.activeWorkspaceId,
   async (workspaceId) => {
     if (!workspaceId) return
-    await appStore.fetchConversations()
-    if (appStore.activeConversationId) {
-      await appStore.fetchConversationTurns()
+    await conversationStore.fetchConversations()
+    if (conversationStore.activeConversationId) {
+      await conversationStore.fetchConversationTurns()
     }
   }
 )

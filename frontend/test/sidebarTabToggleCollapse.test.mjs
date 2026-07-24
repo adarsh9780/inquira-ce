@@ -45,5 +45,5 @@ test('sidebar uses settings and profile actions in the footer', () => {
   assert.equal(sidebarSource.includes('Account Settings'), true)
   assert.equal(sidebarSource.includes('Theme Preference'), true)
   assert.equal(sidebarSource.includes('@click="promptLogout'), false)
-  assert.equal(sidebarSource.includes("{{ appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar' }}"), false)
+  assert.equal(sidebarSource.includes("{{ uiStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar' }}"), false)
 })

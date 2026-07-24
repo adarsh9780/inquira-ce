@@ -12,6 +12,6 @@ test('table tab auto-selects from the refreshed active turn artifact list', () =
   assert.equal(source.includes('const preferredSelection = resolvePreferredTableSelectionId(availableArtifactIds)'), true)
   assert.equal(source.includes('selectedArtifactId.value = preferredSelection'), true)
   assert.equal(source.includes('return displayArtifacts.value[0]?.artifact_id || null'), true)
-  assert.equal(source.includes("const latestArtifactId = String(appStore.dataframes?.[0]?.data?.artifact_id || '').trim()"), false)
+  assert.equal(source.includes("const latestArtifactId = String(artifactStore.dataframes?.[0]?.data?.artifact_id || '').trim()"), false)
   assert.equal(source.includes('pendingAutoSelectArtifactId'), false)
 })

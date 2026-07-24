@@ -29,6 +29,6 @@ test('sidebar branding keeps a stable fixed top row while the shell owns width a
   assert.equal(appSource.includes('.app-nav-pane-collapsed {'), true)
   assert.equal(sidebarSource.includes('class="sidebar-brand-row justify-between px-3"'), true)
   assert.equal(sidebarSource.includes('class="sidebar-brand-button justify-start"'), true)
-  assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'justify-center' : 'justify-start'"), false)
+  assert.equal(sidebarSource.includes("uiStore.isSidebarCollapsed ? 'justify-center' : 'justify-start'"), false)
   assert.equal(sidebarSource.includes('alt="Inquira"'), true)
 })

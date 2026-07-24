@@ -1,18 +1,11 @@
 import { mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-
-const store = {
-  activeWorkspaceId: 'workspace-1',
-  workspaceTurnTree: { conversations: [] },
-  activeTurnId: '',
-  activeTurnRelations: null,
-  loadWorkspaceTurnTree: vi.fn(),
-}
-
-vi.mock('../src/stores/appStore', () => ({ useAppStore: () => store }))
 vi.mock('../src/composables/useToast', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 
 import SidebarGlobalTurnTree from '../src/components/layout/sidebar/SidebarGlobalTurnTree.vue'
+import { useConversationStore } from '../src/stores/conversationStore'
+import { useWorkspaceStore } from '../src/stores/workspaceStore'
 
 describe('SidebarGlobalTurnTree graph view', () => {
   beforeEach(() => {
@@ -22,7 +15,6 @@ describe('SidebarGlobalTurnTree graph view', () => {
       setItem: (key, value) => values.set(key, String(value)),
       clear: () => values.clear(),
     })
-    store.loadWorkspaceTurnTree.mockClear()
   })
 
   it('renders only the graph and opens the conversation tree rules', async () => {
@@ -32,8 +24,16 @@ describe('SidebarGlobalTurnTree graph view', () => {
       setItem,
       clear: vi.fn(),
     })
+    const pinia = createPinia()
+    const workspaceStore = useWorkspaceStore(pinia)
+    const conversationStore = useConversationStore(pinia)
+    workspaceStore.activeWorkspaceId = 'workspace-1'
+    conversationStore.workspaceTurnTree = { conversations: [] }
+    conversationStore.loadWorkspaceTurnTree = vi.fn()
+
     const wrapper = mount(SidebarGlobalTurnTree, {
       global: {
+        plugins: [pinia],
         stubs: {
           TurnTreeGraphView: { template: '<div data-view="graph"></div>' },
           ConversationTreeRulesModal: {

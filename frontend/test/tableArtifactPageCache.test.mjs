@@ -8,10 +8,10 @@ test('TableTab remembers and restores pagination page per artifact selection usi
   const source = readFileSync(path, 'utf-8')
 
   assert.equal(source.includes('const pendingRestorePageByArtifact = new Map()'), true)
-  assert.equal(source.includes('appStore.getTablePageOffset(appStore.activeWorkspaceId, newId)'), true)
-  assert.equal(source.includes('appStore.setTablePageOffset(appStore.activeWorkspaceId, artifactId, normalizedQuery.pageIndex)'), true)
+  assert.equal(source.includes('artifactStore.getTablePageOffset(workspaceStore.activeWorkspaceId, newId)'), true)
+  assert.equal(source.includes('artifactStore.setTablePageOffset(workspaceStore.activeWorkspaceId, artifactId, normalizedQuery.pageIndex)'), true)
   assert.equal(source.includes('function restoredArtifactPage(artifactId) {'), true)
-  assert.equal(source.includes('?? appStore.getTablePageOffset(appStore.activeWorkspaceId, artifactId)'), true)
+  assert.equal(source.includes('?? artifactStore.getTablePageOffset(workspaceStore.activeWorkspaceId, artifactId)'), true)
   assert.equal(source.includes('const pageIndex = restoredArtifactPage(artifactId)'), true)
   assert.equal(source.includes('tableQuery.value = createTableQuery({ pageIndex, pageSize })'), true)
   assert.equal(source.includes('await loadServerPage(artifactId, tableQuery.value)'), true)

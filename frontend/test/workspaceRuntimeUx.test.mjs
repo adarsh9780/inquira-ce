@@ -11,7 +11,7 @@ test('sidebar renders grouped workspaces with lazy conversation caches', () => {
   assert.equal(source.includes('loadSidebarConversations'), true)
   assert.equal(source.includes('selectConversation(workspace.id, conv.id)'), true)
   assert.equal(source.includes('normalizedSidebarSearchQuery'), false)
-  assert.equal(source.includes('appStore.conversations.length'), false)
+  assert.equal(source.includes('conversationStore.conversations.length'), false)
 })
 
 test('workspace context stays in the context bar without resource-limit warnings', () => {

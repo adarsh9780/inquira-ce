@@ -91,9 +91,14 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
-import { useAppStore } from '../../stores/appStore'
-import { usePreferencesStore } from '../../stores/preferencesStore'
 import { useUiStore } from '../../stores/uiStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
+import { useArtifactStore } from '../../stores/artifactStore'
+import { useExecutionStore } from '../../stores/executionStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useConversationStore } from '../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import Plotly from 'plotly.js-dist-min'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
@@ -109,9 +114,14 @@ import {
   ChartBarIcon,
 } from '@heroicons/vue/24/outline'
 
-const appStore = useAppStore()
-const preferencesStore = usePreferencesStore()
 const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
 
 const plotContainer = ref(null)
 let ro = null
@@ -147,12 +157,12 @@ const liveFigureArtifacts = computed(() => {
       .map((fig) => String(fig?.artifact_id || '').trim())
       .filter(Boolean),
   )
-  const conversationId = String(appStore.activeConversationId || '').trim()
-  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  const conversationId = String(conversationStore.activeConversationId || '').trim()
+  const workspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
   const scopeKey = conversationId ? `conversation:${conversationId}` : `workspace:${workspaceId || 'unscoped'}`
-  const userRevisions = (Array.isArray(appStore.promotedUserFigures) ? appStore.promotedUserFigures : [])
+  const userRevisions = (Array.isArray(artifactStore.promotedUserFigures) ? artifactStore.promotedUserFigures : [])
     .filter((item) => String(item?.scopeKey || '') === scopeKey)
-  return [...userRevisions, ...(Array.isArray(appStore.figures) ? appStore.figures : [])]
+  return [...userRevisions, ...(Array.isArray(artifactStore.figures) ? artifactStore.figures : [])]
     .map((fig, index) => {
       const figurePayload = normalizePlotlyFigure(fig?.data ?? fig)
       if (!figurePayload) return null
@@ -234,7 +244,7 @@ onMounted(async () => {
     await renderPlot()
   }
 
-  if (appStore.activeConversationId && appStore.activeTurnId && appStore.hasWorkspace) {
+  if (conversationStore.activeConversationId && conversationStore.activeTurnId && workspaceStore.hasWorkspace) {
     await loadActiveTurnFigureArtifacts()
   }
 })
@@ -259,7 +269,7 @@ watch(() => selectedFigure.value, (newFigure) => {
   }
 })
 
-watch(() => appStore.activeWorkspaceId, () => {
+watch(() => workspaceStore.activeWorkspaceId, () => {
   selectedArtifactId.value = null
   selectedFigurePayload.value = null
   workspaceFigureArtifacts.value = []
@@ -268,12 +278,12 @@ watch(() => appStore.activeWorkspaceId, () => {
 
 watch(
   () => [
-    String(appStore.activeConversationId || '').trim(),
-    String(appStore.activeTurnId || '').trim(),
-    String(appStore.activeTurnArtifactRefreshKey || 0),
+    String(conversationStore.activeConversationId || '').trim(),
+    String(conversationStore.activeTurnId || '').trim(),
+    String(artifactStore.activeTurnArtifactRefreshKey || 0),
   ].join('||'),
   async () => {
-    if (!appStore.hasWorkspace) return
+    if (!workspaceStore.hasWorkspace) return
 
     const previousSelection = String(selectedArtifactId.value || '').trim()
     await loadActiveTurnFigureArtifacts()
@@ -285,9 +295,9 @@ watch(
 )
 
 watch(orderedFigures, (figures) => {
-  appStore.setFigureCount(Array.isArray(figures) ? figures.length : 0)
-  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
-  const preferredArtifactId = workspaceId ? appStore.getSelectedFigureArtifact(workspaceId) : ''
+  artifactStore.setFigureCount(Array.isArray(figures) ? figures.length : 0)
+  const workspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
+  const preferredArtifactId = workspaceId ? artifactStore.getSelectedFigureArtifact(workspaceId) : ''
   if (
     preferredArtifactId
     && preferredArtifactId !== selectedArtifactId.value
@@ -306,7 +316,7 @@ watch(orderedFigures, (figures) => {
 }, { immediate: true })
 
 watch(
-  () => appStore.getSelectedFigureArtifact(appStore.activeWorkspaceId),
+  () => artifactStore.getSelectedFigureArtifact(workspaceStore.activeWorkspaceId),
   (preferredArtifactId) => {
     const normalizedArtifactId = String(preferredArtifactId || '').trim()
     if (
@@ -320,16 +330,16 @@ watch(
 )
 
 watch(selectedArtifactId, (artifactId) => {
-  const normalizedWorkspaceId = String(appStore.activeWorkspaceId || '').trim()
+  const normalizedWorkspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
   if (normalizedWorkspaceId) {
-    appStore.setSelectedFigureArtifact(normalizedWorkspaceId, String(artifactId || '').trim())
+    artifactStore.setSelectedFigureArtifact(normalizedWorkspaceId, String(artifactId || '').trim())
   }
   void loadSelectedFigurePayload(artifactId)
 })
 
 // Re-render when the Figure pane becomes visible after being hidden by v-show
 watch(() => uiStore.dataPane, (pane) => {
-  if (pane === 'figure' && appStore.activeConversationId && appStore.activeTurnId && appStore.hasWorkspace) {
+  if (pane === 'figure' && conversationStore.activeConversationId && conversationStore.activeTurnId && workspaceStore.hasWorkspace) {
     void loadActiveTurnFigureArtifacts()
   }
   if (pane === 'figure' && selectedFigure.value) {
@@ -349,13 +359,13 @@ watch(
 )
 
 async function loadActiveTurnFigureArtifacts() {
-  const conversationId = String(appStore.activeConversationId || '').trim()
-  const turnId = String(appStore.activeTurnId || '').trim()
-  if (!conversationId || !turnId || !appStore.hasWorkspace) {
+  const conversationId = String(conversationStore.activeConversationId || '').trim()
+  const turnId = String(conversationStore.activeTurnId || '').trim()
+  if (!conversationId || !turnId || !workspaceStore.hasWorkspace) {
     workspaceFigureArtifacts.value = []
     selectedArtifactId.value = liveFigureArtifacts.value[0]?.artifact_id || null
     selectedFigurePayload.value = liveFigureArtifacts.value[0]?.data || null
-    appStore.setFigureCount(liveFigureArtifacts.value.length)
+    artifactStore.setFigureCount(liveFigureArtifacts.value.length)
     return
   }
   listAbortController?.abort()
@@ -371,13 +381,13 @@ async function loadActiveTurnFigureArtifacts() {
     )
     const artifacts = Array.isArray(response?.artifacts) ? response.artifacts : []
     workspaceFigureArtifacts.value = artifacts
-    appStore.setFigureCount(orderedFigures.value.length)
+    artifactStore.setFigureCount(orderedFigures.value.length)
 
     const candidates = orderedFigures.value
     if (!candidates.length) {
       selectedArtifactId.value = null
       selectedFigurePayload.value = null
-      appStore.setPlotlyFigure(null)
+      artifactStore.setPlotlyFigure(null)
       return
     }
 
@@ -397,20 +407,20 @@ async function loadActiveTurnFigureArtifacts() {
     workspaceFigureArtifacts.value = []
     selectedArtifactId.value = null
     selectedFigurePayload.value = null
-    appStore.setPlotlyFigure(null)
-    appStore.setFigureCount(0)
+    artifactStore.setPlotlyFigure(null)
+    artifactStore.setFigureCount(0)
   } finally {
     isLoadingArtifacts.value = false
   }
 }
 
 async function loadSelectedFigurePayload(artifactId) {
-  const conversationId = String(appStore.activeConversationId || '').trim()
-  const turnId = String(appStore.activeTurnId || '').trim()
+  const conversationId = String(conversationStore.activeConversationId || '').trim()
+  const turnId = String(conversationStore.activeTurnId || '').trim()
   const normalizedArtifactId = String(artifactId || '').trim()
-  if (!normalizedArtifactId || !appStore.hasWorkspace) {
+  if (!normalizedArtifactId || !workspaceStore.hasWorkspace) {
     selectedFigurePayload.value = null
-    appStore.setPlotlyFigure(null)
+    artifactStore.setPlotlyFigure(null)
     return
   }
   const liveFigure = liveFigureArtifacts.value.find(
@@ -418,12 +428,12 @@ async function loadSelectedFigurePayload(artifactId) {
   )
   if (liveFigure) {
     selectedFigurePayload.value = liveFigure.data
-    appStore.setPlotlyFigure(liveFigure.data)
+    artifactStore.setPlotlyFigure(liveFigure.data)
     return
   }
   if (!conversationId || !turnId) {
     selectedFigurePayload.value = null
-    appStore.setPlotlyFigure(null)
+    artifactStore.setPlotlyFigure(null)
     return
   }
   figureAbortController?.abort()
@@ -442,12 +452,12 @@ async function loadSelectedFigurePayload(artifactId) {
     }
     if (selectedArtifactId.value !== normalizedArtifactId) return
     selectedFigurePayload.value = figurePayload
-    appStore.setPlotlyFigure(figurePayload)
+    artifactStore.setPlotlyFigure(figurePayload)
   } catch (error) {
     if (error?.name === 'AbortError') return
     console.warn('Failed to load selected figure payload:', error)
     selectedFigurePayload.value = null
-    appStore.setPlotlyFigure(null)
+    artifactStore.setPlotlyFigure(null)
     artifactListError.value = error?.message || 'Failed to load selected chart.'
   } finally {
     isLoadingFigure.value = false
@@ -639,8 +649,8 @@ function closeDeleteDialog() {
 }
 
 async function deleteSelectedFigure() {
-  const conversationId = String(appStore.activeConversationId || '').trim()
-  const turnId = String(appStore.activeTurnId || '').trim()
+  const conversationId = String(conversationStore.activeConversationId || '').trim()
+  const turnId = String(conversationStore.activeTurnId || '').trim()
   const artifactId = String(selectedArtifactId.value || '').trim()
   if (!conversationId || !turnId || !artifactId || isDeletingArtifact.value) return
 
@@ -649,13 +659,13 @@ async function deleteSelectedFigure() {
   artifactListError.value = ''
   try {
     await artifactApi.remove(conversationId, turnId, artifactId)
-    appStore.removeResultArtifact(artifactId)
+    artifactStore.removeResultArtifact(artifactId)
     await loadActiveTurnFigureArtifacts()
     const remainingArtifactId = workspaceFigureArtifacts.value[0]?.artifact_id || null
     selectedArtifactId.value = remainingArtifactId
     if (!remainingArtifactId) {
       selectedFigurePayload.value = null
-      appStore.setPlotlyFigure(null)
+      artifactStore.setPlotlyFigure(null)
     }
   } catch (error) {
     if (error?.name === 'AbortError') return

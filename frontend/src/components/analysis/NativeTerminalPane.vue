@@ -40,15 +40,25 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { ArrowPathIcon, TrashIcon } from '@heroicons/vue/24/outline'
-import { useAppStore } from '../../stores/appStore'
 import { useUiStore } from '../../stores/uiStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
+import { useArtifactStore } from '../../stores/artifactStore'
+import { useExecutionStore } from '../../stores/executionStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useConversationStore } from '../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import { toast } from '../../composables/useToast'
 import nativeTerminalService from '../../services/nativeTerminalService'
 
-const appStore = useAppStore()
 const uiStore = useUiStore()
 const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
 const terminalHostRef = ref(null)
 const sessionId = ref('')
 const sessionCwd = ref('')
@@ -108,7 +118,7 @@ function normalizeErrorMessage(error, fallback) {
 }
 
 function buildSessionId() {
-  const workspaceId = String(appStore.activeWorkspaceId || 'default')
+  const workspaceId = String(workspaceStore.activeWorkspaceId || 'default')
   return `workspace:${workspaceId}`
 }
 
@@ -134,7 +144,7 @@ function writeBanner() {
 
 async function startSession() {
   if (!terminal) return
-  if (!appStore.activeWorkspaceId) {
+  if (!workspaceStore.activeWorkspaceId) {
     terminal.writeln('\x1b[33mNo active workspace selected.\x1b[0m')
     return
   }
@@ -144,7 +154,7 @@ async function startSession() {
 
   try {
     const response = await nativeTerminalService.startSession({
-      workspaceId: appStore.activeWorkspaceId,
+      workspaceId: workspaceStore.activeWorkspaceId,
       sessionId: sessionId.value,
       cwd: uiStore.terminalCwd || null,
       cols: terminal.cols,
@@ -222,7 +232,7 @@ onMounted(async () => {
 })
 
 watch(
-  () => appStore.activeWorkspaceId,
+  () => workspaceStore.activeWorkspaceId,
   async () => {
     if (!terminal) return
     await startSession()

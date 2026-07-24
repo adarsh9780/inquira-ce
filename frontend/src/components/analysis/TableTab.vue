@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col h-full" style="background-color: var(--color-base);">
-    <Teleport to="#workspace-right-pane-toolbar-center" v-if="isMounted && appStore.dataPane === 'table'">
+    <Teleport to="#workspace-right-pane-toolbar-center" v-if="isMounted && uiStore.dataPane === 'table'">
       <div v-if="tableDropdownOptions.length > 0" class="flex min-w-[11rem] max-w-full items-center" style="width: clamp(11rem, 28vw, 19rem);">
         <HeaderDropdown
           id="dataframe-select"
@@ -13,7 +13,7 @@
       </div>
     </Teleport>
 
-    <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && appStore.dataPane === 'table'">
+    <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && uiStore.dataPane === 'table'">
       <TableToolbar>
         <div v-if="tableStatusMessage" class="flex items-center gap-2 text-[12px] leading-[1.3] mr-1" :class="tableStatusClass">
           <div
@@ -190,7 +190,14 @@
 
 <script setup>
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
-import { useAppStore } from '../../stores/appStore'
+import { useUiStore } from '../../stores/uiStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
+import { useArtifactStore } from '../../stores/artifactStore'
+import { useExecutionStore } from '../../stores/executionStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useConversationStore } from '../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import { artifactApi } from '../../api/artifacts'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
@@ -215,7 +222,14 @@ import {
   TableCellsIcon
 } from '@heroicons/vue/24/outline'
 
-const appStore = useAppStore()
+const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
 useTableArtifacts()
 
 const pageSize = DEFAULT_TABLE_PAGE_SIZE
@@ -336,12 +350,12 @@ const liveDataframeArtifacts = computed(() => {
       .map((artifact) => String(artifact?.artifact_id || '').trim())
       .filter(Boolean),
   )
-  const conversationId = String(appStore.activeConversationId || '').trim()
-  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  const conversationId = String(conversationStore.activeConversationId || '').trim()
+  const workspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
   const scopeKey = conversationId ? `conversation:${conversationId}` : `workspace:${workspaceId || 'unscoped'}`
-  const userRevisions = (Array.isArray(appStore.promotedUserDataframes) ? appStore.promotedUserDataframes : [])
+  const userRevisions = (Array.isArray(artifactStore.promotedUserDataframes) ? artifactStore.promotedUserDataframes : [])
     .filter((item) => String(item?.scopeKey || '') === scopeKey)
-  return [...userRevisions, ...(Array.isArray(appStore.dataframes) ? appStore.dataframes : [])]
+  return [...userRevisions, ...(Array.isArray(artifactStore.dataframes) ? artifactStore.dataframes : [])]
     .map((item, index) => normalizeLiveDataframeArtifact(item, index))
     .filter((artifact) => artifact.artifact_id && !persistedIds.has(artifact.artifact_id))
 })
@@ -361,7 +375,7 @@ const tableDropdownOptions = computed(() => displayArtifacts.value.map((artifact
 })))
 
 const showArtifactListLoadingState = computed(() => {
-  return isLoadingArtifacts.value && Boolean(String(appStore.activeTurnId || '').trim())
+  return isLoadingArtifacts.value && Boolean(String(conversationStore.activeTurnId || '').trim())
 })
 
 // Expose dataframe count to the store so StatusBar can read it
@@ -375,9 +389,9 @@ watch(allArtifacts, () => {
 }, { immediate: true })
 
 watch(displayArtifacts, (list) => {
-  appStore.setDataframeCount(list.length)
-  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
-  const preferredArtifactId = workspaceId ? appStore.getSelectedTableArtifact(workspaceId) : ''
+  artifactStore.setDataframeCount(list.length)
+  const workspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
+  const preferredArtifactId = workspaceId ? artifactStore.getSelectedTableArtifact(workspaceId) : ''
   if (
     preferredArtifactId
     && preferredArtifactId !== selectedArtifactId.value
@@ -396,7 +410,7 @@ watch(displayArtifacts, (list) => {
 }, { immediate: true })
 
 watch(
-  () => appStore.getSelectedTableArtifact(appStore.activeWorkspaceId),
+  () => artifactStore.getSelectedTableArtifact(workspaceStore.activeWorkspaceId),
   (preferredArtifactId) => {
     const normalizedArtifactId = String(preferredArtifactId || '').trim()
     if (
@@ -435,9 +449,9 @@ function isArtifactMissingError(error) {
 function clearMissingSelectedArtifact(artifactId) {
   const normalizedArtifactId = String(artifactId || selectedArtifactId.value || '').trim()
   if (!normalizedArtifactId) return
-  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
-  if (workspaceId && String(appStore.getSelectedTableArtifact(workspaceId) || '').trim() === normalizedArtifactId) {
-    appStore.setSelectedTableArtifact(workspaceId, '')
+  const workspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
+  if (workspaceId && String(artifactStore.getSelectedTableArtifact(workspaceId) || '').trim() === normalizedArtifactId) {
+    artifactStore.setSelectedTableArtifact(workspaceId, '')
   }
   if (String(selectedArtifactId.value || '').trim() === normalizedArtifactId) {
     selectedArtifactId.value = null
@@ -445,7 +459,7 @@ function clearMissingSelectedArtifact(artifactId) {
   workspaceArtifacts.value = workspaceArtifacts.value.filter(
     (artifact) => String(artifact?.artifact_id || '').trim() !== normalizedArtifactId,
   )
-  appStore.removeResultArtifact(normalizedArtifactId)
+  artifactStore.removeResultArtifact(normalizedArtifactId)
   resetTableState()
 }
 
@@ -459,9 +473,9 @@ function enqueueSerializedRequest(task) {
 // Load active turn artifact list whenever the conversation turn changes
 // ---------------------------------------------------------------------------
 async function loadActiveTurnArtifacts() {
-  const conversationId = String(appStore.activeConversationId || '').trim()
-  const turnId = String(appStore.activeTurnId || '').trim()
-  if (!conversationId || !turnId || !appStore.hasWorkspace) {
+  const conversationId = String(conversationStore.activeConversationId || '').trim()
+  const turnId = String(conversationStore.activeTurnId || '').trim()
+  if (!conversationId || !turnId || !workspaceStore.hasWorkspace) {
     workspaceArtifacts.value = []
     selectedArtifactId.value = liveDataframeArtifacts.value[0]?.artifact_id || null
     return
@@ -470,7 +484,7 @@ async function loadActiveTurnArtifacts() {
   listAbortController = new AbortController()
   isLoadingArtifacts.value = true
   artifactListError.value = ''
-  appStore.clearDataPaneError()
+  artifactStore.clearDataPaneError()
   try {
     const response = await enqueueSerializedRequest(() => artifactApi.listTurn(
       conversationId,
@@ -500,14 +514,14 @@ async function loadActiveTurnArtifacts() {
     console.warn('Failed to load active turn artifacts:', error)
     const brief = error?.response?.data?.detail || error?.message || 'Failed to load tables'
     artifactListError.value = brief
-    appStore.setDataPaneError(brief)
+    uiStore.setDataPaneError(brief)
     workspaceArtifacts.value = []
   } finally {
     isLoadingArtifacts.value = false
   }
 }
 
-watch(() => appStore.activeWorkspaceId, () => {
+watch(() => workspaceStore.activeWorkspaceId, () => {
   tableSearch.value = ''
   pendingRestorePageByArtifact.clear()
   selectedArtifactLoadToken += 1
@@ -518,12 +532,12 @@ watch(() => appStore.activeWorkspaceId, () => {
 
 watch(
   () => [
-    String(appStore.activeConversationId || '').trim(),
-    String(appStore.activeTurnId || '').trim(),
-    String(appStore.activeTurnArtifactRefreshKey || 0),
+    String(conversationStore.activeConversationId || '').trim(),
+    String(conversationStore.activeTurnId || '').trim(),
+    String(artifactStore.activeTurnArtifactRefreshKey || 0),
   ].join('||'),
   async () => {
-    if (!appStore.hasWorkspace) return
+    if (!workspaceStore.hasWorkspace) return
 
     const previousSelection = String(selectedArtifactId.value || '').trim()
     await loadActiveTurnArtifacts()
@@ -533,8 +547,8 @@ watch(
 
     resetTableState()
 
-    const workspaceId = String(appStore.activeWorkspaceId || '').trim()
-    const rememberedPage = appStore.getTablePageOffset(workspaceId, nextSelection)
+    const workspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
+    const rememberedPage = artifactStore.getTablePageOffset(workspaceId, nextSelection)
     if (Number.isInteger(rememberedPage) && rememberedPage > 0) {
       pendingRestorePageByArtifact.set(nextSelection, rememberedPage)
     } else {
@@ -559,13 +573,13 @@ watch(selectedArtifactId, async (newId) => {
     tableSearchDebounceTimer = null
   }
   const loadToken = ++selectedArtifactLoadToken
-  const normalizedWorkspaceId = String(appStore.activeWorkspaceId || '').trim()
+  const normalizedWorkspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
   if (normalizedWorkspaceId) {
-    appStore.setSelectedTableArtifact(normalizedWorkspaceId, String(newId || '').trim())
+    artifactStore.setSelectedTableArtifact(normalizedWorkspaceId, String(newId || '').trim())
   }
   resetTableState()
   if (!newId) {
-    appStore.clearTableViewport()
+    artifactStore.clearTableViewport()
     return
   }
   const isKnownPersistedArtifact = allArtifacts.value.some(
@@ -602,10 +616,10 @@ watch(selectedArtifactId, async (newId) => {
     rowCountValue.value = Number(liveArtifact.row_count || rows.length || 0)
     windowStart.value = rows.length > 0 ? 1 : 0
     windowEnd.value = rows.length > 0 ? Math.min(pageSize, rowCountValue.value || rows.length) : 0
-    appStore.setTableViewport(windowStart.value, windowEnd.value, rowCountValue.value)
+    artifactStore.setTableViewport(windowStart.value, windowEnd.value, rowCountValue.value)
     return
   }
-  const rememberedPage = appStore.getTablePageOffset(appStore.activeWorkspaceId, newId)
+  const rememberedPage = artifactStore.getTablePageOffset(workspaceStore.activeWorkspaceId, newId)
   if (Number.isInteger(rememberedPage) && rememberedPage > 0) {
     pendingRestorePageByArtifact.set(newId, rememberedPage)
   } else {
@@ -629,7 +643,7 @@ watch(tableSearch, () => {
   tableSearchDebounceTimer = setTimeout(() => {
     tableSearchDebounceTimer = null
     pendingRestorePageByArtifact.delete(artifactId)
-    appStore.setTablePageOffset(appStore.activeWorkspaceId, artifactId, 0)
+    artifactStore.setTablePageOffset(workspaceStore.activeWorkspaceId, artifactId, 0)
     tableQuery.value = createTableQuery({
       ...tableQuery.value,
       pageIndex: 0,
@@ -722,7 +736,7 @@ function resetTableState() {
   rowCountValue.value = 0
   windowStart.value = 0
   windowEnd.value = 0
-  appStore.clearTableViewport()
+  artifactStore.clearTableViewport()
   tableError.value = ''
   useClientFallback.value = false
   tableQuery.value = createTableQuery({ pageSize })
@@ -733,27 +747,27 @@ function updateTableViewport() {
   if (total <= 0) {
     windowStart.value = 0
     windowEnd.value = 0
-    appStore.clearTableViewport()
+    artifactStore.clearTableViewport()
     return
   }
   const page = Math.max(0, Number(tableQuery.value.pageIndex || 0))
   const aid = selectedArtifactId.value
   if (aid) {
     pendingRestorePageByArtifact.delete(aid)
-    appStore.setTablePageOffset(appStore.activeWorkspaceId, aid, page)
+    artifactStore.setTablePageOffset(workspaceStore.activeWorkspaceId, aid, page)
   }
   const start = page * pageSize + 1
   const visibleLength = useServerModel.value ? serverRows.value.length : pageSize
   const end = Math.min(total, start + Math.max(0, visibleLength) - 1)
   windowStart.value = start
   windowEnd.value = end
-  appStore.setTableViewport(start, end, total)
+  artifactStore.setTableViewport(start, end, total)
 }
 
 function restoredArtifactPage(artifactId) {
   if (!artifactId || String(tableSearch.value || '').trim()) return 0
   const rememberedPage = pendingRestorePageByArtifact.get(artifactId)
-    ?? appStore.getTablePageOffset(appStore.activeWorkspaceId, artifactId)
+    ?? artifactStore.getTablePageOffset(workspaceStore.activeWorkspaceId, artifactId)
   if (!Number.isInteger(rememberedPage) || rememberedPage <= 0) return 0
   const knownTotal = Number(selectedArtifactMeta.value?.row_count || 0)
   if (knownTotal <= 0) return rememberedPage
@@ -765,7 +779,7 @@ function handleTableQueryChange(nextQuery) {
   tableQuery.value = normalizedQuery
   const artifactId = String(selectedArtifactId.value || '').trim()
   if (!artifactId) return
-  appStore.setTablePageOffset(appStore.activeWorkspaceId, artifactId, normalizedQuery.pageIndex)
+  artifactStore.setTablePageOffset(workspaceStore.activeWorkspaceId, artifactId, normalizedQuery.pageIndex)
   if (useServerModel.value) {
     void loadServerPage(artifactId, normalizedQuery)
     return
@@ -786,9 +800,9 @@ function columnsChanged(nextColumns) {
 // Data loading
 // ---------------------------------------------------------------------------
 async function prepareArtifact(artifactId) {
-  if (!artifactId || !appStore.activeWorkspaceId) return
+  if (!artifactId || !workspaceStore.activeWorkspaceId) return
   const sourceArtifactId = String(selectedArtifactMeta.value?.source_artifact_id || '').trim()
-  if (!sourceArtifactId && (!appStore.activeConversationId || !appStore.activeTurnId)) return
+  if (!sourceArtifactId && (!conversationStore.activeConversationId || !conversationStore.activeTurnId)) return
   tableError.value = ''
   useClientFallback.value = false
   clientRows.value = []
@@ -798,9 +812,9 @@ async function prepareArtifact(artifactId) {
 }
 
 async function loadServerPage(artifactId, query = tableQuery.value) {
-  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
-  const conversationId = String(appStore.activeConversationId || '').trim()
-  const turnId = String(appStore.activeTurnId || '').trim()
+  const workspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
+  const conversationId = String(conversationStore.activeConversationId || '').trim()
+  const turnId = String(conversationStore.activeTurnId || '').trim()
   const normalizedArtifactId = String(artifactId || '').trim()
   const sourceArtifactId = String(selectedArtifactMeta.value?.source_artifact_id || '').trim()
   if (!workspaceId || !normalizedArtifactId || (!sourceArtifactId && (!conversationId || !turnId))) return
@@ -816,9 +830,9 @@ async function loadServerPage(artifactId, query = tableQuery.value) {
     const requestLimit = Math.max(1, Math.min(pageSize, Number(query?.pageSize || pageSize)))
     const startRow = pageIndex * requestLimit
     const payload = await enqueueSerializedRequest(async () => {
-      if (workspaceId !== String(appStore.activeWorkspaceId || '').trim()) throw createAbortError()
-      if (!sourceArtifactId && conversationId !== String(appStore.activeConversationId || '').trim()) throw createAbortError()
-      if (!sourceArtifactId && turnId !== String(appStore.activeTurnId || '').trim()) throw createAbortError()
+      if (workspaceId !== String(workspaceStore.activeWorkspaceId || '').trim()) throw createAbortError()
+      if (!sourceArtifactId && conversationId !== String(conversationStore.activeConversationId || '').trim()) throw createAbortError()
+      if (!sourceArtifactId && turnId !== String(conversationStore.activeTurnId || '').trim()) throw createAbortError()
       if (normalizedArtifactId !== String(selectedArtifactId.value || '').trim()) throw createAbortError()
       if (sourceArtifactId) {
         return artifactApi.workspaceRows(
@@ -861,7 +875,7 @@ async function loadServerPage(artifactId, query = tableQuery.value) {
     if (pageIndex > maxPage) {
       const clampedQuery = createTableQuery({ ...query, pageIndex: maxPage })
       tableQuery.value = clampedQuery
-      appStore.setTablePageOffset(workspaceId, normalizedArtifactId, maxPage)
+      artifactStore.setTablePageOffset(workspaceId, normalizedArtifactId, maxPage)
       pendingControllers.delete(controller)
       if (requestToken === currentPageRequestToken) isPageLoading.value = false
       await loadServerPage(normalizedArtifactId, clampedQuery)
@@ -886,7 +900,7 @@ async function loadServerPage(artifactId, query = tableQuery.value) {
     rowCountValue.value = 0
     windowStart.value = 0
     windowEnd.value = 0
-    appStore.clearTableViewport()
+    artifactStore.clearTableViewport()
   } finally {
     pendingControllers.delete(controller)
     if (requestToken === currentPageRequestToken) {
@@ -963,8 +977,8 @@ function closeDeleteDialog() {
 }
 
 async function deleteSelectedArtifact() {
-  const conversationId = String(appStore.activeConversationId || '').trim()
-  const turnId = String(appStore.activeTurnId || '').trim()
+  const conversationId = String(conversationStore.activeConversationId || '').trim()
+  const turnId = String(conversationStore.activeTurnId || '').trim()
   const artifactId = String(selectedArtifactId.value || '').trim()
   if (!conversationId || !turnId || !artifactId || isDeletingArtifact.value) return
 
@@ -973,13 +987,13 @@ async function deleteSelectedArtifact() {
   tableError.value = ''
   try {
     await artifactApi.remove(conversationId, turnId, artifactId)
-    appStore.removeResultArtifact(artifactId)
+    artifactStore.removeResultArtifact(artifactId)
     await loadActiveTurnArtifacts()
     const remainingArtifactId = allArtifacts.value[0]?.artifact_id || null
     selectedArtifactId.value = remainingArtifactId
     if (!remainingArtifactId) {
       resetTableState()
-      appStore.clearTableViewport()
+      artifactStore.clearTableViewport()
     }
   } catch (error) {
     if (isAbortError(error)) return

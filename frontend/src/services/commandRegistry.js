@@ -69,18 +69,22 @@ export function getRegisteredCommands() {
   return Array.from(commandRegistry.values()).sort((left, right) => left.name.localeCompare(right.name))
 }
 
-function resolveDefaultTable(appStore) {
-  const summaryTable = (Array.isArray(appStore?.activeWorkspaceSummary?.table_names)
-    ? appStore.activeWorkspaceSummary.table_names
+function resolveDefaultTable(workspaceStore) {
+  const summaryTable = (Array.isArray(workspaceStore?.activeWorkspaceSummary?.table_names)
+    ? workspaceStore.activeWorkspaceSummary.table_names
     : []
   ).map((name) => String(name || '').trim()).find(Boolean)
   if (summaryTable) return summaryTable
-  const catalogItem = (Array.isArray(appStore?.columnCatalog) ? appStore.columnCatalog : [])
+  const catalogItem = (Array.isArray(workspaceStore?.columnCatalog) ? workspaceStore.columnCatalog : [])
     .find((item) => String(item?.table_name || '').trim())
   return String(catalogItem?.table_name || '').trim() || null
 }
 
-export async function executeCommand(text, { appStore, executionApi: api = executionApi } = {}) {
+export async function executeCommand(text, {
+  workspaceStore,
+  conversationStore,
+  executionApi: api = executionApi,
+} = {}) {
   const parsed = parseCommand(text)
   if (!parsed) {
     throw new Error('Input is not a slash command.')
@@ -91,7 +95,7 @@ export async function executeCommand(text, { appStore, executionApi: api = execu
     throw new Error(`Unknown command '/${parsed.name}'. Run /help to see available commands.`)
   }
 
-  const workspaceId = String(appStore?.activeWorkspaceId || '').trim()
+  const workspaceId = String(workspaceStore?.activeWorkspaceId || '').trim()
   if (!workspaceId) {
     throw new Error('Create/select a workspace before running commands.')
   }
@@ -100,8 +104,8 @@ export async function executeCommand(text, { appStore, executionApi: api = execu
     text: parsed.text,
     name: parsed.name,
     raw_args: parsed.rawArgs,
-    default_table: resolveDefaultTable(appStore),
-    conversation_id: String(appStore?.activeConversationId || '').trim() || null,
+    default_table: resolveDefaultTable(workspaceStore),
+    conversation_id: String(conversationStore?.activeConversationId || '').trim() || null,
   })
 
   return {

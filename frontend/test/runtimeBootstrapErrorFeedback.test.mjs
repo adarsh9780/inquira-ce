@@ -8,7 +8,7 @@ test('app shows one-shot toast feedback when workspace runtime bootstrap errors 
   const source = readFileSync(appPath, 'utf-8')
 
   assert.equal(source.includes("import { toast } from './composables/useToast'"), true)
-  assert.equal(source.includes('() => appStore.runtimeError'), true)
+  assert.equal(source.includes('() => executionStore.runtimeError'), true)
   assert.equal(source.includes('if (!authStore.isAuthenticated) return'), true)
   assert.equal(source.includes("toast.error('Workspace Runtime Error', normalized)"), true)
   assert.equal(source.includes('if (normalized === lastRuntimeErrorToast.value) return'), true)

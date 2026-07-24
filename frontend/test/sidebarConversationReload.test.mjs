@@ -11,8 +11,8 @@ test('conversation sidebars reload turns even when the selected conversation is 
   const compactSelectSource = compactSidebarSource.slice(compactSelectStart, compactSelectEnd)
 
   assert.equal(compactSelectSource.includes('if (target !== current) {'), true)
-  assert.equal(compactSelectSource.includes('await appStore.fetchConversationTurns({ preferLatest: true })'), true)
+  assert.equal(compactSelectSource.includes('await conversationStore.fetchConversationTurns({ preferLatest: true })'), true)
 
-  assert.equal(globalTreeSource.includes('if (targetConversationId !== appStore.activeConversationId) {'), true)
-  assert.equal(globalTreeSource.includes('await appStore.fetchConversationTurns()'), true)
+  assert.equal(globalTreeSource.includes('if (targetConversationId !== conversationStore.activeConversationId) {'), true)
+  assert.equal(globalTreeSource.includes('await conversationStore.fetchConversationTurns()'), true)
 })

@@ -1,15 +1,18 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { useAppStore } from '../src/stores/appStore'
+import { useWorkspaceActivation } from '../src/composables/useWorkspaceActivation'
+import { usePreferencesStore } from '../src/stores/preferencesStore'
+import { useWorkspaceStore } from '../src/stores/workspaceStore'
 
-describe('app store state synchronization', () => {
+describe('domain store state synchronization', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
   })
 
   it('derives data readiness only from the active workspace summary', () => {
-    const store = useAppStore()
+    const store = useWorkspaceStore()
+    const activation = useWorkspaceActivation()
     store.workspaces = [{ id: 'workspace-1', name: 'Workspace' }]
     store.activeWorkspaceId = 'workspace-1'
     store.activeWorkspaceSummary = {
@@ -28,18 +31,18 @@ describe('app store state synchronization', () => {
     expect('ingestedTableName' in store).toBe(false)
     expect('ingestedColumns' in store).toBe(false)
     expect('hasDataFile' in store).toBe(false)
-    expect(store.workspaceReadiness).toEqual({ state: 'no_data', ready: false })
+    expect(activation.workspaceReadiness).toEqual({ state: 'no_data', ready: false })
 
     store.activeWorkspaceSummary = {
       id: 'workspace-1',
       table_count: 1,
       table_names: ['sales'],
     }
-    expect(store.workspaceReadiness).toEqual({ state: 'ready', ready: true })
+    expect(activation.workspaceReadiness).toEqual({ state: 'ready', ready: true })
   })
 
   it('applies saved request-warning and data-sample preferences immediately', () => {
-    const store = useAppStore()
+    const store = usePreferencesStore()
 
     expect(store.applyPreferencesResponse).toBeTypeOf('function')
     store.applyPreferencesResponse({

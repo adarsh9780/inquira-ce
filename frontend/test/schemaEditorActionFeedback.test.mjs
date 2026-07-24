@@ -15,5 +15,5 @@ test('schema editor actions emit feedback and keep refresh, save, and regenerati
   assert.equal(source.includes('async function saveAllSchema()'), true)
   assert.equal(source.includes('async function regenerateTableSchema(tableName)'), true)
   assert.equal(source.includes('await workspaceApi.saveDatasetSchema(workspaceId, group.tableName, {'), true)
-  assert.equal(source.includes('await workspaceApi.regenerateDatasetSchema(appStore.activeWorkspaceId, tableName, {'), true)
+  assert.equal(source.includes('await workspaceApi.regenerateDatasetSchema(workspaceStore.activeWorkspaceId, tableName, {'), true)
 })

@@ -17,5 +17,5 @@ test('manual dataframes render inline in Runs and only become full tables after 
   assert.equal(table.includes('<DataTable'), true)
   assert.equal(table.includes(':manual="useServerModel"'), true)
   assert.equal(rightPane.includes("selectedCategory === 'table'"), true)
-  assert.equal(table.includes('appStore.promotedUserDataframes'), true)
+  assert.equal(table.includes('artifactStore.promotedUserDataframes'), true)
 })

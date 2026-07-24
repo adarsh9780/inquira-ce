@@ -108,7 +108,14 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useLLMConfig } from '../../composables/useLLMConfig'
-import { useAppStore } from '../../stores/appStore'
+import { useUiStore } from '../../stores/uiStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
+import { useArtifactStore } from '../../stores/artifactStore'
+import { useExecutionStore } from '../../stores/executionStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useConversationStore } from '../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import { filenameFromPath } from '../../utils/pathUtils'
 import LLMSettingsTab from './tabs/LLMSettingsTab.vue'
 import WorkspaceTab from './tabs/WorkspaceTab.vue'
@@ -137,7 +144,14 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
-const appStore = useAppStore()
+const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
 const llmConfig = useLLMConfig()
 
 const activeSection = ref('setup')
@@ -168,7 +182,7 @@ const activeSectionDescription = computed(() => {
 })
 
 const workspaceItems = computed(() => {
-  const items = Array.isArray(appStore.workspaces) ? appStore.workspaces : []
+  const items = Array.isArray(workspaceStore.workspaces) ? workspaceStore.workspaces : []
   return items.map((workspace) => {
     const duckdbPath = String(workspace?.duckdb_path || '').trim()
     const filename = filenameFromPath(duckdbPath, 'workspace.duckdb')
@@ -183,8 +197,8 @@ watch(
   () => props.modelValue,
   async (isOpen) => {
     if (isOpen) {
-      await appStore.fetchWorkspaces()
-      const initialWorkspace = String(appStore.activeWorkspaceId || '').trim() || String(workspaceItems.value[0]?.id || '').trim()
+      await workspaceStore.fetchWorkspaces()
+      const initialWorkspace = String(workspaceStore.activeWorkspaceId || '').trim() || String(workspaceItems.value[0]?.id || '').trim()
       activeWorkspaceId.value = initialWorkspace
       initializePanelState(props.initialTab)
       return
@@ -268,8 +282,8 @@ async function activateWorkspace(workspaceId) {
   const nextId = String(workspaceId || '').trim()
   if (!nextId) return
   activeWorkspaceId.value = nextId
-  if (String(appStore.activeWorkspaceId || '').trim() === nextId) return
-  await appStore.activateWorkspace(nextId)
+  if (String(workspaceStore.activeWorkspaceId || '').trim() === nextId) return
+  await workspaceActivation.activateWorkspace(nextId)
 }
 
 function handleWorkspaceCreated(payload) {

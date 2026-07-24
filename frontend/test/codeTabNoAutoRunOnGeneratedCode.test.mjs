@@ -10,7 +10,7 @@ test('CodeTab generatedCode watcher does not auto-execute runCode', () => {
   const filePath = path.resolve(__dirname, '..', 'src', 'components', 'analysis', 'CodeTab.vue')
   const source = fs.readFileSync(filePath, 'utf8')
 
-  const watcherStart = source.indexOf('watch(() => appStore.generatedCode, (newCode) => {')
+  const watcherStart = source.indexOf('watch(() => executionStore.generatedCode, (newCode) => {')
   assert.notEqual(watcherStart, -1)
   const watcherEnd = source.indexOf('watch(() => uiStore.isLoading, (loading) => {', watcherStart)
   assert.notEqual(watcherEnd, -1)

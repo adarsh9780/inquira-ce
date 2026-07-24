@@ -12,5 +12,5 @@ test('table tab skips row fetch when selected artifact is not in active turn cat
   assert.equal(source.includes('const isKnownPersistedArtifact = allArtifacts.value.some('), true)
   assert.equal(source.includes('if (!isKnownPersistedArtifact) {'), true)
   assert.equal(source.includes("tableError.value = 'Selected table is not available for this turn.'"), true)
-  assert.equal(source.includes('void loadWorkspaceArtifacts(appStore.activeWorkspaceId)'), false)
+  assert.equal(source.includes('void loadWorkspaceArtifacts(workspaceStore.activeWorkspaceId)'), false)
 })

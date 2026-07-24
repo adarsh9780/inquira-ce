@@ -4,7 +4,15 @@ import { computed, markRaw, ref } from 'vue'
 const MAX_TERMINAL_ENTRIES = 50
 const MAX_TERMINAL_STREAM_CHARS = 200_000
 const MAX_TERMINAL_TOTAL_CHARS = 2_000_000
-const RUNTIME_STATUSES = new Set(['missing', 'starting', 'ready', 'failed'])
+const RUNTIME_STATUSES = new Set([
+  'missing',
+  'starting',
+  'connecting',
+  'ready',
+  'busy',
+  'error',
+  'failed',
+])
 
 type TerminalEntry = Record<string, unknown> & {
   id: string
@@ -143,7 +151,7 @@ export const useExecutionStore = defineStore('execution', () => {
       id: String(entry.id || `terminal-${now}-${Math.random().toString(36).slice(2, 8)}`),
       stdout: trimTerminalStream(entry.stdout),
       stderr: trimTerminalStream(entry.stderr),
-      status: ['queued', 'running', 'complete', 'failed', 'cancelled'].includes(String(entry.status || ''))
+      status: ['queued', 'running', 'success', 'error', 'complete', 'failed', 'cancelled'].includes(String(entry.status || ''))
         ? String(entry.status)
         : 'complete',
     }

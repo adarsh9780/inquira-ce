@@ -52,10 +52,12 @@ test('executeCommand dispatches to backend endpoint with workspace context', asy
   }
 
   const result = await executeCommand('/shape sales', {
-    appStore: {
+    workspaceStore: {
       activeWorkspaceId: 'ws-1',
       activeWorkspaceSummary: { table_names: ['sales'] },
       columnCatalog: [],
+    },
+    conversationStore: {
       activeConversationId: 'conv-1',
     },
     executionApi: mockExecutionApi,
@@ -72,7 +74,7 @@ test('executeCommand dispatches to backend endpoint with workspace context', asy
 test('executeCommand reports when the native command bridge is unavailable', async () => {
   await assert.rejects(
     executeCommand('/shape sales', {
-      appStore: {
+      workspaceStore: {
         activeWorkspaceId: 'ws-1',
         activeWorkspaceSummary: { table_names: ['sales'] },
         columnCatalog: [],
@@ -91,6 +93,6 @@ test('chat input routes slash commands through the command handler path', () => 
   assert.equal(source.includes('if (isCommand(questionText)) {'), true)
   assert.equal(source.includes('await handleSlashCommand(questionText)'), true)
   assert.equal(source.includes('const result = await executeCommand(questionText'), true)
-  assert.equal(source.includes("appStore.addChatMessage(questionText, 'Running command...', { conversationId: requestConversationId })"), true)
+  assert.equal(source.includes("conversationStore.addChatMessage(questionText, 'Running command...', { conversationId: requestConversationId })"), true)
   assert.equal(source.includes('getRegisteredCommands()'), true)
 })

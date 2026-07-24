@@ -12,7 +12,7 @@ test('status bar renders table row count and viewport window when table pane is 
 
   assert.equal(statusBar.includes('const tableViewportLabel = computed(() => {'), true)
   assert.equal(statusBar.includes("if (uiStore.dataPane !== 'table') return null"), true)
-  assert.equal(statusBar.includes('appStore.tableRowCount'), true)
+  assert.equal(statusBar.includes('artifactStore.tableRowCount'), true)
   assert.equal(statusBar.includes('Showing ${start.toLocaleString()}-${end.toLocaleString()} of ${total.toLocaleString()}'), true)
 
   assert.equal(tableTab.includes('Showing {{ windowStart.toLocaleString() }}-{{ windowEnd.toLocaleString() }}'), false)

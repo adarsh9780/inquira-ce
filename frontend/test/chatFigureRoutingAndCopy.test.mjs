@@ -8,7 +8,7 @@ test('chat input routes chart-like responses to figure data pane', () => {
   const source = readFileSync(chatInputPath, 'utf-8')
 
   assert.equal(source.includes('applyConversationResultState(requestConversationId, finalStatePatch, { hasFigures: true })'), true)
-  assert.equal(source.includes("appStore.setActiveTab('chart')"), false)
+  assert.equal(source.includes("uiStore.setActiveTab('chart')"), false)
 })
 
 test('readiness and provider settings avoid provider-specific hardcoding in chat', () => {
@@ -29,7 +29,7 @@ test('readiness and provider settings avoid provider-specific hardcoding in chat
   assert.equal(chatInput.includes('missingSetupRequirements'), false)
   assert.equal(chatTab.includes('<WorkspaceReadinessJourney'), true)
   assert.equal(chatTab.includes("state === 'model_connection_required'"), true)
-  assert.equal(chatTab.includes("appStore.openSettings('connections')"), true)
+  assert.equal(chatTab.includes("uiStore.openSettings('connections')"), true)
   assert.equal(llmTab.includes('API Key (OpenRouter)'), false)
   assert.equal(llmTab.includes('{{ apiKeyLabel }}'), true)
 })

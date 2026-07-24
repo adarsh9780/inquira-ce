@@ -81,7 +81,7 @@
 
         <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-1 custom-scrollbar">
           <div
-            v-if="appStore.workspaces.length === 0"
+            v-if="workspaceStore.workspaces.length === 0"
             class="px-2.5 py-2 text-[12px] text-[var(--color-text-muted)] transition-opacity"
             :class="uiStore.isSidebarCollapsed ? 'opacity-0' : 'opacity-100'"
           >
@@ -95,7 +95,7 @@
                   type="button"
                   class="sidebar-workspace-row justify-start px-2.5"
                   :class="[
-                    appStore.activeWorkspaceId === workspace.id ? 'sidebar-workspace-row-active' : '',
+                    workspaceStore.activeWorkspaceId === workspace.id ? 'sidebar-workspace-row-active' : '',
                   ]"
                   :title="workspace.name || 'Untitled workspace'"
                   @click="selectWorkspace(workspace.id)"
@@ -117,7 +117,7 @@
               </div>
 
               <div
-                v-if="!uiStore.isSidebarCollapsed && appStore.activeWorkspaceId === workspace.id"
+                v-if="!uiStore.isSidebarCollapsed && workspaceStore.activeWorkspaceId === workspace.id"
                 class="space-y-px pl-6 pr-1"
               >
                 <div v-if="isWorkspaceConversationsLoading(workspace.id)" class="px-2 py-1 text-[12px] font-medium text-[var(--color-text-muted)]">
@@ -137,7 +137,7 @@
                     :key="conv.id"
                     v-model:editing-title-value="editingTitleValue"
                     :conversation="conv"
-                    :active="appStore.activeConversationId === conv.id"
+                    :active="conversationStore.activeConversationId === conv.id"
                     :is-editing="editingId === conv.id"
                     :compact-timestamp="formatConversationTimestamp(conv)"
                     :menu-open="conversationMenuId === conv.id"
@@ -167,7 +167,7 @@
           type="button"
           class="sidebar-nav-row justify-start px-2.5"
           title="Data sources"
-          @click="appStore.openDataConnectionFlow()"
+          @click="workspaceActivation.openDataConnectionFlow()"
         >
           <span class="sidebar-row-icon"><CircleStackIcon class="h-4 w-4" /></span>
           <span
@@ -332,8 +332,14 @@
 
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
-import { useAppStore } from '../../stores/appStore'
 import { useUiStore } from '../../stores/uiStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
+import { useArtifactStore } from '../../stores/artifactStore'
+import { useExecutionStore } from '../../stores/executionStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useConversationStore } from '../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import { useAuthStore } from '../../stores/authStore'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
@@ -361,8 +367,14 @@ import {
 } from '@heroicons/vue/24/outline'
 
 // ─── Store ───────────────────────────────────────────────────────────────────
-const appStore = useAppStore()
 const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
 const authStore = useAuthStore()
 
 // ─── UI State ────────────────────────────────────────────────────────────────
@@ -421,7 +433,7 @@ const activeConversationMenuExactDate = computed(() => (
 ))
 
 const filteredSidebarWorkspaces = computed(() => {
-  const workspaces = Array.isArray(appStore.workspaces) ? appStore.workspaces : []
+  const workspaces = Array.isArray(workspaceStore.workspaces) ? workspaceStore.workspaces : []
   return workspaces
 })
 
@@ -429,8 +441,8 @@ const filteredSidebarWorkspaces = computed(() => {
 function conversationsForWorkspace(workspaceId) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return []
-  if (normalizedWorkspaceId === String(appStore.activeWorkspaceId || '').trim()) {
-    return Array.isArray(appStore.conversations) ? appStore.conversations : []
+  if (normalizedWorkspaceId === String(workspaceStore.activeWorkspaceId || '').trim()) {
+    return Array.isArray(conversationStore.conversations) ? conversationStore.conversations : []
   }
   return Array.isArray(sidebarConversationsByWorkspace.value?.[normalizedWorkspaceId])
     ? sidebarConversationsByWorkspace.value[normalizedWorkspaceId]
@@ -478,7 +490,7 @@ function updateSidebarConversationCache(workspaceId, conversations) {
 function findSidebarConversation(conversationId) {
   const normalizedConversationId = String(conversationId || '').trim()
   if (!normalizedConversationId) return null
-  const activeMatch = appStore.conversations.find((conversation) => String(conversation?.id || '').trim() === normalizedConversationId)
+  const activeMatch = conversationStore.conversations.find((conversation) => String(conversation?.id || '').trim() === normalizedConversationId)
   if (activeMatch) return activeMatch
   for (const conversations of Object.values(sidebarConversationsByWorkspace.value || {})) {
     const match = Array.isArray(conversations)
@@ -549,7 +561,7 @@ function conversationTimestampValue(conversation) {
 }
 
 function formatConversationTimestamp(conversation) {
-  if (appStore.isConversationRunning(conversation?.id)) return 'Run'
+  if (executionStore.isConversationRunning(conversation?.id)) return 'Run'
   return formatCompactRelativeTimestamp(conversationTimestampValue(conversation)) || '-'
 }
 
@@ -626,11 +638,11 @@ async function selectWorkspace(workspaceId) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return
   try {
-    if (normalizedWorkspaceId !== String(appStore.activeWorkspaceId || '').trim()) {
-      await appStore.activateWorkspace(normalizedWorkspaceId)
+    if (normalizedWorkspaceId !== String(workspaceStore.activeWorkspaceId || '').trim()) {
+      await workspaceActivation.activateWorkspace(normalizedWorkspaceId)
     }
-    await appStore.fetchConversations()
-    updateSidebarConversationCache(normalizedWorkspaceId, appStore.conversations)
+    await conversationStore.fetchConversations()
+    updateSidebarConversationCache(normalizedWorkspaceId, conversationStore.conversations)
     await loadSidebarConversations(normalizedWorkspaceId, { force: true })
     uiStore.setWorkspacePane('chat')
     uiStore.setActiveTab('workspace')
@@ -639,18 +651,18 @@ async function selectWorkspace(workspaceId) {
   }
 }
 
-async function createConversation(workspaceId = appStore.activeWorkspaceId) {
+async function createConversation(workspaceId = workspaceStore.activeWorkspaceId) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   try {
-    if (normalizedWorkspaceId && normalizedWorkspaceId !== String(appStore.activeWorkspaceId || '').trim()) {
-      await appStore.activateWorkspace(normalizedWorkspaceId)
-      await appStore.fetchConversations()
+    if (normalizedWorkspaceId && normalizedWorkspaceId !== String(workspaceStore.activeWorkspaceId || '').trim()) {
+      await workspaceActivation.activateWorkspace(normalizedWorkspaceId)
+      await conversationStore.fetchConversations()
     }
-    const conversation = await appStore.createConversation()
-    updateSidebarConversationCache(String(appStore.activeWorkspaceId || '').trim(), appStore.conversations)
+    const conversation = await conversationStore.createConversation(workspaceStore.activeWorkspaceId)
+    updateSidebarConversationCache(String(workspaceStore.activeWorkspaceId || '').trim(), conversationStore.conversations)
     if (conversation?.id) {
-      appStore.setActiveConversationId(conversation.id)
-      await appStore.fetchConversationTurns()
+      conversationStore.setActiveConversationId(conversation.id)
+      await conversationStore.fetchConversationTurns()
     }
   } catch (error) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to create conversation'))
@@ -662,20 +674,20 @@ async function selectConversation(workspaceId, id) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   const target = String(id || '').trim()
   if (!target) return
-  const current = String(appStore.activeConversationId || '').trim()
+  const current = String(conversationStore.activeConversationId || '').trim()
   try {
-    if (normalizedWorkspaceId && normalizedWorkspaceId !== String(appStore.activeWorkspaceId || '').trim()) {
-      await appStore.activateWorkspace(normalizedWorkspaceId)
-      await appStore.fetchConversations()
-      updateSidebarConversationCache(normalizedWorkspaceId, appStore.conversations)
+    if (normalizedWorkspaceId && normalizedWorkspaceId !== String(workspaceStore.activeWorkspaceId || '').trim()) {
+      await workspaceActivation.activateWorkspace(normalizedWorkspaceId)
+      await conversationStore.fetchConversations()
+      updateSidebarConversationCache(normalizedWorkspaceId, conversationStore.conversations)
     }
     if (target !== current) {
-      appStore.setActiveConversationId(target)
+      conversationStore.setActiveConversationId(target)
     } else {
       uiStore.setWorkspacePane('chat')
       uiStore.setActiveTab('workspace')
     }
-    await appStore.fetchConversationTurns({ preferLatest: true })
+    await conversationStore.fetchConversationTurns({ preferLatest: true })
   } catch (error) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to load conversation'))
   }
@@ -711,13 +723,13 @@ async function saveTitle(id) {
 
   isSaving.value = true
   try {
-    if (id === appStore.activeConversationId) {
-      await appStore.updateConversationTitle(newTitle)
+    if (id === conversationStore.activeConversationId) {
+      await conversationStore.updateConversationTitle(newTitle)
     } else {
       const updated = await conversationApi.update(id, newTitle)
-      const idx = appStore.conversations.findIndex((conversation) => conversation.id === id)
+      const idx = conversationStore.conversations.findIndex((conversation) => conversation.id === id)
       if (idx !== -1) {
-        appStore.conversations[idx] = { ...appStore.conversations[idx], title: updated.title }
+        conversationStore.conversations[idx] = { ...conversationStore.conversations[idx], title: updated.title }
       }
       for (const [workspaceId, conversations] of Object.entries(sidebarConversationsByWorkspace.value || {})) {
         const cachedIndex = Array.isArray(conversations)
@@ -816,7 +828,7 @@ function closeDeleteDialog() {
 async function confirmDelete() {
   if (!pendingDeleteId.value) return
   try {
-    await appStore.deleteConversationById(pendingDeleteId.value)
+    await conversationStore.deleteConversationById(pendingDeleteId.value)
     removeConversationFromSidebarCache(pendingDeleteId.value)
     toast.success('Conversation Deleted', 'Conversation has been removed.')
     closeDeleteDialog()
@@ -830,10 +842,10 @@ async function confirmDelete() {
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 onMounted(async () => {
   try {
-    await appStore.fetchWorkspaces()
-    if (appStore.activeWorkspaceId) {
-      await appStore.fetchConversations()
-      updateSidebarConversationCache(appStore.activeWorkspaceId, appStore.conversations)
+    await workspaceStore.fetchWorkspaces()
+    if (workspaceStore.activeWorkspaceId) {
+      await conversationStore.fetchConversations()
+      updateSidebarConversationCache(workspaceStore.activeWorkspaceId, conversationStore.conversations)
     }
   } catch {
     // Recovery handled by parent app
@@ -851,15 +863,15 @@ onUnmounted(() => {
   window.removeEventListener('scroll', updateProfileMenuPosition, true)
 })
 
-watch(() => appStore.activeWorkspaceId, async (newId) => {
+watch(() => workspaceStore.activeWorkspaceId, async (newId) => {
   if (newId) {
-    await appStore.fetchConversations()
-    updateSidebarConversationCache(newId, appStore.conversations)
+    await conversationStore.fetchConversations()
+    updateSidebarConversationCache(newId, conversationStore.conversations)
   }
 })
 
-watch(() => appStore.conversations, (items) => {
-  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+watch(() => conversationStore.conversations, (items) => {
+  const workspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
   if (!workspaceId) return
   updateSidebarConversationCache(workspaceId, Array.isArray(items) ? items : [])
 }, { deep: true })

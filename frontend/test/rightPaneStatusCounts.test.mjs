@@ -32,10 +32,10 @@ test('status bar renders pane count from canonical table/chart counts and keeps 
 
   assert.equal(source.includes('const paneArtifactCountLabel = computed(() => {'), true)
   assert.equal(source.includes('Math.max('), true)
-  assert.equal(source.includes('Number(appStore.dataframeCount || 0)'), true)
-  assert.equal(source.includes('Number(appStore.figureCount || 0)'), true)
-  assert.equal(source.includes('v-if="appStore.activeWorkspaceId && paneArtifactCountLabel"'), true)
-  assert.equal(source.includes('v-if="appStore.activeWorkspaceId && tableViewportLabel"'), true)
+  assert.equal(source.includes('Number(artifactStore.dataframeCount || 0)'), true)
+  assert.equal(source.includes('Number(artifactStore.figureCount || 0)'), true)
+  assert.equal(source.includes('v-if="workspaceStore.activeWorkspaceId && paneArtifactCountLabel"'), true)
+  assert.equal(source.includes('v-if="workspaceStore.activeWorkspaceId && tableViewportLabel"'), true)
   assert.equal(source.includes('showArtifactUsageWarning'), false)
   assert.equal(source.includes('artifactUsageWarningTitle'), false)
   assert.equal(source.includes('subscribeWorkspaceArtifactUsage'), false)
@@ -60,7 +60,7 @@ test('figure renderer keeps a contextual artifact selector and export actions', 
 })
 
 test('app store keeps figureCount synchronized with setFigures output', () => {
-  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const storePath = resolve(process.cwd(), 'src/stores/artifactStore.ts')
   const source = [
     readFileSync(storePath, 'utf-8'),
     readFileSync(resolve(process.cwd(), 'src/stores/artifactStore.ts'), 'utf-8'),

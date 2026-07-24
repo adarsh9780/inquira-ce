@@ -1,7 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import { modelConnectionService } from '../services/modelConnectionService'
 import { extractApiErrorMessage } from '../utils/apiError'
-import { useAppStore } from '../stores/appStore'
+import { usePreferencesStore } from '../stores/preferencesStore'
 
 const provider = ref(null)
 const apiKey = ref('')
@@ -36,13 +36,13 @@ const slowRequestWarningSeconds = ref(120)
 const allowLlmDataSamples = ref(false)
 
 const modelMetaByProvider = ref({})
-let appStore = null
+let preferencesStore = null
 
-function getAppStore() {
-  if (!appStore) {
-    appStore = useAppStore()
+function getPreferencesStore() {
+  if (!preferencesStore) {
+    preferencesStore = usePreferencesStore()
   }
-  return appStore
+  return preferencesStore
 }
 
 function normalizeProvider(raw) {
@@ -166,7 +166,7 @@ function normalizeModelMetadata(providerName, catalog, mainIds, liteIds) {
 }
 
 function syncProviderStateToAppStore(providerName) {
-  const store = getAppStore()
+  const store = getPreferencesStore()
   if (!store) return
 
   const normalized = normalizeProvider(providerName)
@@ -382,7 +382,7 @@ function setApiKey(value) {
 function setMainModel(value) {
   const nextValue = String(value || '').trim()
   mainModel.value = nextValue || null
-  const store = getAppStore()
+  const store = getPreferencesStore()
   if (store && typeof store.setSelectedModel === 'function') {
     store.setSelectedModel(nextValue)
   }
@@ -474,7 +474,7 @@ async function saveDataSamplesPreference() {
   const response = await modelConnectionService.updatePreferences({
     allow_llm_data_samples: Boolean(allowLlmDataSamples.value),
   })
-  const store = getAppStore()
+  const store = getPreferencesStore()
   if (response && store && typeof store.applyPreferencesResponse === 'function') {
     store.applyPreferencesResponse(response)
   }
@@ -661,12 +661,12 @@ const currentProviderModelMeta = computed(() => (
 ))
 
 export const useLLMConfig = () => {
-  appStore = getAppStore()
+  preferencesStore = getPreferencesStore()
 
   watch(
-    () => getAppStore().selectedModel,
+    () => getPreferencesStore().selectedModel,
     (nextValue) => {
-      const store = getAppStore()
+      const store = getPreferencesStore()
       const normalizedProvider = normalizeProvider(provider.value)
       if (!normalizedProvider) return
       if (normalizedProvider !== normalizeProvider(store.llmProvider)) return

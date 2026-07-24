@@ -18,7 +18,7 @@ test('code editor binds Shift+Enter to selected code execution', () => {
   assert.equal(source.includes('function startRunEntry(scopeLabel, code) {'), true)
   assert.equal(source.includes("command: String(code || '')"), true)
   assert.equal(source.includes("status: 'running'"), true)
-  assert.equal(source.includes('appStore.updateTerminalEntry(runMeta.entryId, {'), true)
+  assert.equal(source.includes('executionStore.updateTerminalEntry(runMeta.entryId, {'), true)
   assert.equal(source.includes("origin: 'user'"), true)
   assert.equal(source.includes("toast.success('Selection Complete'"), false)
   assert.equal(source.includes("toast.success('Execution Complete'"), false)

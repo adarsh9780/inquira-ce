@@ -9,5 +9,5 @@ test('figure tab re-renders when data pane switches to figure', () => {
 
   assert.equal(source.includes('watch(() => uiStore.dataPane'), true)
   assert.equal(source.includes("if (pane === 'figure' && selectedFigure.value)"), true)
-  assert.equal(source.includes('watch(() => appStore.activeTab'), false)
+  assert.equal(source.includes('watch(() => uiStore.activeTab'), false)
 })

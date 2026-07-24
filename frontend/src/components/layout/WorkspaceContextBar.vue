@@ -17,7 +17,7 @@
       </div>
 
       <div
-        v-if="appStore.hasWorkspace"
+        v-if="workspaceStore.hasWorkspace"
         data-workspace-status
         class="hidden shrink-0 items-center gap-1.5 lg:flex"
       >
@@ -44,16 +44,16 @@
         type="button"
         data-action="add-data"
         class="context-add-data-button"
-        :title="appStore.hasWorkspace ? 'Add a data source' : 'Create a workspace'"
-        :aria-label="appStore.hasWorkspace ? 'Add a data source' : 'Create a workspace'"
-        @click="appStore.openDataConnectionFlow()"
+        :title="workspaceStore.hasWorkspace ? 'Add a data source' : 'Create a workspace'"
+        :aria-label="workspaceStore.hasWorkspace ? 'Add a data source' : 'Create a workspace'"
+        @click="workspaceActivation.openDataConnectionFlow()"
       >
         <PlusIcon class="h-3.5 w-3.5" aria-hidden="true" />
-        <span class="hidden sm:inline">{{ appStore.hasWorkspace ? 'Add data' : 'New workspace' }}</span>
+        <span class="hidden sm:inline">{{ workspaceStore.hasWorkspace ? 'Add data' : 'New workspace' }}</span>
       </button>
 
       <div
-        v-if="appStore.activeTurnId"
+        v-if="conversationStore.activeTurnId"
         class="context-turn-controls hidden items-center sm:flex"
         role="group"
         aria-label="Turn navigation"
@@ -64,8 +64,8 @@
           class="context-icon-button"
           title="Previous turn"
           aria-label="Previous turn"
-          :disabled="!appStore.activeTurnRelations?.previous_turn"
-          @click="appStore.goToPreviousTurn()"
+          :disabled="!conversationStore.activeTurnRelations?.previous_turn"
+          @click="conversationStore.goToPreviousTurn()"
         >
           <ChevronLeftIcon class="h-3.5 w-3.5" />
         </button>
@@ -75,24 +75,24 @@
           class="context-icon-button"
           title="Next turn"
           aria-label="Next turn"
-          :disabled="!appStore.activeTurnRelations?.next_turn"
-          @click="appStore.goToNextTurn()"
+          :disabled="!conversationStore.activeTurnRelations?.next_turn"
+          @click="conversationStore.goToNextTurn()"
         >
           <ChevronRightIcon class="h-3.5 w-3.5" />
         </button>
       </div>
 
-      <div v-if="appStore.hasWorkspace" class="workspace-context-model hidden w-36 min-w-0 md:block xl:w-44">
+      <div v-if="workspaceStore.hasWorkspace" class="workspace-context-model hidden w-36 min-w-0 md:block xl:w-44">
         <ModelSelector
           :selected-model="effectiveWorkspaceModel"
           :model-options="workspaceModelOptions"
           :provider="effectiveWorkspaceProvider"
           :backend-search="searchProviderModels"
-          :search-loading="appStore.providerModelSearchLoading"
+          :search-loading="preferencesStore.providerModelSearchLoading"
           :search-debounce-ms="250"
           :max-options-without-search="10"
           @model-changed="handleModelChange"
-          @manage-models="appStore.openSettings('workspace-ai')"
+          @manage-models="uiStore.openSettings('workspace-ai')"
         />
       </div>
 
@@ -101,7 +101,7 @@
         class="context-icon-button"
         title="Open command palette"
         aria-label="Open command palette"
-        @click="appStore.openCommandPalette()"
+        @click="uiStore.openCommandPalette()"
       >
         <MagnifyingGlassIcon class="h-4 w-4" />
       </button>
@@ -110,7 +110,7 @@
         class="context-icon-button"
         title="Workspace settings"
         aria-label="Open workspace settings"
-        @click="appStore.openSettings('workspace')"
+        @click="uiStore.openSettings('workspace')"
       >
         <Cog6ToothIcon class="h-4 w-4" />
       </button>
@@ -128,28 +128,42 @@ import {
   MagnifyingGlassIcon,
   PlusIcon,
 } from '@heroicons/vue/24/outline'
-import { useAppStore } from '../../stores/appStore'
+import { useUiStore } from '../../stores/uiStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
+import { useArtifactStore } from '../../stores/artifactStore'
+import { useExecutionStore } from '../../stores/executionStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useConversationStore } from '../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import { preferencesApi } from '../../api/preferences'
 import ModelSelector from '../ui/ModelSelector.vue'
 
-const appStore = useAppStore()
+const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
 
 const activeWorkspaceName = computed(() => {
-  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  const workspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
   if (!workspaceId) return 'No workspace'
-  const workspace = appStore.workspaces.find((item) => String(item?.id || '').trim() === workspaceId)
+  const workspace = workspaceStore.workspaces.find((item) => String(item?.id || '').trim() === workspaceId)
   return String(workspace?.name || '').trim() || 'Untitled workspace'
 })
 
 const activeConversationTitle = computed(() => {
-  const conversationId = String(appStore.activeConversationId || '').trim()
+  const conversationId = String(conversationStore.activeConversationId || '').trim()
   if (!conversationId) return 'New conversation'
-  const conversation = appStore.conversations.find((item) => String(item?.id || '').trim() === conversationId)
+  const conversation = conversationStore.conversations.find((item) => String(item?.id || '').trim() === conversationId)
   return String(conversation?.title || '').trim() || 'Untitled conversation'
 })
 
 const runtimeStateLabel = computed(() => {
-  switch (String(appStore.activeWorkspaceRuntimeStatus || 'missing')) {
+  switch (String(executionStore.getWorkspaceRuntimeStatus(workspaceStore.activeWorkspaceId) || 'missing')) {
     case 'ready': return 'Runtime ready'
     case 'busy': return 'Working'
     case 'starting':
@@ -160,7 +174,7 @@ const runtimeStateLabel = computed(() => {
 })
 
 const runtimeStateClass = computed(() => {
-  switch (String(appStore.activeWorkspaceRuntimeStatus || 'missing')) {
+  switch (String(executionStore.getWorkspaceRuntimeStatus(workspaceStore.activeWorkspaceId) || 'missing')) {
     case 'ready': return 'text-[var(--color-success)]'
     case 'busy': return 'text-[var(--color-warning)]'
     case 'starting':
@@ -172,7 +186,7 @@ const runtimeStateClass = computed(() => {
 
 const workspaceTableCount = computed(() => Math.max(
   0,
-  Number(appStore.activeWorkspaceSummary?.table_count || 0),
+  Number(workspaceStore.activeWorkspaceSummary?.table_count || 0),
 ))
 const dataStateLabel = computed(() => {
   const count = workspaceTableCount.value
@@ -181,14 +195,14 @@ const dataStateLabel = computed(() => {
 })
 
 const effectiveWorkspaceProvider = computed(() => (
-  appStore.workspaceAIConfig?.effective?.provider || appStore.llmProvider
+  workspaceStore.workspaceAIConfig?.effective?.provider || preferencesStore.llmProvider
 ))
 const effectiveWorkspaceModel = computed(() => (
-  appStore.workspaceAIConfig?.effective?.main_model || appStore.selectedModel
+  workspaceStore.workspaceAIConfig?.effective?.main_model || preferencesStore.selectedModel
 ))
 const workspaceModelOptions = computed(() => {
-  const configured = appStore.workspaceAIConfig?.defaults?.provider === effectiveWorkspaceProvider.value
-    ? appStore.availableModels
+  const configured = workspaceStore.workspaceAIConfig?.defaults?.provider === effectiveWorkspaceProvider.value
+    ? preferencesStore.availableModels
     : []
   const values = Array.isArray(configured) ? [...configured] : []
   if (effectiveWorkspaceModel.value && !values.includes(effectiveWorkspaceModel.value)) {
@@ -198,13 +212,13 @@ const workspaceModelOptions = computed(() => {
 })
 
 async function handleModelChange(model) {
-  const config = appStore.workspaceAIConfig
-  if (!config || !appStore.activeWorkspaceId) {
-    appStore.setSelectedModel(model)
+  const config = workspaceStore.workspaceAIConfig
+  if (!config || !workspaceStore.activeWorkspaceId) {
+    preferencesStore.setSelectedModel(model)
     return
   }
   const overrides = config.overrides || {}
-  await appStore.saveWorkspaceAIConfig({
+  await workspaceStore.saveWorkspaceAIConfig({
     llm_provider_override: overrides.provider,
     main_model_override: model,
     lite_model_override: overrides.lite_model,

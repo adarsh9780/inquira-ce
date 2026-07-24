@@ -11,7 +11,7 @@ test('sidebar keeps the bottom action stack and expanded-only labels', () => {
   const source = read('src/components/layout/UnifiedSidebar.vue')
 
   assert.equal(source.includes('Settings'), true)
-  assert.equal(source.includes("{{ appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar' }}"), false)
+  assert.equal(source.includes("{{ uiStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar' }}"), false)
   assert.equal(source.includes('class="sidebar-nav-row justify-start px-2.5"'), true)
   assert.equal(source.includes('{{ profileDisplayName }}'), true)
   assert.equal(source.includes('sidebar-initials-avatar'), true)

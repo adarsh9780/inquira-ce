@@ -73,13 +73,25 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { preferencesApi } from '../../../api/preferences'
-import { useAppStore } from '../../../stores/appStore'
 import { useUiStore } from '../../../stores/uiStore'
+import { usePreferencesStore } from '../../../stores/preferencesStore'
+import { useArtifactStore } from '../../../stores/artifactStore'
+import { useExecutionStore } from '../../../stores/executionStore'
+import { useWorkspaceStore } from '../../../stores/workspaceStore'
+import { useConversationStore } from '../../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../../composables/useArtifactPresentation'
 import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 
 const props = defineProps({ workspaceId: { type: String, required: true } })
-const appStore = useAppStore()
 const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
 const advancedOpen = ref(false)
 const isSaving = ref(false)
 const errorMessage = ref('')
@@ -92,10 +104,10 @@ const form = reactive({ provider: '', mainModel: '', liteModel: '', codingModel:
 const config = computed(() => localConfig.value)
 const hasOverrides = computed(() => Object.entries(config.value?.overrides || {}).some(([key, value]) => key !== 'allow_llm_data_samples' && value !== null && value !== ''))
 const useDefaults = ref(true)
-const providerOptions = computed(() => (appStore.availableProviders || []).map((value) => ({ value, label: value === 'openrouter' ? 'OpenRouter' : value === 'openai' ? 'OpenAI' : value === 'ollama' ? 'Ollama (local)' : value })))
+const providerOptions = computed(() => (preferencesStore.availableProviders || []).map((value) => ({ value, label: value === 'openrouter' ? 'OpenRouter' : value === 'openai' ? 'OpenAI' : value === 'ollama' ? 'Ollama (local)' : value })))
 const modelOptions = (values) => (Array.isArray(values) ? values : []).map((value) => ({ value, label: value }))
-const mainModelOptions = computed(() => modelOptions(providerCatalog.value?.provider_available_main_models || appStore.providerMainModels))
-const liteModelOptions = computed(() => modelOptions(providerCatalog.value?.provider_available_lite_models || appStore.providerLiteModels))
+const mainModelOptions = computed(() => modelOptions(providerCatalog.value?.provider_available_main_models || preferencesStore.providerMainModels))
+const liteModelOptions = computed(() => modelOptions(providerCatalog.value?.provider_available_lite_models || preferencesStore.providerLiteModels))
 const codingModelOptions = computed(() => mainModelOptions.value)
 const effectiveSummary = computed(() => {
   const effective = config.value?.effective
@@ -106,14 +118,14 @@ const credentialLabel = computed(() => config.value?.readiness?.credential_ready
 const isDirty = computed(() => Boolean(config.value) && payloadSignature(buildPayload()) !== initialPayloadSignature.value)
 
 watch(config, hydrate, { immediate: true })
-watch(() => appStore.workspaceAIConfig, (value) => {
-  if (props.workspaceId === appStore.activeWorkspaceId && value) localConfig.value = value
+watch(() => workspaceStore.workspaceAIConfig, (value) => {
+  if (props.workspaceId === workspaceStore.activeWorkspaceId && value) localConfig.value = value
 })
 watch(() => props.workspaceId, async (workspaceId) => {
   localConfig.value = null
   initialPayloadSignature.value = ''
   saveStateLabel.value = 'Changes apply to this workspace only.'
-  if (workspaceId) localConfig.value = await appStore.fetchWorkspaceAIConfig(workspaceId)
+  if (workspaceId) localConfig.value = await workspaceStore.fetchWorkspaceAIConfig(workspaceId)
 }, { immediate: true })
 
 function hydrate(value) {
@@ -159,7 +171,7 @@ async function save() {
   isSaving.value = true
   errorMessage.value = ''
   try {
-    const savedConfig = await appStore.saveWorkspaceAIConfig(buildPayload(), props.workspaceId)
+    const savedConfig = await workspaceStore.saveWorkspaceAIConfig(buildPayload(), props.workspaceId)
     localConfig.value = savedConfig
     hydrate(savedConfig)
     saveStateLabel.value = 'Saved.'

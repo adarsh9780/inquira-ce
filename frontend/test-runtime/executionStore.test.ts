@@ -37,4 +37,18 @@ describe('executionStore', () => {
     vi.advanceTimersByTime(3500)
     expect(store.backgroundOperations).toHaveLength(0)
   })
+
+  it('preserves runtime and terminal statuses used by the workbench', () => {
+    const store = useExecutionStore()
+
+    for (const status of ['starting', 'connecting', 'ready', 'busy', 'error', 'failed']) {
+      store.setWorkspaceRuntimeStatus('workspace-a', status)
+      expect(store.getWorkspaceRuntimeStatus('workspace-a')).toBe(status)
+    }
+
+    const entryId = store.appendTerminalEntry({ status: 'success', stdout: 'done' })
+    expect((store.terminalEntries[0] as Record<string, unknown>).status).toBe('success')
+    store.updateTerminalEntry(entryId, { status: 'error' })
+    expect((store.terminalEntries[0] as Record<string, unknown>).status).toBe('error')
+  })
 })

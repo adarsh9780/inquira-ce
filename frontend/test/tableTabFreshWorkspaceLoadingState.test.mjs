@@ -13,6 +13,6 @@ test('TableTab shows saved-table loading only while an active turn artifact list
   assert.equal(source.includes('const activeWorkspaceHasKnownSavedTables = computed(() => {'), false)
   assert.equal(source.includes('const showArtifactListLoadingState = computed(() => {'), true)
   assert.equal(source.includes('v-else-if="showArtifactListLoadingState"'), true)
-  assert.equal(source.includes("return isLoadingArtifacts.value && Boolean(String(appStore.activeTurnId || '').trim())"), true)
+  assert.equal(source.includes("return isLoadingArtifacts.value && Boolean(String(conversationStore.activeTurnId || '').trim())"), true)
   assert.equal(source.includes('[normalizedWorkspaceId]: artifacts.length > 0'), false)
 })

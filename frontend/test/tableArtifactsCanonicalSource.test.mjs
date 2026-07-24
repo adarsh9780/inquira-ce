@@ -15,7 +15,7 @@ test('TableTab uses active turn artifact catalog as canonical source', () => {
   assert.equal(source.includes('sourceArtifactId'), true)
   assert.equal(source.includes('artifactApi.workspaceRows('), true)
   assert.equal(source.includes('waitForKernelReady'), false)
-  assert.equal(source.includes("() => [\n    String(appStore.activeConversationId || '').trim(),\n    String(appStore.activeTurnId || '').trim(),"), true)
+  assert.equal(source.includes("() => [\n    String(conversationStore.activeConversationId || '').trim(),\n    String(conversationStore.activeTurnId || '').trim(),"), true)
   assert.equal(source.includes('await prepareArtifact(nextSelection)'), true)
   assert.equal(source.includes('const liveDataframeArtifacts = computed(() => {'), true)
   assert.equal(source.includes('return [...liveDataframeArtifacts.value, ...persistedArtifacts]'), true)

@@ -149,7 +149,14 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { workspaceApi } from '../../api/workspaces'
-import { useAppStore } from '../../stores/appStore'
+import { useUiStore } from '../../stores/uiStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
+import { useArtifactStore } from '../../stores/artifactStore'
+import { useExecutionStore } from '../../stores/executionStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useConversationStore } from '../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import { toast } from '../../composables/useToast'
 import MarkdownIt from 'markdown-it'
 
@@ -159,7 +166,14 @@ const vFocus = {
 }
 
 const md = new MarkdownIt({ breaks: true, linkify: true })
-const appStore = useAppStore()
+const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
 
 const schemaLoading = ref(false)
 const regeneratingTableName = ref('')
@@ -175,7 +189,7 @@ const tempContext = ref('')
 // Inline editing state
 const editingCell = ref(null) // { col: Object, field: 'description' | 'aliases', value: String }
 
-const hasWorkspace = computed(() => !!appStore.activeWorkspaceId)
+const hasWorkspace = computed(() => !!workspaceStore.activeWorkspaceId)
 
 const renderedContext = computed(() => {
   if (!schemaContext.value || schemaContext.value.trim() === '') return ''
@@ -195,24 +209,24 @@ const groupedSchema = computed(() => {
 })
 
 async function loadWorkspaceContext() {
-  if (!appStore.activeWorkspaceId) {
+  if (!workspaceStore.activeWorkspaceId) {
     schemaContext.value = ''
     return
   }
   try {
-    const summary = await workspaceApi.summary(appStore.activeWorkspaceId)
+    const summary = await workspaceApi.summary(workspaceStore.activeWorkspaceId)
     schemaContext.value = String(summary?.schema_context || '').trim()
   } catch (error) {
     // Silently fail or use store fallback
-    schemaContext.value = String(appStore.workspaces.find(w => w.id === appStore.activeWorkspaceId)?.schema_context || '').trim()
+    schemaContext.value = String(workspaceStore.workspaces.find(w => w.id === workspaceStore.activeWorkspaceId)?.schema_context || '').trim()
   }
 }
 
 async function fetchWorkspaceSchema(forceRefresh = false) {
-  if (!appStore.activeWorkspaceId) return
+  if (!workspaceStore.activeWorkspaceId) return
   schemaLoading.value = true
   try {
-    const workspaceId = appStore.activeWorkspaceId
+    const workspaceId = workspaceStore.activeWorkspaceId
     const datasetResponse = await workspaceApi.listDatasets(workspaceId)
     const datasets = datasetResponse?.datasets || []
 
@@ -261,10 +275,10 @@ function cancelEditContext() {
 }
 
 async function saveEditContext() {
-  if (!appStore.activeWorkspaceId) return
+  if (!workspaceStore.activeWorkspaceId) return
   try {
-    const workspace = appStore.workspaces.find(w => w.id === appStore.activeWorkspaceId)
-    await workspaceApi.update(appStore.activeWorkspaceId, workspace?.name ?? null, tempContext.value.trim())
+    const workspace = workspaceStore.workspaces.find(w => w.id === workspaceStore.activeWorkspaceId)
+    await workspaceApi.update(workspaceStore.activeWorkspaceId, workspace?.name ?? null, tempContext.value.trim())
     schemaContext.value = tempContext.value.trim()
     isEditingContext.value = false
     toast.success('Workspace context saved')
@@ -328,7 +342,7 @@ function saveInlineEdit() {
 }
 
 async function saveAllSchema() {
-  if (!schemaEdited.value || !appStore.activeWorkspaceId) return
+  if (!schemaEdited.value || !workspaceStore.activeWorkspaceId) return
 
   // If user clicks save while editing, commit the inline edit first
   if (editingCell.value) {
@@ -337,7 +351,7 @@ async function saveAllSchema() {
 
   schemaLoading.value = true
   try {
-    const workspaceId = appStore.activeWorkspaceId
+    const workspaceId = workspaceStore.activeWorkspaceId
 
     // Only save the tables that have been modified
     const tablesToSave = groupedSchema.value.filter(g => dirtyTables.value.has(g.tableName))
@@ -366,10 +380,10 @@ async function saveAllSchema() {
 
 
 async function regenerateTableSchema(tableName) {
-  if (!appStore.activeWorkspaceId || !tableName) return
+  if (!workspaceStore.activeWorkspaceId || !tableName) return
   if (regeneratingTableName.value) return
   regeneratingTableName.value = tableName
-  const operationId = appStore.startBackgroundOperation({
+  const operationId = executionStore.startBackgroundOperation({
     id: `schema-regeneration-${tableName}`,
     type: 'schema',
     title: 'Regenerating schema',
@@ -378,7 +392,7 @@ async function regenerateTableSchema(tableName) {
   })
   try {
     toast.info('Regenerating table schema', `Generating AI descriptions for ${tableName}...`)
-    const regenerated = await workspaceApi.regenerateDatasetSchema(appStore.activeWorkspaceId, tableName, {
+    const regenerated = await workspaceApi.regenerateDatasetSchema(workspaceStore.activeWorkspaceId, tableName, {
       context: schemaContext.value || ''
     })
 
@@ -394,13 +408,13 @@ async function regenerateTableSchema(tableName) {
     if (dirtyTables.value.size === 0) {
       schemaEdited.value = false
     }
-    appStore.finishBackgroundOperation(operationId, {
+    executionStore.finishBackgroundOperation(operationId, {
       title: 'Schema regenerated',
       message: `Schema updated for ${tableName}.`,
     })
     toast.success('Table schema regenerated', `AI descriptions updated for ${tableName}.`)
   } catch (error) {
-    appStore.finishBackgroundOperation(operationId, {
+    executionStore.finishBackgroundOperation(operationId, {
       status: 'failed',
       title: 'Schema regeneration failed',
       message: error?.message || 'Unable to regenerate schema.',
@@ -425,7 +439,7 @@ onUnmounted(() => {
   window.removeEventListener('dataset-schema-ready', handleDatasetSchemaReady)
 })
 
-watch(() => appStore.activeWorkspaceId, async (newId) => {
+watch(() => workspaceStore.activeWorkspaceId, async (newId) => {
   schemaEdited.value = false
   dirtyTables.value.clear()
   if (newId) {
@@ -437,7 +451,7 @@ watch(() => appStore.activeWorkspaceId, async (newId) => {
   }
 })
 
-watch(() => appStore.activeTab, async (nextTab) => {
+watch(() => uiStore.activeTab, async (nextTab) => {
   if (nextTab !== 'schema-editor') {
     // If navigating away and there are unsaved changes, we could potentially auto-save or prompt.
     // For now, let's keep it simple.

@@ -30,8 +30,8 @@
         :placeholder="composerPlaceholder"
         class="w-full px-3 pt-3 pb-1.5 resize-none focus:outline-none text-[13px] leading-[1.55] bg-transparent border-none"
         style="color: var(--color-text-main); min-height: 60px;"
-        :class="{ 'opacity-60 cursor-not-allowed': !appStore.canAnalyze || appStore.activeConversationIsLoading }"
-        :disabled="!appStore.canAnalyze || appStore.activeConversationIsLoading"
+        :class="{ 'opacity-60 cursor-not-allowed': !workspaceActivation.canAnalyze || executionStore.isConversationRunning(conversationStore.activeConversationId) }"
+        :disabled="!workspaceActivation.canAnalyze || executionStore.isConversationRunning(conversationStore.activeConversationId)"
       />
 
       <ChatAttachmentTray
@@ -94,7 +94,7 @@
           </button>
 
           <button
-            v-if="appStore.activeConversationIsLoading"
+            v-if="executionStore.isConversationRunning(conversationStore.activeConversationId)"
             type="button"
             class="composer-action-button focus:outline-none"
             title="Stop generation"
@@ -164,7 +164,14 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useAppStore } from '../../stores/appStore'
+import { useUiStore } from '../../stores/uiStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
+import { useArtifactStore } from '../../stores/artifactStore'
+import { useExecutionStore } from '../../stores/executionStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useConversationStore } from '../../stores/conversationStore'
+import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
+import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import { executionApi } from '../../api/execution'
 import { workspaceApi } from '../../api/workspaces'
 import executionService from '../../services/executionService'
@@ -185,15 +192,22 @@ import {
 } from '@heroicons/vue/24/outline'
 import { ArrowUpIcon, MicrophoneIcon, StopIcon } from '@heroicons/vue/24/solid'
 
-const appStore = useAppStore()
-const effectiveWorkspaceModel = computed(() => appStore.workspaceAIConfig?.effective?.main_model || appStore.selectedModel)
+const uiStore = useUiStore()
+const preferencesStore = usePreferencesStore()
+const artifactStore = useArtifactStore()
+const executionStore = useExecutionStore()
+const workspaceStore = useWorkspaceStore()
+const conversationStore = useConversationStore()
+const workspaceActivation = useWorkspaceActivation()
+const artifactPresentation = useArtifactPresentation()
+const effectiveWorkspaceModel = computed(() => workspaceStore.workspaceAIConfig?.effective?.main_model || preferencesStore.selectedModel)
 const primaryWorkspaceTableName = computed(() => {
-  const summaryTable = (Array.isArray(appStore.activeWorkspaceSummary?.table_names)
-    ? appStore.activeWorkspaceSummary.table_names
+  const summaryTable = (Array.isArray(workspaceStore.activeWorkspaceSummary?.table_names)
+    ? workspaceStore.activeWorkspaceSummary.table_names
     : []
   ).map((name) => String(name || '').trim()).find(Boolean)
   if (summaryTable) return summaryTable
-  const catalogItem = (Array.isArray(appStore.columnCatalog) ? appStore.columnCatalog : [])
+  const catalogItem = (Array.isArray(workspaceStore.columnCatalog) ? workspaceStore.columnCatalog : [])
     .find((item) => String(item?.table_name || '').trim())
   return String(catalogItem?.table_name || '').trim()
 })
@@ -231,15 +245,15 @@ const composerPlaceholder = computed(() => {
   return tableName ? `Ask about ${tableName}…` : 'Ask about your data…'
 })
 const canSend = computed(() =>
-  appStore.canAnalyze &&
+  workspaceActivation.canAnalyze &&
   (question.value.trim().length > 0 || pendingAttachments.value.length > 0) &&
   question.value.length <= 1000 &&
-  !appStore.activeConversationIsLoading
+  !executionStore.isConversationRunning(conversationStore.activeConversationId)
 )
 const canTriggerVoiceInput = computed(() =>
-  appStore.canAnalyze &&
+  workspaceActivation.canAnalyze &&
   supportsVoiceInput.value &&
-  !appStore.activeConversationIsLoading
+  !executionStore.isConversationRunning(conversationStore.activeConversationId)
 )
 const voiceButtonTitle = computed(() => (
   supportsVoiceInput.value
@@ -306,7 +320,7 @@ async function refreshRuntimeStatusAfterExplicitWork(workspaceId) {
   if (!normalizedWorkspaceId) return
   try {
     const payload = await workspaceApi.runtimeStatus(normalizedWorkspaceId)
-    appStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, payload?.status || 'missing')
+    executionStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, payload?.status || 'missing')
   } catch (_error) {
     // Runtime status is informational; keep the completed chat response intact.
   }
@@ -500,10 +514,10 @@ function stopVoiceInput() {
 }
 
 function handleStopGeneration() {
-  const conversationId = String(appStore.activeConversationId || '').trim()
+  const conversationId = String(conversationStore.activeConversationId || '').trim()
   if (!conversationId) return
   stoppedConversationIds.value = new Set([...stoppedConversationIds.value, conversationId])
-  appStore.abortConversationRun(conversationId)
+  executionStore.abortConversationRun(conversationId)
 }
 
 function isSimpleIdentifier(value) {
@@ -561,7 +575,7 @@ function collectColumnCandidates() {
     if (suggestion) merged.push(suggestion)
   }
 
-  const catalogItems = Array.isArray(appStore.columnCatalog) ? appStore.columnCatalog : []
+  const catalogItems = Array.isArray(workspaceStore.columnCatalog) ? workspaceStore.columnCatalog : []
   catalogItems.forEach((item) => {
     addCandidate(item?.table_name, item?.column_name, item?.dtype)
   })
@@ -702,8 +716,8 @@ async function updateAutocompleteSuggestions() {
     return
   }
 
-  if (!Array.isArray(appStore.columnCatalog) || appStore.columnCatalog.length === 0) {
-    await appStore.fetchColumnCatalog()
+  if (!Array.isArray(workspaceStore.columnCatalog) || workspaceStore.columnCatalog.length === 0) {
+    await workspaceStore.fetchColumnCatalog()
   }
 
   const normalizedToken = token.toLowerCase()
@@ -774,7 +788,7 @@ function isHistoryNavigationAllowed(event, step) {
 }
 
 function navigateQuestionHistory(step) {
-  const history = Array.isArray(appStore.questionHistory) ? appStore.questionHistory : []
+  const history = Array.isArray(conversationStore.questionHistory) ? conversationStore.questionHistory : []
   if (history.length === 0) return false
 
   if (step < 0) {
@@ -873,32 +887,32 @@ function applyCommandResultToStore(commandResult) {
       row_count: Number.isFinite(Number(payload?.row_count)) ? Number(payload.row_count) : rows.length,
       result_type: String(payload?.result_type || commandResult?.result_type || 'table'),
     }
-    appStore.setDataframes([
+    artifactStore.setDataframes([
       {
         name: String(commandResult?.name || 'command_result'),
         origin: 'ai',
         data: tableResult,
       },
     ])
-    appStore.setResultData(tableResult)
-    appStore.setFigures([])
-    appStore.setPlotlyFigure(null)
-    appStore.revealArtifactsPane({ hasDataframes: true })
-    appStore.setActiveTab('table')
+    artifactStore.setResultData(tableResult)
+    artifactStore.setFigures([])
+    artifactStore.setPlotlyFigure(null)
+    artifactPresentation.revealArtifactsPane({ hasDataframes: true })
+    uiStore.setActiveTab('table')
   } else {
-    appStore.setDataframes([])
-    appStore.setResultData(null)
-    appStore.setFigures([])
-    appStore.setPlotlyFigure(null)
+    artifactStore.setDataframes([])
+    artifactStore.setResultData(null)
+    artifactStore.setFigures([])
+    artifactStore.setPlotlyFigure(null)
   }
 
   const output = String(commandResult?.output || `/${commandResult?.name || 'command'} executed.`)
-  appStore.setTerminalOutput(output)
-  appStore.appendTerminalEntry({
+  executionStore.setTerminalOutput(output)
+  executionStore.appendTerminalEntry({
     kind: 'output',
     source: 'analysis',
     origin: 'ai',
-    conversationId: String(appStore.activeConversationId || ''),
+    conversationId: String(conversationStore.activeConversationId || ''),
     label: `/${String(commandResult?.name || 'command')}`,
     command: `/${String(commandResult?.name || 'command')}`,
     status: 'success',
@@ -908,7 +922,7 @@ function applyCommandResultToStore(commandResult) {
   })
 }
 
-function appendChatExecutionOutput(response, conversationId = appStore.activeConversationId, code = '') {
+function appendChatExecutionOutput(response, conversationId = conversationStore.activeConversationId, code = '') {
   const execution = response?.execution && typeof response.execution === 'object'
     ? response.execution
     : null
@@ -931,9 +945,9 @@ function appendChatExecutionOutput(response, conversationId = appStore.activeCon
 
   const success = execution.success !== false && String(execution.status || 'success').toLowerCase() !== 'failed'
   const terminalOutput = stderr || stdout
-  if (String(conversationId || '').trim() === String(appStore.activeConversationId || '').trim()) {
-    appStore.setTerminalOutput(terminalOutput)
-    appStore.appendTerminalEntry({
+  if (String(conversationId || '').trim() === String(conversationStore.activeConversationId || '').trim()) {
+    executionStore.setTerminalOutput(terminalOutput)
+    executionStore.appendTerminalEntry({
       kind: 'output',
       source: 'analysis',
       origin: 'ai',
@@ -952,7 +966,7 @@ function appendChatExecutionOutput(response, conversationId = appStore.activeCon
       hasChartOutput,
     })
   } else {
-    appStore.patchConversationState(conversationId, { terminalOutput })
+    conversationStore.patchConversationState(conversationId, { terminalOutput })
   }
   return true
 }
@@ -996,26 +1010,26 @@ function preferredDataPane(payload = {}) {
   if (payload?.hasFigures) return 'figure'
   if (payload?.hasDataframes) return 'table'
   if (payload?.hasOutput) return 'output'
-  return appStore.dataPane || 'table'
+  return uiStore.dataPane || 'table'
 }
 
 function applyConversationResultState(conversationId, statePatch = {}, revealPayload = {}) {
   const targetConversationId = String(conversationId || '').trim()
   if (!targetConversationId) return
-  const active = targetConversationId === String(appStore.activeConversationId || '').trim()
+  const active = targetConversationId === String(conversationStore.activeConversationId || '').trim()
   if (active) {
-    if (Object.prototype.hasOwnProperty.call(statePatch, 'generatedCode')) appStore.setGeneratedCode(statePatch.generatedCode)
-    if (Object.prototype.hasOwnProperty.call(statePatch, 'pythonFileContent')) appStore.setPythonFileContent(statePatch.pythonFileContent)
-    if (Object.prototype.hasOwnProperty.call(statePatch, 'resultData')) appStore.setResultData(statePatch.resultData)
-    if (Object.prototype.hasOwnProperty.call(statePatch, 'plotlyFigure')) appStore.setPlotlyFigure(statePatch.plotlyFigure)
-    if (Object.prototype.hasOwnProperty.call(statePatch, 'dataframes')) appStore.setDataframes(statePatch.dataframes)
-    if (Object.prototype.hasOwnProperty.call(statePatch, 'figures')) appStore.setFigures(statePatch.figures)
-    if (Object.prototype.hasOwnProperty.call(statePatch, 'scalars')) appStore.setScalars(statePatch.scalars)
-    if (Object.prototype.hasOwnProperty.call(statePatch, 'terminalOutput')) appStore.setTerminalOutput(statePatch.terminalOutput)
-    appStore.revealArtifactsPane(revealPayload)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'generatedCode')) executionStore.setGeneratedCode(statePatch.generatedCode)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'pythonFileContent')) executionStore.setPythonFileContent(statePatch.pythonFileContent)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'resultData')) artifactStore.setResultData(statePatch.resultData)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'plotlyFigure')) artifactStore.setPlotlyFigure(statePatch.plotlyFigure)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'dataframes')) artifactStore.setDataframes(statePatch.dataframes)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'figures')) artifactStore.setFigures(statePatch.figures)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'scalars')) artifactStore.setScalars(statePatch.scalars)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'terminalOutput')) executionStore.setTerminalOutput(statePatch.terminalOutput)
+    artifactPresentation.revealArtifactsPane(revealPayload)
     return
   }
-  appStore.patchConversationState(targetConversationId, {
+  conversationStore.patchConversationState(targetConversationId, {
     ...statePatch,
     dataPane: preferredDataPane(revealPayload),
   })
@@ -1027,65 +1041,65 @@ async function handleSlashCommand(questionText) {
   let operationId = ''
   let commandFailed = false
   try {
-    const workspaceId = appStore.activeWorkspaceId
+    const workspaceId = workspaceStore.activeWorkspaceId
     if (!workspaceId) {
       throw new Error('Create/select a workspace before analysis.')
     }
 
-    requestConversationId = String(await appStore.ensureActiveConversation('New chat') || '').trim()
+    requestConversationId = String(await conversationStore.ensureActiveConversation(workspaceStore.activeWorkspaceId, 'New chat') || '').trim()
     if (!requestConversationId) {
       throw new Error('Could not create a chat for this command.')
     }
-    appStore.setConversationRun(requestConversationId, {
+    executionStore.setConversationRun(requestConversationId, {
       status: 'running',
       requestId: `command-${Date.now()}`,
       startedAt: new Date().toISOString(),
     })
-    operationId = appStore.startBackgroundOperation({
+    operationId = executionStore.startBackgroundOperation({
       id: `chat-command-${requestConversationId}`,
       type: 'chat',
       title: 'Running command',
       message: 'Executing chat command...',
       priority: 70,
     })
-    appStore.addChatMessage(questionText, 'Running command...', { conversationId: requestConversationId })
+    conversationStore.addChatMessage(questionText, 'Running command...', { conversationId: requestConversationId })
     commandMessageCreated = true
-    const result = await executeCommand(questionText, { appStore, executionService })
+    const result = await executeCommand(questionText, { workspaceStore, conversationStore, executionService })
     const persistedConversationId = String(result?.conversation_id || '').trim()
     if (
       persistedConversationId &&
-      persistedConversationId !== String(appStore.activeConversationId || '').trim() &&
-      requestConversationId === String(appStore.activeConversationId || '').trim()
+      persistedConversationId !== String(conversationStore.activeConversationId || '').trim() &&
+      requestConversationId === String(conversationStore.activeConversationId || '').trim()
     ) {
-      appStore.setActiveConversationId(persistedConversationId)
+      conversationStore.setActiveConversationId(persistedConversationId)
     }
     if (persistedConversationId) {
-      await appStore.fetchConversations()
-      await appStore.loadWorkspaceTurnTree()
+      await conversationStore.fetchConversations()
+      await conversationStore.loadWorkspaceTurnTree()
       try {
-        await appStore.fetchActiveConversationUsage(persistedConversationId)
+        await conversationStore.fetchActiveConversationUsage(persistedConversationId)
       } catch (_error) {
         // Usage display is informational; command output should still render.
       }
     }
-    appStore.updateLastMessageExplanation(
+    conversationStore.updateLastMessageExplanation(
       String(result?.output || `/${String(result?.name || 'command')} executed.`),
       null,
       { conversationId: requestConversationId },
     )
-    if (requestConversationId === String(appStore.activeConversationId || '').trim()) {
+    if (requestConversationId === String(conversationStore.activeConversationId || '').trim()) {
       applyCommandResultToStore(result)
     }
   } catch (error) {
     commandFailed = true
     const message = extractApiErrorMessage(error, 'Failed to run command.')
     if (commandMessageCreated) {
-      appStore.updateLastMessageExplanation(`Command failed: ${message}`, null, { conversationId: requestConversationId })
+      conversationStore.updateLastMessageExplanation(`Command failed: ${message}`, null, { conversationId: requestConversationId })
     }
     toast.error('Command Failed', message)
-    if (requestConversationId === String(appStore.activeConversationId || '').trim()) {
-      appStore.setTerminalOutput(`Error: ${message}`)
-      appStore.appendTerminalEntry({
+    if (requestConversationId === String(conversationStore.activeConversationId || '').trim()) {
+      executionStore.setTerminalOutput(`Error: ${message}`)
+      executionStore.appendTerminalEntry({
         kind: 'output',
         source: 'analysis',
         origin: 'ai',
@@ -1098,17 +1112,17 @@ async function handleSlashCommand(questionText) {
         exitCode: 1,
       })
     } else {
-      appStore.patchConversationState(requestConversationId, {
+      conversationStore.patchConversationState(requestConversationId, {
         terminalOutput: `Error: ${message}`,
         dataPane: 'output',
       })
     }
   } finally {
     if (requestConversationId) {
-      appStore.clearConversationRun(requestConversationId)
+      executionStore.clearConversationRun(requestConversationId)
     }
     if (operationId) {
-      appStore.finishBackgroundOperation(operationId, {
+      executionStore.finishBackgroundOperation(operationId, {
         status: commandFailed ? 'failed' : 'complete',
         title: commandFailed ? 'Command failed' : 'Command complete',
         message: commandFailed ? 'Chat command failed.' : 'Chat command finished.',
@@ -1136,7 +1150,7 @@ async function handleSubmit() {
     data_base64: item.data_base64,
   }))
   if (rawQuestionText) {
-    appStore.addQuestionHistoryEntry(questionText)
+    conversationStore.addQuestionHistoryEntry(questionText)
   }
   questionHistoryIndex.value = -1
   questionHistoryDraft.value = ''
@@ -1161,7 +1175,7 @@ async function handleSubmit() {
 
   let requestConversationId = ''
   try {
-    requestConversationId = String(await appStore.ensureActiveConversation('New chat') || '').trim()
+    requestConversationId = String(await conversationStore.ensureActiveConversation(workspaceStore.activeWorkspaceId, 'New chat') || '').trim()
   } catch (error) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Could not create a chat.'))
     question.value = rawQuestionText
@@ -1177,14 +1191,14 @@ async function handleSubmit() {
     question.value = rawQuestionText
     return
   }
-  if (appStore.isConversationRunning(requestConversationId)) {
+  if (executionStore.isConversationRunning(requestConversationId)) {
     toast.warning('Conversation Running', 'Wait for this conversation to finish before sending another prompt.')
     return
   }
   const localMessageId = `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`
-  appStore.addChatMessage(questionText, '', { attachments: attachmentsPayload, localMessageId, conversationId: requestConversationId })
-  appStore.syncLiveTokenUsageFromChatHistory({ conversationId: requestConversationId })
-  const operationId = appStore.startBackgroundOperation({
+  conversationStore.addChatMessage(questionText, '', { attachments: attachmentsPayload, localMessageId, conversationId: requestConversationId })
+  conversationStore.syncLiveTokenUsageFromChatHistory({ conversationId: requestConversationId })
+  const operationId = executionStore.startBackgroundOperation({
     id: `chat-stream-${requestConversationId}`,
     type: 'chat',
     title: 'Generating response',
@@ -1195,7 +1209,7 @@ async function handleSubmit() {
   let operationMessage = 'Chat response finished.'
 
   const abortController = new AbortController()
-  appStore.setConversationRun(requestConversationId, {
+  executionStore.setConversationRun(requestConversationId, {
     status: 'running',
     requestId: localMessageId,
     startedAt: new Date().toISOString(),
@@ -1207,12 +1221,12 @@ async function handleSubmit() {
   let cancelTimer = null
 
   try {
-    const workspaceId = appStore.activeWorkspaceId
+    const workspaceId = workspaceStore.activeWorkspaceId
     if (!workspaceId) {
       throw new Error('Create/select a workspace before analysis.')
     }
 
-    const warningAfterMs = resolveSlowRequestWarningTimeoutMs(appStore.slowRequestWarningSeconds)
+    const warningAfterMs = resolveSlowRequestWarningTimeoutMs(preferencesStore.slowRequestWarningSeconds)
     warningTimer = setTimeout(() => {
       toast.warning('Request Taking Longer', 'Your query is taking longer than expected.')
     }, warningAfterMs)
@@ -1224,15 +1238,15 @@ async function handleSubmit() {
     }, cancelAfterMs)
 
     let response
-    const selectedParentTurnId = String(appStore.activeTurnId || '').trim()
+    const selectedParentTurnId = String(conversationStore.activeTurnId || '').trim()
     response = await executionApi.analyze(
       {
         workspace_id: workspaceId,
         conversation_id: requestConversationId,
         question: questionText,
-        current_code: appStore.pythonFileContent || '',
+        current_code: executionStore.pythonFileContent || '',
         model: effectiveWorkspaceModel.value,
-        context: appStore.schemaContext.trim() || null,
+        context: workspaceStore.schemaContext.trim() || null,
         use_selected_turn_context: Boolean(selectedParentTurnId),
         selected_parent_turn_id: selectedParentTurnId || null,
         attachments: attachmentsPayload,
@@ -1244,7 +1258,7 @@ async function handleSubmit() {
           if ((evt.event === 'messages' || evt.event === 'messages/partial' || evt.event === 'messages-tuple')) {
             const text = extractLangGraphTokenText(evt.data)
             if (text) {
-              appStore.appendLastMessageExplanationChunk(text, localMessageId, { conversationId: requestConversationId })
+              conversationStore.appendLastMessageExplanationChunk(text, localMessageId, { conversationId: requestConversationId })
             }
             return
           }
@@ -1254,14 +1268,14 @@ async function handleSubmit() {
           if (evt.event === 'token' && typeof evt.data?.text === 'string') {
             const nodeName = String(evt.data?.node || '').trim().toLowerCase()
             if (FINAL_STREAM_NODES.has(nodeName)) {
-              appStore.appendLastMessageExplanationChunk(evt.data.text, localMessageId, { conversationId: requestConversationId })
+              conversationStore.appendLastMessageExplanationChunk(evt.data.text, localMessageId, { conversationId: requestConversationId })
             } else {
-              appStore.appendLastMessagePlanChunk(evt.data.text, evt.data.node || '', localMessageId, { conversationId: requestConversationId })
+              conversationStore.appendLastMessagePlanChunk(evt.data.text, evt.data.node || '', localMessageId, { conversationId: requestConversationId })
             }
             return
           }
           if (evt.event === 'llm_progress' && evt.data?.message) {
-            appStore.appendLastMessageTraceEvent({
+            conversationStore.appendLastMessageTraceEvent({
               type: 'llm_progress',
               stage: evt.data?.stage || '',
               message: evt.data.message,
@@ -1270,7 +1284,7 @@ async function handleSubmit() {
             return
           }
           if (evt.event === 'reasoning' && evt.data?.message) {
-            appStore.appendLastMessageReasoningEvent({
+            conversationStore.appendLastMessageReasoningEvent({
               stage: evt.data?.stage || 'intent',
               message: evt.data.message,
               route: evt.data?.route || ''
@@ -1278,7 +1292,7 @@ async function handleSubmit() {
             return
           }
           if (evt.event === 'agent_status' && evt.data?.message) {
-            appStore.appendLastMessageTraceEvent({
+            conversationStore.appendLastMessageTraceEvent({
               type: 'status',
               node: 'agent_status',
               stage: evt.data.step || '',
@@ -1288,15 +1302,15 @@ async function handleSubmit() {
             return
           }
           if (evt.event === 'tool_call' && evt.data?.call_id) {
-            appStore.appendLastMessageToolCall(evt.data, localMessageId, { conversationId: requestConversationId })
+            conversationStore.appendLastMessageToolCall(evt.data, localMessageId, { conversationId: requestConversationId })
             return
           }
           if (evt.event === 'tool_progress' && evt.data?.call_id) {
-            appStore.appendLastMessageToolProgress(evt.data, localMessageId, { conversationId: requestConversationId })
+            conversationStore.appendLastMessageToolProgress(evt.data, localMessageId, { conversationId: requestConversationId })
             return
           }
           if (evt.event === 'tool_result' && evt.data?.call_id) {
-            appStore.appendLastMessageToolResult(evt.data, localMessageId, { conversationId: requestConversationId })
+            conversationStore.appendLastMessageToolResult(evt.data, localMessageId, { conversationId: requestConversationId })
             return
           }
           if (evt.event === 'error') {
@@ -1304,13 +1318,13 @@ async function handleSubmit() {
               { data: evt.data },
               'Streaming analysis failed.',
             )
-            appStore.updateLastMessageExplanation(streamErrorMessage, localMessageId, { conversationId: requestConversationId })
+            conversationStore.updateLastMessageExplanation(streamErrorMessage, localMessageId, { conversationId: requestConversationId })
             return
           }
           if (evt.event === 'token_usage' && evt.data && typeof evt.data === 'object') {
             const tokenUsage = evt.data?.token_usage
             if (tokenUsage && typeof tokenUsage === 'object') {
-              appStore.setLiveTokenUsageForCurrentTurn(tokenUsage, { conversationId: requestConversationId })
+              conversationStore.setLiveTokenUsageForCurrentTurn(tokenUsage, { conversationId: requestConversationId })
             }
           }
         }
@@ -1319,41 +1333,41 @@ async function handleSubmit() {
 
     if (
       response?.conversation_id &&
-      response.conversation_id !== appStore.activeConversationId &&
-      requestConversationId === String(appStore.activeConversationId || '').trim()
+      response.conversation_id !== conversationStore.activeConversationId &&
+      requestConversationId === String(conversationStore.activeConversationId || '').trim()
     ) {
-      appStore.setActiveConversationId(response.conversation_id)
-      await appStore.fetchConversations()
+      conversationStore.setActiveConversationId(response.conversation_id)
+      await conversationStore.fetchConversations()
     }
 
     const responseTurnId = String(response?.turn_id || '').trim()
     if (responseTurnId) {
-      appStore.setLastMessageTurnId(responseTurnId, localMessageId, { conversationId: requestConversationId })
-      if (String(response?.conversation_id || requestConversationId) === String(appStore.activeConversationId || '')) {
-        await appStore.loadActiveTurnRelations(responseTurnId)
-        await appStore.loadFinalTurn()
+      conversationStore.setLastMessageTurnId(responseTurnId, localMessageId, { conversationId: requestConversationId })
+      if (String(response?.conversation_id || requestConversationId) === String(conversationStore.activeConversationId || '')) {
+        await conversationStore.loadActiveTurnRelations(responseTurnId)
+        await conversationStore.loadFinalTurn()
       }
-      await appStore.loadWorkspaceTurnTree()
+      await conversationStore.loadWorkspaceTurnTree()
     }
 
     const { is_safe, code, current_code, explanation, result_explanation, code_explanation } = response
     const finalCode = (code ?? current_code ?? '').toString()
-    appStore.setLastMessageAnalysisMetadata(response?.metadata || {}, localMessageId, { conversationId: requestConversationId })
+    conversationStore.setLastMessageAnalysisMetadata(response?.metadata || {}, localMessageId, { conversationId: requestConversationId })
     try {
-      await appStore.fetchActiveConversationUsage(String(response?.conversation_id || requestConversationId || '').trim())
+      await conversationStore.fetchActiveConversationUsage(String(response?.conversation_id || requestConversationId || '').trim())
     } catch (_error) {
       // Usage display is informational; the completed response should still render.
     }
     const finalExplanation = (result_explanation ?? explanation ?? '').toString()
-    appStore.setLastMessageCodeSnapshot(finalCode, localMessageId, { conversationId: requestConversationId })
-    appStore.setLastMessageCodeExplanation((code_explanation ?? '').toString(), localMessageId, { conversationId: requestConversationId })
+    conversationStore.setLastMessageCodeSnapshot(finalCode, localMessageId, { conversationId: requestConversationId })
+    conversationStore.setLastMessageCodeExplanation((code_explanation ?? '').toString(), localMessageId, { conversationId: requestConversationId })
 
     if (!is_safe) {
-      appStore.updateLastMessageExplanation(finalExplanation || 'Your query was flagged as potentially unsafe.', localMessageId, { conversationId: requestConversationId })
+      conversationStore.updateLastMessageExplanation(finalExplanation || 'Your query was flagged as potentially unsafe.', localMessageId, { conversationId: requestConversationId })
       return
     }
 
-    appStore.updateLastMessageExplanation(finalExplanation, localMessageId, { conversationId: requestConversationId })
+    conversationStore.updateLastMessageExplanation(finalExplanation, localMessageId, { conversationId: requestConversationId })
     const finalStatePatch = {}
     if (finalCode.trim()) {
       finalStatePatch.generatedCode = finalCode
@@ -1502,7 +1516,7 @@ async function handleSubmit() {
         errorMessage = 'Response generation was stopped.'
         operationStatus = 'failed'
         operationMessage = errorMessage
-        appStore.markLastMessageStreamStopped(errorMessage, localMessageId, { conversationId: requestConversationId })
+        conversationStore.markLastMessageStreamStopped(errorMessage, localMessageId, { conversationId: requestConversationId })
         toast.error(errorTitle, errorMessage)
         return
       } else {
@@ -1544,7 +1558,7 @@ async function handleSubmit() {
       },
     )
     applyConversationResultState(requestConversationId, { terminalOutput: `Error: ${errorMessage}` })
-    appStore.updateLastMessageExplanation(errorMessage, localMessageId, { conversationId: requestConversationId })
+    conversationStore.updateLastMessageExplanation(errorMessage, localMessageId, { conversationId: requestConversationId })
     if (attachmentsPayload.length > 0) {
       pendingAttachments.value = attachmentsPayload.map((item) => ({
         ...item,
@@ -1555,12 +1569,12 @@ async function handleSubmit() {
   } finally {
     if (warningTimer) clearTimeout(warningTimer)
     if (cancelTimer) clearTimeout(cancelTimer)
-    await refreshRuntimeStatusAfterExplicitWork(appStore.activeWorkspaceId)
+    await refreshRuntimeStatusAfterExplicitWork(workspaceStore.activeWorkspaceId)
     const nextStopped = new Set(stoppedConversationIds.value)
     nextStopped.delete(requestConversationId)
     stoppedConversationIds.value = nextStopped
-    appStore.clearConversationRun(requestConversationId)
-    appStore.finishBackgroundOperation(operationId, {
+    executionStore.clearConversationRun(requestConversationId)
+    executionStore.finishBackgroundOperation(operationId, {
       status: operationStatus,
       title: operationStatus === 'failed' ? 'Chat response failed' : 'Chat response complete',
       message: operationMessage,
@@ -1592,15 +1606,15 @@ onUnmounted(() => {
   window.removeEventListener('resize', updateSuggestionPlacement)
 })
 
-watch(() => appStore.activeWorkspaceId, () => {
+watch(() => workspaceStore.activeWorkspaceId, () => {
   clearSuggestions()
 })
 
-watch(() => appStore.currentQuestion, async (nextQuestion) => {
+watch(() => conversationStore.currentQuestion, async (nextQuestion) => {
   const prompt = String(nextQuestion || '').trim()
   if (!prompt || prompt === question.value.trim()) return
 
-  const messages = Array.isArray(appStore.chatHistory) ? appStore.chatHistory : []
+  const messages = Array.isArray(conversationStore.chatHistory) ? conversationStore.chatHistory : []
   const latestSubmittedQuestion = String(messages[messages.length - 1]?.question || '').trim()
   if (latestSubmittedQuestion === prompt) return
 
@@ -1618,7 +1632,7 @@ watch(() => appStore.currentQuestion, async (nextQuestion) => {
   void updateAutocompleteSuggestions()
 })
 
-watch(() => appStore.columnCatalog, () => {
+watch(() => workspaceStore.columnCatalog, () => {
   void updateAutocompleteSuggestions()
 }, { deep: true })
 </script>

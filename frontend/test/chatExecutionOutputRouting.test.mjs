@@ -15,7 +15,7 @@ test('chat execution output is appended to rendered output entries', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/chat/ChatInput.vue'), 'utf-8')
   const helperBlock = extractBlock(
     source,
-    'function appendChatExecutionOutput(response, conversationId = appStore.activeConversationId, code = \'\') {',
+    'function appendChatExecutionOutput(response, conversationId = conversationStore.activeConversationId, code = \'\') {',
     'async function handleSlashCommand(questionText) {',
   )
   const submitBlock = extractBlock(
@@ -25,7 +25,7 @@ test('chat execution output is appended to rendered output entries', () => {
   )
 
   assert.equal(helperBlock.includes('const execution = response?.execution && typeof response.execution === \'object\''), true)
-  assert.equal(helperBlock.includes('appStore.appendTerminalEntry({'), true)
+  assert.equal(helperBlock.includes('executionStore.appendTerminalEntry({'), true)
   assert.equal(helperBlock.includes("kind: 'output'"), true)
   assert.equal(helperBlock.includes("source: 'analysis'"), true)
   assert.equal(helperBlock.includes("origin: 'ai'"), true)
@@ -41,5 +41,5 @@ test('chat execution output is appended to rendered output entries', () => {
   assert.equal(helperBlock.includes('durationMs: Number.isFinite(Number(execution.duration_ms))'), true)
   assert.equal(submitBlock.includes('const hasChatExecutionOutput = appendChatExecutionOutput(response, requestConversationId, finalCode)'), true)
   assert.equal(submitBlock.includes('} else if (hasChatExecutionOutput) {\n        applyConversationResultState(requestConversationId, finalStatePatch)'), true)
-  assert.equal(submitBlock.includes("appStore.setTerminalOutput(executionStderr || executionStdout || response.stdout || response.terminal_output || 'Code generated and executed.')"), false)
+  assert.equal(submitBlock.includes("executionStore.setTerminalOutput(executionStderr || executionStdout || response.stdout || response.terminal_output || 'Code generated and executed.')"), false)
 })

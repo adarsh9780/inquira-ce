@@ -9,6 +9,6 @@ test('right panel resizer uses container bounds instead of hardcoded body/sideba
 
   assert.equal(source.includes('ref="panelRef"'), true)
   assert.equal(source.includes('getBoundingClientRect'), true)
-  assert.equal(source.includes('document.body.clientWidth - (appStore.isSidebarCollapsed ? 64 : 256)'), false)
+  assert.equal(source.includes('document.body.clientWidth - (uiStore.isSidebarCollapsed ? 64 : 256)'), false)
   assert.equal(source.includes('document.body.clientHeight'), false)
 })
