@@ -9,7 +9,7 @@ function readSource(relativePath) {
 
 test('workspace tab dataset add flow syncs shared selection state and dispatches dataset-switched event', () => {
   const source = readSource('src/components/modals/tabs/WorkspaceTab.vue')
-  const store = readSource('src/stores/appStore.js')
+  const store = readSource('src/stores/appCoordinatorStore.js')
 
   assert.equal(source.includes('function applyDatasetSelectionFromUpload(uploadResult, fallbackPath = \'\') {'), true)
   assert.equal(source.includes('appStore.setDataFilePath(resolvedPath)'), true)

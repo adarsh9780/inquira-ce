@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const source = readFileSync(resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue'), 'utf-8')
+const datasetHelpers = readFileSync(resolve(process.cwd(), 'src/composables/useWorkspaceDatasets.js'), 'utf-8')
 
 test('workspace setup combines context and dataset management without steps', () => {
   assert.equal(source.includes('Workspace Context'), true)
@@ -24,8 +25,10 @@ test('workspace dataset view keeps one import target and schema management actio
 })
 
 test('workspace dataset flow relies on persisted schema status', () => {
-  assert.equal(source.includes('function datasetSchemaStatusLabel(dataset) {'), true)
-  assert.equal(source.includes('function datasetSchemaStatusBadgeClass(dataset) {'), true)
+  assert.equal(source.includes('datasetSchemaStatusLabel,'), true)
+  assert.equal(source.includes('datasetSchemaStatusBadgeClass,'), true)
+  assert.equal(datasetHelpers.includes('function datasetSchemaStatusLabel(dataset) {'), true)
+  assert.equal(datasetHelpers.includes('function datasetSchemaStatusBadgeClass(dataset) {'), true)
   assert.equal(source.includes('function syncDatasetSchemaPolling() {'), true)
   assert.equal(source.includes('async function generateWorkspaceSchemas('), false)
 })

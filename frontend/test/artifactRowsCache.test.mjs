@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 test('apiService caches artifact row responses by workspace, artifact, page, and query state', () => {
   const __filename = fileURLToPath(import.meta.url)
   const __dirname = path.dirname(__filename)
-  const filePath = path.resolve(__dirname, '..', 'src', 'services', 'apiService.js')
+  const filePath = path.resolve(__dirname, '..', 'src', 'services', 'apiRuntime.js')
   const source = fs.readFileSync(filePath, 'utf8')
 
   assert.equal(source.includes('const artifactRowsCache = new Map()'), true)

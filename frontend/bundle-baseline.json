@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-07-24T05:48:24.740Z",
+  "entryFile": {
+    "rawBytes": 708849,
+    "gzipBytes": 204481
+  },
+  "initialClosure": {
+    "rawBytes": 1263317,
+    "gzipBytes": 370476
+  },
+  "plotlyChunk": {
+    "rawBytes": 1368228,
+    "gzipBytes": 445156
+  },
+  "features": {
+    "table": {
+      "rawBytes": 1356831,
+      "gzipBytes": 396402
+    },
+    "figure": {
+      "rawBytes": 2652044,
+      "gzipBytes": 823418
+    },
+    "output": {
+      "rawBytes": 1280978,
+      "gzipBytes": 376660
+    },
+    "runChart": {
+      "rawBytes": 2639563,
+      "gzipBytes": 818855
+    }
+  }
+}

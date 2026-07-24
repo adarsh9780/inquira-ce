@@ -4,11 +4,12 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('app store exposes pinia state/actions for live token usage updates', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf8')
+  const source = ['src/stores/conversationStore.ts', 'src/stores/appCoordinatorStore.js']
+    .map((path) => readFileSync(resolve(process.cwd(), path), 'utf8')).join('\n')
 
-  assert.equal(source.includes('const liveTokenUsage = ref(null)'), true)
-  assert.equal(source.includes('const activeConversationUsage = ref(null)'), true)
-  assert.equal(source.includes('const conversationUsageById = ref({})'), true)
+  assert.match(source, /const liveTokenUsage = ref<.*>\(null\)/)
+  assert.match(source, /const activeConversationUsage = ref<.*>\(null\)/)
+  assert.match(source, /const conversationUsageById = ref<.*>\(\{\}\)/)
   assert.equal(source.includes('function setLiveTokenUsage(usage)'), true)
   assert.equal(source.includes('function setLiveTokenUsageForCurrentTurn(usage, options = {})'), true)
   assert.equal(source.includes('function setActiveConversationUsage(summary)'), true)

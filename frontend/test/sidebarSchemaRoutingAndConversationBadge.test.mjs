@@ -39,7 +39,7 @@ test('sidebar adds workspace view entries and uses simple project conversations'
 })
 
 test('activating a conversation returns the shell to workspace chat', () => {
-  const storeSource = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf-8')
+  const storeSource = readFileSync(resolve(process.cwd(), 'src/stores/appCoordinatorStore.js'), 'utf-8')
   const globalTreeSource = readFileSync(resolve(process.cwd(), 'src/components/layout/sidebar/SidebarGlobalTurnTree.vue'), 'utf-8')
 
   assert.equal(storeSource.includes("function setActiveConversationId(conversationId) {"), true)

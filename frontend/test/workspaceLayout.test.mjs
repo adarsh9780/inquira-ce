@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 test('workspace layout keeps only the default split view', () => {
   const layoutUtilityPath = resolve(process.cwd(), 'src/utils/workspaceLayout.js')
   const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
-  const storeSource = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf-8')
+  const storeSource = readFileSync(resolve(process.cwd(), 'src/stores/appCoordinatorStore.js'), 'utf-8')
   const shortcutsSource = readFileSync(resolve(process.cwd(), 'src/utils/keyboardShortcuts.js'), 'utf-8')
   const panelSource = readFileSync(resolve(process.cwd(), 'src/components/layout/RightPanel.vue'), 'utf-8')
 

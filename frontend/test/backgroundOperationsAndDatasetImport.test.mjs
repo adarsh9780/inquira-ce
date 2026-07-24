@@ -8,10 +8,10 @@ function read(relativePath) {
 }
 
 test('app store exposes foreground and background operation state with status helpers', () => {
-  const store = read('src/stores/appStore.js')
+  const store = `${read('src/stores/executionStore.ts')}\n${read('src/stores/appCoordinatorStore.js')}`
 
-  assert.equal(store.includes('const foregroundOperation = ref(null)'), true)
-  assert.equal(store.includes('const backgroundOperations = ref([])'), true)
+  assert.match(store, /const foregroundOperation = ref<.*>\(null\)/)
+  assert.match(store, /const backgroundOperations = ref<.*>\(\[\]\)/)
   assert.equal(store.includes('const primaryBackgroundOperation = computed(() => {'), true)
   assert.equal(store.includes('function startForegroundOperation(payload = {})'), true)
   assert.equal(store.includes('function startBackgroundOperation(payload = {})'), true)

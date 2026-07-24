@@ -8,11 +8,10 @@ test('settings modal is viewport bounded and exposes dialog keyboard semantics',
   const source = read('src/components/modals/SettingsModal.vue')
 
   assert.match(source, /h-\[min\(640px,calc\(100dvh-2rem\)\)\]/)
-  assert.match(source, /role="dialog"/)
-  assert.match(source, /aria-modal="true"/)
-  assert.match(source, /@keydown="handleDialogKeydown"/)
-  assert.match(source, /event\.key === 'Escape'/)
-  assert.match(source, /previouslyFocusedElement\.value\?\.focus/)
+  assert.match(source, /<Dialog :open="modelValue"/)
+  assert.match(source, /<DialogContent/)
+  assert.match(source, /@escape-key-down="handleDismissEvent"/)
+  assert.match(source, /@update:open="handleOpenChange"/)
 })
 
 test('inactive settings panels are removed from keyboard and accessibility navigation', () => {
@@ -20,7 +19,7 @@ test('inactive settings panels are removed from keyboard and accessibility navig
 
   assert.equal((source.match(/:inert="currentPanel !==/g) || []).length, 5)
   assert.equal((source.match(/:aria-hidden="currentPanel !==/g) || []).length, 5)
-  assert.match(source, /filter\(\(element\) => !element\.closest\('\[inert\]'\)\)/)
+  assert.doesNotMatch(source, /querySelectorAll\(/)
 })
 
 test('model selector uses a bounded scroll surface and full-name tooltips', () => {
@@ -69,10 +68,11 @@ test('composer setup guidance is provider-aware and icon controls are labelled',
 test('global UI honors reduced motion and startup states are announced', () => {
   const styles = read('src/style.css')
   const app = read('src/App.vue')
+  const startupGate = read('src/components/startup/DesktopStartupGate.vue')
 
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/)
   assert.match(styles, /transition-duration: 0\.01ms !important/)
   assert.match(app, /role="status"/)
-  assert.match(app, /role="alert"/)
+  assert.match(startupGate, /role="alert"/)
   assert.match(app, /:aria-hidden="blockingOverlayActive \? 'false' : 'true'"/)
 })

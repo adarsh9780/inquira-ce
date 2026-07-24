@@ -21,10 +21,10 @@
 
     <div class="workspace-left-content min-h-0 flex-1 flex flex-col p-2.5 sm:p-3 pb-0">
       <div class="min-h-0 flex-1">
-      <div v-show="appStore.workspacePane === 'code'" class="h-full">
+      <div v-if="appStore.workspacePane === 'code'" class="h-full">
         <CodeTab />
       </div>
-      <div v-show="appStore.workspacePane === 'chat'" class="h-full">
+      <div v-else class="h-full">
         <ChatTab />
       </div>
       </div>
@@ -37,9 +37,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useAppStore } from '../../stores/appStore'
-import CodeTab from '../analysis/CodeTab.vue'
+import { computed, defineAsyncComponent } from 'vue'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
 import ChatTab from '../chat/ChatTab.vue'
 import ChatInput from '../chat/ChatInput.vue'
 import AppToolbar from '../ui/AppToolbar.vue'
@@ -51,7 +50,8 @@ import {
   MagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
+const CodeTab = defineAsyncComponent(() => import('../analysis/CodeTab.vue'))
 const workspacePaneOptions = [
   { value: 'chat', label: 'Chat', icon: ChatBubbleLeftRightIcon },
   { value: 'code', label: 'Code', icon: CodeBracketIcon },

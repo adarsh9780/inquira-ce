@@ -8,7 +8,7 @@ function readSource(relativePath) {
 }
 
 test('store exposes dataset-removal sync helpers for active selection cleanup', () => {
-  const storeSource = readSource('src/stores/appStore.js')
+  const storeSource = readSource('src/stores/appCoordinatorStore.js')
 
   assert.equal(storeSource.includes('function clearActiveDatasetSelection() {'), true)
   assert.equal(storeSource.includes('function handleDatasetRemoved(tableName) {'), true)

@@ -6,8 +6,8 @@ import test from 'node:test'
 
 test('sidebar turn tree flow loads the full tree and restores state from selection', () => {
   const testDir = dirname(fileURLToPath(import.meta.url))
-  const apiSource = readFileSync(resolve(testDir, '../src/services/apiService.js'), 'utf-8')
-  const storeSource = readFileSync(resolve(testDir, '../src/stores/appStore.js'), 'utf-8')
+  const apiSource = readFileSync(resolve(testDir, '../src/services/apiRuntime.js'), 'utf-8')
+  const storeSource = readFileSync(resolve(testDir, '../src/stores/appCoordinatorStore.js'), 'utf-8')
   const globalTreeSource = readFileSync(resolve(testDir, '../src/components/layout/sidebar/SidebarGlobalTurnTree.vue'), 'utf-8')
   const graphViewSource = readFileSync(resolve(testDir, '../src/components/chat/TurnTreeGraphView.vue'), 'utf-8')
   const treeActionsSource = readFileSync(resolve(testDir, '../src/components/chat/TurnTreeNodeActions.vue'), 'utf-8')

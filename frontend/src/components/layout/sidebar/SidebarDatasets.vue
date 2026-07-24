@@ -87,8 +87,8 @@
 
 <script setup>
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
-import { useAppStore } from '../../../stores/appStore'
-import { apiService } from '../../../services/apiService'
+import { useAppCoordinatorStore } from '../../../stores/appCoordinatorStore'
+import { apiService } from '../../../services/apiRuntime'
 import { previewService } from '../../../services/previewService'
 import { inferTableNameFromDataPath } from '../../../utils/chatBootstrap'
 import { mergeDatasetSources } from '../../../utils/datasetCatalogMerge'
@@ -106,7 +106,7 @@ defineProps({
 
 const emit = defineEmits(['header-click', 'select', 'open-settings'])
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const loading = ref(false)
 const datasets = ref([])
 const isDropActive = ref(false)

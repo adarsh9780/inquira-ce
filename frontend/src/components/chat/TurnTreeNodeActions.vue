@@ -71,7 +71,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { apiService } from '../../services/apiService'
+import { apiService } from '../../services/apiRuntime'
 import { formatTimestamp } from '../../utils/dateUtils'
 import { formatUsageCompact, formatUsageTooltip } from '../../utils/usageFormat'
 import FloatingActionMenu from '../ui/FloatingActionMenu.vue'

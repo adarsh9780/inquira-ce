@@ -24,7 +24,7 @@ test('chat input consumes live token events and does not fall back to non-stream
 })
 
 test('v1AnalyzeStream always uses stream endpoint without local non-stream fallback', () => {
-  const servicePath = resolve(process.cwd(), 'src/services/apiService.js')
+  const servicePath = resolve(process.cwd(), 'src/services/apiRuntime.js')
   const source = readFileSync(servicePath, 'utf-8')
 
   assert.equal(source.includes('if (!isStreamingEnabled()) {'), false)

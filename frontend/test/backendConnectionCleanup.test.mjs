@@ -22,7 +22,7 @@ test('backend connection state uses the status bar without the obsolete red aler
 })
 
 test('frontend connection services omit HTTP readiness polling and legacy websocket APIs', () => {
-  const apiSource = readFileSync(resolve(process.cwd(), 'src/services/apiService.js'), 'utf-8')
+  const apiSource = readFileSync(resolve(process.cwd(), 'src/services/apiRuntime.js'), 'utf-8')
   const websocketSource = readFileSync(
     resolve(process.cwd(), 'src/services/websocketService.js'),
     'utf-8',

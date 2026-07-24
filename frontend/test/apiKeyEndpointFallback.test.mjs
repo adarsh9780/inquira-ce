@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('apiService testGeminiApi uses generated client and 404 fallback to v1 admin route', () => {
-  const servicePath = resolve(process.cwd(), 'src/services/apiService.js')
+  const servicePath = resolve(process.cwd(), 'src/services/apiRuntime.js')
   const source = readFileSync(servicePath, 'utf-8')
 
   assert.equal(source.includes('testGeminiApiKeyApiV1AdminTestGeminiPost'), true)

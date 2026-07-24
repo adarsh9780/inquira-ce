@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { apiService } from '../services/apiService'
+import { apiService } from '../services/apiRuntime'
 
 const DEFAULT_LOCAL_USER = Object.freeze({
   user_id: 'local-user',

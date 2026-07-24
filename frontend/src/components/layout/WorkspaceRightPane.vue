@@ -35,7 +35,7 @@
 
 <script setup>
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
-import { useAppStore } from '../../stores/appStore'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import AppToolbar from '../ui/AppToolbar.vue'
 import {
@@ -44,7 +44,7 @@ import {
   TableCellsIcon,
 } from '@heroicons/vue/24/outline'
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const resultAnnouncement = ref('')
 const TableTab = defineAsyncComponent(() => import('../analysis/TableTab.vue'))
 const FigureTab = defineAsyncComponent(() => import('../analysis/FigureTab.vue'))

@@ -9,8 +9,8 @@ const rulesModalSource = readFileSync(new URL('../src/components/modals/Conversa
 const sidebarSource = readFileSync(new URL('../src/components/layout/UnifiedSidebar.vue', import.meta.url), 'utf8')
 const rightPanelSource = readFileSync(new URL('../src/components/layout/RightPanel.vue', import.meta.url), 'utf8')
 const globalTreeSource = readFileSync(new URL('../src/components/layout/sidebar/SidebarGlobalTurnTree.vue', import.meta.url), 'utf8')
-const apiServiceSource = readFileSync(new URL('../src/services/apiService.js', import.meta.url), 'utf8')
-const storeSource = readFileSync(new URL('../src/stores/appStore.js', import.meta.url), 'utf8')
+const apiServiceSource = readFileSync(new URL('../src/services/apiRuntime.js', import.meta.url), 'utf8')
+const storeSource = readFileSync(new URL('../src/stores/appCoordinatorStore.js', import.meta.url), 'utf8')
 const turnTreeModalPath = new URL('../src/components/chat/TurnTreeModal.vue', import.meta.url)
 const sidebarConversationsPath = new URL('../src/components/layout/sidebar/SidebarConversations.vue', import.meta.url)
 

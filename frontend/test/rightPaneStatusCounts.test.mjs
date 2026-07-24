@@ -60,7 +60,7 @@ test('figure renderer keeps a contextual artifact selector and export actions', 
 })
 
 test('app store keeps figureCount synchronized with setFigures output', () => {
-  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const storePath = resolve(process.cwd(), 'src/stores/appCoordinatorStore.js')
   const source = readFileSync(storePath, 'utf-8')
 
   assert.equal(source.includes('figureCount.value = 0'), true)
@@ -68,7 +68,7 @@ test('app store keeps figureCount synchronized with setFigures output', () => {
 })
 
 test('api service exposes artifact usage summary endpoint helper', () => {
-  const apiPath = resolve(process.cwd(), 'src/services/apiService.js')
+  const apiPath = resolve(process.cwd(), 'src/services/apiRuntime.js')
   const source = readFileSync(apiPath, 'utf-8')
 
   assert.equal(source.includes('async v1GetWorkspaceArtifactUsage(workspaceId, options = {})'), true)

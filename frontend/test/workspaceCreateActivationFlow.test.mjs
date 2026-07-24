@@ -8,7 +8,7 @@ function read(relativePath) {
 }
 
 test('workspace creation activates the new workspace centrally in the store', () => {
-  const source = read('src/stores/appStore.js')
+  const source = read('src/stores/appCoordinatorStore.js')
   const start = source.indexOf("async function createWorkspace(name, schemaContext = '') {")
   const end = source.indexOf('async function activateWorkspace(workspaceId) {', start)
   const block = source.slice(start, end)
@@ -47,7 +47,7 @@ test('existing workspace summary supports inspect-first activation and active-on
 })
 
 test('workspace activation updates active state immediately without waiting for a list refresh', () => {
-  const store = read('src/stores/appStore.js')
+  const store = read('src/stores/appCoordinatorStore.js')
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
   const start = store.indexOf('async function activateWorkspace(workspaceId) {')
   const end = store.indexOf('async function renameWorkspace(', start)
@@ -73,5 +73,5 @@ test('workspace launchers open the unified workspace settings surface without st
     assert.equal(source.includes("openSettings('workspace', 1)"), false)
   }
   assert.equal(read('src/App.vue').includes('initial-step'), false)
-  assert.equal(read('src/stores/appStore.js').includes('settingsInitialStep'), false)
+  assert.equal(read('src/stores/appCoordinatorStore.js').includes('settingsInitialStep'), false)
 })

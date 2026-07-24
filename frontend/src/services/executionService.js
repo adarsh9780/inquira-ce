@@ -9,8 +9,8 @@
  * components (CodeTab, ChatInput) require minimal changes.
  */
 
-import apiService from './apiService'
-import { useAppStore } from '../stores/appStore'
+import apiService from './apiRuntime'
+import { useAppCoordinatorStore } from '../stores/appCoordinatorStore'
 import { mapExecutionServiceResponse } from '../utils/executionServiceMapper'
 
 class ExecutionService {
@@ -23,7 +23,7 @@ class ExecutionService {
      */
     async executePython(code) {
         try {
-            const appStore = useAppStore()
+            const appStore = useAppCoordinatorStore()
             const response = await apiService.executeCode(
                 code,
                 60,

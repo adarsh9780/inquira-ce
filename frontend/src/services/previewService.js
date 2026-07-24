@@ -1,6 +1,6 @@
-import { apiService } from './apiService'
+import { apiService } from './apiRuntime'
 import { cacheService } from './cacheService'
-import { useAppStore } from '../stores/appStore'
+import { useAppCoordinatorStore } from '../stores/appCoordinatorStore'
 import { inferTableNameFromDataPath } from '../utils/chatBootstrap'
 
 class PreviewService {
@@ -10,7 +10,7 @@ class PreviewService {
 
   // Load schema with caching
   async loadSchema(filepath, forceRefresh = false, tableNameOverride = null) {
-    const appStore = useAppStore()
+    const appStore = useAppCoordinatorStore()
     const dataPath = filepath || appStore.dataFilePath
     const tableName = (
       tableNameOverride ||

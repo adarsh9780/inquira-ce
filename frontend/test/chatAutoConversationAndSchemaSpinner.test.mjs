@@ -8,7 +8,7 @@ function read(relativePath) {
 }
 
 test('chat submit ensures an active conversation before optimistic render and streaming', () => {
-  const store = read('src/stores/appStore.js')
+  const store = read('src/stores/appCoordinatorStore.js')
   const chatInput = read('src/components/chat/ChatInput.vue')
 
   assert.equal(store.includes('async function ensureActiveConversation(title = null)'), true)

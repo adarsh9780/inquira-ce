@@ -31,7 +31,7 @@ test('FigureTab renders artifact load errors inside the centered empty state ins
 })
 
 test('apiService exposes turn artifact metadata route used by FigureTab', () => {
-  const apiServicePath = resolve(process.cwd(), 'src/services/apiService.js')
+  const apiServicePath = resolve(process.cwd(), 'src/services/apiRuntime.js')
   const source = readFileSync(apiServicePath, 'utf-8')
 
   assert.equal(source.includes('async v1GetTurnArtifactMetadata(conversationId, turnId, artifactId, options = {})'), true)

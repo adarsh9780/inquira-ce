@@ -42,21 +42,30 @@ test('floating overlays animate from their anchor and are positioned before ente
 })
 
 test('dialogs, compact panels, disclosures, and toasts all have exit motion', () => {
-  const modalPaths = [
-    'src/components/modals/SettingsModal.vue',
-    'src/components/modals/ConfirmationModal.vue',
-    'src/components/modals/KeyboardShortcutsModal.vue',
-    'src/components/modals/TermsModal.vue',
-    'src/components/modals/WorkspaceRenameModal.vue',
-    'src/components/modals/CommandPaletteModal.vue',
-    'src/components/modals/ConversationTreeRulesModal.vue',
+  const legacyModalPaths = [
     'src/components/chat/TurnTreeNodeActions.vue',
   ]
-  for (const path of modalPaths) {
+  for (const path of legacyModalPaths) {
     const source = read(path)
     assert.match(source, /dialog-fade-leave-active dialog-pop-leave-active/, path)
     assert.match(source, /dialog-fade-leave-to dialog-pop-leave-to/, path)
   }
+
+  const migratedModalPaths = [
+    'src/components/modals/ConfirmationModal.vue',
+    'src/components/modals/KeyboardShortcutsModal.vue',
+    'src/components/modals/WorkspaceRenameModal.vue',
+    'src/components/modals/ConversationTreeRulesModal.vue',
+    'src/components/modals/TermsModal.vue',
+    'src/components/modals/CommandPaletteModal.vue',
+    'src/components/modals/SettingsModal.vue',
+  ]
+  for (const path of migratedModalPaths) {
+    assert.match(read(path), /@\/components\/ui\/(alert-dialog|dialog)/, path)
+  }
+  assert.match(read('src/components/ui/dialog/DialogContent.vue'), /data-closed:animate-out/)
+  assert.match(read('src/components/ui/dialog/DialogOverlay.vue'), /data-closed:fade-out-0/)
+  assert.match(read('src/components/ui/alert-dialog/AlertDialogContent.vue'), /data-closed:animate-out/)
 
   const popoverPaths = [
     'src/components/WorkspaceSwitcher.vue',

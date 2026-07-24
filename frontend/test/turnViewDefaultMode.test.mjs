@@ -6,7 +6,7 @@ import test from 'node:test'
 
 test('turn-first mode is the default and selected-turn context no longer depends on a feature flag', () => {
   const testDir = dirname(fileURLToPath(import.meta.url))
-  const storeSource = readFileSync(resolve(testDir, '../src/stores/appStore.js'), 'utf-8')
+  const storeSource = `${readFileSync(resolve(testDir, '../src/stores/conversationStore.ts'), 'utf-8')}\n${readFileSync(resolve(testDir, '../src/stores/appCoordinatorStore.js'), 'utf-8')}`
   const inputSource = readFileSync(resolve(testDir, '../src/components/chat/ChatInput.vue'), 'utf-8')
 
   assert.equal(storeSource.includes('const turnViewEnabled = ref(true)'), true)

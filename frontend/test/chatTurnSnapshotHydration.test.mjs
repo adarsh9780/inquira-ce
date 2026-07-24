@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('app store preserves turn code snapshot and supports ephemeral stream trace updates', () => {
-  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const storePath = resolve(process.cwd(), 'src/stores/appCoordinatorStore.js')
   const source = readFileSync(storePath, 'utf-8')
 
   assert.equal(source.includes("codeSnapshot: turn.code_snapshot || ''"), true)

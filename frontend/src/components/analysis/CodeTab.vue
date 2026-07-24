@@ -125,9 +125,9 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useAppStore } from '../../stores/appStore'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
 import { useAuthStore } from '../../stores/authStore'
-import apiService from '../../services/apiService'
+import apiService from '../../services/apiRuntime'
 import executionService from '../../services/executionService'
 import { toast } from '../../composables/useToast'
 import { buildExecutionViewModel } from '../../utils/executionViewModel'
@@ -153,7 +153,7 @@ import {
   CodeBracketIcon,
 } from '@heroicons/vue/24/outline'
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const authStore = useAuthStore()
 
 const editorContainer = ref(null)

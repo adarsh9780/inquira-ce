@@ -41,7 +41,7 @@ test('chat input model dropdown uses and updates the effective workspace model',
 })
 
 test('app store reads available models from v1 preferences payload', () => {
-  const path = resolve(process.cwd(), 'src/stores/appStore.js')
+  const path = resolve(process.cwd(), 'src/stores/appCoordinatorStore.js')
   const source = readFileSync(path, 'utf-8')
 
   assert.equal(source.includes('function modelAllowedForProvider(provider, modelId)'), true)

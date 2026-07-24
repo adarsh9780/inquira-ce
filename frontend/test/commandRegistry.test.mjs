@@ -85,7 +85,7 @@ test('chat input routes slash commands through the command handler path', () => 
   const source = readFileSync(componentPath, 'utf-8')
 
   assert.equal(source.includes('import { executeCommand, getRegisteredCommands, isCommand } from'), true)
-  assert.equal(source.includes("import apiService from '../../services/apiService'"), true)
+  assert.equal(source.includes("import apiService from '../../services/apiRuntime'"), true)
   assert.equal(source.includes('if (isCommand(questionText)) {'), true)
   assert.equal(source.includes('await handleSlashCommand(questionText)'), true)
   assert.equal(source.includes('const result = await executeCommand(questionText'), true)

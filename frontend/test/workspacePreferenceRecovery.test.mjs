@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('app store requires a ready workspace and effective provider access for chat analysis', () => {
-  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const storePath = resolve(process.cwd(), 'src/stores/appCoordinatorStore.js')
   const source = readFileSync(storePath, 'utf-8')
 
   assert.equal(source.includes('const canAnalyze = computed(() => {'), true)
@@ -14,7 +14,7 @@ test('app store requires a ready workspace and effective provider access for cha
 })
 
 test('user preferences recover from stale active workspace ids', () => {
-  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const storePath = resolve(process.cwd(), 'src/stores/appCoordinatorStore.js')
   const source = readFileSync(storePath, 'utf-8')
 
   assert.equal(source.includes('Preferences may point to deleted/stale workspace IDs.'), true)

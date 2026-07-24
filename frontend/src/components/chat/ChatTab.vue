@@ -56,12 +56,12 @@
 
 <script setup>
 import { onMounted, watch } from 'vue'
-import { useAppStore } from '../../stores/appStore'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
 import ChatHistory from './ChatHistory.vue'
 import AppEmptyState from '../ui/AppEmptyState.vue'
 import { ChatBubbleLeftRightIcon, CircleStackIcon, KeyIcon, SparklesIcon } from '@heroicons/vue/24/outline'
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const starterPrompts = ['Summarize this dataset', 'Check for missing values', 'Show the main trends', 'Find unusual records']
 function openDatasetPicker() {
   window.dispatchEvent(new CustomEvent('inquira:open-dataset-picker'))

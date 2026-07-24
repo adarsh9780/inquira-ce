@@ -4,10 +4,11 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('app store persists selected table/figure artifacts per workspace', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf-8')
+  const source = ['src/stores/artifactStore.ts', 'src/stores/appCoordinatorStore.js']
+    .map((path) => readFileSync(resolve(process.cwd(), path), 'utf-8')).join('\n')
 
-  assert.equal(source.includes('const selectedTableArtifactsByWorkspace = ref({})'), true)
-  assert.equal(source.includes('const selectedFigureArtifactsByWorkspace = ref({})'), true)
+  assert.match(source, /const selectedTableArtifactsByWorkspace = ref<.*>\(\{\}\)/)
+  assert.match(source, /const selectedFigureArtifactsByWorkspace = ref<.*>\(\{\}\)/)
   assert.equal(source.includes('table_selected_artifacts: selectedTableArtifactsByWorkspace.value || {}'), true)
   assert.equal(source.includes('figure_selected_artifacts: selectedFigureArtifactsByWorkspace.value || {}'), true)
   assert.equal(source.includes('function setSelectedTableArtifact(workspaceId, artifactId) {'), true)
@@ -17,7 +18,7 @@ test('app store persists selected table/figure artifacts per workspace', () => {
 })
 
 test('active turn hydration selects that turn artifacts for the data panes', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf-8')
+  const source = readFileSync(resolve(process.cwd(), 'src/stores/appCoordinatorStore.js'), 'utf-8')
 
   assert.equal(source.includes("setSelectedTableArtifact(workspaceId, dataframeArtifacts[0]?.data?.artifact_id || '')"), true)
   assert.equal(source.includes("setSelectedFigureArtifact(workspaceId, figureArtifacts[0]?.artifact_id || '')"), true)

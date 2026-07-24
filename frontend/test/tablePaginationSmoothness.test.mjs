@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 test('table pagination avoids extra row animation churn and redundant viewport persistence updates', () => {
   const tableTabPath = resolve(process.cwd(), 'src/components/analysis/TableTab.vue')
   const dataTablePath = resolve(process.cwd(), 'src/components/analysis/table/DataTable.vue')
-  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const storePath = resolve(process.cwd(), 'src/stores/appCoordinatorStore.js')
 
   const tableTab = readFileSync(tableTabPath, 'utf-8')
   const dataTable = readFileSync(dataTablePath, 'utf-8')

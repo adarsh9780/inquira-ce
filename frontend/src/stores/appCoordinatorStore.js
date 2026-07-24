@@ -1,8 +1,14 @@
-import { defineStore } from 'pinia'
+import { defineStore, storeToRefs } from 'pinia'
 import { ref, computed, watch, markRaw } from 'vue'
-import { apiService } from '../services/apiService'
+import { apiService } from '../services/apiRuntime'
 import { localStateService } from '../services/localStateService'
 import { useAuthStore } from './authStore'
+import { useUiStore } from './uiStore'
+import { usePreferencesStore } from './preferencesStore'
+import { useWorkspaceStore } from './workspaceStore'
+import { useConversationStore } from './conversationStore'
+import { useArtifactStore } from './artifactStore'
+import { useExecutionStore } from './executionStore'
 import { normalizePlotlyFigure } from '../utils/figurePayload'
 import { DEFAULT_THEME_ID, THEME_OPTIONS, normalizeThemeId } from '../constants/themes'
 import {
@@ -15,8 +21,142 @@ import {
 } from '../constants/fonts'
 import { mergeUsageTotals, normalizeUsage } from '../utils/usageFormat'
 
-export const useAppStore = defineStore('app', () => {
+export const useAppCoordinatorStore = defineStore('app-coordinator', () => {
   const authStore = useAuthStore()
+  const uiStore = useUiStore()
+  const preferencesStore = usePreferencesStore()
+  const workspaceStore = useWorkspaceStore()
+  const conversationStore = useConversationStore()
+  const artifactStore = useArtifactStore()
+  const executionStore = useExecutionStore()
+  const {
+    activeTab,
+    workspacePane,
+    dataPane,
+    leftPaneWidth,
+    isTerminalOpen,
+    terminalHeight,
+    isChatOverlayOpen,
+    chatOverlayWidth,
+    isSidebarCollapsed,
+    hideShortcutsModal,
+    isKeyboardShortcutsOpen,
+    isCommandPaletteOpen,
+    editorLine,
+    editorCol,
+    isEditorFocused,
+    isSettingsOpen,
+    settingsInitialTab,
+    isLoading,
+  } = storeToRefs(uiStore)
+  const {
+    llmProvider,
+    availableProviders,
+    selectedModel,
+    selectedLiteModel,
+    selectedCodingModel,
+    slowRequestWarningSeconds,
+    availableModels,
+    providerMainModels,
+    providerLiteModels,
+    providerModelSearchResults,
+    providerModelSearchLoading,
+    providerModelSearchQuery,
+    providerModelCatalogs,
+    providerRequiresApiKey,
+    apiKeyPresenceByProvider,
+    selectedProviderApiKeyPresent,
+    apiKey,
+    apiKeyConfigured,
+    plotlyThemeMode,
+    uiTheme,
+    availableThemes,
+    uiFont,
+    availableFonts,
+    uiCodeFont,
+    availableCodeFonts,
+  } = storeToRefs(preferencesStore)
+  const {
+    dataFilePath,
+    schemaFilePath,
+    schemaFileId,
+    isSchemaFileUploaded,
+    ingestedTableName,
+    ingestedColumns,
+    columnCatalog,
+    profileData,
+    schemaContext,
+    allowSchemaSampleValues,
+    allowLlmDataSamples,
+    workspaces,
+    activeWorkspaceSummary,
+    workspaceAIConfig,
+    workspaceAIConfigLoading,
+    workspaceDeletionJobs,
+    activeWorkspaceId,
+  } = storeToRefs(workspaceStore)
+  const {
+    chatHistory,
+    questionHistory,
+    currentQuestion,
+    currentExplanation,
+    liveTokenUsage,
+    activeConversationUsage,
+    conversationUsageById,
+    conversations,
+    activeConversationId,
+    conversationStateById,
+    conversationRuns,
+    turnViewEnabled,
+    activeTurnId,
+    activeTurn,
+    activeTurnCode,
+    activeTurnArtifacts,
+    activeTurnRelations,
+    activeTurnTree,
+    activeTurnArtifactRefreshKey,
+    workspaceTurnTree,
+    finalTurnId,
+    turnsNextCursor,
+  } = storeToRefs(conversationStore)
+  const {
+    resultData,
+    plotlyFigure,
+    dataframes,
+    figures,
+    scalars,
+    promotedUserDataframes,
+    promotedUserFigures,
+    selectedResultId,
+    dataframeCount,
+    tableRowCount,
+    tableWindowStart,
+    tableWindowEnd,
+    tablePageOffsets,
+    selectedTableArtifactsByWorkspace,
+    selectedFigureArtifactsByWorkspace,
+    dataPaneError,
+    figureCount,
+  } = storeToRefs(artifactStore)
+  const {
+    pythonFileContent,
+    userEditedCode,
+    hasUserEditedCode,
+    codeEditorSource,
+    historicalCodeBlocks,
+    generatedCode,
+    terminalOutput,
+    terminalEntries,
+    terminalEntriesTrimmedCount,
+    terminalEnabled,
+    terminalConsentGranted,
+    terminalCwd,
+    runtimeError,
+    workspaceRuntimeStatusById,
+    isCodeRunning,
+    foregroundOperation,
+    backgroundOperations,
+  } = storeToRefs(executionStore)
   const DEFAULT_MODELS = [
     'google/gemini-3-flash-preview',
     'google/gemini-2.5-flash',
@@ -27,158 +167,6 @@ export const useAppStore = defineStore('app', () => {
   const DEFAULT_LITE_MODEL = 'google/gemini-2.5-flash-lite'
   const DEFAULT_PROVIDER_LIST = ['openrouter', 'openai', 'anthropic', 'ollama']
   const DEFAULT_SLOW_REQUEST_WARNING_SECONDS = 120
-
-  // Files
-  const dataFilePath = ref('')
-  const schemaFilePath = ref('')
-  const schemaFileId = ref('')
-  const isSchemaFileUploaded = ref(false)
-  const ingestedTableName = ref('')
-  const ingestedColumns = ref([])
-  const columnCatalog = ref([])
-  const profileData = ref(null)
-
-  // LLM Configuration
-  const llmProvider = ref(DEFAULT_PROVIDER)
-  const availableProviders = ref([...DEFAULT_PROVIDER_LIST])
-  const selectedModel = ref('google/gemini-2.5-flash')
-  const selectedLiteModel = ref(DEFAULT_LITE_MODEL)
-  const selectedCodingModel = ref('google/gemini-2.5-flash')
-  const slowRequestWarningSeconds = ref(DEFAULT_SLOW_REQUEST_WARNING_SECONDS)
-  const availableModels = ref([...DEFAULT_MODELS])
-  const providerMainModels = ref([...DEFAULT_MODELS])
-  const providerLiteModels = ref([DEFAULT_LITE_MODEL])
-  const providerModelSearchResults = ref({})
-  const providerModelSearchLoading = ref(false)
-  const providerModelSearchQuery = ref('')
-  const providerModelCatalogs = ref({})
-  const providerRequiresApiKey = ref(true)
-  const apiKeyPresenceByProvider = ref({})
-  const selectedProviderApiKeyPresent = ref(false)
-  const apiKey = ref('')
-  const apiKeyConfigured = ref(false)
-
-  // Schema Context
-  const schemaContext = ref('')
-  const allowSchemaSampleValues = ref(false)
-  const allowLlmDataSamples = ref(false)
-  const plotlyThemeMode = ref('soft')
-  const uiTheme = ref(DEFAULT_THEME_ID)
-  const availableThemes = THEME_OPTIONS.map((theme) => ({ ...theme }))
-  const uiFont = ref(DEFAULT_APP_FONT_ID)
-  const availableFonts = APP_FONT_OPTIONS.map((font) => ({ ...font }))
-  const uiCodeFont = ref(DEFAULT_CODE_FONT_ID)
-  const availableCodeFonts = CODE_FONT_OPTIONS.map((font) => ({ ...font }))
-
-
-  // Single Python File per Session (simplified)
-  const pythonFileContent = ref('')
-  const userEditedCode = ref('')
-  const hasUserEditedCode = ref(false)
-  const codeEditorSource = ref('agent')
-
-  // Chat
-  const chatHistory = ref([])
-  const questionHistory = ref([])
-  const currentQuestion = ref('')
-  const currentExplanation = ref('')
-  const liveTokenUsage = ref(null)
-  const activeConversationUsage = ref(null)
-  const conversationUsageById = ref({})
-  const workspaces = ref([])
-  const activeWorkspaceSummary = ref(null)
-  const workspaceAIConfig = ref(null)
-  const workspaceAIConfigLoading = ref(false)
-  const workspaceDeletionJobs = ref([])
-  const activeWorkspaceId = ref('')
-  const conversations = ref([])
-  const activeConversationId = ref('')
-  const conversationStateById = ref({})
-  const conversationRuns = ref({})
-  const turnViewEnabled = ref(true)
-  const activeTurnId = ref('')
-  const activeTurn = ref(null)
-  const activeTurnCode = ref('')
-  const activeTurnArtifacts = ref([])
-  const activeTurnRelations = ref(null)
-  const activeTurnTree = ref(null)
-  const activeTurnArtifactRefreshKey = ref(0)
-  const workspaceTurnTree = ref(null)
-  const finalTurnId = ref('')
-  const turnsNextCursor = ref(null)
-  const workspaceRuntimeStatusById = ref({})
-
-  // Wasm Execution State
-  const historicalCodeBlocks = ref([]) // Tracks successfully executed code snippets
-
-  // Analysis
-  const generatedCode = ref('')
-  const resultData = ref(null)
-  const plotlyFigure = ref(null)
-  const dataframes = ref([])
-  const figures = ref([])
-  const scalars = ref([])
-  const promotedUserDataframes = ref([])
-  const promotedUserFigures = ref([])
-  const selectedResultId = ref('')
-  const dataframeCount = ref(0)
-  const tableRowCount = ref(0)
-  const tableWindowStart = ref(0)
-  const tableWindowEnd = ref(0)
-  const tablePageOffsets = ref({})
-  const selectedTableArtifactsByWorkspace = ref({})
-  const selectedFigureArtifactsByWorkspace = ref({})
-  const dataPaneError = ref('')
-  const figureCount = ref(0)
-  const terminalOutput = ref('')
-  const terminalEntries = ref([])
-  const terminalEntriesTrimmedCount = ref(0)
-  const terminalEnabled = ref(false)
-  const runtimeError = ref('')
-  const activeTab = ref('workspace')
-  const workspacePane = ref('chat') // 'code' | 'chat'
-  const dataPane = ref('table') // 'table' | 'figure' | 'output'
-  const leftPaneWidth = ref(50) // percentage
-  const terminalConsentGranted = ref(false)
-  const isTerminalOpen = ref(false)
-  const terminalHeight = ref(30) // percentage
-  const terminalCwd = ref('')
-  const isChatOverlayOpen = ref(true)
-  const chatOverlayWidth = ref(0.25) // 25% of area
-  const isSidebarCollapsed = ref(false)
-  const hideShortcutsModal = ref(false)
-  const isKeyboardShortcutsOpen = ref(false)
-  const isCommandPaletteOpen = ref(false)
-
-  // Editor State
-  const editorLine = ref(1)
-  const editorCol = ref(1)
-  const isEditorFocused = ref(false)
-
-  // UI State
-  const isLoading = ref(false)
-  const isCodeRunning = ref(false)
-  const foregroundOperation = ref(null)
-  const backgroundOperations = ref([])
-
-  // Settings trigger
-  const isSettingsOpen = ref(false)
-  const settingsInitialTab = ref('setup')
-
-  function openSettings(tab = 'setup') {
-    const n = String(tab || '').trim().toLowerCase()
-    if      (n === 'setup' || n === 'readiness')   settingsInitialTab.value = 'setup'
-    else if (n === 'api' || n === 'llm' || n === 'connections') settingsInitialTab.value = 'connections'
-    else if (n === 'models' || n === 'workspace-ai') settingsInitialTab.value = 'workspace-ai'
-    else if (n === 'data' || n === 'workspace-data') settingsInitialTab.value = 'workspace-data'
-    else if (n === 'workspace' || n === 'workspace-general') settingsInitialTab.value = 'workspace-general'
-    else if (n === 'account')                       settingsInitialTab.value = 'account'
-    else if (n === 'appearance' || n === 'theme')   settingsInitialTab.value = 'appearance'
-    else if (n === 'terms'  || n === 'legal')       settingsInitialTab.value = 'terms'
-    else                                            settingsInitialTab.value = 'setup'
-
-    isSettingsOpen.value = true
-  }
 
   // Computed
   const hasDataFile = computed(() => dataFilePath.value.trim() !== '')
@@ -3561,62 +3549,33 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setActiveTab(tab) {
-    const normalized = String(tab || '').trim().toLowerCase()
-    if (normalized === 'code') {
-      activeTab.value = 'workspace'
-      workspacePane.value = 'code'
-    } else if (normalized === 'chat') {
-      activeTab.value = 'workspace'
-      workspacePane.value = 'chat'
-    } else if (normalized === 'ctree') {
-      activeTab.value = 'workspace'
-      workspacePane.value = 'chat'
-    } else if (['table', 'figure', 'output'].includes(normalized)) {
-      // Route data-related tabs to the right pane instead of a full-screen view
-      activeTab.value = 'workspace'
-      dataPane.value = normalized
-    } else if (normalized === 'terminal') {
-      // Open the bottom terminal pane instead of navigating away
-      activeTab.value = 'workspace'
-      isTerminalOpen.value = true
-    } else if (normalized === 'preview') {
-      activeTab.value = 'workspace'
-    } else {
-      activeTab.value = normalized || 'workspace'
-    }
+    uiStore.setActiveTab(tab)
     saveLocalConfig()
   }
   function setWorkspacePane(pane) {
-    workspacePane.value = normalizeWorkspacePane(pane)
-    activeTab.value = 'workspace'
+    uiStore.setWorkspacePane(pane)
     saveLocalConfig()
   }
   function setDataPane(pane) {
-    const normalizedPane = String(pane || '').trim().toLowerCase()
-    dataPane.value = ['table', 'figure', 'output'].includes(normalizedPane) ? normalizedPane : 'table'
-    activeTab.value = 'workspace'
+    uiStore.setDataPane(pane)
     saveLocalConfig()
   }
   function setLeftPaneWidth(widthPct) {
     if (widthPct >= 10 && widthPct <= 90) {
-      leftPaneWidth.value = widthPct
+      uiStore.setLeftPaneWidth(widthPct)
       saveLocalConfig()
     }
   }
 
   function setTerminalHeight(heightPct) {
     if (heightPct >= 10 && heightPct <= 90) {
-      terminalHeight.value = heightPct
+      uiStore.setTerminalHeight(heightPct)
       saveLocalConfig()
     }
   }
 
   function toggleTerminal() {
-    isTerminalOpen.value = !isTerminalOpen.value
-    // If opening the terminal, ensure we are not hiding the workspace if we were previously in a full-screen view.
-    if (isTerminalOpen.value && ['schema-editor', 'conversation-tree'].includes(activeTab.value)) {
-      activeTab.value = 'workspace'
-    }
+    uiStore.toggleTerminal()
     saveLocalConfig()
   }
 
@@ -3628,56 +3587,59 @@ export const useAppStore = defineStore('app', () => {
     terminalCwd.value = String(cwd || '')
   }
   function toggleChatOverlay() {
-    isChatOverlayOpen.value = !isChatOverlayOpen.value
+    uiStore.toggleChatOverlay()
     saveLocalConfig()
   }
   function setChatOverlayOpen(open) {
-    isChatOverlayOpen.value = !!open
+    uiStore.setChatOverlayOpen(open)
     saveLocalConfig()
   }
   function setChatOverlayWidth(widthFraction) {
     if (widthFraction > 0.1 && widthFraction < 0.9) {
-      chatOverlayWidth.value = widthFraction
+      uiStore.setChatOverlayWidth(widthFraction)
       saveLocalConfig()
     }
   }
   function setSidebarCollapsed(collapsed) {
-    isSidebarCollapsed.value = !!collapsed
+    uiStore.setSidebarCollapsed(collapsed)
     saveLocalConfig()
   }
 
   function setHideShortcutsModal(hide) {
-    hideShortcutsModal.value = !!hide
+    uiStore.setHideShortcutsModal(hide)
     saveLocalConfig()
   }
 
   function openKeyboardShortcuts() {
-    isKeyboardShortcutsOpen.value = true
+    uiStore.openKeyboardShortcuts()
   }
 
   function closeKeyboardShortcuts() {
-    isKeyboardShortcutsOpen.value = false
+    uiStore.closeKeyboardShortcuts()
   }
 
   function openCommandPalette() {
-    isCommandPaletteOpen.value = true
+    uiStore.openCommandPalette()
   }
 
   function closeCommandPalette() {
-    isCommandPaletteOpen.value = false
+    uiStore.closeCommandPalette()
   }
 
   function toggleCommandPalette() {
-    isCommandPaletteOpen.value = !isCommandPaletteOpen.value
+    uiStore.toggleCommandPalette()
   }
 
   // Editor tracking
   function setEditorPosition(line, col) {
-    editorLine.value = line
-    editorCol.value = col
+    uiStore.setEditorPosition(line, col)
   }
   function setEditorFocused(focused) {
-    isEditorFocused.value = focused
+    uiStore.setEditorFocused(focused)
+  }
+
+  function openSettings(tab = 'setup') {
+    uiStore.openSettings(tab)
   }
 
   function setLoading(loading) {

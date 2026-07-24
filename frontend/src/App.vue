@@ -2,78 +2,18 @@
   <div class="min-h-screen bg-[var(--color-base)] flex flex-col">
     <ToastContainer />
 
-    <div
-      v-show="!startupFailure && !desktopStartup.ready"
-      class="fixed inset-0 flex items-center justify-center bg-[var(--color-base)]"
-      role="status"
-      aria-live="polite"
-    >
-      <div class="w-full max-w-md px-6 text-center">
-        <!-- Logo -->
-        <div class="flex justify-center mb-8">
-          <img
-            :src="logo"
-            alt="Inquira logo"
-            class="h-16 w-16"
-          />
-        </div>
-
-        <!-- Brand -->
-        <h1 class="text-2xl font-semibold tracking-tight text-[var(--color-text-main)]">
-          {{ desktopStartupTitle }}
-        </h1>
-        <p class="mt-3 text-sm text-[var(--color-text-muted)]">
-          {{ desktopStartupMessage }}
-        </p>
-
-        <!-- Progress -->
-        <div class="mt-10">
-          <div class="h-px w-full bg-[var(--color-border)]">
-            <div
-              class="h-full bg-[var(--color-text-main)] transition-all duration-500 ease-out"
-              :style="{ width: progressPercent + '%' }"
-            ></div>
-          </div>
-          <div class="mt-4 flex items-center justify-center gap-2">
-            <div class="h-1.5 w-1.5 rounded-full bg-[var(--color-text-muted)] animate-pulse"></div>
-            <span class="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">Starting</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div
-      v-show="startupFailure"
-      class="fixed inset-0 flex items-center justify-center bg-[var(--color-base)]"
-      role="alert"
-    >
-      <div class="w-full max-w-md px-6 text-center">
-        <!-- Logo -->
-        <div class="flex justify-center mb-8">
-          <img :src="logo" alt="Inquira logo" class="h-16 w-16" />
-        </div>
-
-        <!-- Error -->
-        <h1 class="text-xl font-semibold tracking-tight text-[var(--color-text-main)]">
-          Startup Failed
-        </h1>
-        <p class="mt-3 text-sm text-[var(--color-text-muted)]">
-          The desktop services could not reach a healthy state.
-        </p>
-
-        <!-- Error details -->
-        <div class="mt-8 rounded-lg border border-[var(--color-accent-border)] bg-[var(--color-danger-bg)] px-4 py-3 text-left">
-          <p class="text-xs font-medium uppercase tracking-wider text-[var(--color-danger-text)]">Error</p>
-          <p class="mt-2 text-sm text-[var(--color-danger-text)]">{{ startupFailure }}</p>
-        </div>
-        <StartupFailureActions
-          :message="startupRecoveryMessage"
-          @restart="restartDesktopApp"
-          @open-logs="openStartupLogs"
-          @copy-diagnostics="copyStartupDiagnostics"
-        />
-      </div>
-    </div>
+    <DesktopStartupGate
+      :ready="desktopStartup.ready"
+      :failure="startupFailure"
+      :title="desktopStartupTitle"
+      :message="desktopStartupMessage"
+      :progress-percent="progressPercent"
+      :recovery-message="startupRecoveryMessage"
+      :logo="logo"
+      @restart="restartDesktopApp"
+      @open-logs="openStartupLogs"
+      @copy-diagnostics="copyStartupDiagnostics"
+    />
 
     <div v-if="authStore.isAuthenticated && appBootstrap.ready" class="flex flex-col h-screen">
       <div class="flex-1 flex overflow-hidden app-shell-frame relative">
@@ -91,16 +31,19 @@
       </div>
       <StatusBar />
       <SettingsModal
-        v-model="appStore.isSettingsOpen"
-        :initial-tab="appStore.settingsInitialTab"
+        v-if="uiStore.isSettingsOpen"
+        v-model="uiStore.isSettingsOpen"
+        :initial-tab="uiStore.settingsInitialTab"
       />
       <CommandPaletteModal
-        :is-open="appStore.isCommandPaletteOpen"
-        @close="appStore.closeCommandPalette()"
+        v-if="uiStore.isCommandPaletteOpen"
+        :is-open="uiStore.isCommandPaletteOpen"
+        @close="uiStore.closeCommandPalette()"
       />
       <KeyboardShortcutsModal
-        :is-open="appStore.isKeyboardShortcutsOpen"
-        @close="appStore.closeKeyboardShortcuts()"
+        v-if="uiStore.isKeyboardShortcutsOpen"
+        :is-open="uiStore.isKeyboardShortcutsOpen"
+        @close="uiStore.closeKeyboardShortcuts()"
       />
     </div>
 
@@ -153,14 +96,15 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { useAppStore } from './stores/appStore'
+import { useAppCoordinatorStore } from './stores/appCoordinatorStore'
 import { useAuthStore } from './stores/authStore'
+import { useUiStore } from './stores/uiStore'
 import { settingsWebSocket } from './services/websocketService'
 import { previewService } from './services/previewService'
-import { apiService } from './services/apiService'
+import { apiService } from './services/apiRuntime'
 import { themeService } from './services/themeService'
 import { fontService } from './services/fontService'
 import { toast } from './composables/useToast'
@@ -173,13 +117,14 @@ import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
 import RightPanel from './components/layout/RightPanel.vue'
 import StatusBar from './components/layout/StatusBar.vue'
 import ToastContainer from './components/ui/ToastContainer.vue'
-import StartupFailureActions from './components/startup/StartupFailureActions.vue'
-import SettingsModal from './components/modals/SettingsModal.vue'
-import CommandPaletteModal from './components/modals/CommandPaletteModal.vue'
-import KeyboardShortcutsModal from './components/modals/KeyboardShortcutsModal.vue'
+import DesktopStartupGate from './components/startup/DesktopStartupGate.vue'
+const SettingsModal = defineAsyncComponent(() => import('./components/modals/SettingsModal.vue'))
+const CommandPaletteModal = defineAsyncComponent(() => import('./components/modals/CommandPaletteModal.vue'))
+const KeyboardShortcutsModal = defineAsyncComponent(() => import('./components/modals/KeyboardShortcutsModal.vue'))
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const authStore = useAuthStore()
+const uiStore = useUiStore()
 
 const workspaceRuntimeStatus = reactive({
   active: false,

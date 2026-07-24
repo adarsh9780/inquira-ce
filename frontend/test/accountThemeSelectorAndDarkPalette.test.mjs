@@ -11,8 +11,8 @@ test('appearance tab owns theme selection wired to app store theme state', () =>
   const source = read('src/components/modals/tabs/AppearanceTab.vue')
 
   assert.equal(source.includes("import HeaderDropdown from '../../ui/HeaderDropdown.vue'"), true)
-  assert.equal(source.includes("import { useAppStore } from '../../../stores/appStore'"), true)
-  assert.equal(source.includes('const appStore = useAppStore()'), true)
+  assert.equal(source.includes("import { useAppCoordinatorStore } from '../../../stores/appCoordinatorStore'"), true)
+  assert.equal(source.includes('const appStore = useAppCoordinatorStore()'), true)
   assert.equal(source.includes('const activeTheme = computed(() => appStore.uiTheme)'), true)
   assert.equal(source.includes('const themes = computed(() => appStore.availableThemes)'), true)
   assert.equal(source.includes('v-for="theme in themes"'), true)

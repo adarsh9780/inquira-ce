@@ -6,16 +6,18 @@ import { resolve } from 'node:path'
 const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
 test('api client exposes durable conversation usage endpoint', () => {
-  const apiService = read('src/services/apiService.js')
-  const contract = read('src/services/contracts/v1Api.js')
+  const apiService = read('src/services/apiRuntime.js')
+  const contract = read('src/services/apiClient.ts')
+  const generated = read('src/services/generatedApi.ts')
 
   assert.equal(apiService.includes('async v1GetConversationUsage(conversationId)'), true)
-  assert.equal(contract.includes("usage: (conversationId) => axios.get(`/api/v1/conversations/${conversationId}/usage`)"), true)
+  assert.equal(contract.includes('usage: (conversationId: string)'), true)
+  assert.equal(generated.includes('/api/v1/conversations/${conversationId}/usage'), true)
 })
 
 test('status bar and store use full active conversation usage aggregate', () => {
   const statusBar = read('src/components/layout/StatusBar.vue')
-  const store = read('src/stores/appStore.js')
+  const store = read('src/stores/appCoordinatorStore.js')
 
   assert.equal(statusBar.includes('appStore.activeConversationUsage'), true)
   assert.equal(statusBar.includes('formatUsageCompact'), true)

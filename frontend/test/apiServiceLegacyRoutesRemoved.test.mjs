@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 
 test('api service does not expose legacy dataset routes or helper shims', () => {
   const source = readFileSync(
-    resolve(process.cwd(), 'src/services/apiService.js'),
+    resolve(process.cwd(), 'src/services/apiRuntime.js'),
     'utf-8',
   )
 

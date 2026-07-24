@@ -1,30 +1,23 @@
 <template>
-  <Transition
-    enter-active-class="dialog-fade-enter-active dialog-pop-enter-active"
-    enter-from-class="dialog-fade-enter-from dialog-pop-enter-from"
-    leave-active-class="dialog-fade-leave-active dialog-pop-leave-active"
-    leave-to-class="dialog-fade-leave-to dialog-pop-leave-to"
-  >
-  <div
-    v-if="isOpen"
-    class="fixed inset-0 z-[95] flex items-start justify-center px-4 pt-[9vh]"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="command-palette-title"
-  >
-    <div class="modal-overlay" @click="emit('close')"></div>
-    <div class="modal-card command-palette-card relative flex w-full max-w-3xl flex-col overflow-hidden" @click.stop @keydown="handlePaletteKeydown">
+  <Dialog :open="isOpen" @update:open="handleOpenChange">
+    <DialogContent
+      :show-close-button="false"
+      class="modal-card command-palette-card top-[9vh] flex w-[calc(100vw-2rem)] max-w-3xl translate-y-0 flex-col gap-0 overflow-hidden border-[var(--color-border)] bg-[var(--color-surface)] p-0"
+    >
+    <Command class="flex min-h-0 flex-1 flex-col bg-transparent" @keydown="handlePaletteKeydown">
       <div class="flex items-center gap-3 border-b border-[var(--color-border)] px-4 py-3">
         <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--color-selected-surface)] text-[var(--color-text-main)]">
           <MagnifyingGlassIcon class="h-4 w-4" />
         </div>
         <div class="min-w-0 flex-1">
-          <h3 id="command-palette-title" class="truncate text-sm font-semibold text-[var(--color-text-main)]">Command Palette</h3>
-          <p class="truncate text-[12px] text-[var(--color-text-muted)]">Run commands or switch conversations across workspaces.</p>
+          <DialogTitle class="truncate text-sm font-semibold text-[var(--color-text-main)]">Command Palette</DialogTitle>
+          <DialogDescription class="truncate text-[12px] text-[var(--color-text-muted)]">Run commands or switch conversations across workspaces.</DialogDescription>
         </div>
-        <button type="button" class="btn-icon h-8 w-8" aria-label="Close command palette" @click="emit('close')">
-          <XMarkIcon class="h-4 w-4" />
-        </button>
+        <DialogClose as-child>
+          <button type="button" class="btn-icon h-8 w-8" aria-label="Close command palette">
+            <XMarkIcon class="h-4 w-4" />
+          </button>
+        </DialogClose>
       </div>
 
       <div class="border-b border-[var(--color-border)] px-4 py-3">
@@ -128,9 +121,9 @@
         <span>{{ footerLabel }}</span>
         <span v-if="loadError" class="truncate text-[var(--color-warning)]">{{ loadError }}</span>
       </div>
-    </div>
-  </div>
-  </Transition>
+    </Command>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <script setup>
@@ -149,20 +142,28 @@ import {
   ShareIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
-import { useAppStore } from '../../stores/appStore'
-import apiService from '../../services/apiService'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
+import apiService from '../../services/apiRuntime'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { formatCompactRelativeTimestamp, formatExactTimestamp, parseTimestamp } from '../../utils/dateUtils'
 import { SHORTCUTS, shortcutLabel } from '../../utils/keyboardShortcuts'
 import { workspaceInitials } from '../../utils/workspaceDisplay'
+import { Command } from '@/components/ui/command'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
 })
 const emit = defineEmits(['close'])
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const query = ref('')
 const loading = ref(false)
 const loadError = ref('')
@@ -172,6 +173,10 @@ const commandActionBusyId = ref('')
 const searchInputRef = ref(null)
 const conversationsByWorkspace = ref({})
 let loadRequestId = 0
+
+function handleOpenChange(open) {
+  if (!open) emit('close')
+}
 
 const normalizedQuery = computed(() => String(query.value || '').trim().toLowerCase())
 const platform = typeof navigator !== 'undefined' ? navigator.platform : ''

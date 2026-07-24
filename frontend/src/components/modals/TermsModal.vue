@@ -1,46 +1,15 @@
 <template>
-  <Transition
-    enter-active-class="dialog-fade-enter-active dialog-pop-enter-active"
-    enter-from-class="dialog-fade-enter-from dialog-pop-enter-from"
-    leave-active-class="dialog-fade-leave-active dialog-pop-leave-active"
-    leave-to-class="dialog-fade-leave-to dialog-pop-leave-to"
-  >
-    <!-- Modal Overlay -->
-    <div
-      v-if="isOpen"
-      class="fixed inset-0 layer-modal overflow-y-auto"
-      aria-labelledby="modal-title"
-      role="dialog"
-      aria-modal="true"
-    >
-      <!-- Background overlay -->
-      <div
-        class="modal-overlay"
-        @click="closeModal"
-      ></div>
-
-      <!-- Modal container -->
-      <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-        <div
-          class="modal-card relative w-full max-w-2xl text-left sm:my-8 h-[600px] flex flex-col"
-          @click.stop
-        >
+  <Dialog :open="isOpen" @update:open="handleOpenChange">
+    <DialogContent class="modal-card flex h-[min(600px,calc(100vh-2rem))] w-[calc(100vw-2rem)] max-w-2xl flex-col gap-0 overflow-hidden border-[var(--color-border)] bg-[var(--color-surface)] p-0">
           <!-- Modal Header -->
           <div class="modal-header shrink-0 flex items-center justify-between">
             <div class="flex items-center gap-3">
               <DocumentTextIcon class="h-5 w-5 shrink-0 text-[var(--color-accent)]" />
-              <h3 class="text-base font-semibold text-[var(--color-text-main)]" id="modal-title">Terms &amp; Conditions</h3>
+              <div>
+                <DialogTitle class="text-base font-semibold text-[var(--color-text-main)]">Terms &amp; Conditions</DialogTitle>
+                <DialogDescription class="sr-only">Read the current Inquira terms and conditions.</DialogDescription>
+              </div>
             </div>
-            <button
-              type="button"
-              class="btn-icon"
-              aria-label="Close terms"
-              @click="closeModal"
-            >
-              <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
           </div>
 
           <!-- Modal Body -->
@@ -68,21 +37,30 @@
           </div>
 
           <!-- Modal Footer -->
-          <div class="modal-footer shrink-0 justify-end">
-            <button @click="closeModal" class="btn-primary text-sm px-4 py-2">Close</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </Transition>
+          <DialogFooter class="modal-footer shrink-0 justify-end rounded-none border-t border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+            <DialogClose as-child>
+              <Button class="btn-primary h-9 px-4 text-sm">Close</Button>
+            </DialogClose>
+          </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
-<script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
 import { DocumentTextIcon } from '@heroicons/vue/24/outline'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
-import { apiService } from '../../services/apiService'
+import { apiService } from '../../services/apiRuntime'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 const props = defineProps({
   isOpen: {
@@ -127,33 +105,22 @@ async function loadTermsAndConditions({ force = false } = {}) {
   isTermsLoading.value = true
   termsError.value = ''
   try {
-    const payload = await apiService.v1GetTermsAndConditions()
+    const payload = await apiService.v1GetTermsAndConditions() as unknown as {
+      markdown?: string
+      last_updated?: string
+    }
     termsMarkdown.value = String(payload?.markdown || '').trim()
     termsLastUpdated.value = String(payload?.last_updated || '').trim()
-  } catch (error) {
-    termsError.value = error?.message || 'Failed to load Terms & Conditions.'
+  } catch (error: unknown) {
+    termsError.value = error instanceof Error ? error.message : 'Failed to load Terms & Conditions.'
   } finally {
     isTermsLoading.value = false
   }
 }
 
-function closeModal() {
-  emit('close')
+function handleOpenChange(open: boolean) {
+  if (!open) emit('close')
 }
-
-function handleEscape(e) {
-  if (e.key === 'Escape' && props.isOpen) {
-    closeModal()
-  }
-}
-
-onMounted(() => {
-  document.addEventListener('keydown', handleEscape)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('keydown', handleEscape)
-})
 </script>
 
 <style scoped>

@@ -21,7 +21,7 @@ test('workspace-driven panels guard backend calls until active workspace is vali
     'utf-8',
   )
   const apiService = readFileSync(
-    resolve(process.cwd(), 'src/services/apiService.js'),
+    resolve(process.cwd(), 'src/services/apiRuntime.js'),
     'utf-8',
   )
 

@@ -120,13 +120,13 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { ArrowPathIcon, TrashIcon } from '@heroicons/vue/24/outline'
-import { useAppStore } from '../../stores/appStore'
-import apiService from '../../services/apiService'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
+import apiService from '../../services/apiRuntime'
 import { toast } from '../../composables/useToast'
 import TauriTerminalPane from './TauriTerminalPane.vue'
 import { filenameFromPath } from '../../utils/pathUtils'
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const isMounted = ref(false)
 
 const command = ref('')

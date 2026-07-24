@@ -109,10 +109,10 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useAppStore } from '../../../stores/appStore'
+import { useAppCoordinatorStore } from '../../../stores/appCoordinatorStore'
 import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 
 const activeTheme = computed(() => appStore.uiTheme)
 const themes = computed(() => appStore.availableThemes)

@@ -13,7 +13,7 @@ test('preview service accepts table override for schema loads', () => {
 })
 
 test('api service exposes v1 regenerate schema endpoint for workspace datasets', () => {
-  const servicePath = resolve(process.cwd(), 'src/services/apiService.js')
+  const servicePath = resolve(process.cwd(), 'src/services/apiRuntime.js')
   const source = readFileSync(servicePath, 'utf-8')
 
   assert.equal(source.includes('async v1RegenerateDatasetSchema(workspaceId, tableName, payload = {})'), true)

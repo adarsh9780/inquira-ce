@@ -12,7 +12,7 @@ function extractBlock(source, startMarker, endMarker) {
 }
 
 test('workspace listing no longer bootstraps runtimes as a side effect', () => {
-  const appStorePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const appStorePath = resolve(process.cwd(), 'src/stores/appCoordinatorStore.js')
   const source = readFileSync(appStorePath, 'utf-8')
   const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
 
@@ -76,7 +76,7 @@ test('workspace creation and mounted panes do not warm runtimes implicitly', () 
 })
 
 test('column catalog path uses saved schema metadata without runtime bootstrap', () => {
-  const appStorePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const appStorePath = resolve(process.cwd(), 'src/stores/appCoordinatorStore.js')
   const source = readFileSync(appStorePath, 'utf-8')
   const catalogBlock = extractBlock(
     source,

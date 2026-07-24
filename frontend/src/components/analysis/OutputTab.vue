@@ -229,7 +229,7 @@
 
 <script setup>
 import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
-import { useAppStore } from '../../stores/appStore'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
 import { buildUserRunItems } from '../../utils/unifiedResults'
 import AppEmptyState from '../ui/AppEmptyState.vue'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
@@ -248,7 +248,7 @@ import {
 
 const INLINE_TEXT_LIMIT = 4_000
 const RunChartOutput = defineAsyncComponent(() => import('./runs/RunChartOutput.vue'))
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const isMounted = ref(false)
 const selectedRunId = ref('')
 const focusedRunId = ref('')

@@ -258,9 +258,9 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useAppStore } from '../../stores/appStore'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
 import { useAuthStore } from '../../stores/authStore'
-import apiService from '../../services/apiService'
+import apiService from '../../services/apiRuntime'
 import { openExternalUrl } from '../../services/externalLinkService'
 import { settingsWebSocket } from '../../services/websocketService'
 import { formatUsageCompact, formatUsageTooltip } from '../../utils/usageFormat'
@@ -273,7 +273,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { toast, useToast } from '../../composables/useToast'
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const authStore = useAuthStore()
 const {
   notificationHistory,

@@ -254,10 +254,10 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { stat } from '@tauri-apps/plugin-fs'
-import { apiService } from '../../../services/apiService'
+import { apiService } from '../../../services/apiRuntime'
 import { previewService } from '../../../services/previewService'
 import { settingsWebSocket } from '../../../services/websocketService'
-import { useAppStore } from '../../../stores/appStore'
+import { useAppCoordinatorStore } from '../../../stores/appCoordinatorStore'
 import { toast } from '../../../composables/useToast'
 import WorkspaceAIConfigSection from './WorkspaceAIConfigSection.vue'
 import { extractApiErrorMessage } from '../../../utils/apiError'
@@ -267,7 +267,6 @@ import {
   getDroppedDatasetPaths,
   SUPPORTED_DATASET_EXTENSIONS,
 } from '../../../utils/datasetImport'
-import { filenameFromPath } from '../../../utils/pathUtils'
 import ConfirmationModal from '../ConfirmationModal.vue'
 import WorkspaceContextSection from './workspace/WorkspaceContextSection.vue'
 import WorkspaceDatasetSection from './workspace/WorkspaceDatasetSection.vue'
@@ -291,8 +290,7 @@ const props = defineProps({
 
 const emit = defineEmits(['select-workspace', 'activate-workspace', 'workspace-operation-change', 'workspace-created'])
 
-const appStore = useAppStore()
-useWorkspaceDatasets()
+const appStore = useAppCoordinatorStore()
 const workspaceSections = [
   { id: 'general', label: 'General' },
   { id: 'data', label: 'Data' },
@@ -328,6 +326,21 @@ const workspaceDetail = ref(null)
 const datasetEntries = ref([])
 const datasetColumnCounts = ref({})
 const datasetFileSizes = ref({})
+const {
+  datasetRowCount,
+  datasetColumnCount,
+  datasetFileSize,
+  datasetMetadata,
+  datasetSchemaStatusState,
+  datasetSchemaStatusLabel,
+  datasetSchemaStatusBadgeClass,
+  formatFilename,
+  formatCreatedDate,
+  formatRelativeTime,
+} = useWorkspaceDatasets({
+  columnCounts: datasetColumnCounts,
+  fileSizes: datasetFileSizes,
+})
 const isDatasetIngesting = ref(false)
 const datasetIngestFilename = ref('')
 const datasetIngestMessage = ref('')
@@ -1351,37 +1364,6 @@ async function resolveDatasetFileSize(path) {
   return Number.isFinite(bytes) && bytes > 0 ? bytes : null
 }
 
-function datasetRowCount(dataset) {
-  const value = Number(dataset?.row_count || 0)
-  return Number.isFinite(value) && value > 0 ? value.toLocaleString() : '?'
-}
-
-function datasetColumnCount(dataset) {
-  const value = Number(datasetColumnCounts.value?.[dataset?.table_name] || 0)
-  return Number.isFinite(value) && value > 0 ? value : '?'
-}
-
-function datasetFileSize(dataset) {
-  const bytes = Number(datasetFileSizes.value?.[dataset?.table_name] || 0)
-  if (!Number.isFinite(bytes) || bytes <= 0) return null
-  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${bytes} B`
-}
-
-function datasetMetadata(dataset) {
-  const segments = [
-    `${datasetRowCount(dataset)} rows`,
-    `${datasetColumnCount(dataset)} cols`,
-  ]
-  const sizeLabel = datasetFileSize(dataset)
-  if (sizeLabel) {
-    segments.push(sizeLabel)
-  }
-  return segments.join(' · ')
-}
-
 function requestRemoveDataset(dataset) {
   if (!dataset || isDeletingDataset.value) return
   pendingRemovalDataset.value = dataset
@@ -1667,30 +1649,6 @@ async function createWorkspace() {
   }
 }
 
-function datasetSchemaStatusState(dataset) {
-  const persistedStatus = String(dataset?.schema_status || 'queued').trim().toLowerCase()
-  if (['queued', 'generating', 'ready', 'failed'].includes(persistedStatus)) {
-    return persistedStatus
-  }
-  return 'queued'
-}
-
-function datasetSchemaStatusLabel(dataset) {
-  const status = datasetSchemaStatusState(dataset)
-  if (status === 'generating') return 'Generating schema'
-  if (status === 'ready') return 'Schema ready'
-  if (status === 'failed') return 'Schema failed'
-  return 'Schema queued'
-}
-
-function datasetSchemaStatusBadgeClass(dataset) {
-  const status = datasetSchemaStatusState(dataset)
-  if (status === 'generating') return 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
-  if (status === 'ready') return 'bg-[var(--color-success-bg)] text-[var(--color-success)]'
-  if (status === 'failed') return 'bg-[var(--color-danger-bg)] text-[var(--color-danger)]'
-  return 'bg-[var(--color-base-muted)] text-[var(--color-text-muted)]'
-}
-
 function stopDatasetSchemaPolling() {
   if (datasetSchemaPoller !== null) {
     clearInterval(datasetSchemaPoller)
@@ -1713,33 +1671,6 @@ function syncDatasetSchemaPolling() {
   }, 1500)
 }
 
-function formatFilename(raw) {
-  const value = String(raw || '').trim()
-  if (!value) return 'dataset'
-  return filenameFromPath(value, value)
-}
-
-function formatCreatedDate(raw) {
-  const value = String(raw || '').trim()
-  if (!value) return '—'
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return '—'
-  return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-function formatRelativeTime(raw) {
-  const value = String(raw || '').trim()
-  if (!value) return 'unknown'
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return 'unknown'
-  const deltaMs = Date.now() - parsed.getTime()
-  const minutes = Math.max(1, Math.round(deltaMs / 60000))
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.round(minutes / 60)
-  if (hours < 48) return `${hours}h ago`
-  const days = Math.round(hours / 24)
-  return `${days}d ago`
-}
 </script>
 
 <style scoped>

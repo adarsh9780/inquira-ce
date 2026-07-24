@@ -9,7 +9,7 @@ const store = {
   loadWorkspaceTurnTree: vi.fn(),
 }
 
-vi.mock('../src/stores/appStore', () => ({ useAppStore: () => store }))
+vi.mock('../src/stores/appCoordinatorStore', () => ({ useAppCoordinatorStore: () => store }))
 vi.mock('../src/composables/useToast', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 
 import SidebarGlobalTurnTree from '../src/components/layout/sidebar/SidebarGlobalTurnTree.vue'

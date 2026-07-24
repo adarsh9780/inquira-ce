@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('chat history binds scroll logic to outer scroll host and forces initial bottom alignment', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/components/chat/ChatHistory.vue'), 'utf-8')
+  const source = readFileSync(resolve(process.cwd(), 'src/composables/useChatScrollFollow.js'), 'utf-8')
 
   assert.equal(source.includes('scrollHost.value = resolveScrollHost()'), true)
   assert.equal(source.includes("localContainer.parentElement?.closest?.('[data-chat-scroll-container]')"), true)
@@ -13,7 +13,10 @@ test('chat history binds scroll logic to outer scroll host and forces initial bo
 })
 
 test('chat history renders conditional scroll-to-bottom button when user scrolls up', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/components/chat/ChatHistory.vue'), 'utf-8')
+  const source = [
+    'src/components/chat/ChatHistory.vue',
+    'src/composables/useChatScrollFollow.js',
+  ].map((path) => readFileSync(resolve(process.cwd(), path), 'utf-8')).join('\n')
 
   assert.equal(source.includes('v-if="showScrollToBottomButton"'), true)
   assert.equal(source.includes('aria-label="Scroll to bottom"'), true)

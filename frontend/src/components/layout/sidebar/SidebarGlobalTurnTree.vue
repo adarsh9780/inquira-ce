@@ -45,7 +45,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { ExclamationCircleIcon } from '@heroicons/vue/24/outline'
-import { useAppStore } from '../../../stores/appStore'
+import { useAppCoordinatorStore } from '../../../stores/appCoordinatorStore'
 import { toast } from '../../../composables/useToast'
 import { extractApiErrorMessage } from '../../../utils/apiError'
 import TurnTreeGraphView from '../../chat/TurnTreeGraphView.vue'
@@ -56,7 +56,7 @@ defineProps({
   variant: { type: String, default: 'sidebar' },
 })
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const isLoading = ref(false)
 const rulesDialogOpen = ref(false)
 const deleteDialogOpen = ref(false)

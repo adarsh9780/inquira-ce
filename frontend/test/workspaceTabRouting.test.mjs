@@ -4,20 +4,22 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('app store maps legacy code/chat tabs into workspace pane routing', () => {
-  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const storePath = resolve(process.cwd(), 'src/stores/appCoordinatorStore.js')
   const source = readFileSync(storePath, 'utf-8')
+  const uiStorePath = resolve(process.cwd(), 'src/stores/uiStore.ts')
+  const uiSource = readFileSync(uiStorePath, 'utf-8')
 
-  assert.equal(source.includes("const activeTab = ref('workspace')"), true)
-  assert.equal(source.includes("const workspacePane = ref('chat')"), true)
-  assert.equal(source.includes("const WORKSPACE_PANES = new Set(['code', 'chat'])"), true)
-  assert.equal(source.includes("if (normalized === 'code')"), true)
-  assert.equal(source.includes("if (normalized === 'chat')"), true)
-  assert.equal(source.includes("if (normalized === 'ctree')"), true)
-  assert.equal(source.includes("workspacePane.value = 'ctree'"), false)
-  assert.equal(source.includes("workspacePane.value = 'chat'"), true)
+  assert.equal(source.includes("import { useUiStore } from './uiStore'"), true)
+  assert.equal(source.includes('storeToRefs(uiStore)'), true)
+  assert.equal(uiSource.includes("const activeTab = ref('workspace')"), true)
+  assert.equal(uiSource.includes("const workspacePane = ref<WorkspacePane>('chat')"), true)
+  assert.equal(uiSource.includes("const WORKSPACE_PANES = new Set<WorkspacePane>(['code', 'chat'])"), true)
+  assert.equal(uiSource.includes("normalized === 'code' || normalized === 'chat' || normalized === 'ctree'"), true)
+  assert.equal(uiSource.includes("workspacePane.value = normalized === 'code' ? 'code' : 'chat'"), true)
+  assert.equal(uiSource.includes("workspacePane.value = 'ctree'"), false)
   assert.equal(source.includes('normalizeWorkspacePane(pane)'), true)
-  assert.equal(source.includes("'conversation-tree'"), true)
-  assert.equal(source.includes("activeTab.value = 'workspace'"), true)
+  assert.equal(uiSource.includes("'conversation-tree'"), true)
+  assert.equal(uiSource.includes("activeTab.value = 'workspace'"), true)
 })
 
 test('right panel includes unified workspace layout', () => {
@@ -34,7 +36,7 @@ test('right panel includes unified workspace layout', () => {
 test('preview tab is removed from sidebar navigation and runtime API client', () => {
   const sidebarPath = resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue')
   const sidebarSource = readFileSync(sidebarPath, 'utf-8')
-  const apiServicePath = resolve(process.cwd(), 'src/services/apiService.js')
+  const apiServicePath = resolve(process.cwd(), 'src/services/apiRuntime.js')
   const apiSource = readFileSync(apiServicePath, 'utf-8')
 
   assert.equal(sidebarSource.includes("id: 'preview'"), false)

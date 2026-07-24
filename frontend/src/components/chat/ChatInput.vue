@@ -196,15 +196,15 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useAppStore } from '../../stores/appStore'
-import apiService from '../../services/apiService'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
+import apiService from '../../services/apiRuntime'
 import executionService from '../../services/executionService'
 import { executeCommand, getRegisteredCommands, isCommand } from '../../services/commandRegistry'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { buildBrowserDataPath, inferTableNameFromDataPath } from '../../utils/chatBootstrap'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
-import { modelSupportsImages, SUPPORTED_CHAT_IMAGE_TYPES } from '../../utils/modelCapabilities'
+import { modelSupportsImages } from '../../utils/modelCapabilities'
 import ModelSelector from '../ui/ModelSelector.vue'
 import ColumnSuggest from './ColumnSuggest.vue'
 import ChatAttachmentTray from './ChatAttachmentTray.vue'
@@ -221,7 +221,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { ArrowUpIcon, MicrophoneIcon, StopIcon } from '@heroicons/vue/24/solid'
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const effectiveWorkspaceProvider = computed(() => appStore.workspaceAIConfig?.effective?.provider || appStore.llmProvider)
 const effectiveWorkspaceModel = computed(() => appStore.workspaceAIConfig?.effective?.main_model || appStore.selectedModel)
 const workspaceModelOptions = computed(() => {
@@ -232,7 +232,6 @@ const workspaceModelOptions = computed(() => {
   if (effectiveWorkspaceModel.value && !values.includes(effectiveWorkspaceModel.value)) values.unshift(effectiveWorkspaceModel.value)
   return values
 })
-const { formatAttachmentSize } = useChatAttachments()
 useChatAutocomplete()
 useVoiceInput()
 
@@ -284,9 +283,6 @@ const setupNotice = computed(() => {
 const activeTokenRange = ref({ start: 0, end: 0, token: '' })
 const suggestionsOpenUp = ref(false)
 const dismissedSuggestionSignature = ref('')
-const pendingAttachments = ref([])
-const isAttachmentDragActive = ref(false)
-const dragDepth = ref(0)
 const supportsVoiceInput = ref(false)
 const isVoiceInputActive = ref(false)
 const speechRecognition = ref(null)
@@ -296,6 +292,23 @@ const stoppedConversationIds = ref(new Set())
 const showCommandSuggestions = computed(() => commandSuggestions.value.length > 0)
 const showColumnSuggestions = computed(() => columnSuggestions.value.length > 0)
 const imageAttachmentsSupported = computed(() => modelSupportsImages(appStore.selectedModel))
+const {
+  pendingAttachments,
+  isAttachmentDragActive,
+  formatAttachmentSize,
+  openAttachmentPicker,
+  appendPendingAttachments,
+  handleAttachmentSelection,
+  removePendingAttachment,
+  handleAttachmentDragEnter,
+  handleAttachmentDragOver,
+  handleAttachmentDragLeave,
+  handleAttachmentDrop,
+} = useChatAttachments({
+  supported: imageAttachmentsSupported,
+  inputRef: attachmentInputRef,
+  notifyError: (title, message) => toast.error(title, message),
+})
 const composerCardStyle = computed(() => {
   const style = isFocused.value
     ? {
@@ -424,99 +437,6 @@ function sortArtifactsNewestFirst(items) {
     if (delta !== 0) return delta
     return String(right?.artifact_id || '').localeCompare(String(left?.artifact_id || ''))
   })
-}
-
-function buildAttachmentId(file) {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${String(file?.name || 'image')}`
-}
-
-function openAttachmentPicker() {
-  if (!imageAttachmentsSupported.value) {
-    toast.error('Images Not Supported', 'The selected model does not support image attachments.')
-    return
-  }
-  attachmentInputRef.value?.click()
-}
-
-async function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = String(reader.result || '')
-      resolve(result.includes(',') ? result.split(',')[1] : result)
-    }
-    reader.onerror = () => reject(reader.error || new Error('Failed to read image file.'))
-    reader.readAsDataURL(file)
-  })
-}
-
-async function appendPendingAttachments(files) {
-  if (!imageAttachmentsSupported.value) {
-    toast.error('Images Not Supported', 'Switch to a vision-capable model before attaching images.')
-    return
-  }
-  const normalizedFiles = Array.from(files || []).filter((file) => SUPPORTED_CHAT_IMAGE_TYPES.has(String(file?.type || '').toLowerCase()))
-  if (normalizedFiles.length === 0) {
-    toast.error('Unsupported File', 'Only PNG, JPG, WEBP, and GIF images can be attached.')
-    return
-  }
-
-  for (const file of normalizedFiles) {
-    const dataBase64 = await fileToBase64(file)
-    pendingAttachments.value.push({
-      attachment_id: buildAttachmentId(file),
-      filename: String(file.name || 'image'),
-      media_type: String(file.type || 'image/png'),
-      data_base64: dataBase64,
-      preview_url: `data:${String(file.type || 'image/png')};base64,${dataBase64}`,
-      size: Number(file.size || 0),
-    })
-  }
-}
-
-async function handleAttachmentSelection(event) {
-  try {
-    await appendPendingAttachments(event?.target?.files || [])
-  } catch (error) {
-    toast.error('Image Attach Failed', extractApiErrorMessage(error, 'Failed to attach image.'))
-  } finally {
-    if (event?.target) event.target.value = ''
-  }
-}
-
-function removePendingAttachment(attachmentId) {
-  const targetId = String(attachmentId || '').trim()
-  pendingAttachments.value = pendingAttachments.value.filter(
-    (item) => String(item?.attachment_id || '') !== targetId
-  )
-}
-
-function handleAttachmentDragEnter() {
-  dragDepth.value += 1
-  if (!imageAttachmentsSupported.value) return
-  isAttachmentDragActive.value = true
-}
-
-function handleAttachmentDragOver() {
-  if (!imageAttachmentsSupported.value) return
-  isAttachmentDragActive.value = true
-}
-
-function handleAttachmentDragLeave() {
-  dragDepth.value = Math.max(0, dragDepth.value - 1)
-  if (dragDepth.value === 0) {
-    isAttachmentDragActive.value = false
-  }
-}
-
-async function handleAttachmentDrop(event) {
-  dragDepth.value = 0
-  isAttachmentDragActive.value = false
-  try {
-    await appendPendingAttachments(event?.dataTransfer?.files || [])
-  } catch (error) {
-    toast.error('Image Attach Failed', extractApiErrorMessage(error, 'Failed to attach image.'))
-  }
 }
 
 async function handleModelChange(model) {

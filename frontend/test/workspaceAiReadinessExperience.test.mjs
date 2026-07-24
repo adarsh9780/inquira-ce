@@ -6,8 +6,8 @@ import test from 'node:test'
 const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
 test('workspace AI API keeps defaults overrides effective values and readiness separate', () => {
-  const contract = read('src/services/contracts/v1Api.js')
-  const store = read('src/stores/appStore.js')
+  const contract = read('src/services/generatedApi.ts')
+  const store = read('src/stores/appCoordinatorStore.js')
 
   assert.match(contract, /workspaces\/\$\{workspaceId\}\/ai-config/)
   assert.match(contract, /ai-config\/overrides/)
@@ -53,7 +53,7 @@ test('settings puts workspace models with workspace data and isolates credential
 test('first-run surfaces follow workspace data connection configuration readiness order', () => {
   const setup = read('src/components/modals/tabs/SetupTab.vue')
   const chat = read('src/components/chat/ChatTab.vue')
-  const store = read('src/stores/appStore.js')
+  const store = read('src/stores/appCoordinatorStore.js')
 
   assert.match(setup, /Workspace/)
   assert.match(setup, /Model connection/)

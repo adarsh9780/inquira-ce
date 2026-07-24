@@ -97,14 +97,14 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useAppStore } from '../stores/appStore'
+import { useAppCoordinatorStore } from '../stores/appCoordinatorStore'
 import { toast } from '../composables/useToast'
 import { extractApiErrorMessage } from '../utils/apiError'
 import WorkspaceRenameModal from './modals/WorkspaceRenameModal.vue'
 import ConfirmationModal from './modals/ConfirmationModal.vue'
 import FloatingActionMenu from './ui/FloatingActionMenu.vue'
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const isOpen = ref(false)
 const containerRef = ref(null)
 const isDeleteDialogOpen = ref(false)

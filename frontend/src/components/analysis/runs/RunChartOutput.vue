@@ -4,8 +4,8 @@
 
 <script setup>
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import Plotly from 'plotly.js-dist-min'
-import { useAppStore } from '../../../stores/appStore'
+import Plotly from 'plotly.js-cartesian-dist-min'
+import { useAppCoordinatorStore } from '../../../stores/appCoordinatorStore'
 import { normalizePlotlyFigure } from '../../../utils/figurePayload'
 import { applyPlotlyConfigTheme, applyPlotlyTheme, PLOTLY_THEME_MODE } from '../../../utils/plotlyTheme'
 
@@ -13,7 +13,7 @@ const props = defineProps({
   output: { type: Object, required: true },
 })
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const plotContainer = ref(null)
 let resizeObserver = null
 

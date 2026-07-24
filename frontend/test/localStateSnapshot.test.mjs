@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('app store persists local session snapshot via Tauri app data file service', () => {
-  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const storePath = resolve(process.cwd(), 'src/stores/appCoordinatorStore.js')
   const source = readFileSync(storePath, 'utf-8')
 
   assert.equal(source.includes("import { localStateService } from '../services/localStateService'"), true)
@@ -43,8 +43,8 @@ test('app boot and unload flows load and flush local snapshot state', () => {
 })
 
 test('terminal pane visibility changes are persisted to local snapshot', () => {
-  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
-  const source = readFileSync(storePath, 'utf-8')
+  const storePath = resolve(process.cwd(), 'src/stores/appCoordinatorStore.js')
+  const source = `${readFileSync(resolve(process.cwd(), 'src/stores/uiStore.ts'), 'utf-8')}\n${readFileSync(storePath, 'utf-8')}`
 
   assert.equal(source.includes('function toggleTerminal() {'), true)
   assert.equal(source.includes('isTerminalOpen.value = !isTerminalOpen.value'), true)
@@ -52,7 +52,7 @@ test('terminal pane visibility changes are persisted to local snapshot', () => {
 })
 
 test('local snapshot restore recovers model selections and flushes pending preference sync on app close', () => {
-  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const storePath = resolve(process.cwd(), 'src/stores/appCoordinatorStore.js')
   const source = readFileSync(storePath, 'utf-8')
 
   assert.equal(source.includes('const llm = snapshot.llm || {}'), true)
@@ -68,7 +68,7 @@ test('local snapshot restore recovers model selections and flushes pending prefe
 })
 
 test('preference sync payload excludes enabled_models and keeps selected model only', () => {
-  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const storePath = resolve(process.cwd(), 'src/stores/appCoordinatorStore.js')
   const source = readFileSync(storePath, 'utf-8')
 
   assert.equal(source.includes('selected_model: selectedModel.value'), true)

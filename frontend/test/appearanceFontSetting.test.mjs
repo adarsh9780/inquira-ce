@@ -45,7 +45,7 @@ test('app shell applies and persists font preference through font service', () =
 
 test('style and store include app and code font catalogs', () => {
   const styleSource = read('src/style.css')
-  const storeSource = read('src/stores/appStore.js')
+  const storeSource = `${read('src/stores/preferencesStore.ts')}\n${read('src/stores/appCoordinatorStore.js')}`
   const fontsSource = read('src/constants/fonts.js')
 
   assert.equal(styleSource.includes('family=Ubuntu:wght@400;500;700'), true)

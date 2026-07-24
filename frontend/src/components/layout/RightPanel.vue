@@ -89,16 +89,16 @@
         </button>
       </div>
       <div class="flex-1 overflow-hidden relative p-1 pb-3">
-        <TerminalTab />
+        <TerminalTab v-if="appStore.isTerminalOpen" />
       </div>
     </div>
 
     <!-- Other Full-Screen Views -->
     <div v-show="appStore.activeTab !== 'workspace'" class="relative flex-1 overflow-hidden" style="background-color: var(--color-workspace-surface);">
-      <div v-show="appStore.activeTab === 'schema-editor'" class="h-full p-3 sm:p-4">
+      <div v-if="appStore.activeTab === 'schema-editor'" class="h-full p-3 sm:p-4">
         <SchemaEditorTab />
       </div>
-      <div v-show="appStore.activeTab === 'conversation-tree'" class="flex h-full min-h-0 flex-col p-3 sm:p-4">
+      <div v-else-if="appStore.activeTab === 'conversation-tree'" class="flex h-full min-h-0 flex-col p-3 sm:p-4">
         <div class="mb-3 flex h-9 shrink-0 items-center justify-between">
           <div class="min-w-0">
             <h2 class="truncate text-sm font-semibold text-[var(--color-text-main)]">Conversation Tree</h2>
@@ -125,16 +125,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useAppStore } from '../../stores/appStore'
+import { ref, computed, defineAsyncComponent, onMounted, onUnmounted } from 'vue'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
 import WorkspaceLeftPane from './WorkspaceLeftPane.vue'
 import WorkspaceRightPane from './WorkspaceRightPane.vue'
-import SidebarGlobalTurnTree from './sidebar/SidebarGlobalTurnTree.vue'
-import TerminalTab from '../analysis/TerminalTab.vue'
-import SchemaEditorTab from '../preview/SchemaEditorTab.vue'
+const SidebarGlobalTurnTree = defineAsyncComponent(() => import('./sidebar/SidebarGlobalTurnTree.vue'))
+const TerminalTab = defineAsyncComponent(() => import('../analysis/TerminalTab.vue'))
+const SchemaEditorTab = defineAsyncComponent(() => import('../preview/SchemaEditorTab.vue'))
 import { CommandLineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const isWorkspaceActive = computed(() => appStore.activeTab === 'workspace')
 const leftPaneWidth = computed(() => appStore.leftPaneWidth)
 const rightPaneWidth = computed(() => 100 - appStore.leftPaneWidth)

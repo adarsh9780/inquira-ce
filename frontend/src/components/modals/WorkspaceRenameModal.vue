@@ -1,108 +1,111 @@
 <template>
-  <Transition
-    enter-active-class="dialog-fade-enter-active dialog-pop-enter-active"
-    enter-from-class="dialog-fade-enter-from dialog-pop-enter-from"
-    leave-active-class="dialog-fade-leave-active dialog-pop-leave-active"
-    leave-to-class="dialog-fade-leave-to dialog-pop-leave-to"
-  >
-    <div
-      v-if="isOpen"
-      class="fixed inset-0 layer-modal overflow-y-auto"
-      role="dialog"
-      aria-modal="true"
+  <Dialog :open="isOpen" @update:open="handleOpenChange">
+    <DialogContent
+      :show-close-button="false"
+      class="max-w-md gap-0 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-panel-elevated)] p-0 shadow-[var(--shadow-modal)] sm:max-w-md"
+      @open-auto-focus="handleOpenAutoFocus"
     >
-      <div class="modal-overlay" @click="closeModal"></div>
+      <DialogHeader class="modal-header space-y-1 text-left">
+        <DialogTitle class="text-base font-semibold text-[var(--color-text-main)]">
+          Rename Workspace
+        </DialogTitle>
+        <DialogDescription class="text-sm text-[var(--color-text-muted)]">
+          Update the workspace name shown in workspace and chat selectors.
+        </DialogDescription>
+      </DialogHeader>
 
-      <div class="flex min-h-full items-center justify-center p-4">
-        <div class="relative w-full max-w-md modal-card" @click.stop>
-          <div class="modal-header flex-col items-start">
-            <h3 class="text-base font-semibold text-[var(--color-text-main)]">Rename Workspace</h3>
-            <p class="mt-1 text-sm text-[var(--color-text-muted)]">
-              Update the workspace name shown in workspace and chat selectors.
-            </p>
-          </div>
-
-          <div class="px-5 py-4 space-y-3">
-            <label for="workspace-rename" class="text-sm font-medium text-[var(--color-text-main)]">Workspace Name</label>
-            <input
-              id="workspace-rename"
-              ref="nameInputRef"
-              v-model="name"
-              type="text"
-              maxlength="120"
-              class="input-base"
-              placeholder="e.g. IPL Analytics"
-              @keydown.enter.prevent="submit"
-            />
-          </div>
-
-          <div class="modal-footer">
-            <button type="button" class="btn-secondary text-sm px-4 py-2" :disabled="isSubmitting" @click="closeModal">Cancel</button>
-            <button type="button" class="btn-primary text-sm px-4 py-2" :disabled="isSubmitting || !name.trim()" @click="submit">
-              {{ isSubmitting ? 'Renaming…' : 'Rename Workspace' }}
-            </button>
-          </div>
-        </div>
+      <div class="space-y-3 px-5 py-4">
+        <Label for="workspace-rename" class="text-sm font-medium text-[var(--color-text-main)]">
+          Workspace Name
+        </Label>
+        <Input
+          id="workspace-rename"
+          ref="nameInputRef"
+          v-model="name"
+          maxlength="120"
+          class="input-base"
+          placeholder="e.g. IPL Analytics"
+          @keydown.enter.prevent="submit"
+        />
       </div>
-    </div>
-  </Transition>
+
+      <DialogFooter class="modal-footer m-0 rounded-none border-t border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+        <DialogClose as-child>
+          <Button variant="outline" :disabled="isSubmitting">
+            Cancel
+          </Button>
+        </DialogClose>
+        <Button :disabled="isSubmitting || !name.trim()" @click="submit">
+          {{ isSubmitting ? 'Renaming…' : 'Rename Workspace' }}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
-<script setup>
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+<script setup lang="ts">
+import { nextTick, ref, watch } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    default: false
-  },
-  isSubmitting: {
-    type: Boolean,
-    default: false
-  },
-  initialName: {
-    type: String,
-    default: ''
-  }
-})
-
-const emit = defineEmits(['close', 'submit'])
-
-const name = ref('')
-const nameInputRef = ref(null)
-
-function closeModal() {
-  emit('close')
+interface Props {
+  isOpen?: boolean
+  isSubmitting?: boolean
+  initialName?: string
 }
 
+const props = withDefaults(defineProps<Props>(), {
+  isOpen: false,
+  isSubmitting: false,
+  initialName: '',
+})
+
+const emit = defineEmits<{
+  close: []
+  submit: [name: string]
+}>()
+
+const name = ref('')
+const nameInputRef = ref<ComponentPublicInstance | null>(null)
+
 function submit() {
-  if (!name.value.trim()) return
-  emit('submit', name.value.trim())
+  const normalized = name.value.trim()
+  if (!normalized) return
+  emit('submit', normalized)
+}
+
+function handleOpenChange(open: boolean) {
+  if (!open) emit('close')
+}
+
+async function focusAndSelectName() {
+  await nextTick()
+  const input = nameInputRef.value?.$el as HTMLInputElement | undefined
+  input?.focus()
+  input?.select()
+}
+
+function handleOpenAutoFocus(event: Event) {
+  event.preventDefault()
+  void focusAndSelectName()
 }
 
 watch(
   () => props.isOpen,
-  async (open) => {
-    if (open) {
-      name.value = String(props.initialName || '').trim()
-      await nextTick()
-      nameInputRef.value?.focus()
-      nameInputRef.value?.select?.()
-    }
-  }
+  (open) => {
+    if (open) name.value = props.initialName.trim()
+  },
+  { immediate: true },
 )
-
-function handleEscape(event) {
-  if (event.key === 'Escape' && props.isOpen) {
-    closeModal()
-  }
-}
-
-onMounted(() => {
-  document.addEventListener('keydown', handleEscape)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('keydown', handleEscape)
-})
 </script>

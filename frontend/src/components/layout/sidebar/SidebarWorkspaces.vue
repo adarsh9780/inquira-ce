@@ -108,7 +108,7 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/vue'
-import { useAppStore } from '../../../stores/appStore'
+import { useAppCoordinatorStore } from '../../../stores/appCoordinatorStore'
 import { toast } from '../../../composables/useToast'
 import { extractApiErrorMessage } from '../../../utils/apiError'
 import ConfirmationModal from '../../modals/ConfirmationModal.vue'
@@ -126,7 +126,7 @@ defineProps({
 
 const emit = defineEmits(['header-click', 'select'])
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const isDeleteDialogOpen = ref(false)
 const pendingDeleteWorkspaceId = ref('')
 

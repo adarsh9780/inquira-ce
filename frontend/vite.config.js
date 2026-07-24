@@ -17,7 +17,7 @@ const manualChunkGroups = {
   'table-engine': ['node_modules/@tanstack/table-core/', 'node_modules/@tanstack/vue-table/'],
   'ui-icons': ['node_modules/@heroicons/vue/'],
   'ui-headless': ['node_modules/@headlessui/vue/'],
-  'plotly-charts': ['node_modules/plotly.js-dist-min/'],
+  'plotly-charts': ['node_modules/plotly.js-cartesian-dist-min/'],
   'axios-http': ['node_modules/axios/'],
   'utils': ['node_modules/markdown-it/', 'node_modules/dompurify/'],
 }
@@ -35,6 +35,11 @@ function manualChunks(id) {
 
 // https://vite.dev/config/
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': resolve(frontendRoot, 'src'),
+    },
+  },
   envDir: '..',
   envPrefix: ['VITE_'],
   base: './',
@@ -65,7 +70,7 @@ export default defineConfig({
       '@headlessui/vue',
       'markdown-it',
       'dompurify',
-      'plotly.js-dist-min'
+      'plotly.js-cartesian-dist-min'
     ]
   },
   server: {

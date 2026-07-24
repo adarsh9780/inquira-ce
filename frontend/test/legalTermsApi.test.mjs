@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 
 test('api service exposes v1 legal terms endpoint helper', () => {
   const source = readFileSync(
-    resolve(process.cwd(), 'src/services/apiService.js'),
+    resolve(process.cwd(), 'src/services/apiRuntime.js'),
     'utf-8',
   )
 

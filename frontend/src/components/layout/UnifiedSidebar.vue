@@ -328,7 +328,7 @@
 
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
-import { useAppStore } from '../../stores/appStore'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
 import { useAuthStore } from '../../stores/authStore'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
@@ -343,7 +343,7 @@ import SidebarPrimaryNav from './sidebar/SidebarPrimaryNav.vue'
 import SidebarWorkspaceConversations from './sidebar/SidebarWorkspaceConversations.vue'
 import DisclosureSection from '../ui/DisclosureSection.vue'
 import logo from '../../assets/favicon.svg'
-import apiService from '../../services/apiService'
+import apiService from '../../services/apiRuntime'
 import { sidebarConversationPageSize, useSidebarConversations } from '../../composables/useSidebarConversations'
 import { workspaceInitials } from '../../utils/workspaceDisplay'
 
@@ -357,7 +357,7 @@ import {
 } from '@heroicons/vue/24/outline'
 
 // ─── Store ───────────────────────────────────────────────────────────────────
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const authStore = useAuthStore()
 
 // ─── UI State ────────────────────────────────────────────────────────────────

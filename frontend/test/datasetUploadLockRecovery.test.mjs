@@ -12,7 +12,7 @@ function extractBlock(source, startMarker, endMarker) {
 }
 
 test('dataset upload retries once after resetting the runtime on workspace lock conflicts', () => {
-  const apiServicePath = resolve(process.cwd(), 'src/services/apiService.js')
+  const apiServicePath = resolve(process.cwd(), 'src/services/apiRuntime.js')
   const source = readFileSync(apiServicePath, 'utf-8')
   const uploadBlock = extractBlock(
     source,

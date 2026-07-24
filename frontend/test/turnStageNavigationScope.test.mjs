@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('active turn payload syncs the editor code and keys pane state by active turn', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf-8')
+  const source = readFileSync(resolve(process.cwd(), 'src/stores/appCoordinatorStore.js'), 'utf-8')
 
   assert.equal(source.includes('setPythonFileContent(activeTurnCode.value)'), true)
   assert.equal(source.includes("return `${workspaceKey}::${turnKey || 'workspace'}::${artifactKey}`"), true)

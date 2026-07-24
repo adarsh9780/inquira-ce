@@ -447,16 +447,16 @@ import { computed, onMounted, ref, watch } from 'vue'
 import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 import FloatingActionMenu from '../../ui/FloatingActionMenu.vue'
 import ConfirmationModal from '../ConfirmationModal.vue'
-import { apiService } from '../../../services/apiService'
+import { apiService } from '../../../services/apiRuntime'
 import { useLLMConfig } from '../../../composables/useLLMConfig'
-import { useAppStore } from '../../../stores/appStore'
+import { useAppCoordinatorStore } from '../../../stores/appCoordinatorStore'
 import { useAuthStore } from '../../../stores/authStore'
 import { toast } from '../../../composables/useToast'
 import { openExternalUrl } from '../../../services/externalLinkService'
 
 const emit = defineEmits(['close-request'])
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const authStore = useAuthStore()
 const llm = useLLMConfig()
 

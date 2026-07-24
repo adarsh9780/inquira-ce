@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Ubuntu:wght@400;500;700&family=Inter:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Fira+Code:wght@400;500;700&family=Source+Code+Pro:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap');
+
 @import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:where([data-theme="midnight"], [data-theme="midnight"] *));
 
 @theme {
   --color-shell-backdrop: #F5F4EF;
@@ -1930,4 +1934,25 @@ p {
 
 .save-btn:hover:not(:disabled) {
   opacity: 0.9;
+}
+
+@theme inline {
+  --font-heading: var(--font-ui);
+  --font-sans: var(--font-ui);
+  --color-background: var(--color-base);
+  --color-foreground: var(--color-text-main);
+  --color-card: var(--color-surface);
+  --color-card-foreground: var(--color-text-main);
+  --color-popover: var(--color-panel-elevated);
+  --color-popover-foreground: var(--color-text-main);
+  --color-primary: var(--color-accent);
+  --color-primary-foreground: var(--color-on-accent);
+  --color-secondary: var(--color-base-muted);
+  --color-secondary-foreground: var(--color-text-main);
+  --color-muted: var(--color-panel-muted);
+  --color-muted-foreground: var(--color-text-muted);
+  --color-accent-foreground: var(--color-text-main);
+  --color-destructive: var(--color-danger);
+  --color-input: var(--color-control-surface);
+  --color-ring: var(--color-accent);
 }

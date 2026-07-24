@@ -98,13 +98,13 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
-import { useAppStore } from '../../stores/appStore'
-import Plotly from 'plotly.js-dist-min'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
+import Plotly from 'plotly.js-cartesian-dist-min'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import FloatingActionMenu from '../ui/FloatingActionMenu.vue'
 import AppEmptyState from '../ui/AppEmptyState.vue'
-import apiService from '../../services/apiService'
+import apiService from '../../services/apiRuntime'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import { persistExportFile } from '../../utils/exportFile'
 import { applyPlotlyTheme, applyPlotlyConfigTheme, PLOTLY_THEME_MODE } from '../../utils/plotlyTheme'
@@ -114,7 +114,7 @@ import {
   ChartBarIcon,
 } from '@heroicons/vue/24/outline'
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 
 const plotContainer = ref(null)
 let ro = null

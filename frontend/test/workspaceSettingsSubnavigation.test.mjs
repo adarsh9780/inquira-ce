@@ -23,13 +23,13 @@ test('workspace settings separate General, Data, and AI without losing workspace
 
 test('workspace entry points deep-link to the relevant scoped tab', () => {
   const settings = read('src/components/modals/SettingsModal.vue')
-  const store = read('src/stores/appStore.js')
+  const store = read('src/stores/uiStore.ts')
   const setup = read('src/components/modals/tabs/SetupTab.vue')
   const composer = read('src/components/chat/ChatInput.vue')
 
   assert.match(settings, /:initial-section="workspaceInitialSection"/)
-  assert.match(store, /settingsInitialTab\.value = 'workspace-ai'/)
-  assert.match(store, /settingsInitialTab\.value = 'workspace-data'/)
+  assert.match(store, /normalized === 'models' \|\| normalized === 'workspace-ai'\) return 'workspace-ai'/)
+  assert.match(store, /normalized === 'data' \|\| normalized === 'workspace-data'\) return 'workspace-data'/)
   assert.match(setup, /openSettings\('workspace-data'\)/)
   assert.match(setup, /openSettings\('workspace-ai'\)/)
   assert.match(composer, /@manage-models="appStore\.openSettings\('workspace-ai'\)"/)

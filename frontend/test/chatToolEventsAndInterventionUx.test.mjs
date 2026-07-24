@@ -44,7 +44,7 @@ test('tool activity card prefers streamed explanation text when present', () => 
 })
 
 test('app store preserves tool-call explanations in stream trace', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf-8')
+  const source = readFileSync(resolve(process.cwd(), 'src/stores/appCoordinatorStore.js'), 'utf-8')
   assert.equal(source.includes('existing.explanation = String(event.explanation || existing.explanation || \'\')'), true)
   assert.equal(source.includes('explanation: String(event.explanation || \'\')'), true)
   assert.equal(source.includes('function appendLastMessageReasoningEvent(event, messageId = null, options = {})'), true)
@@ -53,7 +53,8 @@ test('app store preserves tool-call explanations in stream trace', () => {
 })
 
 test('v1 contract includes intervention response endpoint', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/services/contracts/v1Api.js'), 'utf-8')
-  assert.equal(source.includes('respondIntervention: (interventionId, payload) =>'), true)
-  assert.equal(source.includes('/api/v1/chat/interventions/${interventionId}/response'), true)
+  const source = readFileSync(resolve(process.cwd(), 'src/services/apiClient.ts'), 'utf-8')
+  const generated = readFileSync(resolve(process.cwd(), 'src/services/generatedApi.ts'), 'utf-8')
+  assert.equal(source.includes('respondIntervention: ('), true)
+  assert.equal(generated.includes('/api/v1/chat/interventions/${interventionId}/response'), true)
 })

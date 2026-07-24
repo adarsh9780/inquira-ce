@@ -190,8 +190,8 @@
 
 <script setup>
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
-import { useAppStore } from '../../stores/appStore'
-import apiService from '../../services/apiService'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
+import apiService from '../../services/apiRuntime'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import DataTable from './table/DataTable.vue'
@@ -215,7 +215,7 @@ import {
   TableCellsIcon
 } from '@heroicons/vue/24/outline'
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 useTableArtifacts()
 
 const pageSize = DEFAULT_TABLE_PAGE_SIZE

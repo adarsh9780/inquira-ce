@@ -8,7 +8,7 @@ function readSource(relativePath) {
 }
 
 test('conversation delete flow in store re-syncs active conversation and hydrates fallback turns', () => {
-  const source = readSource('src/stores/appStore.js')
+  const source = readSource('src/stores/appCoordinatorStore.js')
 
   assert.equal(source.includes('async function deleteConversationById(conversationId) {'), true)
   assert.equal(source.includes('await apiService.v1DeleteConversation(targetId)'), true)

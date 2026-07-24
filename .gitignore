@@ -51,6 +51,7 @@ release_metadata.md
 backend/app/static/pyodide/
 dummy.md
 frontend/dist/
+frontend/reports/
 src/inquira/frontend/dist/
 backend/app/frontend/dist/
 span.txt

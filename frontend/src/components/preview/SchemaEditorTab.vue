@@ -148,8 +148,8 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { apiService } from '../../services/apiService'
-import { useAppStore } from '../../stores/appStore'
+import { apiService } from '../../services/apiRuntime'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
 import { toast } from '../../composables/useToast'
 import MarkdownIt from 'markdown-it'
 
@@ -159,7 +159,7 @@ const vFocus = {
 }
 
 const md = new MarkdownIt({ breaks: true, linkify: true })
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 
 const schemaLoading = ref(false)
 const regeneratingTableName = ref('')

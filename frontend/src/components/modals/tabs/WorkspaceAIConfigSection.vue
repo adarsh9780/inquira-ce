@@ -67,12 +67,12 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { apiService } from '../../../services/apiService'
-import { useAppStore } from '../../../stores/appStore'
+import { apiService } from '../../../services/apiRuntime'
+import { useAppCoordinatorStore } from '../../../stores/appCoordinatorStore'
 import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 
 const props = defineProps({ workspaceId: { type: String, required: true } })
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const advancedOpen = ref(false)
 const isSaving = ref(false)
 const errorMessage = ref('')

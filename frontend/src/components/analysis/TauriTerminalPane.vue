@@ -40,11 +40,11 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { ArrowPathIcon, TrashIcon } from '@heroicons/vue/24/outline'
-import { useAppStore } from '../../stores/appStore'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
 import { toast } from '../../composables/useToast'
 import tauriTerminalService from '../../services/tauriTerminalService'
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 const terminalHostRef = ref(null)
 const sessionId = ref('')
 const sessionCwd = ref('')

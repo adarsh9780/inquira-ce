@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('axios response interceptor forwards backend detail into the thrown error message', () => {
-  const apiServicePath = resolve(process.cwd(), 'src/services/apiService.js')
+  const apiServicePath = resolve(process.cwd(), 'src/services/apiRuntime.js')
   const source = readFileSync(apiServicePath, 'utf-8')
 
   assert.equal(source.includes("import { extractApiErrorMessage } from '../utils/apiError'"), true)

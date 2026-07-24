@@ -26,7 +26,7 @@ test('code tab binds Shift+Enter to selected code execution', () => {
 })
 
 test('api service exposes workspace terminal execute endpoint', () => {
-  const apiServicePath = resolve(process.cwd(), 'src/services/apiService.js')
+  const apiServicePath = resolve(process.cwd(), 'src/services/apiRuntime.js')
   const source = readFileSync(apiServicePath, 'utf-8')
 
   assert.equal(source.includes('executeTerminalCommand(workspaceId, payload)'), true)

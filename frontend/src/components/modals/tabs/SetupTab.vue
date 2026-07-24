@@ -25,9 +25,9 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useAppStore } from '../../../stores/appStore'
+import { useAppCoordinatorStore } from '../../../stores/appCoordinatorStore'
 
-const appStore = useAppStore()
+const appStore = useAppCoordinatorStore()
 
 const readinessItems = computed(() => {
   const state = appStore.workspaceReadiness.state

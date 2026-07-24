@@ -71,10 +71,17 @@ test('modal surfaces use shared tokenized dialog transition primitives', () => {
   const renameModal = readFileSync(resolve(process.cwd(), 'src/components/modals/WorkspaceRenameModal.vue'), 'utf-8')
   const termsModal = readFileSync(resolve(process.cwd(), 'src/components/modals/TermsModal.vue'), 'utf-8')
 
-  for (const source of [settingsModal, confirmationModal, renameModal, termsModal]) {
-    assert.equal(source.includes('dialog-fade-enter-active'), true)
-    assert.equal(source.includes('dialog-pop-enter-active'), true)
-    assert.match(source, /class="[^"]*\bmodal-overlay\b[^"]*"/)
-    assert.match(source, /class="[^"]*\bmodal-card\b[^"]*"/)
+  assert.match(settingsModal, /@\/components\/ui\/dialog/)
+  assert.match(settingsModal, /class="[^"]*\bmodal-card\b[^"]*"/)
+
+  assert.match(confirmationModal, /@\/components\/ui\/alert-dialog/)
+  assert.match(renameModal, /@\/components\/ui\/dialog/)
+  assert.match(termsModal, /@\/components\/ui\/dialog/)
+
+  const dialogContent = readFileSync(resolve(process.cwd(), 'src/components/ui/dialog/DialogContent.vue'), 'utf-8')
+  const alertDialogContent = readFileSync(resolve(process.cwd(), 'src/components/ui/alert-dialog/AlertDialogContent.vue'), 'utf-8')
+  for (const source of [dialogContent, alertDialogContent]) {
+    assert.match(source, /bg-popover/)
+    assert.match(source, /data-closed:animate-out/)
   }
 })

@@ -27,7 +27,7 @@ test('chat submit path enforces workspace dataset sync without legacy setDataPat
 })
 
 test('v1 runtime avoids legacy settings check-update endpoint calls', () => {
-  const servicePath = resolve(process.cwd(), 'src/services/apiService.js')
+  const servicePath = resolve(process.cwd(), 'src/services/apiRuntime.js')
   const source = readFileSync(servicePath, 'utf-8')
 
   assert.equal(source.includes('checkUpdateNeededSettingsCheckUpdateGet'), false)

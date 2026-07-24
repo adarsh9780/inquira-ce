@@ -1,24 +1,12 @@
 <template>
-  <Transition
-    enter-active-class="dialog-fade-enter-active dialog-pop-enter-active"
-    enter-from-class="dialog-fade-enter-from dialog-pop-enter-from"
-    leave-active-class="dialog-fade-leave-active dialog-pop-leave-active"
-    leave-to-class="dialog-fade-leave-to dialog-pop-leave-to"
-  >
-    <div
-      v-if="modelValue"
-      class="fixed inset-0 layer-modal flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
+  <Dialog :open="modelValue" @update:open="handleOpenChange">
+    <DialogContent
+      :show-close-button="false"
+      class="modal-card settings-modal-card h-[min(640px,calc(100dvh-2rem))] max-w-[860px] gap-0 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-panel-elevated)] p-0 text-[var(--color-text-main)] shadow-[var(--shadow-modal)] sm:max-w-[860px]"
       aria-labelledby="settings-modal-title"
-      @keydown="handleDialogKeydown"
+      @escape-key-down="handleDismissEvent"
+      @pointer-down-outside="handleDismissEvent"
     >
-      <div class="modal-overlay" @click="closeModal"></div>
-      <div
-        ref="dialogRef"
-        class="modal-card settings-modal-card relative h-[min(640px,calc(100dvh-2rem))] w-full max-w-[860px] text-[var(--color-text-main)]"
-        @click.stop
-      >
         <button
           type="button"
           class="btn-icon absolute right-3 top-3 z-20"
@@ -116,15 +104,15 @@
             </div>
           </main>
         </div>
-      </div>
-    </div>
-  </Transition>
+    </DialogContent>
+  </Dialog>
 </template>
 
-<script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useLLMConfig } from '../../composables/useLLMConfig'
-import { useAppStore } from '../../stores/appStore'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
 import { toast } from '../../composables/useToast'
 import { filenameFromPath } from '../../utils/pathUtils'
 import LLMSettingsTab from './tabs/LLMSettingsTab.vue'
@@ -153,7 +141,23 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
-const appStore = useAppStore()
+interface WorkspaceItem {
+  id?: string
+  duckdb_path?: string
+  [key: string]: unknown
+}
+
+interface WorkspaceOperationPayload {
+  locked?: boolean
+  operation?: string
+  message?: string
+}
+
+interface WorkspaceCreatedPayload {
+  workspaceId?: string
+}
+
+const appStore = useAppCoordinatorStore()
 const llmConfig = useLLMConfig()
 
 const activeSection = ref('setup')
@@ -163,8 +167,6 @@ const currentPanel = ref('setup')
 const panelDirection = ref('forward')
 const activeWorkspaceOperation = ref('')
 const activeWorkspaceOperationMessage = ref('')
-const dialogRef = ref(null)
-const previouslyFocusedElement = ref(null)
 
 const activeNavClass = 'nav-tab-active'
 const inactiveNavClass = 'nav-tab'
@@ -188,7 +190,7 @@ const activeSectionDescription = computed(() => {
 })
 
 const workspaceItems = computed(() => {
-  const items = Array.isArray(appStore.workspaces) ? appStore.workspaces : []
+  const items = (Array.isArray(appStore.workspaces) ? appStore.workspaces : []) as WorkspaceItem[]
   return items.map((workspace) => {
     const duckdbPath = String(workspace?.duckdb_path || '').trim()
     const filename = filenameFromPath(duckdbPath, 'workspace.duckdb')
@@ -203,18 +205,13 @@ watch(
   () => props.modelValue,
   async (isOpen) => {
     if (isOpen) {
-      previouslyFocusedElement.value = document.activeElement instanceof HTMLElement ? document.activeElement : null
       await appStore.fetchWorkspaces()
       const initialWorkspace = String(appStore.activeWorkspaceId || '').trim() || String(workspaceItems.value[0]?.id || '').trim()
       activeWorkspaceId.value = initialWorkspace
       initializePanelState(props.initialTab)
-      await nextTick()
-      dialogRef.value?.querySelector('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')?.focus?.()
       return
     }
     llmConfig.clearSensitiveState()
-    previouslyFocusedElement.value?.focus?.()
-    previouslyFocusedElement.value = null
   },
   { immediate: true },
 )
@@ -227,7 +224,7 @@ watch(
   },
 )
 
-function normalizeTab(tab) {
+function normalizeTab(tab: string) {
   const candidate = String(tab || '').toLowerCase()
   if (candidate === 'api' || candidate === 'llm') return 'connections'
   if (candidate === 'data' || candidate === 'models' || candidate.startsWith('workspace-')) return 'workspace'
@@ -237,7 +234,7 @@ function normalizeTab(tab) {
   return 'setup'
 }
 
-function initializePanelState(tab) {
+function initializePanelState(tab: string) {
   const candidate = String(tab || '').trim().toLowerCase()
   workspaceInitialSection.value = candidate === 'data' || candidate === 'workspace-data'
     ? 'data'
@@ -255,7 +252,7 @@ function initializePanelState(tab) {
   currentPanel.value = normalized
 }
 
-function panelClass(panelId) {
+function panelClass(panelId: string) {
   if (currentPanel.value === panelId) {
     return 'translate-x-0 opacity-100 pointer-events-auto settings-panel-transition'
   }
@@ -263,7 +260,7 @@ function panelClass(panelId) {
   return `${offset} opacity-0 pointer-events-none settings-panel-transition`
 }
 
-function navigateTo(panel, direction = 'forward') {
+function navigateTo(panel: string, direction = 'forward') {
   if (notifyWorkspaceOperationBlocked()) return
   panelDirection.value = direction
   currentPanel.value = panel
@@ -272,7 +269,7 @@ function navigateTo(panel, direction = 'forward') {
   }
 }
 
-function openLeafSection(section) {
+function openLeafSection(section: string) {
   if (notifyWorkspaceOperationBlocked()) return
   activeSection.value = section
   navigateTo(section, 'forward')
@@ -284,7 +281,7 @@ function openWorkspaceSection() {
   navigateTo('workspace', 'forward')
 }
 
-function selectWorkspace(workspaceId) {
+function selectWorkspace(workspaceId: string) {
   if (notifyWorkspaceOperationBlocked()) return
   const nextId = String(workspaceId || '').trim()
   if (!nextId) return
@@ -293,7 +290,7 @@ function selectWorkspace(workspaceId) {
   }
 }
 
-async function activateWorkspace(workspaceId) {
+async function activateWorkspace(workspaceId: string) {
   if (notifyWorkspaceOperationBlocked()) return
   const nextId = String(workspaceId || '').trim()
   if (!nextId) return
@@ -302,7 +299,7 @@ async function activateWorkspace(workspaceId) {
   await appStore.activateWorkspace(nextId)
 }
 
-function handleWorkspaceCreated(payload) {
+function handleWorkspaceCreated(payload: WorkspaceCreatedPayload) {
   const workspaceId = String(payload?.workspaceId || '').trim()
   if (!workspaceId) return
   activeWorkspaceId.value = workspaceId
@@ -315,29 +312,17 @@ function closeModal() {
   emit('update:modelValue', false)
 }
 
-function handleDialogKeydown(event) {
-  if (event.key === 'Escape') {
+function handleOpenChange(open: boolean) {
+  if (!open) closeModal()
+}
+
+function handleDismissEvent(event: Event) {
+  if (activeWorkspaceOperation.value) {
     event.preventDefault()
-    closeModal()
-    return
-  }
-  if (event.key !== 'Tab') return
-  const focusable = [...(dialogRef.value?.querySelectorAll(
-    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
-  ) || [])].filter((element) => !element.closest('[inert]'))
-  if (!focusable.length) return
-  const first = focusable[0]
-  const last = focusable[focusable.length - 1]
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault()
-    last.focus()
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault()
-    first.focus()
   }
 }
 
-function setActiveWorkspaceOperation(payload) {
+function setActiveWorkspaceOperation(payload: WorkspaceOperationPayload | null) {
   if (!payload || payload.locked === false) {
     activeWorkspaceOperation.value = ''
     activeWorkspaceOperationMessage.value = ''

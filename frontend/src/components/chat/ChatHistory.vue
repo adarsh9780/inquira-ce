@@ -221,9 +221,9 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue'
-import { useAppStore } from '../../stores/appStore'
-import apiService from '../../services/apiService'
+import { ref, watch, computed } from 'vue'
+import { useAppCoordinatorStore } from '../../stores/appCoordinatorStore'
+import apiService from '../../services/apiRuntime'
 import {
   DocumentDuplicateIcon,
   ChevronDownIcon,
@@ -254,18 +254,12 @@ DOMPurify.addHook('afterSanitizeAttributes', function(node) {
 })
 
 
-const appStore = useAppStore()
-useChatScrollFollow()
+const appStore = useAppCoordinatorStore()
 const chatContainer = ref(null)
-const scrollHost = ref(null)
 const end = ref(null)
 const pendingInterventionIds = ref(new Set())
 const expandedCodeMessageIds = ref(new Set())
 const SHOW_EPHEMERAL_TRACE = true
-const showScrollToBottomButton = ref(false)
-let shouldAutoScroll = true
-let mutationObserver = null
-let lastScrollTop = 0
 
 function isCodeDetailsOpen(messageId) {
   return expandedCodeMessageIds.value.has(messageId)
@@ -323,8 +317,6 @@ const displayedChatHistory = computed(() => {
 
 const lastMessageId = computed(() => displayedChatHistory.value.at(-1)?.id)
 
-const SCROLL_THRESHOLD_PX = 100
-const SHOW_SCROLL_BUTTON_THRESHOLD_PX = 220
 const QUESTION_REFERENCE_RE = /\b[A-Za-z_][A-Za-z0-9_]*\."(?:[^"]|"")+"|\b[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*/g
 
 function attachmentPreviewSrc(attachment) {
@@ -453,50 +445,6 @@ const HIDDEN_EPHEMERAL_NODES = new Set([
   'code_guard',
   'explain_code'
 ])
-
-// Initialize shouldAutoScroll and setup listeners on mount
-onMounted(() => {
-  scrollHost.value = resolveScrollHost()
-  shouldAutoScroll = true // Start with auto-scroll enabled
-  showScrollToBottomButton.value = false
-
-  // Listen for scroll events on the scrollable container
-  const container = getScrollContainer()
-  if (container) {
-    lastScrollTop = container.scrollTop
-    container.addEventListener('scroll', handleScroll, { passive: true })
-    container.addEventListener('click', handleChatContainerClick)
-  }
-
-  // Setup MutationObserver for dynamic content
-  if (chatContainer.value) {
-    mutationObserver = new MutationObserver(() => {
-      if (shouldAutoScroll) {
-        scrollToBottom()
-      }
-    })
-    mutationObserver.observe(chatContainer.value, { childList: true, subtree: true })
-  }
-
-  // Hydrated conversations mount with existing messages, so force initial bottom alignment.
-  if (displayedChatHistory.value.length > 0) {
-    nextTick(() => scrollToBottom())
-    window.setTimeout(() => scrollToBottom({ behavior: 'auto', force: true, hardAlign: true }), 32)
-  }
-})
-
-// Clean up event listener and observer when component unmounts
-onUnmounted(() => {
-  const container = getScrollContainer()
-  if (container) {
-    container.removeEventListener('scroll', handleScroll)
-    container.removeEventListener('click', handleChatContainerClick)
-  }
-  if (mutationObserver) {
-    mutationObserver.disconnect()
-  }
-})
-
 
 const copiedUserMessageId = ref(null)
 const copiedAssistantMessageId = ref(null)
@@ -925,87 +873,6 @@ async function submitInterventionResponse(message, payload) {
   }
 }
 
-function resolveScrollHost() {
-  const localContainer = chatContainer.value
-  if (!localContainer) return null
-  const host = localContainer.parentElement?.closest?.('[data-chat-scroll-container]')
-  return host || localContainer
-}
-
-function getScrollContainer() {
-  return scrollHost.value || chatContainer.value
-}
-
-function updateScrollState(options = {}) {
-  const fromUserScroll = options?.fromUserScroll === true
-  const previousTop = Number.isFinite(options?.previousTop) ? options.previousTop : lastScrollTop
-  const container = getScrollContainer()
-  if (!container) {
-    shouldAutoScroll = true
-    showScrollToBottomButton.value = false
-    lastScrollTop = 0
-    return
-  }
-  const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
-  const isNearBottomNow = distanceFromBottom <= SCROLL_THRESHOLD_PX
-  if (fromUserScroll) {
-    if (container.scrollTop < previousTop && distanceFromBottom > 0) {
-      // Any manual upward scroll should pause auto-follow immediately.
-      shouldAutoScroll = false
-    } else if (isNearBottomNow) {
-      shouldAutoScroll = true
-    }
-  } else {
-    shouldAutoScroll = isNearBottomNow
-  }
-  showScrollToBottomButton.value = distanceFromBottom > SHOW_SCROLL_BUTTON_THRESHOLD_PX
-  lastScrollTop = container.scrollTop
-}
-
-function scrollToBottom(options = {}) {
-  const resolvedBehavior = String(options?.behavior || '').trim() || (appStore.activeConversationIsLoading ? 'auto' : 'smooth')
-  const force = options?.force === true
-  const hardAlign = options?.hardAlign === true
-  nextTick(() => {
-    const container = getScrollContainer()
-    const endEl = end.value
-    if (!container) return
-    const behavior = resolvedBehavior
-    if (force) {
-      shouldAutoScroll = true
-      showScrollToBottomButton.value = false
-    }
-    if (typeof container.scrollTo === 'function') {
-      container.scrollTo({ top: container.scrollHeight, behavior })
-      if (hardAlign && force && behavior === 'auto') {
-        // Hydrated history needs one hard align pass after layout settles.
-        window.requestAnimationFrame(() => {
-          container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
-          updateScrollState()
-        })
-        return
-      }
-      window.requestAnimationFrame(() => {
-        updateScrollState()
-      })
-      return
-    }
-    if (!endEl) return
-    endEl.scrollIntoView({ behavior, block: 'end' })
-    window.requestAnimationFrame(() => {
-      updateScrollState()
-    })
-  })
-}
-
-function handleScroll() {
-  updateScrollState({ fromUserScroll: true, previousTop: lastScrollTop })
-}
-
-function handleScrollToBottomClick() {
-  scrollToBottom({ behavior: 'auto', force: true })
-}
-
 async function copyCodeFromBlock(copyButton) {
   const block = copyButton?.closest?.('.chat-code-block')
   const codeNode = block?.querySelector('.chat-code-scroll code')
@@ -1031,26 +898,23 @@ function handleChatContainerClick(event) {
   void copyCodeFromBlock(copyButton)
 }
 
-// Watch for chat history changes and auto-scroll if user is near bottom
-watch([() => displayedChatHistory.value.length, lastMessageId], ([newLength], [oldLength]) => {
-  const previousLength = Number.isFinite(oldLength) ? oldLength : 0
-  if (shouldAutoScroll && newLength > previousLength) {
-    nextTick(() => scrollToBottom())
-  }
-})
-
-watch(() => appStore.activeConversationId, () => {
-  shouldAutoScroll = true
-  nextTick(() => scrollToBottom())
+const {
+  showScrollToBottomButton,
+  handleScrollToBottomClick,
+} = useChatScrollFollow({
+  chatContainer,
+  end,
+  history: displayedChatHistory,
+  lastMessageId,
+  activeConversationId: computed(() => appStore.activeConversationId),
+  isLoading: computed(() => appStore.activeConversationIsLoading),
+  onContainerClick: handleChatContainerClick,
 })
 
 // Watch for loading state changes
 watch(() => appStore.activeConversationIsLoading, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) {
     pendingInterventionIds.value.clear()
-  }
-  if (shouldAutoScroll) {
-    nextTick(() => scrollToBottom())
   }
 })
 </script>

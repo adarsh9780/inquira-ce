@@ -1,22 +1,22 @@
 <template>
-  <Transition
-    enter-active-class="dialog-fade-enter-active dialog-pop-enter-active"
-    enter-from-class="dialog-fade-enter-from dialog-pop-enter-from"
-    leave-active-class="dialog-fade-leave-active dialog-pop-leave-active"
-    leave-to-class="dialog-fade-leave-to dialog-pop-leave-to"
-  >
-  <div v-if="isOpen" class="fixed inset-0 z-[90] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="keyboard-shortcuts-title">
-    <div class="modal-overlay" @click="$emit('close')"></div>
-    <div class="modal-card relative flex w-full max-w-lg flex-col overflow-hidden" @click.stop>
-      <div class="modal-header">
-        <div class="min-w-0">
-          <h3 id="keyboard-shortcuts-title" class="text-base font-semibold text-[var(--color-text-main)]">Keyboard Shortcuts</h3>
-          <p class="mt-1 text-sm text-[var(--color-text-muted)]">Quick actions available across the workspace.</p>
-        </div>
-      </div>
+  <Dialog :open="isOpen" @update:open="handleOpenChange">
+    <DialogContent
+      class="max-w-lg gap-0 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-panel-elevated)] p-0 shadow-[var(--shadow-modal)] sm:max-w-lg"
+    >
+      <DialogHeader class="modal-header pr-12 text-left">
+        <DialogTitle class="text-base font-semibold text-[var(--color-text-main)]">
+          Keyboard Shortcuts
+        </DialogTitle>
+        <DialogDescription class="text-sm text-[var(--color-text-muted)]">
+          Quick actions available across the workspace.
+        </DialogDescription>
+      </DialogHeader>
+
       <div class="max-h-[65vh] overflow-y-auto px-5 py-4">
         <div v-for="category in shortcutCategories" :key="category.name" class="mb-5 last:mb-0">
-          <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">{{ category.name }}</p>
+          <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+            {{ category.name }}
+          </p>
           <div class="divide-y divide-[var(--color-border)] rounded-md border border-[var(--color-border)]">
             <div v-for="shortcut in category.items" :key="shortcut.id" class="flex items-center justify-between gap-4 px-3 py-2">
               <span class="text-sm text-[var(--color-text-main)]">{{ shortcut.label }}</span>
@@ -27,26 +27,42 @@
           </div>
         </div>
       </div>
-      <div class="modal-footer px-5 py-4">
-        <button type="button" class="btn-secondary px-3 py-2 text-sm" @click="$emit('close')">Close</button>
-      </div>
-    </div>
-  </div>
-  </Transition>
+
+      <DialogFooter class="modal-footer m-0 rounded-none border-t border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+        <DialogClose as-child>
+          <Button variant="outline">Close</Button>
+        </DialogClose>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { SHORTCUTS, shortcutLabel, shortcutsByCategory } from '../../utils/keyboardShortcuts'
 
-defineProps({
-  isOpen: { type: Boolean, default: false },
+withDefaults(defineProps<{ isOpen?: boolean }>(), {
+  isOpen: false,
 })
-defineEmits(['close'])
 
+const emit = defineEmits<{ close: [] }>()
 const platform = typeof navigator !== 'undefined' ? navigator.platform : ''
 const shortcutCategories = computed(() => {
-  const groups = shortcutsByCategory(SHORTCUTS)
+  const groups = shortcutsByCategory() as Record<string, typeof SHORTCUTS>
   return Object.keys(groups).map((name) => ({ name, items: groups[name] }))
 })
+
+function handleOpenChange(open: boolean) {
+  if (!open) emit('close')
+}
 </script>

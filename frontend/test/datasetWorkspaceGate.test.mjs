@@ -13,7 +13,7 @@ test('sidebar datasets are gated when no workspace exists', () => {
 })
 
 test('app store clears stale dataset state when workspace list is empty', () => {
-  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const storePath = resolve(process.cwd(), 'src/stores/appCoordinatorStore.js')
   const source = readFileSync(storePath, 'utf-8')
 
   assert.equal(source.includes('if (items.length === 0 && (dataFilePath.value || ingestedTableName.value || schemaFileId.value))'), true)
@@ -24,7 +24,7 @@ test('app store clears stale dataset state when workspace list is empty', () => 
 test('schema preview and settings helpers do not expose dataset path without a valid workspace', () => {
   const previewPath = resolve(process.cwd(), 'src/services/previewService.js')
   const previewSource = readFileSync(previewPath, 'utf-8')
-  const apiPath = resolve(process.cwd(), 'src/services/apiService.js')
+  const apiPath = resolve(process.cwd(), 'src/services/apiRuntime.js')
   const apiSource = readFileSync(apiPath, 'utf-8')
 
   assert.equal(previewSource.includes('if (!appStore.activeWorkspaceId || !appStore.hasWorkspace || !tableName)'), true)

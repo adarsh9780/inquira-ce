@@ -1,7 +1,7 @@
 import { computed, ref, watch } from 'vue'
-import { apiService } from '../services/apiService'
+import { apiService } from '../services/apiRuntime'
 import { extractApiErrorMessage } from '../utils/apiError'
-import { useAppStore } from '../stores/appStore'
+import { useAppCoordinatorStore } from '../stores/appCoordinatorStore'
 
 const provider = ref(null)
 const apiKey = ref('')
@@ -40,7 +40,7 @@ let appStore = null
 
 function getAppStore() {
   if (!appStore) {
-    appStore = useAppStore()
+    appStore = useAppCoordinatorStore()
   }
   return appStore
 }
