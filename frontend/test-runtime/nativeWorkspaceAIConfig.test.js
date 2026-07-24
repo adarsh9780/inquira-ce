@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { apiService } from '../src/services/apiService'
+import { workspaceApi } from '../src/api/workspaces'
 
 afterEach(() => {
   delete window.go
@@ -22,8 +22,8 @@ describe('native workspace AI configuration bridge', () => {
     window.go = { main: { App: app } }
     const payload = { main_model_override: 'gpt-4.1', allow_llm_data_samples: true }
 
-    await expect(apiService.v1GetWorkspaceAIConfig('workspace-1')).resolves.toEqual(config)
-    await apiService.v1UpdateWorkspaceAIConfig('workspace-1', payload)
+    await expect(workspaceApi.getAIConfig('workspace-1')).resolves.toEqual(config)
+    await workspaceApi.updateAIConfig('workspace-1', payload)
 
     expect(app.GetWorkspaceAIConfig).toHaveBeenCalledWith('workspace-1')
     expect(app.UpdateWorkspaceAIConfig).toHaveBeenCalledWith('workspace-1', payload)

@@ -33,8 +33,8 @@ test('command registry preloads EDA command catalog entries', () => {
 
 test('executeCommand dispatches to backend endpoint with workspace context', async () => {
   const captured = {}
-  const mockApiService = {
-    async v1ExecuteWorkspaceCommand(workspaceId, payload) {
+  const mockExecutionApi = {
+    async command(workspaceId, payload) {
       captured.workspaceId = workspaceId
       captured.payload = payload
       return {
@@ -58,7 +58,7 @@ test('executeCommand dispatches to backend endpoint with workspace context', asy
       columnCatalog: [],
       activeConversationId: 'conv-1',
     },
-    apiService: mockApiService,
+    executionApi: mockExecutionApi,
   })
 
   assert.equal(captured.workspaceId, 'ws-1')
@@ -69,7 +69,7 @@ test('executeCommand dispatches to backend endpoint with workspace context', asy
   assert.equal(result?.result_type, 'table')
 })
 
-test('executeCommand requires injected API client to avoid bundling api service into source tests', async () => {
+test('executeCommand reports when the native command bridge is unavailable', async () => {
   await assert.rejects(
     executeCommand('/shape sales', {
       appStore: {
@@ -78,7 +78,7 @@ test('executeCommand requires injected API client to avoid bundling api service 
         columnCatalog: [],
       },
     }),
-    /requires an API client/,
+    /desktop bridge is unavailable/,
   )
 })
 
@@ -87,7 +87,7 @@ test('chat input routes slash commands through the command handler path', () => 
   const source = readFileSync(componentPath, 'utf-8')
 
   assert.equal(source.includes('import { executeCommand, getRegisteredCommands, isCommand } from'), true)
-  assert.equal(source.includes("import apiService from '../../services/apiService'"), true)
+  assert.equal(source.includes("import { executionApi } from '../../api/execution'"), true)
   assert.equal(source.includes('if (isCommand(questionText)) {'), true)
   assert.equal(source.includes('await handleSlashCommand(questionText)'), true)
   assert.equal(source.includes('const result = await executeCommand(questionText'), true)

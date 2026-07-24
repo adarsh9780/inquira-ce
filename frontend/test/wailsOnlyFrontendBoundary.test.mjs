@@ -8,14 +8,14 @@ const sourceRoot = resolve(frontendRoot, 'src')
 
 test('frontend package keeps one direct Wails bridge architecture', () => {
   const packageJson = JSON.parse(readFileSync(resolve(frontendRoot, 'package.json'), 'utf8'))
-  const apiService = readFileSync(resolve(sourceRoot, 'services/apiService.js'), 'utf8')
+  const apiService = readFileSync(resolve(sourceRoot, 'api/native.ts'), 'utf8')
   assert.equal(packageJson.scripts.build, 'vite build')
   assert.match(apiService, /window\.go\?\.main\?\.App/)
-  assert.match(apiService, /requireWailsMethod/)
+  assert.match(apiService, /requireNativeMethod/)
 })
 
 test('frontend omits retired workflow wrappers while retaining catalog preparation', () => {
-  const apiService = readFileSync(resolve(sourceRoot, 'services/apiService.js'), 'utf8')
+  const apiService = readFileSync(resolve(sourceRoot, 'api/native.ts'), 'utf8')
   const app = readFileSync(resolve(frontendRoot, '..', 'app.go'), 'utf8')
   const retiredWrappers = [
     'v1ResetWorkspaceAIConfig',

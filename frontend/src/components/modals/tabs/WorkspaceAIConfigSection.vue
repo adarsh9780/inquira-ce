@@ -72,7 +72,7 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { apiService } from '../../../services/apiService'
+import { preferencesApi } from '../../../api/preferences'
 import { useAppStore } from '../../../stores/appStore'
 import { useUiStore } from '../../../stores/uiStore'
 import HeaderDropdown from '../../ui/HeaderDropdown.vue'
@@ -135,7 +135,7 @@ function hydrate(value) {
 }
 
 async function loadProviderModels(provider) {
-  try { providerCatalog.value = await apiService.v1GetPreferences(provider) } catch (_error) { providerCatalog.value = null }
+  try { providerCatalog.value = await preferencesApi.get(provider) } catch (_error) { providerCatalog.value = null }
 }
 
 function buildPayload() {

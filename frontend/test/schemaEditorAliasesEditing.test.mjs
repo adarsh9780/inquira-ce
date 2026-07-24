@@ -15,8 +15,8 @@ test('schema editor supports inline alias editing and persists normalized aliase
 })
 
 test('schema editor loads all workspace dataset schemas without auto-regenerating them', () => {
-  assert.equal(source.includes('const datasetResponse = await apiService.v1ListDatasets(workspaceId)'), true)
-  assert.equal(source.includes('return await apiService.v1GetDatasetSchema(workspaceId, ds.table_name)'), true)
+  assert.equal(source.includes('const datasetResponse = await workspaceApi.listDatasets(workspaceId)'), true)
+  assert.equal(source.includes('return await workspaceApi.getDatasetSchema(workspaceId, ds.table_name)'), true)
   assert.equal(source.includes('await fetchWorkspaceSchema()'), true)
   assert.equal(source.includes('regenerateTableSchema(group.tableName)'), true)
 })

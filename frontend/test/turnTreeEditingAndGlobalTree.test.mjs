@@ -9,7 +9,7 @@ const rulesModalSource = readFileSync(new URL('../src/components/modals/Conversa
 const sidebarSource = readFileSync(new URL('../src/components/layout/UnifiedSidebar.vue', import.meta.url), 'utf8')
 const rightPanelSource = readFileSync(new URL('../src/components/layout/RightPanel.vue', import.meta.url), 'utf8')
 const globalTreeSource = readFileSync(new URL('../src/components/layout/sidebar/SidebarGlobalTurnTree.vue', import.meta.url), 'utf8')
-const apiServiceSource = readFileSync(new URL('../src/services/apiService.js', import.meta.url), 'utf8')
+const conversationApiSource = readFileSync(new URL('../src/api/conversations.ts', import.meta.url), 'utf8')
 const storeSource = readFileSync(new URL('../src/stores/appStore.js', import.meta.url), 'utf8')
 const turnTreeModalPath = new URL('../src/components/chat/TurnTreeModal.vue', import.meta.url)
 const sidebarConversationsPath = new URL('../src/components/layout/sidebar/SidebarConversations.vue', import.meta.url)
@@ -40,8 +40,8 @@ test('turn tree exposes delete and final actions without unsupported moving cont
 })
 
 test('frontend API and store expose the supported turn editing calls', () => {
-  assert.equal(apiServiceSource.includes('async v1GetWorkspaceTurnTree(workspaceId)'), true)
-  assert.equal(apiServiceSource.includes('v1DeleteTurn(conversationId, turnId)'), true)
+  assert.equal(conversationApiSource.includes('async workspaceTurnTree(workspaceId'), true)
+  assert.equal(conversationApiSource.includes('removeTurn(conversationId'), true)
   assert.equal(storeSource.includes('async function loadWorkspaceTurnTree'), true)
   assert.equal(storeSource.includes('async function deleteTurn(turnId, conversationId = activeConversationId.value)'), true)
   assert.equal(storeSource.includes('async function moveTurn(turnId, parentTurnId, conversationId = activeConversationId.value)'), false)

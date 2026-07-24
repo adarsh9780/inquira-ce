@@ -7,8 +7,8 @@ test('schema editor derives dataset options from workspace tables and does not r
   const schemaEditorPath = resolve(process.cwd(), 'src/components/preview/SchemaEditorTab.vue')
   const source = readFileSync(schemaEditorPath, 'utf-8')
 
-  assert.equal(source.includes('apiService.v1ListDatasets(workspaceId)'), true)
-  assert.equal(source.includes('apiService.v1GetDatasetSchema(workspaceId, ds.table_name)'), true)
+  assert.equal(source.includes('workspaceApi.listDatasets(workspaceId)'), true)
+  assert.equal(source.includes('workspaceApi.getDatasetSchema(workspaceId, ds.table_name)'), true)
   assert.equal(source.includes('const groupedSchema = computed(() => {'), true)
 })
 

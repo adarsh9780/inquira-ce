@@ -11,7 +11,7 @@ test('conversation delete flow in store re-syncs active conversation and hydrate
   const source = readSource('src/stores/appStore.js')
 
   assert.equal(source.includes('async function deleteConversationById(conversationId) {'), true)
-  assert.equal(source.includes('await apiService.v1DeleteConversation(targetId)'), true)
+  assert.equal(source.includes('await conversationApi.remove(targetId)'), true)
   assert.equal(source.includes('function clearConversationScopedState(options = {})'), true)
   assert.equal(source.includes("pythonFileContent.value = ''"), true)
   assert.equal(source.includes('activeTurnRelations.value = null'), true)
@@ -43,7 +43,7 @@ test('sidebar uses a simple conversation list and keeps the tree in the dedicate
   assert.equal(globalTreeSource.includes('appStore.deleteTurn(payload?.turnId, payload?.conversationId)'), true)
   assert.equal(globalTreeSource.includes('ConfirmationModal'), true)
   assert.equal(globalTreeSource.includes('window.confirm'), false)
-  assert.equal(sidebarSource.includes('await apiService.v1DeleteConversation(pendingDeleteId.value)'), false)
+  assert.equal(sidebarSource.includes('await conversationApi.remove(pendingDeleteId.value)'), false)
   assert.equal(chatTabSource.includes('title="Delete Conversation"'), false)
 })
 

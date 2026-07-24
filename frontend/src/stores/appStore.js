@@ -1,7 +1,8 @@
 import { defineStore, storeToRefs } from 'pinia'
 import { ref, computed, watch, markRaw } from 'vue'
-import { apiService } from '../services/apiService'
-import { workspaceService } from '../services/workspaceService'
+import { workspaceApi } from '../api/workspaces'
+import { conversationApi } from '../api/conversations'
+import { preferencesApi } from '../api/preferences'
 import { localStateService } from '../services/localStateService'
 import { useAuthStore } from './authStore'
 import { useUiStore } from './uiStore'
@@ -768,7 +769,7 @@ export const useAppStore = defineStore('app', () => {
     const activeUserId = resolveSnapshotUserId()
     if (!authStore.isAuthenticated || !activeUserId || activeUserId !== targetUserId) return
     try {
-      const response = await apiService.v1UpdatePreferences({
+      const response = await preferencesApi.update({
         llm_provider: llmProvider.value,
         selected_model: selectedModel.value,
         selected_lite_model: selectedLiteModel.value,
@@ -910,7 +911,7 @@ export const useAppStore = defineStore('app', () => {
     const requestToken = ++providerModelSearchToken
     providerModelSearchLoading.value = true
     try {
-      const response = await apiService.v1SearchProviderModels(provider, normalizedQuery, limit)
+      const response = await preferencesApi.searchModels(provider, normalizedQuery, limit)
       if (requestToken !== providerModelSearchToken) {
         return mergeProviderModelOptions(provider, [])
       }
@@ -1244,7 +1245,7 @@ export const useAppStore = defineStore('app', () => {
       clearLiveTokenUsage()
       return null
     }
-    const summary = await apiService.v1GetConversationUsage(targetConversationId)
+    const summary = await conversationApi.usage(targetConversationId)
     setActiveConversationUsage(summary)
     return summary
   }
@@ -1485,13 +1486,13 @@ export const useAppStore = defineStore('app', () => {
       return columnCatalog.value
     }
     try {
-      const response = await apiService.v1ListDatasets(workspaceId)
+      const response = await workspaceApi.listDatasets(workspaceId)
       const datasets = Array.isArray(response?.datasets) ? response.datasets : []
       const schemaResults = await Promise.allSettled(
         datasets.map(async (dataset) => {
           const tableName = String(dataset?.table_name || '').trim()
           if (!tableName) return []
-          const schema = await apiService.v1GetDatasetSchema(workspaceId, tableName)
+          const schema = await workspaceApi.getDatasetSchema(workspaceId, tableName)
           const schemaColumns = Array.isArray(schema?.columns) ? schema.columns : []
           return schemaColumns
             .map((column) => ({
@@ -1670,7 +1671,7 @@ export const useAppStore = defineStore('app', () => {
     const conversationId = String(activeConversationId.value || '').trim()
     const targetTurnId = String(turnId || '').trim()
     if (!conversationId || !targetTurnId) return null
-    const relations = await apiService.v1GetTurnRelations(conversationId, targetTurnId)
+    const relations = await conversationApi.relations(conversationId, targetTurnId)
     setActiveTurnId(targetTurnId)
     setActiveTurnPayload(relations?.current || null)
     setActiveTurnRelations(relations)
@@ -1683,7 +1684,7 @@ export const useAppStore = defineStore('app', () => {
       setWorkspaceTurnTree(null)
       return null
     }
-    const payload = await apiService.v1GetWorkspaceTurnTree(targetWorkspaceId)
+    const payload = await conversationApi.workspaceTurnTree(targetWorkspaceId)
     setWorkspaceTurnTree(payload)
     return payload
   }
@@ -1692,7 +1693,7 @@ export const useAppStore = defineStore('app', () => {
     const targetConversationId = String(conversationId || '').trim()
     const targetTurnId = String(turnId || '').trim()
     if (!targetConversationId || !targetTurnId) return null
-    await apiService.v1DeleteTurn(targetConversationId, targetTurnId)
+    await conversationApi.removeTurn(targetConversationId, targetTurnId)
     const nextConversationStates = { ...(conversationStateById.value || {}) }
     delete nextConversationStates[targetConversationId]
     conversationStateById.value = nextConversationStates
@@ -1722,7 +1723,7 @@ export const useAppStore = defineStore('app', () => {
       finalTurnId.value = ''
       return null
     }
-    const turn = await apiService.v1GetFinalTurn(targetConversationId)
+    const turn = await conversationApi.finalTurn(targetConversationId)
     finalTurnId.value = String(turn?.id || '').trim()
     return turn
   }
@@ -1743,7 +1744,7 @@ export const useAppStore = defineStore('app', () => {
     const targetConversationId = String(conversationId || '').trim()
     const targetTurnId = String(turnId || '').trim()
     if (!targetConversationId || !targetTurnId) return null
-    const turn = await apiService.v1MarkFinalTurn(targetConversationId, targetTurnId)
+    const turn = await conversationApi.markFinalTurn(targetConversationId, targetTurnId)
     if (targetConversationId === String(activeConversationId.value || '').trim()) {
       finalTurnId.value = String(turn?.id || '').trim()
       await loadActiveTurnRelations(targetTurnId)
@@ -1838,8 +1839,8 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function fetchWorkspaces() {
-    const response = await workspaceService.list()
-    const items = response?.workspaces || []
+    const response = await workspaceApi.list()
+    const items = Array.isArray(response) ? response : (response?.workspaces || [])
     workspaces.value = items
     if (!activeWorkspaceId.value && items.length > 0) {
       const active = items.find((w) => w.is_active) || items[0]
@@ -1875,7 +1876,7 @@ export const useAppStore = defineStore('app', () => {
       return null
     }
     try {
-      const summary = await workspaceService.summary(target)
+      const summary = await workspaceApi.summary(target)
       if (target === activeWorkspaceId.value) activeWorkspaceSummary.value = summary
       return summary
     } catch (_error) {
@@ -1890,7 +1891,7 @@ export const useAppStore = defineStore('app', () => {
       workspaceAIConfig.value = null
       return null
     }
-    const config = await apiService.v1GetWorkspaceAIConfig(target)
+    const config = await workspaceApi.getAIConfig(target)
     if (target === activeWorkspaceId.value) workspaceAIConfig.value = config
     return config
   }
@@ -1898,13 +1899,13 @@ export const useAppStore = defineStore('app', () => {
   async function saveWorkspaceAIConfig(payload, workspaceId = activeWorkspaceId.value) {
     const target = String(workspaceId || '').trim()
     if (!target) throw new Error('Select a workspace before updating AI settings.')
-    const config = await apiService.v1UpdateWorkspaceAIConfig(target, payload)
+    const config = await workspaceApi.updateAIConfig(target, payload)
     if (target === activeWorkspaceId.value) workspaceAIConfig.value = config
     return config
   }
 
   async function createWorkspace(name, schemaContext = '') {
-    const ws = await workspaceService.create(name, schemaContext)
+    const ws = await workspaceApi.create(name, schemaContext)
     if (ws?.id) {
       await activateWorkspace(ws.id)
     }
@@ -1913,7 +1914,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function activateWorkspace(workspaceId) {
-    await workspaceService.activate(workspaceId)
+    await workspaceApi.activate(workspaceId)
     activeWorkspaceId.value = workspaceId
     workspaces.value = workspaces.value.map((workspace) => ({
       ...workspace,
@@ -1934,7 +1935,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function renameWorkspace(workspaceId, name, schemaContext = undefined) {
-    const updated = await workspaceService.update(workspaceId, name, schemaContext)
+    const updated = await workspaceApi.update(workspaceId, name, schemaContext)
     const idx = workspaces.value.findIndex((ws) => ws.id === workspaceId)
     if (idx >= 0) {
       workspaces.value[idx] = { ...workspaces.value[idx], ...updated }
@@ -1945,7 +1946,7 @@ export const useAppStore = defineStore('app', () => {
 
   async function fetchConversations() {
     if (!activeWorkspaceId.value) return
-    const response = await apiService.v1ListConversations(activeWorkspaceId.value, 50)
+    const response = await conversationApi.list(activeWorkspaceId.value, 50)
     conversations.value = response?.conversations || []
 
     const currentActiveId = String(activeConversationId.value || '').trim()
@@ -1968,7 +1969,7 @@ export const useAppStore = defineStore('app', () => {
 
   async function createConversation(title = null) {
     if (!activeWorkspaceId.value) return null
-    const conv = await apiService.v1CreateConversation(activeWorkspaceId.value, title)
+    const conv = await conversationApi.create(activeWorkspaceId.value, title)
     await fetchConversations()
     setActiveConversationId(conv.id)
     clearConversationScopedState()
@@ -1983,7 +1984,7 @@ export const useAppStore = defineStore('app', () => {
     const currentId = String(activeConversationId.value || '').trim()
     if (currentId) return currentId
 
-    const conv = await apiService.v1CreateConversation(workspaceId, title)
+    const conv = await conversationApi.create(workspaceId, title)
     const conversationId = String(conv?.id || '').trim()
     if (!conversationId) return null
 
@@ -2010,7 +2011,7 @@ export const useAppStore = defineStore('app', () => {
       return
     }
     const preferredTurnId = String(activeTurnId.value || '').trim()
-    const response = await apiService.v1ListTurns(targetConversationId, 5)
+    const response = await conversationApi.listTurns(targetConversationId, 5)
     const turns = response?.turns || []
     chatHistory.value = []
     clearLiveTokenUsage()
@@ -2041,7 +2042,7 @@ export const useAppStore = defineStore('app', () => {
     const targetId = String(conversationId || '').trim()
     if (!targetId) return ''
 
-    await apiService.v1DeleteConversation(targetId)
+    await conversationApi.remove(targetId)
     conversations.value = conversations.value.filter((conversation) => String(conversation?.id || '').trim() !== targetId)
     const usageMap = { ...(conversationUsageById.value || {}) }
     delete usageMap[targetId]
@@ -2078,7 +2079,7 @@ export const useAppStore = defineStore('app', () => {
 
   async function updateConversationTitle(title) {
     if (!activeConversationId.value) return
-    const updated = await apiService.v1UpdateConversation(activeConversationId.value, title)
+    const updated = await conversationApi.update(activeConversationId.value, title)
     // Update local list
     const idx = conversations.value.findIndex(c => c.id === activeConversationId.value)
     if (idx !== -1) {
@@ -2088,7 +2089,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function deleteWorkspaceAsync(workspaceId) {
-    const result = await workspaceService.delete(workspaceId)
+    const result = await workspaceApi.remove(workspaceId)
     setSelectedTableArtifact(workspaceId, '')
     setSelectedFigureArtifact(workspaceId, '')
     if (activeWorkspaceId.value === workspaceId) {
@@ -2825,7 +2826,7 @@ export const useAppStore = defineStore('app', () => {
   async function loadUserPreferences() {
     try {
       suppressPreferenceSync = true
-      const prefs = await apiService.v1GetPreferences()
+      const prefs = await preferencesApi.get()
       applyPreferencesResponse(prefs)
     } catch (_error) {
       // Continue with defaults if preference fetch fails.

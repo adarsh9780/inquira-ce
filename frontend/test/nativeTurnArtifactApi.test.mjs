@@ -5,14 +5,17 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const source = fs.readFileSync(path.join(root, 'src/services/apiService.js'), 'utf8')
+const source = [
+  'src/api/conversations.ts',
+  'src/api/artifacts.ts',
+].map((file) => fs.readFileSync(path.join(root, file), 'utf8')).join('\n')
 
 test('supported turn-tree mutations use native Wails bindings', () => {
   for (const method of [
     'UpdateConversation', 'DeleteConversationTurn', 'GetFinalConversationTurn',
     'MarkFinalConversationTurn',
   ]) {
-    assert.match(source, new RegExp(`requireWailsMethod\\('${method}'\\)`))
+    assert.match(source, new RegExp(`['\"]${method}['\"]`))
   }
   assert.match(source, /item\.final_turn_id/)
 })

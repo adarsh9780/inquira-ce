@@ -45,7 +45,7 @@ test('searchProviderModels enforces provider-local search and query threshold', 
 
   assert.equal(source.includes('async function searchProviderModels(query, limit = 25)'), true)
   assert.equal(source.includes('if (normalizedQuery.length < 3)'), true)
-  assert.equal(source.includes('const response = await apiService.v1SearchProviderModels(provider, normalizedQuery, limit)'), true)
+  assert.equal(source.includes('const response = await preferencesApi.searchModels(provider, normalizedQuery, limit)'), true)
   assert.equal(source.includes('const searchModels = normalizeSearchModelIds(response?.models, provider)'), true)
   assert.equal(source.includes('if (requestToken !== providerModelSearchToken)'), true)
 })

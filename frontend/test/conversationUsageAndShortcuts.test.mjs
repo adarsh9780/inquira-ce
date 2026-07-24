@@ -6,24 +6,24 @@ import { resolve } from 'node:path'
 const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
 test('native bridge exposes durable conversation usage', () => {
-  const apiService = read('src/services/apiService.js')
+  const apiService = read('src/api/conversations.ts')
 
-  assert.equal(apiService.includes('v1GetConversationUsage(conversationId)'), true)
-  assert.equal(apiService.includes("return requireWailsMethod('GetConversationUsage')(String(conversationId || ''))"), true)
+  assert.equal(apiService.includes('usage(conversationId'), true)
+  assert.equal(apiService.includes("invokeNative<RecordValue>('GetConversationUsage'"), true)
 })
 
 test('native turn history uses the bounded Go page endpoint', () => {
-  const apiService = read('src/services/apiService.js')
+  const apiService = read('src/api/conversations.ts')
 
-  assert.equal(apiService.includes("requireWailsMethod('ListConversationTurnPage')"), true)
+  assert.equal(apiService.includes("invokeNative<RecordValue>(\n      'ListConversationTurnPage'"), true)
   assert.equal(apiService.includes('Number(limit || 5)'), true)
   assert.equal(apiService.includes("Number(limit || 5),\n      '',"), true)
 })
 
 test('native conversation tree carries turn and conversation usage', () => {
-  const apiService = read('src/services/apiService.js')
+  const apiService = read('src/api/conversations.ts')
 
-  assert.equal(apiService.includes('usage: turn?.metadata?.token_usage || null'), true)
+  assert.equal(apiService.includes('usage: (turn.metadata as RecordValue | undefined)?.token_usage || null'), true)
   assert.equal(apiService.includes('app.GetConversationUsage(String(item.id || \'\'))'), true)
   assert.equal(apiService.includes('usage_summary: usageSummary'), true)
 })

@@ -8,18 +8,18 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8')
 
 test('slash commands execute through the native Go bridge', () => {
-  const api = read('src/services/apiService.js')
+  const api = read('src/api/execution.ts')
   const goApp = read('../app.go')
 
-  assert.match(api, /requireWailsMethod\('ExecuteWorkspaceCommand'\)/)
+  assert.match(api, /invokeNative<RecordValue>\('ExecuteWorkspaceCommand'/)
   assert.match(goApp, /func \(a \*App\) ExecuteWorkspaceCommand/)
 })
 
 test('Terms are bundled and loaded through the native Go bridge', () => {
-  const api = read('src/services/apiService.js')
+  const api = read('src/api/preferences.ts')
   const goApp = read('../app.go')
 
-  assert.match(api, /requireWailsMethod\('GetTermsAndConditions'\)/)
+  assert.match(api, /invokeNative<RecordValue>\('GetTermsAndConditions'/)
   assert.match(goApp, /func \(a \*App\) GetTermsAndConditions/)
 })
 

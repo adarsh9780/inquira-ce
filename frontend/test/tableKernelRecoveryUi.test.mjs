@@ -14,6 +14,6 @@ test('table pane reads saved turn artifacts without kernel readiness recovery lo
   assert.equal(source.includes('await loadWorkspaceArtifacts(workspaceId)'), false)
   assert.equal(source.includes('function startKernelRecoveryPolling() {'), false)
   assert.equal(source.includes('kernelRecoveryPoller = setInterval(() => {'), false)
-  assert.equal(source.includes('apiService.v1ListTurnArtifacts('), true)
-  assert.equal(source.includes('apiService.getTurnDataframeArtifactRows('), true)
+  assert.equal(source.includes('artifactApi.listTurn('), true)
+  assert.equal(source.includes('artifactApi.turnRows('), true)
 })

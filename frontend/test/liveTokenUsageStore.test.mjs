@@ -17,7 +17,7 @@ test('app store exposes only the live token state and actions consumed by the UI
   assert.equal(source.includes('function setLiveTokenUsageForCurrentTurn(usage, options = {})'), true)
   assert.equal(source.includes('function setActiveConversationUsage(summary)'), true)
   assert.equal(source.includes('async function fetchActiveConversationUsage(conversationId = activeConversationId.value)'), true)
-  assert.equal(source.includes('apiService.v1GetConversationUsage(targetConversationId)'), true)
+  assert.equal(source.includes('conversationApi.usage(targetConversationId)'), true)
   assert.equal(source.includes('function mergeTokenUsageTotals(base, incoming)'), true)
   assert.equal(source.includes('function resolveTokenUsageFromChatHistory(options = {})'), true)
   assert.equal(source.includes('function clearLiveTokenUsage()'), true)

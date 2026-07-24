@@ -159,7 +159,7 @@ test('frontend keeps retired workspace and artifact-limit compatibility paths re
   const guardedSources = [
     'frontend/src/components/modals/SettingsModal.vue',
     'frontend/src/components/layout/StatusBar.vue',
-    'frontend/src/services/apiService.js',
+    'frontend/src/api/native.ts',
   ]
   const retiredMarkers = [
     'workspace-operation-change',

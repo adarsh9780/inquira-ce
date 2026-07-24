@@ -13,6 +13,6 @@ test('workspace runtime readiness is observed without store-owned bootstrap poll
   assert.equal(store.includes('function setWorkspaceRuntimeStatus(workspaceId, status)'), true)
   assert.equal(store.includes('function getWorkspaceRuntimeStatus(workspaceId = activeWorkspaceId.value)'), true)
   assert.equal(statusBar.includes('async function refreshWorkspaceRuntimeStatusFromApi('), true)
-  assert.equal(statusBar.includes('apiService.v1GetWorkspaceRuntimeStatus(normalizedWorkspaceId)'), true)
+  assert.equal(statusBar.includes('workspaceApi.runtimeStatus(normalizedWorkspaceId)'), true)
   assert.equal(chatInput.includes('async function refreshRuntimeStatusAfterExplicitWork(workspaceId)'), true)
 })

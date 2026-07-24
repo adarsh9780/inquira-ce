@@ -83,8 +83,8 @@ test('column catalog path uses saved schema metadata without runtime bootstrap',
   )
   assert.equal(catalogBlock.includes('ensureWorkspaceRuntimeReady('), false)
   assert.equal(catalogBlock.includes('apiService.getWorkspaceColumns(workspaceId)'), false)
-  assert.equal(catalogBlock.includes('apiService.v1ListDatasets(workspaceId)'), true)
-  assert.equal(catalogBlock.includes('apiService.v1GetDatasetSchema(workspaceId, tableName)'), true)
+  assert.equal(catalogBlock.includes('workspaceApi.listDatasets(workspaceId)'), true)
+  assert.equal(catalogBlock.includes('workspaceApi.getDatasetSchema(workspaceId, tableName)'), true)
 })
 
 test('missing saved dataframe artifacts clear stale table selection without startup error', () => {

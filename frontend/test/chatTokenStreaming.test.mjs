@@ -18,7 +18,7 @@ test('chat input consumes live token events and does not fall back to non-stream
   assert.equal(source.includes('appStore.appendLastMessageTraceEvent({'), true)
   assert.equal(source.includes('response = await apiService.v1Analyze('), false)
   assert.equal(source.includes('async function refreshRuntimeStatusAfterExplicitWork(workspaceId)'), true)
-  assert.equal(source.includes('const payload = await apiService.v1GetWorkspaceRuntimeStatus(normalizedWorkspaceId)'), true)
+  assert.equal(source.includes('const payload = await workspaceApi.runtimeStatus(normalizedWorkspaceId)'), true)
   assert.equal(source.includes("appStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, payload?.status || 'missing')"), true)
   assert.equal(source.includes('await refreshRuntimeStatusAfterExplicitWork(appStore.activeWorkspaceId)'), true)
 })

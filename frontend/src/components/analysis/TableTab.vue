@@ -191,7 +191,7 @@
 <script setup>
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../../stores/appStore'
-import apiService from '../../services/apiService'
+import { artifactApi } from '../../api/artifacts'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import DataTable from './table/DataTable.vue'
@@ -472,7 +472,7 @@ async function loadActiveTurnArtifacts() {
   artifactListError.value = ''
   appStore.clearDataPaneError()
   try {
-    const response = await enqueueSerializedRequest(() => apiService.v1ListTurnArtifacts(
+    const response = await enqueueSerializedRequest(() => artifactApi.listTurn(
       conversationId,
       turnId,
       'dataframe',
@@ -821,7 +821,7 @@ async function loadServerPage(artifactId, query = tableQuery.value) {
       if (!sourceArtifactId && turnId !== String(appStore.activeTurnId || '').trim()) throw createAbortError()
       if (normalizedArtifactId !== String(selectedArtifactId.value || '').trim()) throw createAbortError()
       if (sourceArtifactId) {
-        return apiService.getDataframeArtifactRows(
+        return artifactApi.workspaceRows(
           workspaceId,
           sourceArtifactId,
           startRow,
@@ -834,7 +834,7 @@ async function loadServerPage(artifactId, query = tableQuery.value) {
           },
         )
       }
-      return apiService.getTurnDataframeArtifactRows(
+      return artifactApi.turnRows(
         conversationId,
         turnId,
         normalizedArtifactId,
@@ -972,7 +972,7 @@ async function deleteSelectedArtifact() {
   isDeletingArtifact.value = true
   tableError.value = ''
   try {
-    await apiService.v1DeleteTurnArtifact(conversationId, turnId, artifactId)
+    await artifactApi.remove(conversationId, turnId, artifactId)
     appStore.removeResultArtifact(artifactId)
     await loadActiveTurnArtifacts()
     const remainingArtifactId = allArtifacts.value[0]?.artifact_id || null

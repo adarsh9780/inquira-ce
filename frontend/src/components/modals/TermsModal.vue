@@ -50,7 +50,7 @@ import { computed, ref, watch } from 'vue'
 import { DocumentTextIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
-import { apiService } from '../../services/apiService'
+import { preferencesApi } from '../../api/preferences'
 import { Button } from '../ui/button'
 import { DialogShell } from '../ui/dialog'
 
@@ -97,7 +97,7 @@ async function loadTermsAndConditions({ force = false } = {}) {
   isTermsLoading.value = true
   termsError.value = ''
   try {
-    const payload = await apiService.v1GetTermsAndConditions()
+    const payload = await preferencesApi.terms()
     termsMarkdown.value = String(payload?.markdown || '').trim()
     termsLastUpdated.value = String(payload?.last_updated || '').trim()
   } catch (error) {

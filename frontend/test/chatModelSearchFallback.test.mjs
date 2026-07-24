@@ -9,7 +9,7 @@ test('chat composer delegates model management to workspace settings', () => {
 
   assert.equal(source.includes('<ModelSelector'), false)
   assert.equal(source.includes(':backend-search="searchProviderModels"'), false)
-  assert.equal(source.includes('apiService.v1SearchProviderModels('), false)
+  assert.equal(source.includes('preferencesApi.searchModels('), false)
   assert.equal(source.includes('const effectiveWorkspaceModel = computed('), true)
 })
 

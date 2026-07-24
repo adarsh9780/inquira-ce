@@ -43,7 +43,7 @@ test('native file picker accepts modern Excel workbooks without claiming legacy 
 
 test('native workspace exposes an analysis catalog built from connection snapshots', () => {
   const app = read('../app.go')
-  const service = read('src/services/apiService.js')
+  const service = read('src/api/workspaces.ts')
   assert.match(app, /PrepareWorkspaceCatalog/)
   assert.doesNotMatch(service, /v1BootstrapWorkspaceRuntime/)
 })

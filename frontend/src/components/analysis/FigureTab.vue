@@ -99,7 +99,7 @@ import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import FloatingActionMenu from '../ui/FloatingActionMenu.vue'
 import AppEmptyState from '../ui/AppEmptyState.vue'
-import apiService from '../../services/apiService'
+import { artifactApi } from '../../api/artifacts'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import { persistExportFile } from '../../utils/exportFile'
 import { applyPlotlyTheme, applyPlotlyConfigTheme, PLOTLY_THEME_MODE } from '../../utils/plotlyTheme'
@@ -363,7 +363,7 @@ async function loadActiveTurnFigureArtifacts() {
   isLoadingArtifacts.value = true
   artifactListError.value = ''
   try {
-    const response = await apiService.v1ListTurnArtifacts(
+    const response = await artifactApi.listTurn(
       conversationId,
       turnId,
       'figure',
@@ -430,7 +430,7 @@ async function loadSelectedFigurePayload(artifactId) {
   figureAbortController = new AbortController()
   isLoadingFigure.value = true
   try {
-    const metadata = await apiService.v1GetTurnArtifactMetadata(
+    const metadata = await artifactApi.metadata(
       conversationId,
       turnId,
       normalizedArtifactId,
@@ -648,7 +648,7 @@ async function deleteSelectedFigure() {
   isDeletingArtifact.value = true
   artifactListError.value = ''
   try {
-    await apiService.v1DeleteTurnArtifact(conversationId, turnId, artifactId)
+    await artifactApi.remove(conversationId, turnId, artifactId)
     appStore.removeResultArtifact(artifactId)
     await loadActiveTurnFigureArtifacts()
     const remainingArtifactId = workspaceFigureArtifacts.value[0]?.artifact_id || null

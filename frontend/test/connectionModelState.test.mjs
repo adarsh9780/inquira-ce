@@ -30,7 +30,7 @@ test('frontend data context comes only from workspace summaries and the column c
 })
 
 test('obsolete workspace-path helpers and bridge are removed', () => {
-  const apiService = read('src/services/apiService.js')
+  const apiService = read('src/api/native.ts')
   const app = read('../app.go')
 
   assert.doesNotMatch(apiService, /\bgetSettings\s*\(/)

@@ -7,14 +7,14 @@ const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
 test('native workspace AI keeps defaults overrides and effective values separate', () => {
   const store = read('src/stores/appStore.js')
-  const service = read('src/services/apiService.js')
+  const service = read('src/api/workspaces.ts')
 
   assert.match(store, /workspaceAIConfig/)
   assert.match(store, /fetchWorkspaceAIConfig/)
   assert.match(store, /saveWorkspaceAIConfig/)
   assert.doesNotMatch(store, /if \(workspaceService\.isNative\(\)\) \{\s*workspaceAIConfig\.value = null/)
-  assert.match(service, /requireWailsMethod\('GetWorkspaceAIConfig'\)/)
-  assert.match(service, /requireWailsMethod\('UpdateWorkspaceAIConfig'\)/)
+  assert.match(service, /invokeNative<RecordValue>\('GetWorkspaceAIConfig'/)
+  assert.match(service, /invokeNative<RecordValue>\('UpdateWorkspaceAIConfig'/)
   assert.match(read('../app.go'), /func \(a \*App\) GetWorkspaceAIConfig/)
   assert.match(read('../app.go'), /func \(a \*App\) UpdateWorkspaceAIConfig/)
 })

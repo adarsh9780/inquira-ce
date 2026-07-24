@@ -20,6 +20,6 @@ test('status bar owns runtime status while table tab reads saved artifacts witho
   assert.equal(tableTabSource.includes('runtimeReadyWorkspaceId'), false)
   assert.equal(tableTabSource.includes('appStore.getWorkspaceRuntimeStatus'), false)
   assert.equal(tableTabSource.includes('appStore.setWorkspaceRuntimeStatus'), false)
-  assert.equal(tableTabSource.includes('apiService.v1GetWorkspaceRuntimeStatus'), false)
-  assert.equal(tableTabSource.includes('apiService.v1ListTurnArtifacts('), true)
+  assert.equal(tableTabSource.includes('workspaceApi.runtimeStatus'), false)
+  assert.equal(tableTabSource.includes('artifactApi.listTurn('), true)
 })

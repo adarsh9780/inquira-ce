@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { workspaceService } from '../src/services/workspaceService'
+import { workspaceApi } from '../src/api/workspaces'
 
 afterEach(() => {
   delete window.go
 })
 
-describe('workspaceService Wails bridge', () => {
+describe('workspaceApi Wails bridge', () => {
   it('routes workspace metadata operations directly to Go', async () => {
     const app = {
       ListWorkspaces: vi.fn().mockResolvedValue({ workspaces: [] }),
@@ -18,13 +18,13 @@ describe('workspaceService Wails bridge', () => {
     }
     window.go = { main: { App: app } }
 
-    await workspaceService.list()
-    await workspaceService.create('Finance', 'Fiscal calendar starts in April')
-    await workspaceService.activate('workspace-1')
-    await workspaceService.update('workspace-1', 'Finance 2026')
-    await workspaceService.update('workspace-1', 'Finance', 'Updated context')
-    await workspaceService.summary('workspace-1')
-    await workspaceService.delete('workspace-1')
+    await workspaceApi.list()
+    await workspaceApi.create('Finance', 'Fiscal calendar starts in April')
+    await workspaceApi.activate('workspace-1')
+    await workspaceApi.update('workspace-1', 'Finance 2026')
+    await workspaceApi.update('workspace-1', 'Finance', 'Updated context')
+    await workspaceApi.summary('workspace-1')
+    await workspaceApi.remove('workspace-1')
 
     expect(app.ListWorkspaces).toHaveBeenCalledOnce()
     expect(app.CreateWorkspace).toHaveBeenCalledWith({

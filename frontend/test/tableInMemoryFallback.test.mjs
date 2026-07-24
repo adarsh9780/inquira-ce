@@ -14,5 +14,5 @@ test('table tab does not use in-memory dataframe fallback for saved turn artifac
   assert.equal(source.includes('if (isMemoryArtifactId(newId)) {'), false)
   assert.equal(source.includes('loadInMemoryArtifact(memoryArtifact)'), false)
   assert.equal(source.includes('label: isMemory ? `${label} (memory)` : label'), false)
-  assert.equal(source.includes('apiService.getTurnDataframeArtifactRows('), true)
+  assert.equal(source.includes('artifactApi.turnRows('), true)
 })

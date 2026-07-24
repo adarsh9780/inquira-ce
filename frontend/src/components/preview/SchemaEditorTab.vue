@@ -148,7 +148,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { apiService } from '../../services/apiService'
+import { workspaceApi } from '../../api/workspaces'
 import { useAppStore } from '../../stores/appStore'
 import { toast } from '../../composables/useToast'
 import MarkdownIt from 'markdown-it'
@@ -200,7 +200,7 @@ async function loadWorkspaceContext() {
     return
   }
   try {
-    const summary = await apiService.v1GetWorkspaceSummary(appStore.activeWorkspaceId)
+    const summary = await workspaceApi.summary(appStore.activeWorkspaceId)
     schemaContext.value = String(summary?.schema_context || '').trim()
   } catch (error) {
     // Silently fail or use store fallback
@@ -213,13 +213,13 @@ async function fetchWorkspaceSchema(forceRefresh = false) {
   schemaLoading.value = true
   try {
     const workspaceId = appStore.activeWorkspaceId
-    const datasetResponse = await apiService.v1ListDatasets(workspaceId)
+    const datasetResponse = await workspaceApi.listDatasets(workspaceId)
     const datasets = datasetResponse?.datasets || []
 
     const schemas = await Promise.all(
       datasets.map(async (ds) => {
         try {
-          return await apiService.v1GetDatasetSchema(workspaceId, ds.table_name)
+          return await workspaceApi.getDatasetSchema(workspaceId, ds.table_name)
         } catch (err) {
           return { table_name: ds.table_name, context: '', columns: [] }
         }
@@ -264,7 +264,7 @@ async function saveEditContext() {
   if (!appStore.activeWorkspaceId) return
   try {
     const workspace = appStore.workspaces.find(w => w.id === appStore.activeWorkspaceId)
-    await apiService.v1RenameWorkspace(appStore.activeWorkspaceId, workspace?.name ?? null, tempContext.value.trim())
+    await workspaceApi.update(appStore.activeWorkspaceId, workspace?.name ?? null, tempContext.value.trim())
     schemaContext.value = tempContext.value.trim()
     isEditingContext.value = false
     toast.success('Workspace context saved')
@@ -343,7 +343,7 @@ async function saveAllSchema() {
     const tablesToSave = groupedSchema.value.filter(g => dirtyTables.value.has(g.tableName))
 
     for (const group of tablesToSave) {
-      await apiService.v1SaveDatasetSchema(workspaceId, group.tableName, {
+      await workspaceApi.saveDatasetSchema(workspaceId, group.tableName, {
         context: schemaContext.value || '',
         columns: group.columns.map(c => ({
           name: c.name,
@@ -378,7 +378,7 @@ async function regenerateTableSchema(tableName) {
   })
   try {
     toast.info('Regenerating table schema', `Generating AI descriptions for ${tableName}...`)
-    const regenerated = await apiService.v1RegenerateDatasetSchema(appStore.activeWorkspaceId, tableName, {
+    const regenerated = await workspaceApi.regenerateDatasetSchema(appStore.activeWorkspaceId, tableName, {
       context: schemaContext.value || ''
     })
 

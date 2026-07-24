@@ -48,7 +48,7 @@ test('command palette is app-level, uses Cmd/Ctrl+K, and launches common command
   assert.equal(modal.includes('v-for="section in groupedConversationSections"'), true)
   assert.equal(modal.includes('command-palette-workspace-header'), true)
   assert.equal(modal.includes('const displayedConversationRows = computed(() => ('), true)
-  assert.equal(modal.includes('apiService.v1ListConversations(workspaceId, 200)'), true)
+  assert.equal(modal.includes('conversationApi.list(workspaceId, 200)'), true)
   assert.equal(modal.includes('appStore.isConversationRunning(id)'), true)
   assert.equal(modal.includes('formatCreatedLabel(createdAt)'), true)
   assert.equal(modal.includes('workspaceInitials(section.workspaceName)'), true)

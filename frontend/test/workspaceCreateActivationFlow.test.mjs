@@ -13,7 +13,7 @@ test('workspace creation activates the new workspace centrally in the store', ()
   const end = source.indexOf('async function activateWorkspace(workspaceId) {', start)
   const block = source.slice(start, end)
 
-  assert.equal(block.includes('const ws = await workspaceService.create(name, schemaContext)'), true)
+  assert.equal(block.includes('const ws = await workspaceApi.create(name, schemaContext)'), true)
   assert.equal(block.includes('await activateWorkspace(ws.id)'), true)
   assert.equal(block.includes('await fetchWorkspaces()'), true)
 })

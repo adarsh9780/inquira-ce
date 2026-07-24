@@ -165,7 +165,8 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
-import apiService from '../../services/apiService'
+import { executionApi } from '../../api/execution'
+import { workspaceApi } from '../../api/workspaces'
 import executionService from '../../services/executionService'
 import { executeCommand, getRegisteredCommands, isCommand } from '../../services/commandRegistry'
 import { toast } from '../../composables/useToast'
@@ -304,7 +305,7 @@ async function refreshRuntimeStatusAfterExplicitWork(workspaceId) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return
   try {
-    const payload = await apiService.v1GetWorkspaceRuntimeStatus(normalizedWorkspaceId)
+    const payload = await workspaceApi.runtimeStatus(normalizedWorkspaceId)
     appStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, payload?.status || 'missing')
   } catch (_error) {
     // Runtime status is informational; keep the completed chat response intact.
@@ -1049,7 +1050,7 @@ async function handleSlashCommand(questionText) {
     })
     appStore.addChatMessage(questionText, 'Running command...', { conversationId: requestConversationId })
     commandMessageCreated = true
-    const result = await executeCommand(questionText, { appStore, apiService, executionService })
+    const result = await executeCommand(questionText, { appStore, executionService })
     const persistedConversationId = String(result?.conversation_id || '').trim()
     if (
       persistedConversationId &&
@@ -1224,7 +1225,7 @@ async function handleSubmit() {
 
     let response
     const selectedParentTurnId = String(appStore.activeTurnId || '').trim()
-    response = await apiService.v1AnalyzeStream(
+    response = await executionApi.analyze(
       {
         workspace_id: workspaceId,
         conversation_id: requestConversationId,

@@ -3,6 +3,7 @@ import { columnStatsCommands } from './commands/columnStats.js'
 import { distributionCommands } from './commands/distribution.js'
 import { qualityCommands } from './commands/quality.js'
 import { helpCommands } from './commands/help.js'
+import { executionApi } from '../api/execution.ts'
 
 const commandRegistry = new Map()
 
@@ -79,7 +80,7 @@ function resolveDefaultTable(appStore) {
   return String(catalogItem?.table_name || '').trim() || null
 }
 
-export async function executeCommand(text, { appStore, apiService: api = null } = {}) {
+export async function executeCommand(text, { appStore, executionApi: api = executionApi } = {}) {
   const parsed = parseCommand(text)
   if (!parsed) {
     throw new Error('Input is not a slash command.')
@@ -95,11 +96,7 @@ export async function executeCommand(text, { appStore, apiService: api = null } 
     throw new Error('Create/select a workspace before running commands.')
   }
 
-  if (!api) {
-    throw new Error('Command execution requires an API client.')
-  }
-
-  const response = await api.v1ExecuteWorkspaceCommand(workspaceId, {
+  const response = await api.command(workspaceId, {
     text: parsed.text,
     name: parsed.name,
     raw_args: parsed.rawArgs,

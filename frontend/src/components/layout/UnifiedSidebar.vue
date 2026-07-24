@@ -347,7 +347,7 @@ import SidebarFooter from './sidebar/SidebarFooter.vue'
 import SidebarPrimaryNav from './sidebar/SidebarPrimaryNav.vue'
 import SidebarWorkspaceConversations from './sidebar/SidebarWorkspaceConversations.vue'
 import logo from '../../assets/favicon.svg'
-import apiService from '../../services/apiService'
+import { conversationApi } from '../../api/conversations'
 import { sidebarConversationPageSize, useSidebarConversations } from '../../composables/useSidebarConversations'
 import { workspaceInitials } from '../../utils/workspaceDisplay'
 
@@ -516,7 +516,7 @@ async function loadSidebarConversations(workspaceId, { force = false } = {}) {
     [normalizedWorkspaceId]: true,
   }
   try {
-    const response = await apiService.v1ListConversations(normalizedWorkspaceId, 50)
+    const response = await conversationApi.list(normalizedWorkspaceId, 50)
     const conversations = Array.isArray(response?.conversations) ? response.conversations : []
     updateSidebarConversationCache(normalizedWorkspaceId, conversations)
     return conversations
@@ -714,7 +714,7 @@ async function saveTitle(id) {
     if (id === appStore.activeConversationId) {
       await appStore.updateConversationTitle(newTitle)
     } else {
-      const updated = await apiService.v1UpdateConversation(id, newTitle)
+      const updated = await conversationApi.update(id, newTitle)
       const idx = appStore.conversations.findIndex((conversation) => conversation.id === id)
       if (idx !== -1) {
         appStore.conversations[idx] = { ...appStore.conversations[idx], title: updated.title }

@@ -14,5 +14,5 @@ test('figure tab does not use in-memory figure fallback for saved turn artifacts
   assert.equal(source.includes('if (isMemoryFigureId(normalizedArtifactId)) {'), false)
   assert.equal(source.includes('memory_figure: normalizedFigure'), false)
   assert.equal(source.includes('(memory)'), false)
-  assert.equal(source.includes('apiService.v1GetTurnArtifactMetadata('), true)
+  assert.equal(source.includes('artifactApi.metadata('), true)
 })

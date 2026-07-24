@@ -15,7 +15,7 @@ test('table and figure delete flows use shared confirmation modal before delete 
   assert.equal(tableSource.includes("if (action === 'delete') openDeleteDialog()"), true)
   assert.equal(tableSource.includes("label: 'Delete table'"), true)
   assert.equal(tableSource.includes('const deleteDialogMessage = computed(() => {'), true)
-  assert.equal(tableSource.includes('await apiService.v1DeleteTurnArtifact(conversationId, turnId, artifactId)'), true)
+  assert.equal(tableSource.includes('await artifactApi.remove(conversationId, turnId, artifactId)'), true)
   assert.equal(tableSource.includes('type="button"'), true)
 
   assert.equal(figureSource.includes('ConfirmationModal'), true)
@@ -23,6 +23,6 @@ test('table and figure delete flows use shared confirmation modal before delete 
   assert.equal(figureSource.includes("if (action === 'delete') openDeleteDialog()"), true)
   assert.equal(figureSource.includes("label: 'Delete chart'"), true)
   assert.equal(figureSource.includes('const deleteDialogMessage = computed(() => {'), true)
-  assert.equal(figureSource.includes('await apiService.v1DeleteTurnArtifact(conversationId, turnId, artifactId)'), true)
+  assert.equal(figureSource.includes('await artifactApi.remove(conversationId, turnId, artifactId)'), true)
   assert.equal(figureSource.includes('type="button"'), true)
 })

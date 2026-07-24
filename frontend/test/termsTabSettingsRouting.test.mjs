@@ -18,7 +18,7 @@ test('sidebar opens the standalone terms modal', () => {
 test('terms modal loads markdown from the legal endpoint', () => {
   const source = read('src/components/modals/TermsModal.vue')
 
-  assert.equal(source.includes('apiService.v1GetTermsAndConditions()'), true)
+  assert.equal(source.includes('preferencesApi.terms()'), true)
   assert.equal(source.includes("const props = defineProps({"), true)
   assert.equal(source.includes("() => props.isOpen"), true)
   assert.equal(source.includes('Loading terms...'), true)

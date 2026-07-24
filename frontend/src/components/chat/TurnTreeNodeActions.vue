@@ -71,7 +71,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { apiService } from '../../services/apiService'
+import { conversationApi } from '../../api/conversations'
 import { formatTimestamp } from '../../utils/dateUtils'
 import { formatUsageCompact, formatUsageTooltip } from '../../utils/usageFormat'
 import FloatingActionMenu from '../ui/FloatingActionMenu.vue'
@@ -123,7 +123,7 @@ async function handleContextAction(action) {
   else if (action === 'mark-final') emit('mark-final', { conversationId, turnId })
   else if (action === 'delete') emit('delete-turn', { conversationId, turnId })
   else if (action === 'view-details') {
-    detailTurn.value = await apiService.v1GetTurn(conversationId, turnId)
+    detailTurn.value = await conversationApi.getTurn(conversationId, turnId)
     detailModalOpen.value = true
   }
 }

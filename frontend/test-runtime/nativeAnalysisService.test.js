@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { apiService } from '../src/services/apiService'
+import { conversationApi } from '../src/api/conversations'
+import { executionApi } from '../src/api/execution'
 
 afterEach(() => {
   delete window.go
@@ -44,10 +45,10 @@ describe('native analysis bridge', () => {
     }
     window.go = { main: { App: app } }
 
-    const created = await apiService.v1CreateConversation('workspace-1', 'Question')
-    const listed = await apiService.v1ListConversations('workspace-1')
+    const created = await conversationApi.create('workspace-1', 'Question')
+    const listed = await conversationApi.list('workspace-1')
     const events = []
-    const result = await apiService.v1AnalyzeStream({
+    const result = await executionApi.analyze({
       workspace_id: 'workspace-1', conversation_id: 'conversation-1',
       selected_parent_turn_id: 'parent-1', question: 'What are total sales?', current_code: 'result = previous',
       attachments: [{ attachment_id: 'image-1', media_type: 'image/png', filename: 'chart.png', data_base64: 'aW1hZ2U=' }],
@@ -80,7 +81,7 @@ describe('native analysis bridge', () => {
     }
     window.go = { main: { App: app } }
     const controller = new AbortController()
-    const pending = apiService.v1AnalyzeStream({
+    const pending = executionApi.analyze({
       workspace_id: 'workspace-1', question: 'Stop this request',
     }, { signal: controller.signal })
 

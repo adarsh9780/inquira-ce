@@ -32,7 +32,7 @@ test('right panel includes unified workspace layout', () => {
 test('preview tab is removed from sidebar navigation and runtime API client', () => {
   const sidebarPath = resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue')
   const sidebarSource = readFileSync(sidebarPath, 'utf-8')
-  const apiServicePath = resolve(process.cwd(), 'src/services/apiService.js')
+  const apiServicePath = resolve(process.cwd(), 'src/api/workspaces.ts')
   const apiSource = readFileSync(apiServicePath, 'utf-8')
 
   assert.equal(sidebarSource.includes("id: 'preview'"), false)

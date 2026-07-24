@@ -27,7 +27,7 @@ test('terminal service routes PTY lifecycle and events through Go', () => {
 
 test('native terminal availability does not depend on a workspace-path bridge', () => {
   const app = read('../app.go')
-  const apiService = read('src/services/apiService.js')
+  const apiService = read('src/api/native.ts')
 
   assert.equal(app.includes('func (a *App) GetWorkspacePaths'), false)
   assert.equal(apiService.includes('v1GetWorkspacePaths'), false)

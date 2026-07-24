@@ -144,7 +144,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useAppStore } from '../../stores/appStore'
 import { useUiStore } from '../../stores/uiStore'
-import apiService from '../../services/apiService'
+import { conversationApi } from '../../api/conversations'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { formatCompactRelativeTimestamp, formatExactTimestamp, parseTimestamp } from '../../utils/dateUtils'
@@ -445,7 +445,7 @@ async function loadConversations() {
       const workspaceId = String(workspace?.id || '').trim()
       if (!workspaceId) return
       try {
-        const response = await apiService.v1ListConversations(workspaceId, 200)
+        const response = await conversationApi.list(workspaceId, 200)
         entries[workspaceId] = Array.isArray(response?.conversations) ? response.conversations : []
       } catch (_error) {
         failedCount += 1

@@ -129,7 +129,7 @@ import {
   PlusIcon,
 } from '@heroicons/vue/24/outline'
 import { useAppStore } from '../../stores/appStore'
-import { apiService } from '../../services/apiService'
+import { preferencesApi } from '../../api/preferences'
 import ModelSelector from '../ui/ModelSelector.vue'
 
 const appStore = useAppStore()
@@ -217,7 +217,7 @@ async function handleModelChange(model) {
 }
 
 async function searchProviderModels(query, limit = 25) {
-  const response = await apiService.v1SearchProviderModels(
+  const response = await preferencesApi.searchModels(
     effectiveWorkspaceProvider.value,
     query,
     limit,

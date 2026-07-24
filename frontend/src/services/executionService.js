@@ -1,4 +1,4 @@
-import apiService from './apiService'
+import { executionApi } from '../api/execution.ts'
 import { useAppStore } from '../stores/appStore'
 import { extractApiErrorMessage } from '../utils/apiError'
 import { mapExecutionServiceResponse } from '../utils/executionServiceMapper'
@@ -7,11 +7,13 @@ class ExecutionService {
     async executePython(code) {
         try {
             const appStore = useAppStore()
-            const response = await apiService.executeCode(
+            const response = await executionApi.runCode({
                 code,
-                60,
-                appStore.activeWorkspaceId || null,
-            )
+                timeout: 60,
+                workspaceId: appStore.activeWorkspaceId || null,
+                conversationId: appStore.activeConversationId || '',
+                parentTurnId: appStore.activeTurnId || '',
+            })
             return mapExecutionServiceResponse(response)
         } catch (err) {
             return {

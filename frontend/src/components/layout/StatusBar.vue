@@ -181,7 +181,7 @@ import { useAppStore } from '../../stores/appStore'
 import { useArtifactStore } from '../../stores/artifactStore'
 import { useUiStore } from '../../stores/uiStore'
 import { useAuthStore } from '../../stores/authStore'
-import apiService from '../../services/apiService'
+import { workspaceApi } from '../../api/workspaces'
 import { formatUsageCompact, formatUsageTooltip, normalizeUsage } from '../../utils/usageFormat'
 import {
   BellIcon,
@@ -331,7 +331,7 @@ async function refreshWorkspaceRuntimeStatusFromApi(workspaceId, fallbackStatus 
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return 'missing'
   try {
-    const payload = await apiService.v1GetWorkspaceRuntimeStatus(normalizedWorkspaceId)
+    const payload = await workspaceApi.runtimeStatus(normalizedWorkspaceId)
     const status = String(payload?.status || '').trim().toLowerCase() || fallbackStatus
     appStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, status)
     return status
