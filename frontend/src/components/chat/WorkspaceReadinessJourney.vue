@@ -32,19 +32,24 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  state: {
-    type: String,
-    required: true,
-  },
-})
+type ReadinessState =
+  | 'no_workspace'
+  | 'no_data'
+  | 'model_connection_required'
+  | 'workspace_configuration_required'
 
-const emit = defineEmits(['primary-action'])
+const props = defineProps<{ state: string }>()
+const emit = defineEmits<{ 'primary-action': [] }>()
 
-const journeyContent = {
+const journeyContent: Record<ReadinessState, {
+  title: string
+  description: string
+  actionLabel: string
+  actionHint: string
+}> = {
   no_workspace: {
     title: 'Create a workspace',
     description: 'A workspace keeps related data, conversations, code, and results together.',
@@ -71,5 +76,8 @@ const journeyContent = {
   },
 }
 
-const content = computed(() => journeyContent[props.state] || journeyContent.no_workspace)
+const content = computed(() => {
+  const state = props.state as ReadinessState
+  return journeyContent[state] || journeyContent.no_workspace
+})
 </script>

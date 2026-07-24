@@ -7,7 +7,7 @@ const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
 test('native runtime setup supports company Python mirrors proxies and certificate bundles', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
-  const service = read('src/services/runtimeProvisionService.js')
+  const service = read('src/services/runtimeProvisionService.ts')
   const app = read('../app.go')
 
   assert.match(workspace, /Company Python/)

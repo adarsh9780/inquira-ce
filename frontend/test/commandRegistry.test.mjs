@@ -8,7 +8,7 @@ import {
   getRegisteredCommands,
   isCommand,
   parseCommand,
-} from '../src/services/commandRegistry.js'
+} from '../src/services/commandRegistry.ts'
 
 test('command registry recognizes slash command input and parses args', () => {
   assert.equal(isCommand('/shape sales'), true)

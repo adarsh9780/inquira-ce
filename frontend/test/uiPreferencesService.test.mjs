@@ -4,11 +4,11 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('UI preferences service only exposes generic preference persistence helpers', () => {
-  const servicePath = resolve(process.cwd(), 'src/services/uiPreferencesService.js')
+  const servicePath = resolve(process.cwd(), 'src/services/uiPreferencesService.ts')
   const source = readFileSync(servicePath, 'utf-8')
 
-  assert.equal(source.includes('async getPreferences()'), true)
-  assert.equal(source.includes('async savePreferences(prefs)'), true)
+  assert.equal(source.includes('async getPreferences('), true)
+  assert.equal(source.includes('async savePreferences('), true)
   assert.equal(source.includes('app?.LoadLocalState'), true)
   assert.equal(source.includes('app?.SaveLocalState'), true)
   assert.equal(source.includes('hasSeenWalkthrough'), false)

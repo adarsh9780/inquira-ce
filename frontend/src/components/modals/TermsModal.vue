@@ -45,7 +45,7 @@
   </DialogShell>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { DocumentTextIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import MarkdownIt from 'markdown-it'
@@ -100,8 +100,8 @@ async function loadTermsAndConditions({ force = false } = {}) {
     const payload = await preferencesApi.terms()
     termsMarkdown.value = String(payload?.markdown || '').trim()
     termsLastUpdated.value = String(payload?.last_updated || '').trim()
-  } catch (error) {
-    termsError.value = error?.message || 'Failed to load Terms & Conditions.'
+  } catch (error: unknown) {
+    termsError.value = error instanceof Error ? error.message : 'Failed to load Terms & Conditions.'
   } finally {
     isTermsLoading.value = false
   }

@@ -105,7 +105,7 @@
   </DialogShell>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useLLMConfig } from '../../composables/useLLMConfig'
 import { useUiStore } from '../../stores/uiStore'
@@ -185,7 +185,7 @@ const activeSectionDescription = computed(() => {
 const workspaceItems = computed(() => {
   const items = Array.isArray(workspaceStore.workspaces) ? workspaceStore.workspaces : []
   return items.map((workspace) => {
-    const duckdbPath = String(workspace?.duckdb_path || '').trim()
+    const duckdbPath = String((workspace as { duckdb_path?: unknown }).duckdb_path || '').trim()
     const filename = filenameFromPath(duckdbPath, 'workspace.duckdb')
     return {
       ...workspace,
@@ -217,7 +217,7 @@ watch(
   },
 )
 
-function normalizeTab(tab) {
+function normalizeTab(tab: unknown): string {
   const candidate = String(tab || '').toLowerCase()
   if (candidate === 'api' || candidate === 'llm') return 'connections'
   if (candidate === 'data' || candidate === 'models' || candidate.startsWith('workspace-')) return 'workspace'
@@ -227,7 +227,7 @@ function normalizeTab(tab) {
   return 'setup'
 }
 
-function initializePanelState(tab) {
+function initializePanelState(tab: unknown): void {
   const candidate = String(tab || '').trim().toLowerCase()
   workspaceInitialSection.value = candidate === 'data' || candidate === 'workspace-data'
     ? 'data'
@@ -245,7 +245,7 @@ function initializePanelState(tab) {
   currentPanel.value = normalized
 }
 
-function panelClass(panelId) {
+function panelClass(panelId: string): string {
   if (currentPanel.value === panelId) {
     return 'translate-x-0 opacity-100 pointer-events-auto settings-panel-transition'
   }
@@ -253,7 +253,7 @@ function panelClass(panelId) {
   return `${offset} opacity-0 pointer-events-none settings-panel-transition`
 }
 
-function navigateTo(panel, direction = 'forward') {
+function navigateTo(panel: string, direction = 'forward'): void {
   panelDirection.value = direction
   currentPanel.value = panel
   if (panel === 'workspace') {
@@ -261,7 +261,7 @@ function navigateTo(panel, direction = 'forward') {
   }
 }
 
-function openLeafSection(section) {
+function openLeafSection(section: string): void {
   activeSection.value = section
   navigateTo(section, 'forward')
 }
@@ -271,7 +271,7 @@ function openWorkspaceSection() {
   navigateTo('workspace', 'forward')
 }
 
-function selectWorkspace(workspaceId) {
+function selectWorkspace(workspaceId: unknown): void {
   const nextId = String(workspaceId || '').trim()
   if (!nextId) return
   if (activeWorkspaceId.value !== nextId) {
@@ -279,7 +279,7 @@ function selectWorkspace(workspaceId) {
   }
 }
 
-async function activateWorkspace(workspaceId) {
+async function activateWorkspace(workspaceId: unknown) {
   const nextId = String(workspaceId || '').trim()
   if (!nextId) return
   activeWorkspaceId.value = nextId
@@ -287,7 +287,7 @@ async function activateWorkspace(workspaceId) {
   await workspaceActivation.activateWorkspace(nextId)
 }
 
-function handleWorkspaceCreated(payload) {
+function handleWorkspaceCreated(payload: { workspaceId?: unknown }) {
   const workspaceId = String(payload?.workspaceId || '').trim()
   if (!workspaceId) return
   activeWorkspaceId.value = workspaceId

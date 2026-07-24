@@ -1,25 +1,39 @@
-export type NativeMethod = (...arguments_: unknown[]) => Promise<unknown>
+import type {
+  NativeApp,
+  NativeArguments,
+  NativeMethod,
+  NativeMethodName,
+  NativeResult,
+} from '../types/native'
 
-export function nativeApp(): Record<string, NativeMethod> | null {
+export function nativeApp(): NativeApp | null {
   if (typeof window === 'undefined') return null
-  return window.go?.main?.App || null
+  return (window.go?.main?.App || null) as NativeApp | null
 }
 
 export function hasNativeBridge() {
   return Boolean(nativeApp())
 }
 
-export function requireNativeMethod(method: string): NativeMethod {
+export function requireNativeMethod<Method extends NativeMethodName>(
+  method: Method,
+): NativeMethod<Method> {
   const app = nativeApp()
   const candidate = app?.[method]
   if (typeof candidate !== 'function') {
     throw new Error(`The ${method} desktop bridge is unavailable. Open this feature in the installed app.`)
   }
-  return candidate.bind(app)
+  return candidate.bind(app) as NativeMethod<Method>
 }
 
-export function invokeNative<T>(method: string, ...arguments_: unknown[]): Promise<T> {
-  return requireNativeMethod(method)(...arguments_) as Promise<T>
+export function invokeNative<Method extends NativeMethodName>(
+  method: Method,
+  ...arguments_: NativeArguments<Method>
+): Promise<NativeResult<Method>> {
+  const invoke = requireNativeMethod(method) as (
+    ...values: NativeArguments<Method>
+  ) => Promise<NativeResult<Method>>
+  return invoke(...arguments_)
 }
 
 export function createAbortError(message = 'Request aborted') {

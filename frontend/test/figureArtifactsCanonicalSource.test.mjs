@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync } from './sourceText.mjs'
 import { resolve } from 'node:path'
 
 test('FigureTab uses active turn artifact catalog as canonical source and resolves selected chart by artifact id', () => {

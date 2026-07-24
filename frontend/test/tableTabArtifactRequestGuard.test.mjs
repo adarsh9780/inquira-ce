@@ -1,14 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readFileSync } from './sourceText.mjs'
 
 test('TableTab serializes artifact requests without kernel readiness gating', () => {
   const __filename = fileURLToPath(import.meta.url)
   const __dirname = path.dirname(__filename)
   const filePath = path.resolve(__dirname, '..', 'src', 'components', 'analysis', 'TableTab.vue')
-  const source = fs.readFileSync(filePath, 'utf8')
+  const source = readFileSync(filePath, 'utf8')
 
   assert.equal(source.includes('function enqueueSerializedRequest(task)'), true)
   assert.equal(source.includes('async function waitForKernelReady(workspaceId, signal)'), false)

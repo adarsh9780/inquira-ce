@@ -130,7 +130,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, defineAsyncComponent, onMounted, onUnmounted } from 'vue'
 import { useUiStore } from '../../stores/uiStore'
 import WorkspaceLeftPane from './WorkspaceLeftPane.vue'
@@ -152,24 +152,24 @@ const terminalVisualHeight = computed(() => {
 const workspaceVisualHeight = computed(() => 100 - terminalVisualHeight.value)
 
 // Resizing Logic
-const panelRef = ref(null)
+const panelRef = ref<HTMLElement | null>(null)
 const isResizingX = ref(false)
 const isResizingY = ref(false)
 const isCompactLayout = ref(false)
 const compactPane = ref('work')
-let panelResizeObserver = null
+let panelResizeObserver: ResizeObserver | null = null
 
-function startResizeX(e) {
+function startResizeX(_event: PointerEvent) {
   isResizingX.value = true
   document.body.style.userSelect = 'none'
 }
 
-function startResizeY(e) {
+function startResizeY(_event: PointerEvent) {
   isResizingY.value = true
   document.body.style.userSelect = 'none'
 }
 
-function handleResizeXKeydown(event) {
+function handleResizeXKeydown(event: KeyboardEvent) {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
   event.preventDefault()
   if (event.key === 'Home') uiStore.setLeftPaneWidth(20)
@@ -177,7 +177,7 @@ function handleResizeXKeydown(event) {
   else uiStore.setLeftPaneWidth(Math.min(80, Math.max(20, leftPaneWidth.value + (event.key === 'ArrowRight' ? 2 : -2))))
 }
 
-function handleResizeYKeydown(event) {
+function handleResizeYKeydown(event: KeyboardEvent) {
   if (!uiStore.isTerminalOpen || !['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
   event.preventDefault()
   if (event.key === 'Home') uiStore.setTerminalHeight(10)
@@ -185,7 +185,7 @@ function handleResizeYKeydown(event) {
   else uiStore.setTerminalHeight(Math.min(80, Math.max(10, terminalVisualHeight.value + (event.key === 'ArrowUp' ? 2 : -2))))
 }
 
-function onResize(e) {
+function onResize(e: MouseEvent | PointerEvent) {
   const panelRect = panelRef.value?.getBoundingClientRect?.()
   if (!panelRect || panelRect.width <= 0 || panelRect.height <= 0) return
 

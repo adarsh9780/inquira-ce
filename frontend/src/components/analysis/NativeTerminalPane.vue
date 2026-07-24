@@ -34,7 +34,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -59,27 +59,27 @@ const workspaceStore = useWorkspaceStore()
 const conversationStore = useConversationStore()
 const workspaceActivation = useWorkspaceActivation()
 const artifactPresentation = useArtifactPresentation()
-const terminalHostRef = ref(null)
+const terminalHostRef = ref<any>(null)
 const sessionId = ref('')
 const sessionCwd = ref('')
 const shellLabel = ref('shell')
 const isMounted = ref(false)
 
-let terminal = null
-let fitAddon = null
-let dataDisposable = null
-let resizeObserver = null
-let sessionCleanup = null
+let terminal: any = null
+let fitAddon: any = null
+let dataDisposable: { dispose(): void } | null = null
+let resizeObserver: ResizeObserver | null = null
+let sessionCleanup: (() => void | Promise<void>) | null = null
 
 const displayCwd = computed(() => sessionCwd.value || uiStore.terminalCwd || 'n/a')
 
-function readThemeColor(tokenName, fallback) {
+function readThemeColor(tokenName: any, fallback: any) {
   if (typeof window === 'undefined') return fallback
   const value = String(getComputedStyle(document.documentElement).getPropertyValue(tokenName) || '').trim()
   return value || fallback
 }
 
-function readThemeFont(tokenName, fallback) {
+function readThemeFont(tokenName: any, fallback: any) {
   if (typeof window === 'undefined') return fallback
   const value = String(getComputedStyle(document.documentElement).getPropertyValue(tokenName) || '').trim()
   return value || fallback
@@ -106,7 +106,7 @@ function syncTerminalTheme() {
   )
 }
 
-function normalizeErrorMessage(error, fallback) {
+function normalizeErrorMessage(error: any, fallback: any) {
   if (!error) return fallback
   if (typeof error === 'string') return error
   if (typeof error?.message === 'string' && error.message.trim()) return error.message
@@ -153,13 +153,13 @@ async function startSession() {
   sessionId.value = buildSessionId()
 
   try {
-    const response = await nativeTerminalService.startSession({
+    const response: any = await nativeTerminalService.startSession({
       workspaceId: workspaceStore.activeWorkspaceId,
       sessionId: sessionId.value,
       cwd: uiStore.terminalCwd || null,
       cols: terminal.cols,
       rows: terminal.rows,
-      onData: (chunk) => {
+      onData: (chunk: any) => {
         if (!terminal) return
         terminal.write(chunk)
       },
@@ -174,7 +174,7 @@ async function startSession() {
     uiStore.setTerminalCwd(sessionCwd.value)
     sessionCleanup = response?.dispose
     writeBanner()
-  } catch (error) {
+  } catch (error: any) {
     const message = normalizeErrorMessage(error, 'Failed to start terminal session.')
     terminal.writeln(`\x1b[31m${message}\x1b[0m`)
     toast.error('Terminal startup failed', message)
@@ -215,7 +215,7 @@ onMounted(async () => {
   await nextTick()
   fitAddon.fit()
 
-  dataDisposable = terminal.onData((chunk) => {
+  dataDisposable = terminal.onData((chunk: any) => {
     if (!sessionId.value) return
     nativeTerminalService.write(sessionId.value, chunk).catch(() => {})
   })

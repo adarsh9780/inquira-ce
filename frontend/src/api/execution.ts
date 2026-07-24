@@ -1,6 +1,6 @@
 import { EventsOn } from '../../wailsjs/runtime/runtime.js'
-import { extractApiErrorMessage } from '../utils/apiError.js'
-import { normalizeExecutionResponse } from '../utils/runtimeExecution.js'
+import { extractApiErrorMessage } from '../utils/apiError.ts'
+import { normalizeExecutionResponse } from '../utils/runtimeExecution.ts'
 import { invokeNative, nativeApp, withAbortSignal } from './native.ts'
 
 type RecordValue = Record<string, unknown>
@@ -156,7 +156,7 @@ export const executionApi = {
     }
   },
   command(workspaceId: unknown, payload: RecordValue = {}) {
-    return invokeNative<RecordValue>('ExecuteWorkspaceCommand', {
+    return invokeNative('ExecuteWorkspaceCommand', {
       workspace_id: String(workspaceId || ''),
       conversation_id: String(payload.conversation_id || ''),
       text: String(payload.text || ''),

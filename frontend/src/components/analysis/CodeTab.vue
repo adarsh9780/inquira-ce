@@ -46,7 +46,7 @@
           </button>
 
           <button
-            @click="syncTableNameInCode"
+            @click="syncTableNameInCode()"
             title="Sync table name in code to the active workspace"
             class="btn-icon"
           >
@@ -120,7 +120,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useUiStore } from '../../stores/uiStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
@@ -163,13 +163,13 @@ const conversationStore = useConversationStore()
 const workspaceActivation = useWorkspaceActivation()
 const artifactPresentation = useArtifactPresentation()
 
-const editorContainer = ref(null)
+const editorContainer = ref<any>(null)
 const isRunning = ref(false)
 const isGeneratingCode = ref(false)
 const isMounted = ref(false)
 let lastRunBlockedToastAt = 0
 
-let editor = null
+let editor: any = null
 let isUpdatingFromStore = false
 const editableCompartment = new Compartment()
 const visualThemeCompartment = new Compartment()
@@ -178,10 +178,10 @@ const primaryWorkspaceTableName = computed(() => {
   const summaryTable = (Array.isArray(workspaceStore.activeWorkspaceSummary?.table_names)
     ? workspaceStore.activeWorkspaceSummary.table_names
     : []
-  ).map((name) => String(name || '').trim()).find(Boolean)
+  ).map((name: any) => String(name || '').trim()).find(Boolean)
   if (summaryTable) return summaryTable
   const catalogItem = (Array.isArray(workspaceStore.columnCatalog) ? workspaceStore.columnCatalog : [])
-    .find((item) => String(item?.table_name || '').trim())
+    .find((item: any) => String(item?.table_name || '').trim())
   return String(catalogItem?.table_name || '').trim()
 })
 
@@ -190,15 +190,15 @@ const hasSelectedData = computed(() => {
     || Boolean(primaryWorkspaceTableName.value)
 })
 
-function isSimpleIdentifier(value) {
+function isSimpleIdentifier(value: any) {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(value || '').trim())
 }
 
-function quoteSqlIdentifier(value) {
+function quoteSqlIdentifier(value: any) {
   return `"${String(value || '').replace(/"/g, '""')}"`
 }
 
-function buildColumnReference(tableName, columnName) {
+function buildColumnReference(tableName: any, columnName: any) {
   const table = String(tableName || '').trim()
   const column = String(columnName || '').trim()
   if (!table || !column) return ''
@@ -208,9 +208,13 @@ function buildColumnReference(tableName, columnName) {
 
 function buildColumnCompletionOptions(query = '') {
   const loweredQuery = String(query || '').toLowerCase()
-  const options = []
+  const options: any[] = []
   const seen = new Set()
-  const addOption = ({ tableName, columnName, dtype = '' }) => {
+  const addOption = ({ tableName, columnName, dtype = '' }: {
+    tableName: unknown
+    columnName: unknown
+    dtype?: unknown
+  }) => {
     const safeTable = String(tableName || '').trim()
     const safeColumn = String(columnName || '').trim()
     const safeDtype = String(dtype || '').trim()
@@ -244,7 +248,7 @@ function buildColumnCompletionOptions(query = '') {
 
   const columns = Array.isArray(workspaceStore.columnCatalog) ? workspaceStore.columnCatalog : []
 
-  columns.forEach((item) => {
+  columns.forEach((item: any) => {
     addOption({
       tableName: item?.table_name,
       columnName: item?.column_name,
@@ -255,7 +259,7 @@ function buildColumnCompletionOptions(query = '') {
   return options.slice(0, 120)
 }
 
-function completionSource(context) {
+function completionSource(context: any) {
   const word = context.matchBefore(/[A-Za-z_][\w.\[\]"']*/)
   if (!word) {
     if (!context.explicit) return null
@@ -279,7 +283,7 @@ function completionSource(context) {
   }
 }
 
-function stampRunResults(items, runId, createdAt) {
+function stampRunResults(items: any, runId: any, createdAt: any) {
   return (Array.isArray(items) ? items : []).map((item) => ({
     ...item,
     runId,
@@ -348,10 +352,10 @@ combined_preview
 `
 })
 
-function replaceTableNameInCode(src, newName) {
+function replaceTableNameInCode(src: any, newName: any) {
   if (!src || !newName) return src
   const re = /(\n|^)\s*table_name\s*=\s*(["'])(.*?)\2/g
-  return src.replace(re, (m, p1, quote) => `${p1}table_name = ${quote}${newName}${quote}`)
+  return src.replace(re, (m: any, p1: any, quote: any) => `${p1}table_name = ${quote}${newName}${quote}`)
 }
 
 async function syncTableNameInCode(silent = false) {
@@ -384,8 +388,9 @@ const showCodeSourceToggle = computed(() => {
   const edited = String(executionStore.userEditedCode || executionStore.pythonFileContent || '')
   return Boolean(generated && executionStore.hasUserEditedCode && edited !== generated)
 })
+const hasDistinctUserRevision = showCodeSourceToggle
 
-function codeSourceButtonStyle(source) {
+function codeSourceButtonStyle(source: any) {
   const active = executionStore.codeEditorSource === source
   if (active) {
     return {
@@ -401,7 +406,7 @@ function codeSourceButtonStyle(source) {
   }
 }
 
-function selectCodeSource(source) {
+function selectCodeSource(source: any) {
   if (source === executionStore.codeEditorSource) return
   executionStore.setCodeEditorSource(source)
 }
@@ -420,14 +425,14 @@ function notifyExecutionInProgress() {
 function getSelectedSnippet() {
   if (!editor || !editor.state) return ''
   const snippets = editor.state.selection.ranges
-    .map((range) => {
+    .map((range: any) => {
       if (!range.empty) {
         return editor.state.doc.sliceString(range.from, range.to)
       }
       const line = editor.state.doc.lineAt(range.head)
       return line?.text || ''
     })
-    .filter((text) => text && text.trim())
+    .filter((text: any) => text && text.trim())
   return snippets.join('\n\n')
 }
 
@@ -437,7 +442,7 @@ function createRunId() {
   return `run_${ts}_${rand}`
 }
 
-function startRunEntry(scopeLabel, code) {
+function startRunEntry(scopeLabel: any, code: any) {
   const runId = createRunId()
   const entryId = executionStore.appendTerminalEntry({
     kind: 'output',
@@ -462,7 +467,7 @@ function startRunEntry(scopeLabel, code) {
   }
 }
 
-async function executeSnippet(code, successLine, options = {}) {
+async function executeSnippet(code: any, successLine: any, options: any = {}) {
   const runEntryId = String(options?.runEntryId || '').trim()
   const runId = String(options?.runId || '').trim()
   const start = performance.now()
@@ -525,8 +530,6 @@ async function executeSnippet(code, successLine, options = {}) {
     executionStore.updateTerminalEntry(runEntryId, runEntryPayload)
   } else {
     effectiveRunEntryId = executionStore.appendTerminalEntry({
-      kind: 'output',
-      source: 'analysis',
       label: 'Code run',
       command: String(code || ''),
       ...runEntryPayload,
@@ -586,7 +589,7 @@ async function runCode() {
       runEntryId: runMeta.entryId,
       runId: runMeta.runId,
     })
-  } catch (error) {
+  } catch (error: any) {
     const errorMessage = error.response?.data?.detail || error.message || 'Code execution failed'
     executionStore.setTerminalOutput(`Error: ${errorMessage}`)
     executionStore.updateTerminalEntry(runMeta.entryId, {
@@ -628,7 +631,7 @@ async function runSelectedCode() {
         runId: runMeta.runId,
       },
     )
-  } catch (error) {
+  } catch (error: any) {
     const errorMessage = error.response?.data?.detail || error.message || 'Code execution failed'
     executionStore.setTerminalOutput(`Error: ${errorMessage}`)
     executionStore.updateTerminalEntry(runMeta.entryId, {
@@ -646,12 +649,12 @@ async function runSelectedCode() {
   }
 }
 
-function acceptCompletionOrIndent(view) {
+function acceptCompletionOrIndent(view: any) {
   if (acceptCompletion(view)) return true
   return indentMore(view)
 }
 
-function handleEnterWithoutAutocompleteAccept(view) {
+function handleEnterWithoutAutocompleteAccept(view: any) {
   if (completionStatus(view.state)) {
     return insertNewlineAndIndent(view)
   }
@@ -828,7 +831,7 @@ async function downloadCode() {
       return
     }
     toast.success('Export complete', `${filename} saved.`)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to download code:', error)
     toast.error('Export failed', 'Unable to save code file.')
   }
@@ -842,7 +845,7 @@ function redo() {
   if (editor && canRedo.value) editor.dispatch(editor.state.redo())
 }
 
-function isDefaultEditorContent(content) {
+function isDefaultEditorContent(content: any) {
   const current = (content || '').trim()
   return current === '' || current === '# Python code for data analysis'
 }

@@ -2,21 +2,20 @@
   <div ref="plotContainer" class="plotly-surface h-80 min-h-72 w-full" data-run-chart></div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { usePreferencesStore } from '../../../stores/preferencesStore'
 import { normalizePlotlyFigure } from '../../../utils/figurePayload'
 import { loadPlotly } from '../../../utils/loadPlotly'
 import { applyPlotlyConfigTheme, applyPlotlyTheme, PLOTLY_THEME_MODE } from '../../../utils/plotlyTheme'
+import type { NormalizedPlotlyFigure } from '../../../utils/figurePayload'
 
-const props = defineProps({
-  output: { type: Object, required: true },
-})
+const props = defineProps<{ output: Record<string, unknown> }>()
 
 const preferencesStore = usePreferencesStore()
-const plotContainer = ref(null)
-let resizeObserver = null
-let plotly = null
+const plotContainer = ref<HTMLElement | null>(null)
+let resizeObserver: ResizeObserver | null = null
+let plotly: Awaited<ReturnType<typeof loadPlotly>> | null = null
 
 async function renderPlot() {
   const rawFigure = normalizePlotlyFigure(props.output?.data ?? props.output)
@@ -24,7 +23,7 @@ async function renderPlot() {
   plotly = await loadPlotly()
   await nextTick()
   const mode = PLOTLY_THEME_MODE.SOFT
-  const figure = applyPlotlyTheme(rawFigure, { mode, context: 'panel' }) || rawFigure
+  const figure = (applyPlotlyTheme(rawFigure, { mode, context: 'panel' }) || rawFigure) as NormalizedPlotlyFigure
   const config = applyPlotlyConfigTheme({
     displayModeBar: true,
     displaylogo: false,
@@ -46,7 +45,7 @@ onMounted(() => {
     resizeObserver = new ResizeObserver(() => {
       try { plotly?.Plots.resize(plotContainer.value) } catch (_error) {}
     })
-    resizeObserver.observe(plotContainer.value)
+    if (plotContainer.value) resizeObserver.observe(plotContainer.value)
   }
 })
 

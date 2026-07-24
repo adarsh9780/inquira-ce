@@ -11,7 +11,7 @@ test('slash commands execute through the native Go bridge', () => {
   const api = read('src/api/execution.ts')
   const goApp = read('../app.go')
 
-  assert.match(api, /invokeNative<RecordValue>\('ExecuteWorkspaceCommand'/)
+  assert.match(api, /invokeNative\('ExecuteWorkspaceCommand'/)
   assert.match(goApp, /func \(a \*App\) ExecuteWorkspaceCommand/)
 })
 
@@ -19,7 +19,7 @@ test('Terms are bundled and loaded through the native Go bridge', () => {
   const api = read('src/api/preferences.ts')
   const goApp = read('../app.go')
 
-  assert.match(api, /invokeNative<RecordValue>\('GetTermsAndConditions'/)
+  assert.match(api, /invokeNative\('GetTermsAndConditions'/)
   assert.match(goApp, /func \(a \*App\) GetTermsAndConditions/)
 })
 

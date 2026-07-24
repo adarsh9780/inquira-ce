@@ -26,7 +26,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useArtifactStore } from '../../stores/artifactStore'
 import { useConversationStore } from '../../stores/conversationStore'
@@ -68,13 +68,13 @@ const resultCategoryOptions = computed(() => [
   { value: 'runs', label: 'Runs', icon: PlayCircleIcon, count: runResultCount.value },
 ])
 
-function categoryForPane(pane) {
+function categoryForPane(pane: unknown): 'table' | 'chart' | 'runs' {
   if (pane === 'table') return 'table'
   if (pane === 'figure') return 'chart'
   return 'runs'
 }
 
-function paneForCategory(category) {
+function paneForCategory(category: unknown): 'table' | 'figure' | 'output' {
   if (category === 'table') return 'table'
   if (category === 'chart') return 'figure'
   return 'output'

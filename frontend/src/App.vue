@@ -55,7 +55,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useAuthStore } from './stores/authStore'
 import { useUiStore } from './stores/uiStore'
@@ -103,18 +103,18 @@ function wailsApp() {
   if (typeof window === 'undefined') return null
   return window.go?.main?.App || null
 }
-const appBootstrap = reactive({
+const appBootstrap = reactive<any>({
   active: false,
   ready: false,
   message: '',
 })
-const desktopStartup = reactive({
+const desktopStartup = reactive<any>({
   active: false,
   ready: false,
   message: '',
   error: '',
 })
-const modelOnboarding = reactive({
+const modelOnboarding = reactive<any>({
   checked: false,
   required: false,
   status: null,
@@ -123,8 +123,8 @@ const lastRuntimeErrorToast = ref('')
 const activeSnapshotUserId = ref('')
 const startupFailure = ref('')
 const startupRecoveryMessage = ref('')
-const startupTimeline = ref([])
-const desktopStartupTimeline = ref([])
+const startupTimeline = ref<any[]>([])
+const desktopStartupTimeline = ref<any[]>([])
 const startupClock = ref(Date.now())
 const hasLoadedThemePreference = ref(false)
 const applyingThemePreference = ref(false)
@@ -132,26 +132,26 @@ const hasLoadedFontPreference = ref(false)
 const applyingFontPreference = ref(false)
 const hasLoadedCodeFontPreference = ref(false)
 const applyingCodeFontPreference = ref(false)
-let startupClockTimer = null
+let startupClockTimer: ReturnType<typeof setInterval> | null = null
 
-const STARTUP_SCOPE_LABELS = {
+const STARTUP_SCOPE_LABELS: Record<string, string> = {
   workspace: 'Workspace',
   runtime: 'Runtime',
 }
 
-function formatElapsed(ms) {
+function formatElapsed(ms: any) {
   if (!Number.isFinite(ms) || ms < 1000) return '<1s'
   if (ms < 60000) return `${Math.round(ms / 100) / 10}s`
   return `${Math.round(ms / 1000)}s`
 }
 
-function normalizeStartupMessage(message) {
+function normalizeStartupMessage(message: any) {
   return String(message || '')
     .trim()
     .replace(/\s+/g, ' ')
 }
 
-function recordStartupStage(scope, message) {
+function recordStartupStage(scope: any, message: any) {
   const rendered = String(message || '').trim()
   if (!rendered) return
 
@@ -188,7 +188,7 @@ function recordStartupStage(scope, message) {
   console.info(`[STARTUP TRACE] ${scope}: ${rendered}`)
 }
 
-function recordDesktopStartupStage(message) {
+function recordDesktopStartupStage(message: any) {
   const rendered = String(message || '').trim()
   if (!rendered) return
 
@@ -324,29 +324,30 @@ const progressPercent = computed(() => {
   return Math.round((completed / total) * 100)
 })
 
-function applyDocumentTheme(themeId) {
+function applyDocumentTheme(themeId: any) {
   if (typeof document === 'undefined') return
   const normalized = normalizeThemeId(themeId)
   document.documentElement.setAttribute('data-theme', normalized)
 }
 
-function applyDocumentFont(fontId) {
+function applyDocumentFont(fontId: any) {
   if (typeof document === 'undefined') return
   const normalized = normalizeAppFontId(fontId)
   document.documentElement.setAttribute('data-font', normalized)
 }
 
-function applyDocumentCodeFont(fontId) {
+function applyDocumentCodeFont(fontId: any) {
   if (typeof document === 'undefined') return
   const normalized = normalizeCodeFontId(fontId)
   document.documentElement.setAttribute('data-code-font', normalized)
 }
 
-async function readDesktopStartupState() {
-  if (wailsApp()?.GetStartupState) {
+async function readDesktopStartupState(): Promise<any> {
+  const app = wailsApp()
+  if (app?.GetStartupState) {
     try {
-      return wailsApp().GetStartupState()
-    } catch (error) {
+      return app.GetStartupState()
+    } catch (error: any) {
       console.warn('⚠️ Failed to read desktop startup state from Go:', error)
       return {
         ready: false,
@@ -358,13 +359,14 @@ async function readDesktopStartupState() {
   return { ready: true, error: '', message: '' }
 }
 
-async function invokeDesktopRecovery(command) {
-  if (command === 'restart_desktop_app' && wailsApp()?.RestartDesktopApp) {
-    await wailsApp().RestartDesktopApp()
+async function invokeDesktopRecovery(command: any) {
+  const app = wailsApp()
+  if (command === 'restart_desktop_app' && app?.RestartDesktopApp) {
+    await app.RestartDesktopApp()
     return
   }
-  if (command === 'open_startup_logs' && wailsApp()?.OpenStartupLogs) {
-    await wailsApp().OpenStartupLogs()
+  if (command === 'open_startup_logs' && app?.OpenStartupLogs) {
+    await app.OpenStartupLogs()
     return
   }
   startupRecoveryMessage.value = 'Desktop recovery actions are only available in the installed app.'
@@ -384,7 +386,7 @@ async function copyStartupDiagnostics() {
   try {
     await navigator.clipboard.writeText(`Inquira startup failure\n${startupFailure.value}`)
     startupRecoveryMessage.value = 'Startup diagnostics copied.'
-  } catch (error) {
+  } catch (error: any) {
     startupRecoveryMessage.value = String(error?.message || 'Could not copy startup diagnostics.')
   }
 }
@@ -427,7 +429,7 @@ async function waitForDesktopStartupReady() {
   }
 }
 
-async function handleAuthenticated(userData) {
+async function handleAuthenticated(userData: any) {
   const userId = String(userData?.user_id || '').trim()
   if (!userId) return
 
@@ -454,7 +456,7 @@ async function handleAuthenticated(userData) {
       }
     }
     console.debug('Loaded workspace state for local user')
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to load v1 workspace state:', error)
   } finally {
     appBootstrap.active = false
@@ -468,7 +470,7 @@ async function loadModelOnboardingStatus() {
     const status = await modelConnectionService.getOnboardingStatus()
     modelOnboarding.status = status
     modelOnboarding.required = !status?.completed
-  } catch (error) {
+  } catch (error: any) {
     modelOnboarding.status = {
       completed: false,
       connection_ready: false,
@@ -481,7 +483,7 @@ async function loadModelOnboardingStatus() {
   }
 }
 
-function handleModelOnboardingComplete(status) {
+function handleModelOnboardingComplete(status: any) {
   modelOnboarding.status = status
   modelOnboarding.required = false
   uiStore.openSettings('workspace-general')

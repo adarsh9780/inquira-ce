@@ -22,7 +22,7 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useUiStore } from '../../../stores/uiStore'
 import { usePreferencesStore } from '../../../stores/preferencesStore'
@@ -60,7 +60,8 @@ const readinessItems = computed(() => {
   const hasWorkspace = state !== 'no_workspace'
   const hasData = Number(workspaceStore.activeWorkspaceSummary?.table_count || 0) > 0
   const hasConnection = modelConnectionReady.value
-  const configured = Boolean(workspaceStore.workspaceAIConfig?.readiness?.ready)
+  const readiness = workspaceStore.workspaceAIConfig?.readiness as { ready?: unknown } | undefined
+  const configured = Boolean(readiness?.ready)
   const steps = [
     { key: 'connection', label: 'AI provider', description: hasConnection ? 'The application provider is connected.' : 'Connect a provider once for all workspaces.', complete: hasConnection, actionLabel: 'Connect provider', action: () => uiStore.openSettings('connections') },
     { key: 'workspace', label: 'Workspace', description: hasWorkspace ? 'An active workspace is selected.' : 'Create a place for your data and conversations.', complete: hasWorkspace, actionLabel: 'Create workspace', action: () => uiStore.openSettings('workspace-general') },

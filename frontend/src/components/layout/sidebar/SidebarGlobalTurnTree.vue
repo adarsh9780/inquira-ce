@@ -22,7 +22,7 @@
       v-else
       :conversations="conversations"
       :current-turn-id="conversationStore.activeTurnId"
-      :current-parent-turn-id="conversationStore.activeTurnRelations?.parent?.id || ''"
+      :current-parent-turn-id="activeParentTurnId"
       :variant="variant"
       empty-label="No conversation turns yet."
       @select="selectTurn"
@@ -42,7 +42,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { ExclamationCircleIcon } from '@heroicons/vue/24/outline'
 import { useUiStore } from '../../../stores/uiStore'
@@ -64,18 +64,26 @@ const conversationStore = useConversationStore()
 const isLoading = ref(false)
 const rulesDialogOpen = ref(false)
 const deleteDialogOpen = ref(false)
-const pendingDeletePayload = ref(null)
+interface TurnActionPayload {
+  turnId: string
+  conversationId: string
+}
+const pendingDeletePayload = ref<TurnActionPayload | null>(null)
 
-const conversations = computed(() => {
+const conversations = computed<Record<string, unknown>[]>(() => {
   const raw = conversationStore.workspaceTurnTree?.conversations
-  return Array.isArray(raw) ? raw : []
+  return Array.isArray(raw) ? raw as Record<string, unknown>[] : []
+})
+const activeParentTurnId = computed(() => {
+  const parent = conversationStore.activeTurnRelations?.parent
+  return parent && typeof parent === 'object' && 'id' in parent ? String(parent.id || '') : ''
 })
 
 async function refreshTree() {
   if (!workspaceStore.activeWorkspaceId) return
   isLoading.value = true
   try {
-    await conversationStore.loadWorkspaceTurnTree()
+    await conversationStore.loadWorkspaceTurnTree(workspaceStore.activeWorkspaceId)
   } catch (error) {
     toast.error('Tree load failed', extractApiErrorMessage(error, 'Unable to load conversation tree.'))
   } finally {
@@ -83,7 +91,7 @@ async function refreshTree() {
   }
 }
 
-async function selectTurn(payload) {
+async function selectTurn(payload: TurnActionPayload) {
   const targetConversationId = String(payload?.conversationId || '').trim()
   const targetTurnId = String(payload?.turnId || '').trim()
   if (!targetConversationId || !targetTurnId) return
@@ -100,7 +108,7 @@ async function selectTurn(payload) {
   }
 }
 
-async function markTurnFinal(payload) {
+async function markTurnFinal(payload: TurnActionPayload) {
   try {
     await conversationStore.markTurnFinal(payload?.turnId, payload?.conversationId)
     toast.success('Final turn updated', 'This turn is now marked final.')
@@ -109,7 +117,7 @@ async function markTurnFinal(payload) {
   }
 }
 
-function deleteTurn(payload) {
+function deleteTurn(payload: TurnActionPayload) {
   pendingDeletePayload.value = payload || null
   deleteDialogOpen.value = true
 }

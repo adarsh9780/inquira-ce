@@ -6,48 +6,48 @@ export const workspaceApi = {
   isAvailable: hasNativeBridge,
   async list() {
     if (!hasNativeBridge()) return []
-    return invokeNative<unknown[]>('ListWorkspaces')
+    return invokeNative('ListWorkspaces')
   },
   create(name: unknown, schemaContext: unknown = '') {
-    return invokeNative<RecordValue>('CreateWorkspace', {
+    return invokeNative('CreateWorkspace', {
       name: String(name || ''),
       schema_context: String(schemaContext || ''),
     })
   },
   activate(workspaceId: unknown) {
-    return invokeNative<RecordValue>('ActivateWorkspace', String(workspaceId || ''))
+    return invokeNative('ActivateWorkspace', String(workspaceId || ''))
   },
   update(workspaceId: unknown, name: unknown, schemaContext: unknown = undefined) {
-    return invokeNative<RecordValue>('UpdateWorkspace', {
+    return invokeNative('UpdateWorkspace', {
       workspace_id: String(workspaceId || ''),
       name: String(name || ''),
       ...(schemaContext === undefined ? {} : { schema_context: String(schemaContext || '') }),
     })
   },
   summary(workspaceId: unknown) {
-    return invokeNative<RecordValue>('GetWorkspaceSummary', String(workspaceId || ''))
+    return invokeNative('GetWorkspaceSummary', String(workspaceId || ''))
   },
   remove(workspaceId: unknown) {
-    return invokeNative<RecordValue>('DeleteWorkspace', String(workspaceId || ''))
+    return invokeNative('DeleteWorkspace', String(workspaceId || ''))
   },
   getAIConfig(workspaceId: unknown) {
-    return invokeNative<RecordValue>('GetWorkspaceAIConfig', String(workspaceId || ''))
+    return invokeNative('GetWorkspaceAIConfig', String(workspaceId || ''))
   },
   updateAIConfig(workspaceId: unknown, payload: RecordValue = {}) {
-    return invokeNative<RecordValue>('UpdateWorkspaceAIConfig', String(workspaceId || ''), payload)
+    return invokeNative('UpdateWorkspaceAIConfig', String(workspaceId || ''), payload)
   },
   listDatasets(workspaceId: unknown) {
-    return invokeNative<RecordValue>('ListWorkspaceDatasets', String(workspaceId || ''))
+    return invokeNative('ListWorkspaceDatasets', String(workspaceId || ''))
   },
   getDatasetSchema(workspaceId: unknown, tableName: unknown) {
-    return invokeNative<RecordValue>(
+    return invokeNative(
       'GetWorkspaceDatasetSchema',
       String(workspaceId || ''),
       String(tableName || ''),
     )
   },
   saveDatasetSchema(workspaceId: unknown, tableName: unknown, payload: RecordValue = {}) {
-    return invokeNative<RecordValue>('SaveWorkspaceDatasetSchema', {
+    return invokeNative('SaveWorkspaceDatasetSchema', {
       workspace_id: String(workspaceId || ''),
       table_name: String(tableName || ''),
       ...(Object.prototype.hasOwnProperty.call(payload, 'context')
@@ -57,7 +57,7 @@ export const workspaceApi = {
     })
   },
   regenerateDatasetSchema(workspaceId: unknown, tableName: unknown, payload: RecordValue = {}) {
-    return invokeNative<RecordValue>('RegenerateWorkspaceDatasetSchema', {
+    return invokeNative('RegenerateWorkspaceDatasetSchema', {
       workspace_id: String(workspaceId || ''),
       table_name: String(tableName || ''),
       context: String(payload.context || ''),
@@ -65,9 +65,9 @@ export const workspaceApi = {
     })
   },
   async runtimeStatus(workspaceId: unknown) {
-    const provision = await invokeNative<RecordValue>('RuntimeStatus')
+    const provision = await invokeNative('RuntimeStatus')
     if (!provision?.ready && !provision?.Ready) return { status: 'error' }
-    const kernel = await invokeNative<RecordValue>('GetWorkspaceKernelStatus', String(workspaceId || ''))
+    const kernel = await invokeNative('GetWorkspaceKernelStatus', String(workspaceId || ''))
     const status = String(kernel?.status || '').toLowerCase()
     return { status: ['running', 'busy'].includes(status) ? 'busy' : 'ready' }
   },

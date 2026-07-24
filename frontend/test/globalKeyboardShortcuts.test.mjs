@@ -8,7 +8,7 @@ test('app registers global shortcuts for command palette, sidebar, settings, and
   const coordinatorSource = readFileSync(resolve(process.cwd(), 'src/composables/useGlobalShortcuts.ts'), 'utf-8')
   const datasetDropSource = readFileSync(resolve(process.cwd(), 'src/composables/useNativeDatasetDrop.ts'), 'utf-8')
   const interactionSource = [appSource, coordinatorSource, datasetDropSource].join('\n')
-  const shortcutsSource = readFileSync(resolve(process.cwd(), 'src/utils/keyboardShortcuts.js'), 'utf-8')
+  const shortcutsSource = readFileSync(resolve(process.cwd(), 'src/utils/keyboardShortcuts.ts'), 'utf-8')
 
   assert.equal(coordinatorSource.includes('function handleGlobalShortcuts(event: KeyboardEvent) {'), true)
   assert.equal(coordinatorSource.includes('event.metaKey || event.ctrlKey'), true)

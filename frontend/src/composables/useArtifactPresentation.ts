@@ -1,4 +1,4 @@
-import { normalizePlotlyFigure } from '../utils/figurePayload.js'
+import { normalizePlotlyFigure } from '../utils/figurePayload.ts'
 import { useArtifactStore } from '../stores/artifactStore'
 import { useConversationStore } from '../stores/conversationStore'
 import { useUiStore } from '../stores/uiStore'

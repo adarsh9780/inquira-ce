@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync } from './sourceText.mjs'
 import { resolve } from 'node:path'
 
 function read(relativePath) {
@@ -8,18 +8,18 @@ function read(relativePath) {
 }
 
 test('useLLMConfig composable exposes provider-aware save flow and advanced fields', () => {
-  const source = read('src/composables/useLLMConfig.js')
+  const source = read('src/composables/useLLMConfig.ts')
 
-  assert.equal(source.includes('const provider = ref(null)'), true)
+  assert.match(source, /const provider = ref<Provider \| null>\(null\)/)
   assert.equal(source.includes("const apiKey = ref('')"), true)
   assert.equal(source.includes("const ollamaBaseUrl = ref('http://localhost:11434')"), true)
   assert.equal(source.includes('const keyVerified = ref(false)'), true)
-  assert.equal(source.includes('const mainModels = ref([])'), true)
-  assert.equal(source.includes('const liteModels = ref([])'), true)
+  assert.match(source, /const mainModels = ref<string\[]>\(\[]\)/)
+  assert.match(source, /const liteModels = ref<string\[]>\(\[]\)/)
   assert.equal(source.includes('const modelsLoading = ref(false)'), true)
-  assert.equal(source.includes('const mainModel = ref(null)'), true)
-  assert.equal(source.includes('const liteModel = ref(null)'), true)
-  assert.equal(source.includes('function modelAllowedForProvider(providerName, modelId)'), true)
+  assert.match(source, /const mainModel = ref<string \| null>\(null\)/)
+  assert.match(source, /const liteModel = ref<string \| null>\(null\)/)
+  assert.match(source, /function modelAllowedForProvider\(/)
   assert.equal(source.includes("normalizedProvider !== 'ollama' && value.includes(':cloud')"), true)
   assert.equal(source.includes('const normalizedMain = normalizeModelIds(normalized, providerMain)'), true)
   assert.equal(source.includes('const llmTemperature = ref(0.7)'), true)
@@ -29,7 +29,7 @@ test('useLLMConfig composable exposes provider-aware save flow and advanced fiel
   assert.equal(source.includes('const llmFrequencyPenalty = ref(0)'), true)
   assert.equal(source.includes('const llmPresencePenalty = ref(0)'), true)
   assert.equal(source.includes('const slowRequestWarningSeconds = ref(120)'), true)
-  assert.equal(source.includes('function syncProviderStateToAppStore(providerName) {'), true)
+  assert.match(source, /function syncProviderStateToAppStore\(/)
   assert.equal(source.includes('store.providerMainModels = nextMainModels'), true)
   assert.equal(source.includes('store.providerLiteModels = nextLiteModels'), true)
   assert.equal(source.includes('store.llmProvider = normalized'), true)
@@ -41,9 +41,9 @@ test('useLLMConfig composable exposes provider-aware save flow and advanced fiel
   assert.equal(source.includes('async function saveKey()'), true)
   assert.equal(source.includes('async function deleteKey()'), true)
   assert.equal(source.includes('async function verifyAndSaveKey()'), true)
-  assert.equal(source.includes('async function refreshModels({ background = false } = {})'), true)
+  assert.match(source, /async function refreshModels\(\{ background = false \}/)
   assert.equal(source.includes('async function saveConfig()'), true)
-  assert.equal(source.includes('function clearSensitiveState()'), true)
+  assert.match(source, /function clearSensitiveState\(\): void/)
   assert.equal(source.includes("const response = await modelConnectionService.getPreferences(providerHint)"), true)
   assert.equal(source.includes('selectedProviderApiKeyPresent.value = !!apiKeyPresenceByProvider.value?.[normalizedProvider]'), true)
   assert.equal(source.includes("return { ok: false, stage: 'verify', error: verifyResult.error || 'verify_failed' }"), true)

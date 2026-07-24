@@ -21,6 +21,18 @@ type TerminalEntry = Record<string, unknown> & {
   status: string
 }
 
+export type BackgroundOperation = {
+  id: string
+  type: string
+  title: string
+  message: string
+  status: string
+  progress: number | null
+  priority: number
+  createdAt: number
+  updatedAt: number
+}
+
 export const useExecutionStore = defineStore('execution', () => {
   const pythonFileContent = ref('')
   const userEditedCode = ref('')
@@ -34,26 +46,22 @@ export const useExecutionStore = defineStore('execution', () => {
   const terminalEntriesTrimmedCount = ref(0)
   const runtimeError = ref('')
   const isCodeRunning = ref(false)
-  const backgroundOperations = ref<unknown[]>([])
+  const backgroundOperations = ref<BackgroundOperation[]>([])
   const activeBackgroundOperations = computed(() => (
-    backgroundOperations.value.filter((value) => {
-      const item = value as Record<string, unknown>
-      return ['queued', 'running', 'failed', 'complete'].includes(String(item?.status || ''))
-    })
+    backgroundOperations.value.filter((item) => (
+      ['queued', 'running', 'failed', 'complete'].includes(item.status)
+    ))
   ))
   const primaryBackgroundOperation = computed(() => {
-    const running = activeBackgroundOperations.value.filter((value) => {
-      const item = value as Record<string, unknown>
-      return ['queued', 'running'].includes(String(item?.status || ''))
-    })
+    const running = activeBackgroundOperations.value.filter((item) => (
+      ['queued', 'running'].includes(item.status)
+    ))
     const candidates = running.length ? running : activeBackgroundOperations.value
     return candidates
       .slice()
       .sort((leftValue, rightValue) => {
-        const left = leftValue as Record<string, unknown>
-        const right = rightValue as Record<string, unknown>
-        const priorityDelta = Number(right?.priority || 0) - Number(left?.priority || 0)
-        return priorityDelta || Number(right?.updatedAt || 0) - Number(left?.updatedAt || 0)
+        const priorityDelta = rightValue.priority - leftValue.priority
+        return priorityDelta || rightValue.updatedAt - leftValue.updatedAt
       })[0] || null
   })
   const runningConversationCount = computed(() => (
@@ -188,7 +196,7 @@ export const useExecutionStore = defineStore('execution', () => {
     )
   }
 
-  function normalizeOperation(payload: Record<string, unknown> = {}) {
+  function normalizeOperation(payload: Record<string, unknown> = {}): BackgroundOperation {
     const now = Date.now()
     return {
       id: String(payload.id || `${payload.type || 'operation'}-${now}-${Math.random().toString(36).slice(2, 8)}`).trim(),
@@ -206,7 +214,7 @@ export const useExecutionStore = defineStore('execution', () => {
   function startBackgroundOperation(payload: Record<string, unknown> = {}) {
     const operation = normalizeOperation(payload)
     backgroundOperations.value = [
-      ...backgroundOperations.value.filter((item) => String((item as Record<string, unknown>)?.id || '') !== operation.id),
+      ...backgroundOperations.value.filter((item) => item.id !== operation.id),
       operation,
     ]
     return operation.id
@@ -215,12 +223,18 @@ export const useExecutionStore = defineStore('execution', () => {
   function updateBackgroundOperation(operationId: unknown, payload: Record<string, unknown> = {}) {
     const id = String(operationId || '').trim()
     if (!id) return
-    backgroundOperations.value = backgroundOperations.value.map((value) => {
-      const item = value as Record<string, unknown>
-      if (String(item?.id || '') !== id) return item
+    backgroundOperations.value = backgroundOperations.value.map((item) => {
+      if (item.id !== id) return item
       return {
         ...item,
         ...payload,
+        id: String(payload.id ?? item.id),
+        type: String(payload.type ?? item.type),
+        title: String(payload.title ?? item.title),
+        message: String(payload.message ?? item.message),
+        status: String(payload.status ?? item.status),
+        priority: Number(payload.priority ?? item.priority),
+        createdAt: Number(payload.createdAt ?? item.createdAt),
         progress: Number.isFinite(Number(payload.progress))
           ? Math.max(0, Math.min(100, Number(payload.progress)))
           : item.progress,
@@ -241,7 +255,7 @@ export const useExecutionStore = defineStore('execution', () => {
     if (removeAfterMs >= 0) {
       setTimeout(() => {
         backgroundOperations.value = backgroundOperations.value.filter(
-          (item) => String((item as Record<string, unknown>)?.id || '') !== id,
+          (item) => item.id !== id,
         )
       }, removeAfterMs)
     }

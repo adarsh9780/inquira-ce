@@ -48,32 +48,38 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  output: { type: Object, required: true },
-})
+type RowValue = Record<string, unknown>
+interface NormalizedTable {
+  rows: RowValue[]
+  columns: string[]
+  rowCount: number
+}
 
-const normalized = computed(() => {
+const props = defineProps<{ output: Record<string, unknown> }>()
+
+const normalized = computed<NormalizedTable>(() => {
   const value = props.output?.data ?? props.output
   if (Array.isArray(value)) {
-    const rows = value.filter((row) => row && typeof row === 'object' && !Array.isArray(row))
+    const rows = value.filter((row): row is RowValue => Boolean(row && typeof row === 'object' && !Array.isArray(row)))
     return { rows, columns: rows[0] ? Object.keys(rows[0]) : [], rowCount: rows.length }
   }
   if (!value || typeof value !== 'object') return { rows: [], columns: [], rowCount: 0 }
-  const rawRows = Array.isArray(value.data) ? value.data : []
-  const explicitColumns = Array.isArray(value.columns) ? value.columns.map(String) : []
-  const rows = rawRows.map((row) => {
+  const record = value as Record<string, unknown>
+  const rawRows = Array.isArray(record.data) ? record.data : []
+  const explicitColumns = Array.isArray(record.columns) ? record.columns.map(String) : []
+  const rows = rawRows.map((row): RowValue | null => {
     if (row && typeof row === 'object' && !Array.isArray(row)) return row
     if (!Array.isArray(row) || explicitColumns.length === 0) return null
     return Object.fromEntries(explicitColumns.map((column, index) => [column, row[index]]))
-  }).filter(Boolean)
+  }).filter((row): row is RowValue => Boolean(row))
   const columns = explicitColumns.length > 0 ? explicitColumns : (rows[0] ? Object.keys(rows[0]) : [])
   return {
     rows,
     columns,
-    rowCount: Number.isFinite(Number(value.row_count)) ? Number(value.row_count) : rows.length,
+    rowCount: Number.isFinite(Number(record.row_count)) ? Number(record.row_count) : rows.length,
   }
 })
 
@@ -89,7 +95,7 @@ const columnSummary = computed(() => {
   return `${count} ${count === 1 ? 'column' : 'columns'}`
 })
 
-function formatCell(value) {
+function formatCell(value: unknown): string {
   if (value === null) return 'null'
   if (value === undefined) return ''
   if (typeof value === 'string') return value

@@ -15,7 +15,7 @@
         ref="editInputRef"
         :value="editingTitleValue"
         class="w-full rounded border border-[var(--color-accent)] bg-[var(--color-surface)] px-2 py-1 text-[14px] text-[var(--color-text-main)] outline-none"
-        @input="emit('update:editingTitleValue', $event.target.value)"
+        @input="handleTitleInput"
         @keydown.stop
         @keydown.enter.prevent="emit('save-title')"
         @keydown.esc.prevent="emit('cancel-edit')"
@@ -59,7 +59,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { EllipsisHorizontalIcon } from '@heroicons/vue/24/outline'
 
@@ -99,7 +99,11 @@ const emit = defineEmits([
   'cancel-edit',
 ])
 
-const editInputRef = ref(null)
+const editInputRef = ref<HTMLInputElement | null>(null)
+
+function handleTitleInput(event: Event) {
+  emit('update:editingTitleValue', (event.target as HTMLInputElement).value)
+}
 
 const conversationTitle = computed(() => (
   String(props.conversation?.title || '').trim() || 'Untitled'

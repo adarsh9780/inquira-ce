@@ -31,21 +31,24 @@
   </div>
 </template>
 
-<script setup>
-defineProps({
-  items: {
-    type: Array,
-    default: () => [],
-  },
-  selectedIndex: {
-    type: Number,
-    default: 0,
-  },
-  openUp: {
-    type: Boolean,
-    default: false,
-  },
+<script setup lang="ts">
+interface ColumnSuggestion {
+  table_name: string
+  column_name: string
+  displayText?: string
+  dtype?: string
+  isSpecial?: boolean
+}
+
+withDefaults(defineProps<{
+  items?: ColumnSuggestion[]
+  selectedIndex?: number
+  openUp?: boolean
+}>(), {
+  items: () => [],
+  selectedIndex: 0,
+  openUp: false,
 })
 
-defineEmits(['select'])
+defineEmits<{ select: [item: ColumnSuggestion] }>()
 </script>

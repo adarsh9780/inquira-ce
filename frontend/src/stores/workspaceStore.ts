@@ -8,11 +8,49 @@ type WorkspaceRecord = WorkspaceSummary & {
   table_count?: number
 }
 
+type ColumnCatalogEntry = {
+  table_name?: string
+  column_name?: string
+  dtype?: string
+  [key: string]: unknown
+}
+
+export interface WorkspaceAIConfig {
+  defaults?: {
+    provider?: string
+    main_model?: string
+    lite_model?: string
+    coding_model?: string
+  }
+  effective?: {
+    provider?: string
+    main_model?: string
+    lite_model?: string
+    coding_model?: string
+  }
+  overrides?: {
+    provider?: string | null
+    main_model?: string | null
+    lite_model?: string | null
+    coding_model?: string | null
+    temperature?: number | null
+    max_tokens?: number | null
+    top_p?: number | null
+    allow_llm_data_samples?: boolean
+  }
+  readiness?: {
+    ready?: boolean
+    credential_ready?: boolean
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
 export const useWorkspaceStore = defineStore('workspaces', () => {
-  const columnCatalog = ref<unknown[]>([])
+  const columnCatalog = ref<ColumnCatalogEntry[]>([])
   const workspaces = ref<WorkspaceRecord[]>([])
   const activeWorkspaceSummary = ref<WorkspaceRecord | null>(null)
-  const workspaceAIConfig = ref<Record<string, unknown> | null>(null)
+  const workspaceAIConfig = ref<WorkspaceAIConfig | null>(null)
   const activeWorkspaceId = ref('')
   const isLoadingWorkspaces = ref(false)
   const workspaceError = ref('')
@@ -35,7 +73,7 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
   })
 
   function setColumnCatalog(columns: unknown) {
-    columnCatalog.value = Array.isArray(columns) ? columns : []
+    columnCatalog.value = Array.isArray(columns) ? columns as ColumnCatalogEntry[] : []
   }
 
   function setActiveWorkspaceId(workspaceId: unknown) {
@@ -70,7 +108,7 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
       workspaceAIConfig.value = null
       return null
     }
-    const config = await workspaceApi.getAIConfig(target)
+    const config = await workspaceApi.getAIConfig(target) as WorkspaceAIConfig
     if (target === activeWorkspaceId.value) workspaceAIConfig.value = config
     return config
   }
@@ -81,7 +119,7 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
   ) {
     const target = String(workspaceId || '').trim()
     if (!target) throw new Error('Select a workspace before updating AI settings.')
-    const config = await workspaceApi.updateAIConfig(target, payload)
+    const config = await workspaceApi.updateAIConfig(target, payload) as WorkspaceAIConfig
     if (target === activeWorkspaceId.value) workspaceAIConfig.value = config
     return config
   }

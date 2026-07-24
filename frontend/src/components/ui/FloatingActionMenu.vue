@@ -47,54 +47,55 @@
   </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    default: false,
-  },
-  position: {
-    type: Object,
-    default: () => ({ x: 0, y: 0 }),
-  },
-  items: {
-    type: Array,
-    default: () => [],
-  },
-  header: {
-    type: String,
-    default: '',
-  },
-  markerAttr: {
-    type: String,
-    default: '',
-  },
-  widthClass: {
-    type: String,
-    default: 'w-44',
-  },
-  width: {
-    type: Number,
-    default: 176,
-  },
-  height: {
-    type: Number,
-    default: 96,
-  },
-  clampPadding: {
-    type: Number,
-    default: 8,
-  },
+interface MenuPosition {
+  x?: number
+  y?: number
+  left?: number
+  top?: number
+}
+interface MenuItem {
+  id: string
+  label: string
+  destructive?: boolean
+  dividerBefore?: boolean
+  disabled?: boolean
+  closeOnSelect?: boolean
+}
+
+const props = withDefaults(defineProps<{
+  isOpen?: boolean
+  position?: MenuPosition
+  items?: MenuItem[]
+  header?: string
+  markerAttr?: string
+  widthClass?: string
+  width?: number
+  height?: number
+  clampPadding?: number
+}>(), {
+  isOpen: false,
+  position: () => ({ x: 0, y: 0 }),
+  items: () => [],
+  header: '',
+  markerAttr: '',
+  widthClass: 'w-44',
+  width: 176,
+  height: 96,
+  clampPadding: 8,
 })
 
-const emit = defineEmits(['select', 'close'])
+const emit = defineEmits<{
+  select: [id: string, item: MenuItem]
+  close: []
+}>()
 
-const menuRef = ref(null)
-const itemRefs = ref(new Map())
+const menuRef = ref<HTMLElement | null>(null)
+const itemRefs = ref(new Map<string, HTMLElement>())
 const clampedPosition = ref({ x: 0, y: 0 })
-let triggerElement = null
+let triggerElement: HTMLElement | null = null
 
 const normalizedItems = computed(() => (
   Array.isArray(props.items)
@@ -128,7 +129,7 @@ function resolveRawPosition() {
   }
 }
 
-function updateMenuPosition(element = menuRef.value) {
+function updateMenuPosition(element: HTMLElement | null = menuRef.value) {
   const gap = Number(props.clampPadding || 8)
   const rect = element?.getBoundingClientRect?.()
   const width = Number(rect?.width || props.width || 176)
@@ -142,19 +143,20 @@ function updateMenuPosition(element = menuRef.value) {
   }
 }
 
-function prepareMenuEnter(element) {
+function prepareMenuEnter(element: Element) {
+  if (!(element instanceof HTMLElement)) return
   updateMenuPosition(element)
   element.style.left = `${clampedPosition.value.x}px`
   element.style.top = `${clampedPosition.value.y}px`
 }
 
-function handleSelect(item) {
+function handleSelect(item: MenuItem) {
   if (item.disabled) return
   emit('select', item.id, item)
   if (item.closeOnSelect) emit('close')
 }
 
-function handleGlobalPointerDown(event) {
+function handleGlobalPointerDown(event: PointerEvent) {
   if (!props.isOpen) return
   const target = event?.target
   if (!(target instanceof Element)) return
@@ -167,19 +169,20 @@ function handleViewportChange() {
   updateMenuPosition()
 }
 
-function setItemRef(element, id) {
-  if (element) itemRefs.value.set(id, element)
+function setItemRef(element: Element | { $el?: Element } | null, id: string) {
+  const candidate = element instanceof Element ? element : element?.$el
+  if (candidate instanceof HTMLElement) itemRefs.value.set(id, candidate)
   else itemRefs.value.delete(id)
 }
 
-function enabledItems() {
+function enabledItems(): HTMLElement[] {
   return normalizedItems.value
     .filter((item) => !item.disabled)
     .map((item) => itemRefs.value.get(item.id))
-    .filter(Boolean)
+    .filter((item): item is HTMLElement => Boolean(item))
 }
 
-function handleMenuKeydown(event) {
+function handleMenuKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     event.stopPropagation()
     event.preventDefault()
@@ -189,11 +192,11 @@ function handleMenuKeydown(event) {
   const items = enabledItems()
   if (!items.length || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
   event.preventDefault()
-  const currentIndex = items.indexOf(document.activeElement)
-  if (event.key === 'Home') items[0].focus()
-  else if (event.key === 'End') items[items.length - 1].focus()
-  else if (event.key === 'ArrowDown') items[(currentIndex + 1 + items.length) % items.length].focus()
-  else items[(currentIndex - 1 + items.length) % items.length].focus()
+  const currentIndex = items.indexOf(document.activeElement as HTMLElement)
+  if (event.key === 'Home') items[0]?.focus()
+  else if (event.key === 'End') items.at(-1)?.focus()
+  else if (event.key === 'ArrowDown') items[(currentIndex + 1 + items.length) % items.length]?.focus()
+  else items[(currentIndex - 1 + items.length) % items.length]?.focus()
 }
 
 watch(

@@ -54,7 +54,7 @@
                     :type="showKey ? 'text' : 'password'"
                     class="text-input pr-12 font-mono"
                     :placeholder="apiKeyPlaceholder"
-                    @input="setApiKey($event.target.value)"
+                    @input="handleApiKeyInput"
                   />
                   <button
                     type="button"
@@ -215,7 +215,7 @@
                   placeholder="Select lite model"
                   max-width-class="w-full"
                   aria-label="Lite model"
-                  @update:model-value="liteModel = $event"
+                  @update:model-value="handleLiteModelSelect"
                 />
                 <p class="model-select-desc">Used for quick tasks, short summaries, and title generation.</p>
               </div>
@@ -442,7 +442,7 @@
   />
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 import FloatingActionMenu from '../../ui/FloatingActionMenu.vue'
@@ -515,7 +515,7 @@ const showKey = ref(false)
 const applicationDefaultsOpen = ref(false)
 const showAdvanced = ref(false)
 const deleteLoading = ref(false)
-const credentialMenuButton = ref(null)
+const credentialMenuButton = ref<HTMLElement | null>(null)
 const credentialMenuOpen = ref(false)
 const credentialMenuPosition = ref({ x: 0, y: 0 })
 const deleteCredentialDialogOpen = ref(false)
@@ -583,7 +583,15 @@ watch(
   },
 )
 
-function buildModelOptions(type, selectedId) {
+function handleApiKeyInput(event: Event) {
+  setApiKey((event.target as HTMLInputElement).value)
+}
+
+function handleLiteModelSelect(value: string | number | null) {
+  liteModel.value = value === null ? null : String(value)
+}
+
+function buildModelOptions(type: 'main' | 'lite', selectedId: string | null) {
   const ids = type === 'main' ? mainModels.value : liteModels.value
 
   let options = ids.map((id) => {
@@ -611,14 +619,15 @@ function buildModelOptions(type, selectedId) {
   return options
 }
 
-async function searchProviderModels(query, limit = 25) {
+async function searchProviderModels(query: string, limit = 25) {
   const normalizedProvider = String(provider.value || '').trim()
   if (!normalizedProvider) return []
   const response = await modelConnectionService.searchModels(normalizedProvider, query, limit)
-  return Array.isArray(response?.models) ? response.models : []
+  if (Array.isArray(response)) return response
+  return Array.isArray(response.models) ? response.models : []
 }
 
-async function handleProviderSelect(nextProvider) {
+async function handleProviderSelect(nextProvider: unknown) {
   const normalizedProvider = String(nextProvider || '').trim().toLowerCase()
   if (!normalizedProvider || provider.value === normalizedProvider) return
   setProvider(normalizedProvider)
@@ -664,7 +673,7 @@ function openCredentialMenu() {
   credentialMenuOpen.value = true
 }
 
-function handleCredentialMenuSelect(action) {
+function handleCredentialMenuSelect(action: string) {
   if (action === 'delete') deleteCredentialDialogOpen.value = true
 }
 

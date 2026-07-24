@@ -50,7 +50,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { onMounted, watch } from 'vue'
 import { useUiStore } from '../../stores/uiStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
@@ -96,7 +96,7 @@ const starterActions = [
   },
 ]
 
-function selectStarter(prompt) {
+function selectStarter(prompt: string) {
   conversationStore.currentQuestion = String(prompt || '')
 }
 
@@ -123,9 +123,10 @@ onMounted(async () => {
   try {
     await workspaceStore.fetchWorkspaces()
     if (!workspaceStore.activeWorkspaceId) return
-    await conversationStore.fetchConversations()
+    await conversationStore.fetchConversations(workspaceStore.activeWorkspaceId)
     if (!conversationStore.activeConversationId && conversationStore.conversations.length > 0) {
-      conversationStore.setActiveConversationId(conversationStore.conversations[0].id)
+      const firstConversation = conversationStore.conversations[0] as { id?: unknown }
+      conversationStore.setActiveConversationId(firstConversation.id)
     }
     if (conversationStore.activeConversationId) {
       await conversationStore.fetchConversationTurns()
@@ -139,7 +140,7 @@ watch(
   () => workspaceStore.activeWorkspaceId,
   async (workspaceId) => {
     if (!workspaceId) return
-    await conversationStore.fetchConversations()
+    await conversationStore.fetchConversations(workspaceId)
     if (conversationStore.activeConversationId) {
       await conversationStore.fetchConversationTurns()
     }

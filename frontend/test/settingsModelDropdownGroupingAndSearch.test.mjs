@@ -17,7 +17,7 @@ test('settings model selectors use searchable HeaderDropdown controls', () => {
 
 test('shared model dropdown supports provider grouping and search filtering', () => {
   const headerDropdownPath = resolve(process.cwd(), 'src/components/ui/HeaderDropdown.vue')
-  const sharedDropdownPath = resolve(process.cwd(), 'src/components/ui/dropdownShared.js')
+  const sharedDropdownPath = resolve(process.cwd(), 'src/components/ui/dropdownShared.ts')
   const headerSource = readFileSync(headerDropdownPath, 'utf-8')
   const sharedSource = readFileSync(sharedDropdownPath, 'utf-8')
 

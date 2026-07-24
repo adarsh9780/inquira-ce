@@ -18,7 +18,7 @@ const removedLoopbackCommand = ['auth_start', '_loopback_listener'].join('')
 const removedCallbackEvent = ['auth', ':callback'].join('')
 
 test('auth store is local-only in CE', () => {
-  const source = readSource('src/stores/authStore.js')
+  const source = readSource('src/stores/authStore.ts')
 
   assert.equal(source.includes("user_id: 'local-user'"), true)
   assert.equal(source.includes("auth_provider: 'local'"), true)

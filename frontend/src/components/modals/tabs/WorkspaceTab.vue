@@ -388,11 +388,11 @@
   </section>
 </template>
 
-<script>
+<script lang="ts">
 const handledConnectionFlowRequestIds = new WeakMap()
 </script>
 
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { workspaceApi } from '../../../api/workspaces'
 import { connectionService } from '../../../services/connectionService'
@@ -414,19 +414,14 @@ import WorkspaceContextSection from './workspace/WorkspaceContextSection.vue'
 import WorkspaceListPanel from './workspace/WorkspaceListPanel.vue'
 import { useWorkspaceSettings } from '../../../composables/useWorkspaceSettings'
 
-const props = defineProps({
-  activeWorkspaceId: {
-    type: String,
-    default: '',
-  },
-  workspaces: {
-    type: Array,
-    default: () => [],
-  },
-  initialSection: {
-    type: String,
-    default: 'general',
-  },
+const props = withDefaults(defineProps<{
+  activeWorkspaceId?: string
+  workspaces?: any[]
+  initialSection?: string
+}>(), {
+  activeWorkspaceId: '',
+  workspaces: () => [],
+  initialSection: 'general',
 })
 
 const emit = defineEmits(['select-workspace', 'activate-workspace', 'workspace-created'])
@@ -445,13 +440,13 @@ const {
   activeWorkspaceSection,
   moveWorkspaceSection,
 } = useWorkspaceSettings(computed(() => props.initialSection))
-const nativeConnections = ref([])
-const pendingConnection = ref(null)
+const nativeConnections = ref<any[]>([])
+const pendingConnection = ref<any>(null)
 const connectionActionLoading = ref(false)
 const connectionError = ref('')
 const sheetSearch = ref('')
 const refreshingConnectionIds = ref(new Set())
-const nativeRuntimeStatus = ref({ ready: false })
+const nativeRuntimeStatus = ref<any>({ ready: false })
 const runtimeProvisioning = ref(false)
 const runtimeProvisionError = ref('')
 const runtimeConfigurationOpen = ref(false)
@@ -471,14 +466,14 @@ const runtimeConfig = ref({
 })
 const pendingSelectableSheets = computed(() => (
   Array.isArray(pendingConnection.value?.objects)
-    ? pendingConnection.value.objects.filter((object) => object?.metadata?.selectable !== false)
+    ? pendingConnection.value.objects.filter((object: any) => object?.metadata?.selectable !== false)
     : []
 ))
 const filteredPendingSheets = computed(() => {
   const query = String(sheetSearch.value || '').trim().toLowerCase()
   if (!query) return Array.isArray(pendingConnection.value?.objects) ? pendingConnection.value.objects : []
   return (Array.isArray(pendingConnection.value?.objects) ? pendingConnection.value.objects : [])
-    .filter((object) => String(object?.name || object?.id || '').toLowerCase().includes(query))
+    .filter((object: any) => String(object?.name || object?.id || '').toLowerCase().includes(query))
 })
 const visiblePendingColumns = computed(() => (
   Array.isArray(pendingConnection.value?.columns) ? pendingConnection.value.columns.slice(0, 12) : []
@@ -486,7 +481,7 @@ const visiblePendingColumns = computed(() => (
 
 function selectAllPendingSheets() {
   if (!pendingConnection.value) return
-  pendingConnection.value.selected_object_ids = pendingSelectableSheets.value.map((object) => String(object.id))
+  pendingConnection.value.selected_object_ids = pendingSelectableSheets.value.map((object: any) => String(object.id))
 }
 
 function clearPendingSheetSelection() {
@@ -494,25 +489,25 @@ function clearPendingSheetSelection() {
   pendingConnection.value.selected_object_ids = []
 }
 const workspaceActionsOpen = ref(false)
-const workspaceActionsRef = ref(null)
+const workspaceActionsRef = ref<any>(null)
 
-function runWorkspaceAction(action, ...args) {
+function runWorkspaceAction(action: any, ...args: any[]) {
   workspaceActionsOpen.value = false
   return action?.(...args)
 }
 
-function handleWorkspaceActionsPointerDown(event) {
+function handleWorkspaceActionsPointerDown(event: any) {
   if (!workspaceActionsOpen.value) return
   if (workspaceActionsRef.value?.contains(event.target)) return
   workspaceActionsOpen.value = false
 }
 
 
-const workspaceSummaries = ref({})
-const workspaceDetail = ref(null)
+const workspaceSummaries = ref<Record<string, any>>({})
+const workspaceDetail = ref<any>(null)
 const isRenamingInline = ref(false)
 const renameValue = ref('')
-const renameInputRef = ref(null)
+const renameInputRef = ref<any>(null)
 const isWorkspaceDeleteDialogOpen = ref(false)
 const pendingWorkspaceDeletionId = ref('')
 
@@ -523,9 +518,9 @@ const savedWorkspaceContext = ref('')
 const isSavingWorkspaceIdentity = ref(false)
 const isInlineCreating = ref(false)
 const isEditingContext = ref(false)
-const newWorkspaceInputRef = ref(null)
+const newWorkspaceInputRef = ref<any>(null)
 
-function normalizeWorkspaceName(value) {
+function normalizeWorkspaceName(value: any) {
   return String(value || '').toUpperCase()
 }
 
@@ -630,7 +625,7 @@ async function loadNativeRuntimeStatus() {
   try {
     nativeRuntimeStatus.value = await runtimeProvisionService.status()
     applySavedRuntimeConfiguration(nativeRuntimeStatus.value?.configuration)
-  } catch (error) {
+  } catch (error: any) {
     runtimeProvisionError.value = extractApiErrorMessage(error, 'Could not read data runtime status.')
   }
 }
@@ -643,7 +638,7 @@ const runtimeConfigurationSummary = computed(() => {
   return `Runtime ready using managed Python ${configuration.pythonVersion || '3.12'}.`
 })
 
-function applySavedRuntimeConfiguration(configuration) {
+function applySavedRuntimeConfiguration(configuration: any) {
   if (!configuration || typeof configuration !== 'object') return
   runtimeConfig.value.mode = configuration.mode || 'managed'
   runtimeConfig.value.pythonVersion = configuration.pythonVersion || '3.12'
@@ -695,7 +690,7 @@ async function choosePythonExecutable() {
   try {
     const selected = await runtimeProvisionService.choosePythonExecutable()
     if (selected) runtimeConfig.value.pythonExecutable = String(selected)
-  } catch (error) {
+  } catch (error: any) {
     runtimeProvisionError.value = extractApiErrorMessage(error, 'Could not choose a Python executable.')
   }
 }
@@ -704,7 +699,7 @@ async function chooseCertificateBundle() {
   try {
     const selected = await runtimeProvisionService.chooseCertificateBundle()
     if (selected) runtimeConfig.value.certificateBundle = String(selected)
-  } catch (error) {
+  } catch (error: any) {
     runtimeProvisionError.value = extractApiErrorMessage(error, 'Could not choose a certificate bundle.')
   }
 }
@@ -713,14 +708,14 @@ async function provisionDataRuntime() {
   runtimeProvisioning.value = true
   runtimeProvisionError.value = ''
   try {
-    const plan = await runtimeProvisionService.plan({ ...runtimeConfig.value })
+    const plan: any = await runtimeProvisionService.plan({ ...runtimeConfig.value })
     runtimePlanSummary.value = `${Number(plan?.steps?.length || 0)} setup steps validated.`
     await runtimeProvisionService.provision({ ...runtimeConfig.value })
     await loadNativeRuntimeStatus()
     if (!nativeRuntimeStatus.value?.ready) throw new Error('The data runtime did not become ready.')
     runtimeConfigurationOpen.value = false
     toast.success('Data runtime ready', 'CSV, Parquet, and Excel connections can now be created.')
-  } catch (error) {
+  } catch (error: any) {
     runtimeProvisionError.value = extractApiErrorMessage(error, 'Could not set up the data runtime.')
   } finally {
     clearTransientRuntimeConfig()
@@ -736,19 +731,19 @@ async function loadNativeConnections() {
     return
   }
   try {
-    const response = await connectionService.list(workspaceId)
+    const response: any = await connectionService.list(workspaceId)
     nativeConnections.value = Array.isArray(response?.connections) ? response.connections : []
-  } catch (error) {
+  } catch (error: any) {
     connectionError.value = extractApiErrorMessage(error, 'Could not load connections.')
   }
 }
 
-async function refreshNativeConnectionState(workspaceId) {
+async function refreshNativeConnectionState(workspaceId: any) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
-  const refreshes = [loadNativeConnections()]
+  const refreshes: Promise<unknown>[] = [loadNativeConnections()]
   if (normalizedWorkspaceId && normalizedWorkspaceId === String(workspaceStore.activeWorkspaceId || '').trim()) {
     refreshes.push(
-      workspaceStore.fetchActiveWorkspaceSummary(normalizedWorkspaceId),
+      workspaceStore.fetchWorkspaceSummary(normalizedWorkspaceId),
       workspaceStore.fetchColumnCatalog({ force: true }),
     )
   }
@@ -772,17 +767,17 @@ async function chooseConnectionFile() {
   connectionError.value = ''
   connectionActionLoading.value = true
   try {
-    const selection = await connectionService.chooseFile()
+    const selection: any = await connectionService.chooseFile()
     const sourcePath = String(selection?.source_path || '').trim()
     const adapterKind = String(selection?.adapter_kind || '').trim().toLowerCase()
     if (!sourcePath || !adapterKind) return
-    const discovery = await connectionService.discover(adapterKind, sourcePath)
+    const discovery: any = await connectionService.discover(adapterKind, sourcePath)
     const objects = Array.isArray(discovery?.objects) ? discovery.objects : []
-    const selectableObjects = objects.filter((object) => object?.metadata?.selectable !== false)
+    const selectableObjects = objects.filter((object: any) => object?.metadata?.selectable !== false)
     const sourceObject = selectableObjects[0] || objects[0] || {}
     const sourceObjectId = adapterKind === 'excel' ? String(sourceObject?.id || '') : ''
     const options = adapterKind === 'excel' ? { formula_mode: 'cached' } : {}
-    const preview = sourceObjectId || adapterKind !== 'excel'
+    const preview: any = sourceObjectId || adapterKind !== 'excel'
       ? await connectionService.preview(adapterKind, sourcePath, sourceObjectId, 25, options)
       : { columns: [], rows: [] }
     sheetSearch.value = ''
@@ -797,21 +792,21 @@ async function chooseConnectionFile() {
       columns: Array.isArray(preview?.columns) ? preview.columns : (sourceObject?.columns || []),
       preview_rows: Array.isArray(preview?.rows) ? preview.rows : [],
     }
-  } catch (error) {
+  } catch (error: any) {
     connectionError.value = extractApiErrorMessage(error, 'Could not inspect the selected file.')
   } finally {
     connectionActionLoading.value = false
   }
 }
 
-async function previewPendingSheet(source_object_id) {
+async function previewPendingSheet(source_object_id: any) {
   const pending = pendingConnection.value
   if (!pending || !source_object_id || connectionActionLoading.value) return
   connectionError.value = ''
   connectionActionLoading.value = true
   try {
     const options = pending.adapter_kind === 'excel' ? { formula_mode: pending.formula_mode } : {}
-    const preview = await connectionService.preview(
+    const preview: any = await connectionService.preview(
       pending.adapter_kind,
       pending.source_path,
       source_object_id,
@@ -821,7 +816,7 @@ async function previewPendingSheet(source_object_id) {
     pending.active_object_id = source_object_id
     pending.columns = Array.isArray(preview?.columns) ? preview.columns : []
     pending.preview_rows = Array.isArray(preview?.rows) ? preview.rows : []
-  } catch (error) {
+  } catch (error: any) {
     connectionError.value = extractApiErrorMessage(error, 'Could not preview the selected sheet.')
   } finally {
     connectionActionLoading.value = false
@@ -854,14 +849,14 @@ async function createPendingConnection() {
     sheetSearch.value = ''
     await refreshNativeConnectionState(workspaceId)
     toast.success('Connection created', 'The local snapshot is ready for analysis.')
-  } catch (error) {
+  } catch (error: any) {
     connectionError.value = extractApiErrorMessage(error, 'Could not create the connection.')
   } finally {
     connectionActionLoading.value = false
   }
 }
 
-async function refreshNativeConnection(connectionId) {
+async function refreshNativeConnection(connectionId: any) {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   const next = new Set(refreshingConnectionIds.value)
   next.add(connectionId)
@@ -871,7 +866,7 @@ async function refreshNativeConnection(connectionId) {
     await connectionService.refresh(connectionId)
     await refreshNativeConnectionState(workspaceId)
     toast.success('Connection refreshed', 'The local snapshot is up to date.')
-  } catch (error) {
+  } catch (error: any) {
     connectionError.value = extractApiErrorMessage(error, 'Could not refresh the connection.')
     await refreshNativeConnectionState(workspaceId)
   } finally {
@@ -881,7 +876,7 @@ async function refreshNativeConnection(connectionId) {
   }
 }
 
-async function deleteNativeConnection(connectionId) {
+async function deleteNativeConnection(connectionId: any) {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   connectionError.value = ''
   connectionActionLoading.value = true
@@ -889,20 +884,20 @@ async function deleteNativeConnection(connectionId) {
     await connectionService.remove(connectionId)
     await refreshNativeConnectionState(workspaceId)
     toast.success('Connection deleted', 'The connection and its local snapshots were removed.')
-  } catch (error) {
+  } catch (error: any) {
     connectionError.value = extractApiErrorMessage(error, 'Could not delete the connection.')
   } finally {
     connectionActionLoading.value = false
   }
 }
 
-function connectionOutputSummary(connection) {
+function connectionOutputSummary(connection: any) {
   const outputs = Array.isArray(connection?.outputs) ? connection.outputs : []
-  const rows = outputs.reduce((total, output) => total + Number(output?.row_count || 0), 0)
+  const rows = outputs.reduce((total: any, output: any) => total + Number(output?.row_count || 0), 0)
   return `${adapterKindLabel(connection?.adapter_kind)} · ${outputs.length} table${outputs.length === 1 ? '' : 's'} · ${rows.toLocaleString()} rows`
 }
 
-function adapterKindLabel(kind) {
+function adapterKindLabel(kind: any) {
   if (kind === 'csv') return 'CSV'
   if (kind === 'excel') return 'Excel'
   return 'Parquet'
@@ -919,7 +914,7 @@ async function hydrateWorkspaceCards() {
     workspaceSummaries.value = {}
     return
   }
-  const summaries = {}
+  const summaries: Record<string, any> = {}
   await Promise.all(
     ids.map(async (workspaceId) => {
       try {
@@ -933,7 +928,7 @@ async function hydrateWorkspaceCards() {
   workspaceSummaries.value = summaries
 }
 
-async function selectWorkspaceSummary(workspaceId) {
+async function selectWorkspaceSummary(workspaceId: any) {
   isEditingContext.value = false
   isInlineCreating.value = false
   await emitSelectedWorkspace(workspaceId)
@@ -964,7 +959,7 @@ function cancelContextEdit() {
   isEditingContext.value = false
 }
 
-async function emitSelectedWorkspace(workspaceId) {
+async function emitSelectedWorkspace(workspaceId: any) {
   const id = String(workspaceId || '').trim()
   if (!id) return
   emit('select-workspace', id)
@@ -1036,6 +1031,11 @@ async function ensureWorkspaceIdentityPersisted({
   context,
   silent = false,
   successMessage = 'Workspace updated.',
+}: {
+  name?: string
+  context?: string
+  silent?: boolean
+  successMessage?: string
 } = {}) {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   const normalizedName = String(name || '').trim()
@@ -1054,7 +1054,7 @@ async function ensureWorkspaceIdentityPersisted({
       toast.success('Workspace saved', successMessage)
     }
     return true
-  } catch (error) {
+  } catch (error: any) {
     if (!silent) {
       toast.error('Save failed', extractApiErrorMessage(error, 'Failed to save workspace.'))
     } else {
@@ -1102,7 +1102,7 @@ async function saveRename() {
     isRenamingInline.value = false
     renameValue.value = ''
     toast.success('Workspace renamed', 'Workspace name updated.')
-  } catch (error) {
+  } catch (error: any) {
     isRenamingInline.value = false
     renameValue.value = ''
     toast.error('Rename failed', extractApiErrorMessage(error, 'Failed to rename workspace.'))
@@ -1110,7 +1110,7 @@ async function saveRename() {
 }
 
 
-function requestDeleteWorkspace(workspaceId) {
+function requestDeleteWorkspace(workspaceId: any) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return
   pendingWorkspaceDeletionId.value = normalizedWorkspaceId
@@ -1134,7 +1134,7 @@ async function deleteWorkspace() {
       emit('select-workspace', fallbackId)
     }
     toast.success('Workspace deleted', 'Workspace metadata and local data were deleted.')
-  } catch (error) {
+  } catch (error: any) {
     toast.error('Delete failed', extractApiErrorMessage(error, 'Failed to delete workspace.'))
   }
 }
@@ -1161,20 +1161,20 @@ async function createWorkspace() {
     })
     isInlineCreating.value = false
     isEditingContext.value = true
-  } catch (error) {
+  } catch (error: any) {
     toast.error('Create failed', extractApiErrorMessage(error, 'Failed to create workspace.'))
   } finally {
     isCreatingWorkspace.value = false
   }
 }
 
-function formatFilename(raw) {
+function formatFilename(raw: any) {
   const value = String(raw || '').trim()
   if (!value) return 'dataset'
   return filenameFromPath(value, value)
 }
 
-function formatRelativeTime(raw) {
+function formatRelativeTime(raw: any) {
   const value = String(raw || '').trim()
   if (!value) return 'unknown'
   const parsed = new Date(value)

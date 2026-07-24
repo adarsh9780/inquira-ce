@@ -5,7 +5,7 @@ import {
   applyPlotlyTheme,
   applyPlotlyConfigTheme,
   PLOTLY_THEME_MODE,
-} from '../src/utils/plotlyTheme.js'
+} from '../src/utils/plotlyTheme.ts'
 
 test('soft plotly theme updates colors without forcing typography sizes', () => {
   const input = {

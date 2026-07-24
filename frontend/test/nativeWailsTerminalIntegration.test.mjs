@@ -15,7 +15,7 @@ test('interactive terminal selects the PTY pane in Wails', () => {
 })
 
 test('terminal service routes PTY lifecycle and events through Go', () => {
-  const service = read('src/services/nativeTerminalService.js')
+  const service = read('src/services/nativeTerminalService.ts')
 
   assert.equal(service.includes("requireWailsMethod('StartTerminalSession')"), true)
   assert.equal(service.includes("requireWailsMethod('WriteTerminalSession')"), true)

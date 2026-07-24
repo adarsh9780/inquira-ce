@@ -4,7 +4,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import AppEmptyState from '../../ui/AppEmptyState.vue'
 defineProps({
   title: {

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { buildExecutionViewModel } from '../src/utils/executionViewModel.js'
+import { buildExecutionViewModel } from '../src/utils/executionViewModel.ts'
 
 test('buildExecutionViewModel parses variable buckets and renders output text', () => {
   const view = buildExecutionViewModel(

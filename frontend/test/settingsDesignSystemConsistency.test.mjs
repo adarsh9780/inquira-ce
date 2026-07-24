@@ -44,7 +44,7 @@ test('settings-related modals use shared modal primitives and avoid scoped globa
 
 test('dropdown, toast, and blocking overlays use layer utility classes', () => {
   const headerDropdown = read('src/components/ui/HeaderDropdown.vue')
-  const sharedDropdown = read('src/components/ui/dropdownShared.js')
+  const sharedDropdown = read('src/components/ui/dropdownShared.ts')
   const toastContainer = read('src/components/ui/ToastContainer.vue')
   const appSource = read('src/components/startup/BlockingOperationOverlay.vue')
 

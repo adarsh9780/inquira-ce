@@ -45,8 +45,8 @@
   </div>
 </template>
 
-<script setup>
-import { computed, watch } from 'vue'
+<script setup lang="ts">
+import { computed, onUnmounted, watch } from 'vue'
 import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
@@ -63,7 +63,7 @@ const props = defineProps({
   type: {
     type: String,
     default: 'info',
-    validator: (value) => ['success', 'error', 'warning', 'info'].includes(value)
+    validator: (value: unknown) => ['success', 'error', 'warning', 'info'].includes(String(value))
   },
   title: {
     type: String,
@@ -81,7 +81,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-let timeoutId = null
+let timeoutId: ReturnType<typeof setTimeout> | null = null
 
 const containerClass = computed(() => {
   if (props.type === 'success') {
@@ -155,8 +155,6 @@ watch(() => props.isVisible, (isVisible) => {
   }
 }, { immediate: true })
 
-// Cleanup on unmount
-import { onUnmounted } from 'vue'
 onUnmounted(() => {
   clearTimer()
 })

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync } from './sourceText.mjs'
 import { resolve } from 'node:path'
 
 function read(relativePath) {
@@ -40,7 +40,7 @@ test('midnight dark theme keeps brand accent while using deep slate surfaces', (
 })
 
 test('theme catalog presents bluehour as the midnight palette with brand-accent preview chip', () => {
-  const source = read('src/constants/themes.js')
+  const source = read('src/constants/themes.ts')
 
   assert.equal(source.includes("id: 'midnight'"), true)
   assert.equal(source.includes("label: 'Bluehour'"), true)

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync } from './sourceText.mjs'
 import { resolve } from 'node:path'
 
 test('code editor template stays empty until user explicitly requests sync/generation', () => {
@@ -13,5 +13,5 @@ test('code editor template stays empty until user explicitly requests sync/gener
   assert.equal(source.includes('await syncTableNameInCode(true)'), false)
   assert.equal(source.includes('watch(() => defaultCodeTemplate.value, (newTemplate) => {'), false)
   assert.equal(source.includes("watch(() => appStore.dataFilePath, (newPath, oldPath) => {"), false)
-  assert.equal(source.includes('@click="syncTableNameInCode"'), true)
+  assert.equal(source.includes('@click="syncTableNameInCode()"'), true)
 })

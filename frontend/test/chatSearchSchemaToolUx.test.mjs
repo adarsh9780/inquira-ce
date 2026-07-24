@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync } from './sourceText.mjs'
 import { resolve } from 'node:path'
 
 test('tool activity card summarizes search_schema with query and match count', () => {
@@ -8,8 +8,8 @@ test('tool activity card summarizes search_schema with query and match count', (
 
   assert.equal(source.includes("if (normalized === 'search_schema')"), true)
   assert.equal(source.includes('firstText(args.query)'), true)
-  assert.equal(source.includes('output.match_count'), true)
-  assert.equal(source.includes('Array.isArray(output.columns)'), true)
+  assert.equal(source.includes('outputRecord.match_count'), true)
+  assert.equal(source.includes('Array.isArray(outputRecord.columns)'), true)
   assert.equal(source.includes('Searching schema for "${query}" (${count} matches)'), true)
 })
 

@@ -48,32 +48,32 @@ function nativeTurnTree(turns: unknown[]) {
 
 export const conversationApi = {
   async list(workspaceId: unknown, limit = 50) {
-    const response = await invokeNative<unknown>('ListConversations', String(workspaceId || ''))
+    const response = await invokeNative('ListConversations', String(workspaceId || ''))
     const value = response as RecordValue
     const conversations = Array.isArray(response) ? response : (value?.conversations || [])
     return { conversations: (conversations as unknown[]).slice(0, Number(limit || 50)) }
   },
   create(workspaceId: unknown, title: unknown = null) {
-    return invokeNative<RecordValue>('CreateConversation', {
+    return invokeNative('CreateConversation', {
       workspace_id: String(workspaceId || ''),
       title: String(title || 'New conversation'),
     })
   },
   remove(conversationId: unknown) {
-    return invokeNative<RecordValue>('DeleteConversation', String(conversationId || ''))
+    return invokeNative('DeleteConversation', String(conversationId || ''))
   },
   update(conversationId: unknown, title: unknown) {
-    return invokeNative<RecordValue>(
+    return invokeNative(
       'UpdateConversation',
       String(conversationId || ''),
       String(title || ''),
     )
   },
   usage(conversationId: unknown) {
-    return invokeNative<RecordValue>('GetConversationUsage', String(conversationId || ''))
+    return invokeNative('GetConversationUsage', String(conversationId || ''))
   },
   async listTurns(conversationId: unknown, limit = 5) {
-    const page = await invokeNative<RecordValue>(
+    const page = await invokeNative(
       'ListConversationTurnPage',
       String(conversationId || ''),
       Number(limit || 5),
@@ -89,7 +89,7 @@ export const conversationApi = {
     return normalizeNativeTurn(await invokeNative('GetConversationTurn', String(turnId || '')))
   },
   async relations(conversationId: unknown, turnId: unknown) {
-    const raw = await invokeNative<unknown[]>('ListConversationTurns', String(conversationId || ''))
+    const raw = await invokeNative('ListConversationTurns', String(conversationId || ''))
     const turns = raw.map(normalizeNativeTurn).filter(Boolean) as RecordValue[]
     const index = turns.findIndex((turn) => String(turn.id) === String(turnId))
     const current = index >= 0 ? turns[index] : null
@@ -106,14 +106,14 @@ export const conversationApi = {
     }
   },
   async workspaceTurnTree(workspaceId: unknown) {
-    const response = await invokeNative<unknown>('ListConversations', String(workspaceId || ''))
+    const response = await invokeNative('ListConversations', String(workspaceId || ''))
     const value = response as RecordValue
     const conversations = (Array.isArray(response) ? response : (value?.conversations || [])) as RecordValue[]
     const app = nativeApp()
     return {
       workspace_id: String(workspaceId || ''),
       conversations: await Promise.all(conversations.map(async (item) => {
-        const tree = nativeTurnTree(await invokeNative<unknown[]>('ListConversationTurns', String(item.id || '')))
+        const tree = nativeTurnTree(await invokeNative('ListConversationTurns', String(item.id || '')))
         const usageSummary = typeof app?.GetConversationUsage === 'function'
           ? await app.GetConversationUsage(String(item.id || ''))
           : null
@@ -122,7 +122,7 @@ export const conversationApi = {
     }
   },
   removeTurn(conversationId: unknown, turnId: unknown) {
-    return invokeNative<RecordValue>(
+    return invokeNative(
       'DeleteConversationTurn',
       String(conversationId || ''),
       String(turnId || ''),

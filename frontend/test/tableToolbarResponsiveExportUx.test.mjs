@@ -27,7 +27,7 @@ test('table toolbar keeps a contextual artifact selector with search and icon ac
 
 test('table csv export uses save dialog flow instead of forcing downloads folder', () => {
   const tableTabPath = resolve(process.cwd(), 'src/components/analysis/TableTab.vue')
-  const exportUtilPath = resolve(process.cwd(), 'src/utils/exportFile.js')
+  const exportUtilPath = resolve(process.cwd(), 'src/utils/exportFile.ts')
 
   const tableTab = readFileSync(tableTabPath, 'utf-8')
   const exportUtil = readFileSync(exportUtilPath, 'utf-8')
@@ -36,5 +36,5 @@ test('table csv export uses save dialog flow instead of forcing downloads folder
   assert.equal(tableTab.includes('const exported = await persistExportFile({'), true)
   assert.equal(tableTab.includes("toast.info('Export canceled')"), true)
   assert.equal(tableTab.includes("toast.success('Export complete'"), true)
-  assert.equal(exportUtil.includes('window.showSaveFilePicker'), true)
+  assert.equal(exportUtil.includes('showSaveFilePicker'), true)
 })

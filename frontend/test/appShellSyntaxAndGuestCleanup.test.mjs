@@ -26,7 +26,7 @@ test('App shell SFC script compiles cleanly for startup/auth orchestration', () 
 })
 
 test('CE local state uses a stable default scope', () => {
-  const localStatePath = resolve(process.cwd(), 'src/services/localStateService.js')
+  const localStatePath = resolve(process.cwd(), 'src/services/localStateService.ts')
   const localStateSource = readFileSync(localStatePath, 'utf-8')
   assert.equal(localStateSource.includes("const DEFAULT_SCOPE = 'anonymous'"), false)
   assert.equal(localStateSource.includes("const DEFAULT_SCOPE = 'default'"), true)

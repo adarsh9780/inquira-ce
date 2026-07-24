@@ -175,7 +175,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useUiStore } from '../../stores/uiStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
@@ -278,7 +278,7 @@ const primaryBackgroundOperationTitle = computed(() => {
   ].filter(Boolean).join('\n')
 })
 
-function runtimeStatusMeta(status) {
+function runtimeStatusMeta(status: unknown) {
   switch (status) {
     case 'ready':
       return { dotClass: 'bg-[var(--color-success)]', textClass: 'text-[var(--color-success)]', label: 'Ready', showSpinner: false }
@@ -337,7 +337,7 @@ const artifactCountClass = computed(() => {
   return 'bg-[var(--color-surface)] text-[var(--color-text-muted)] border border-[var(--color-border)]'
 })
 
-async function refreshWorkspaceRuntimeStatusFromApi(workspaceId, fallbackStatus = 'missing') {
+async function refreshWorkspaceRuntimeStatusFromApi(workspaceId: unknown, fallbackStatus = 'missing') {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return 'missing'
   try {
@@ -351,7 +351,7 @@ async function refreshWorkspaceRuntimeStatusFromApi(workspaceId, fallbackStatus 
   }
 }
 
-function formatNotificationTimestamp(value) {
+function formatNotificationTimestamp(value: unknown) {
   const timestamp = Number(value || 0)
   if (!Number.isFinite(timestamp) || timestamp <= 0) return ''
   return new Date(timestamp).toLocaleTimeString([], {
@@ -360,7 +360,7 @@ function formatNotificationTimestamp(value) {
   })
 }
 
-function notificationDotClass(type) {
+function notificationDotClass(type: unknown) {
   if (type === 'success') return 'bg-[var(--color-success)]'
   if (type === 'error') return 'bg-[var(--color-error)]'
   if (type === 'warning') return 'bg-[var(--color-warning)]'
@@ -384,14 +384,14 @@ function toggleNotificationsPanel() {
   openNotificationsPanel()
 }
 
-function handleGlobalPointerDown(event) {
+function handleGlobalPointerDown(event: PointerEvent) {
   const target = event?.target
   if (!(target instanceof Element)) return
   if (target.closest('[data-notification-center]')) return
   closeNotificationsPanel()
 }
 
-function handleStatusBarEscape(event) {
+function handleStatusBarEscape(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     closeNotificationsPanel()
   }

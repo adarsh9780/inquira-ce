@@ -107,7 +107,7 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { usePreferencesStore } from '../../../stores/preferencesStore'
 import HeaderDropdown from '../../ui/HeaderDropdown.vue'
@@ -133,15 +133,15 @@ const codeFontOptions = computed(() => {
   }))
 })
 
-function selectTheme(themeId) {
+function selectTheme(themeId: unknown) {
   preferencesStore.setUiTheme(themeId)
 }
 
-function selectFont(fontId) {
+function selectFont(fontId: unknown) {
   preferencesStore.setUiFont(fontId)
 }
 
-function selectCodeFont(fontId) {
+function selectCodeFont(fontId: unknown) {
   preferencesStore.setUiCodeFont(fontId)
 }
 </script>

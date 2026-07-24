@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync } from './sourceText.mjs'
 import { resolve } from 'node:path'
 
 test('code tab does not auto-populate code template when dataset changes', () => {
@@ -13,5 +13,5 @@ test('code tab does not auto-populate code template when dataset changes', () =>
   assert.equal(source.includes('watch(() => defaultCodeTemplate.value'), false)
   assert.equal(source.includes('watch(() => appStore.dataFilePath, (newPath, oldPath) => {'), false)
   assert.equal(source.includes('const defaultCodeTemplate = computed(() => {'), true)
-  assert.equal(source.includes('@click="syncTableNameInCode"'), true)
+  assert.equal(source.includes('@click="syncTableNameInCode()"'), true)
 })

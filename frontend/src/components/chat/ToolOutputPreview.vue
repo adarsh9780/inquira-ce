@@ -75,7 +75,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
@@ -131,9 +131,11 @@ const copyText = computed(() => {
   const value = preview.value
   if (!value || value.kind === 'empty') return ''
   if (value.kind === 'table') {
+    const columns = value.columns || []
+    const tableRows = value.rows || []
     const rows = [
-      value.columns.join('\t'),
-      ...value.rows.map((row) => row.map((cell) => String(cell ?? '')).join('\t')),
+      columns.join('\t'),
+      ...tableRows.map((row) => row.map((cell) => String(cell ?? '')).join('\t')),
     ]
     return rows.join('\n')
   }
@@ -176,7 +178,7 @@ const renderedMarkdown = computed(() => {
   })
 })
 
-function escapeHtml(text) {
+function escapeHtml(text: unknown): string {
   return String(text || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

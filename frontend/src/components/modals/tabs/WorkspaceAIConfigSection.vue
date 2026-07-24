@@ -70,7 +70,7 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { preferencesApi } from '../../../api/preferences'
 import { useUiStore } from '../../../stores/uiStore'
@@ -82,6 +82,12 @@ import { useConversationStore } from '../../../stores/conversationStore'
 import { useWorkspaceActivation } from '../../../composables/useWorkspaceActivation'
 import { useArtifactPresentation } from '../../../composables/useArtifactPresentation'
 import HeaderDropdown from '../../ui/HeaderDropdown.vue'
+import type { WorkspaceAIConfig } from '../../../stores/workspaceStore'
+
+type ProviderCatalog = Record<string, unknown> & {
+  provider_available_main_models?: unknown[]
+  provider_available_lite_models?: unknown[]
+}
 
 const props = defineProps({ workspaceId: { type: String, required: true } })
 const uiStore = useUiStore()
@@ -96,16 +102,25 @@ const advancedOpen = ref(false)
 const isSaving = ref(false)
 const errorMessage = ref('')
 const saveStateLabel = ref('Changes apply to this workspace only.')
-const providerCatalog = ref(null)
-const localConfig = ref(null)
+const providerCatalog = ref<ProviderCatalog | null>(null)
+const localConfig = ref<WorkspaceAIConfig | null>(null)
 const initialPayloadSignature = ref('')
-const form = reactive({ provider: '', mainModel: '', liteModel: '', codingModel: '', allowDataSamples: false, temperature: null, maxTokens: null, topP: null })
+const form = reactive<{
+  provider: string
+  mainModel: string
+  liteModel: string
+  codingModel: string
+  allowDataSamples: boolean
+  temperature: number | null
+  maxTokens: number | null
+  topP: number | null
+}>({ provider: '', mainModel: '', liteModel: '', codingModel: '', allowDataSamples: false, temperature: null, maxTokens: null, topP: null })
 
 const config = computed(() => localConfig.value)
 const hasOverrides = computed(() => Object.entries(config.value?.overrides || {}).some(([key, value]) => key !== 'allow_llm_data_samples' && value !== null && value !== ''))
 const useDefaults = ref(true)
 const providerOptions = computed(() => (preferencesStore.availableProviders || []).map((value) => ({ value, label: value === 'openrouter' ? 'OpenRouter' : value === 'openai' ? 'OpenAI' : value === 'ollama' ? 'Ollama (local)' : value })))
-const modelOptions = (values) => (Array.isArray(values) ? values : []).map((value) => ({ value, label: value }))
+const modelOptions = (values: unknown) => (Array.isArray(values) ? values : []).map((value) => ({ value: String(value), label: String(value) }))
 const mainModelOptions = computed(() => modelOptions(providerCatalog.value?.provider_available_main_models || preferencesStore.providerMainModels))
 const liteModelOptions = computed(() => modelOptions(providerCatalog.value?.provider_available_lite_models || preferencesStore.providerLiteModels))
 const codingModelOptions = computed(() => mainModelOptions.value)
@@ -118,7 +133,7 @@ const credentialLabel = computed(() => config.value?.readiness?.credential_ready
 const isDirty = computed(() => Boolean(config.value) && payloadSignature(buildPayload()) !== initialPayloadSignature.value)
 
 watch(config, hydrate, { immediate: true })
-watch(() => workspaceStore.workspaceAIConfig, (value) => {
+watch(() => workspaceStore.workspaceAIConfig, (value: WorkspaceAIConfig | null) => {
   if (props.workspaceId === workspaceStore.activeWorkspaceId && value) localConfig.value = value
 })
 watch(() => props.workspaceId, async (workspaceId) => {
@@ -128,7 +143,7 @@ watch(() => props.workspaceId, async (workspaceId) => {
   if (workspaceId) localConfig.value = await workspaceStore.fetchWorkspaceAIConfig(workspaceId)
 }, { immediate: true })
 
-function hydrate(value) {
+function hydrate(value: WorkspaceAIConfig | null) {
   if (!value) return
   const overrides = value.overrides || {}
   const effective = value.effective || {}
@@ -138,16 +153,16 @@ function hydrate(value) {
   form.liteModel = overrides.lite_model || effective.lite_model || ''
   form.codingModel = overrides.coding_model || effective.coding_model || ''
   form.allowDataSamples = Boolean(overrides.allow_llm_data_samples)
-  form.temperature = overrides.temperature
-  form.maxTokens = overrides.max_tokens
-  form.topP = overrides.top_p
+  form.temperature = overrides.temperature ?? null
+  form.maxTokens = overrides.max_tokens ?? null
+  form.topP = overrides.top_p ?? null
   initialPayloadSignature.value = payloadSignature(buildPayload())
   errorMessage.value = ''
   if (form.provider) loadProviderModels(form.provider)
 }
 
-async function loadProviderModels(provider) {
-  try { providerCatalog.value = await preferencesApi.get(provider) } catch (_error) { providerCatalog.value = null }
+async function loadProviderModels(provider: unknown) {
+  try { providerCatalog.value = await preferencesApi.get(String(provider || '')) as ProviderCatalog } catch (_error) { providerCatalog.value = null }
 }
 
 function buildPayload() {
@@ -156,14 +171,14 @@ function buildPayload() {
     main_model_override: useDefaults.value ? null : form.mainModel,
     lite_model_override: useDefaults.value ? null : form.liteModel,
     coding_model_override: useDefaults.value ? null : form.codingModel,
-    llm_temperature_override: useDefaults.value ? null : (form.temperature === '' ? null : form.temperature),
-    llm_max_tokens_override: useDefaults.value ? null : (form.maxTokens === '' ? null : form.maxTokens),
-    llm_top_p_override: useDefaults.value ? null : (form.topP === '' ? null : form.topP),
+    llm_temperature_override: useDefaults.value ? null : form.temperature,
+    llm_max_tokens_override: useDefaults.value ? null : form.maxTokens,
+    llm_top_p_override: useDefaults.value ? null : form.topP,
     allow_llm_data_samples: Boolean(form.allowDataSamples),
   }
 }
 
-function payloadSignature(payload) {
+function payloadSignature(payload: Record<string, unknown>) {
   return JSON.stringify(payload)
 }
 
@@ -175,6 +190,6 @@ async function save() {
     localConfig.value = savedConfig
     hydrate(savedConfig)
     saveStateLabel.value = 'Saved.'
-  } catch (error) { errorMessage.value = error?.message || 'Could not save AI settings.' } finally { isSaving.value = false }
+  } catch (error) { errorMessage.value = error instanceof Error ? error.message : 'Could not save AI settings.' } finally { isSaving.value = false }
 }
 </script>

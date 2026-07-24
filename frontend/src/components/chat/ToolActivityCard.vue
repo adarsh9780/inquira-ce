@@ -24,19 +24,16 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, defineAsyncComponent } from 'vue'
 import { toolOutputHasRenderableContent } from '../../utils/toolOutputPreview'
 
-const props = defineProps({
-  activity: {
-    type: Object,
-    required: true,
-  },
-  collapsed: {
-    type: Boolean,
-    default: false,
-  },
+type RecordValue = Record<string, unknown>
+const props = withDefaults(defineProps<{
+  activity: RecordValue
+  collapsed?: boolean
+}>(), {
+  collapsed: false,
 })
 
 const ToolOutputPreview = defineAsyncComponent(() => import('./ToolOutputPreview.vue'))
@@ -48,7 +45,7 @@ const toolStatus = computed(() => String(props.activity?.status || 'running').tr
 const toolExplanation = computed(() => truncateText(props.activity?.explanation, 140))
 const rawToolArgs = computed(() => {
   const args = props.activity?.args
-  return args && typeof args === 'object' ? args : {}
+  return args && typeof args === 'object' && !Array.isArray(args) ? args as RecordValue : {}
 })
 const toolArgs = computed(() => {
   const args = { ...rawToolArgs.value }
@@ -70,14 +67,14 @@ const durationLabel = computed(() => {
   return `for ${minutes}m ${remaining}s`
 })
 
-function truncateText(value, max = 88) {
+function truncateText(value: unknown, max = 88): string {
   const text = String(value || '').trim()
   if (!text) return ''
   if (text.length <= max) return text
   return `${text.slice(0, max - 1)}…`
 }
 
-function shortInline(value, max = 60) {
+function shortInline(value: unknown, max = 60): string {
   if (value === null || value === undefined) return ''
   if (typeof value === 'string') return truncateText(value, max)
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
@@ -91,25 +88,25 @@ function shortInline(value, max = 60) {
     return preview
   }
   if (typeof value === 'object') {
-    const keys = Object.keys(value)
+    const keys = Object.keys(value as object)
     if (!keys.length) return '{}'
     return `${keys[0]}…`
   }
   return truncateText(String(value), max)
 }
 
-function listFromArgs(value) {
+function listFromArgs(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value
     .map((entry) => {
       if (typeof entry === 'string') return entry.trim()
-      if (entry && typeof entry === 'object') return String(entry.name || '').trim()
+      if (entry && typeof entry === 'object') return String((entry as RecordValue).name || '').trim()
       return ''
     })
     .filter(Boolean)
 }
 
-function firstText(...values) {
+function firstText(...values: unknown[]): string {
   for (const value of values) {
     const text = truncateText(value, 50)
     if (text) return text
@@ -117,14 +114,14 @@ function firstText(...values) {
   return ''
 }
 
-function summarizeList(values, max = 3) {
+function summarizeList(values: string[], max = 3): string {
   const filtered = values.filter(Boolean)
   if (!filtered.length) return ''
   if (filtered.length <= max) return filtered.join(', ')
   return `${filtered.slice(0, max).join(', ')} +${filtered.length - max} more`
 }
 
-function numericArg(value) {
+function numericArg(value: unknown): number | null {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
 }
@@ -160,12 +157,13 @@ const summaryText = computed(() => {
 
   if (normalized === 'search_schema') {
     const query = firstText(args.query) || summarizeList(listFromArgs(args.queries), 6)
-    const output = props.activity?.output
+    const output = props.activity.output
     let count = numericArg(args.match_count)
     if (count === null && output && typeof output === 'object') {
-      count = numericArg(output.match_count)
-      if (count === null && Array.isArray(output.columns)) {
-        count = output.columns.length
+      const outputRecord = output as RecordValue
+      count = numericArg(outputRecord.match_count)
+      if (count === null && Array.isArray(outputRecord.columns)) {
+        count = outputRecord.columns.length
       }
     }
     if (query && count !== null) return `Searching schema for "${query}" (${count} matches)`
@@ -212,11 +210,12 @@ const summaryText = computed(() => {
 
 const errorSummary = computed(() => {
   if (toolStatus.value !== 'error') return ''
-  const payload = props.activity?.output
+  const payload = props.activity.output
   if (payload === null || payload === undefined) return 'Tool failed before returning a result.'
   if (typeof payload === 'string') return payload
   if (payload && typeof payload === 'object') {
-    return String(payload.error || payload.stderr || payload.message || 'Tool returned an error.')
+    const record = payload as RecordValue
+    return String(record.error || record.stderr || record.message || 'Tool returned an error.')
   }
   return String(payload)
 })

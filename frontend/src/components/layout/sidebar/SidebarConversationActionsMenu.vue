@@ -13,7 +13,7 @@
   />
 </template>
 
-<script setup>
+<script setup lang="ts">
 import FloatingActionMenu from '../../ui/FloatingActionMenu.vue'
 
 const props = defineProps({
@@ -38,7 +38,7 @@ const menuItems = [
   { id: 'delete', label: 'Delete', destructive: true },
 ]
 
-function handleSelect(action) {
+function handleSelect(action: string) {
   if (action === 'rename') emit('rename')
   else if (action === 'delete') emit('delete')
 }

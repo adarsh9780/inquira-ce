@@ -23,7 +23,7 @@ test('native worker connection state stays internal while the status bar surface
 })
 
 test('obsolete connection and standalone feature utilities stay removed', () => {
-  const mainSource = readFileSync(resolve(process.cwd(), 'src/main.js'), 'utf-8')
+  const mainSource = readFileSync(resolve(process.cwd(), 'src/main.ts'), 'utf-8')
   const removedPaths = [
     'public/human-body-facts.json',
     'src/components/chat/TurnViewer.vue',

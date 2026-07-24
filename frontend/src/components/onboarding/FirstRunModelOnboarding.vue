@@ -74,7 +74,7 @@
               </div>
 
               <Transition name="onboarding-shift" mode="out-in">
-                <div :key="provider" class="mt-6">
+                <div :key="provider || 'openrouter'" class="mt-6">
                   <div v-if="provider === 'ollama'">
                     <label for="onboarding-ollama-url" class="input-label">Ollama base URL</label>
                     <input
@@ -100,7 +100,7 @@
                         autocomplete="off"
                         spellcheck="false"
                         :placeholder="apiKeyPlaceholder"
-                        @input="setApiKey($event.target.value)"
+                        @input="handleApiKeyInput"
                       />
                       <button type="button" class="eye-toggle-btn" :aria-label="showKey ? 'Hide key' : 'Show key'" @click="showKey = !showKey">
                         <span aria-hidden="true">{{ showKey ? 'Hide' : 'Show' }}</span>
@@ -143,7 +143,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import { useLLMConfig } from '../../composables/useLLMConfig'
@@ -227,7 +227,11 @@ function clearMessages() {
   clearTransientMessages()
 }
 
-async function handleProviderSelect(nextProvider) {
+function handleApiKeyInput(event: Event) {
+  setApiKey((event.target as HTMLInputElement).value)
+}
+
+async function handleProviderSelect(nextProvider: unknown) {
   const normalized = String(nextProvider || '').trim().toLowerCase()
   if (!normalized || normalized === provider.value) return
   connected.value = false

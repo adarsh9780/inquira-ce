@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 
 test('provider credentials cross the Wails bridge and persist in the OS keychain', () => {
   const service = readFileSync(
-    resolve(process.cwd(), 'src/services/modelConnectionService.js'),
+    resolve(process.cwd(), 'src/services/modelConnectionService.ts'),
     'utf-8',
   )
   const goApp = readFileSync(resolve(process.cwd(), '../app.go'), 'utf-8')

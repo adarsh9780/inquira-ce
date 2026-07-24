@@ -10,16 +10,16 @@ describe('typed Wails API transport', () => {
   })
 
   it('reports a clear desktop-only error when a bridge method is unavailable', () => {
-    expect(() => requireNativeMethod('MissingMethod')).toThrow(
-      'The MissingMethod desktop bridge is unavailable',
+    expect(() => requireNativeMethod('ListWorkspaces')).toThrow(
+      'The ListWorkspaces desktop bridge is unavailable',
     )
   })
 
   it('invokes native methods with their original arguments', async () => {
     const method = vi.fn(async () => ({ ok: true }))
-    window.go = { main: { App: { Example: method } } }
-    await expect(invokeNative('Example', 'value')).resolves.toEqual({ ok: true })
-    expect(method).toHaveBeenCalledWith('value')
+    window.go = { main: { App: { ListWorkspaces: method } } }
+    await expect(invokeNative('ListWorkspaces')).resolves.toEqual({ ok: true })
+    expect(method).toHaveBeenCalledWith()
   })
 
   it('normalizes workspace runtime readiness', async () => {

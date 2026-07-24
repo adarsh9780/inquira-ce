@@ -35,7 +35,7 @@ test('interactive terminal keeps its Wails implementation under runtime-neutral 
     'utf8',
   )
   const terminalService = readFileSync(
-    resolve(sourceRoot, 'services/nativeTerminalService.js'),
+    resolve(sourceRoot, 'services/nativeTerminalService.ts'),
     'utf8',
   )
 
@@ -52,7 +52,7 @@ test('data import and export use the connection model and native-neutral filters
     resolve(sourceRoot, 'components/modals/tabs/WorkspaceTab.vue'),
     'utf8',
   )
-  const exportFile = readFileSync(resolve(sourceRoot, 'utils/exportFile.js'), 'utf8')
+  const exportFile = readFileSync(resolve(sourceRoot, 'utils/exportFile.ts'), 'utf8')
 
   assert.equal(app.includes('startGlobalDatasetImport'), false)
   assert.match(workspace, /connectionService\.chooseFile\(\)/)

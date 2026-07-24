@@ -192,7 +192,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch, nextTick, onMounted, onUnmounted, computed, defineAsyncComponent } from 'vue'
 import { useUiStore } from '../../stores/uiStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
@@ -226,28 +226,28 @@ const conversationStore = useConversationStore()
 const workspaceActivation = useWorkspaceActivation()
 const artifactPresentation = useArtifactPresentation()
 useChatScrollFollow()
-const chatContainer = ref(null)
-const scrollHost = ref(null)
-const end = ref(null)
+const chatContainer = ref<any>(null)
+const scrollHost = ref<any>(null)
+const end = ref<any>(null)
 const expandedAnalysisMessageIds = ref(new Set())
 const SHOW_EPHEMERAL_TRACE = false
 const showScrollToBottomButton = ref(false)
 let shouldAutoScroll = true
-let mutationObserver = null
+let mutationObserver: MutationObserver | null = null
 let lastScrollTop = 0
 
-function isAnalysisDetailsOpen(messageId) {
+function isAnalysisDetailsOpen(messageId: any) {
   return expandedAnalysisMessageIds.value.has(messageId)
 }
 
-function toggleAnalysisDetails(messageId) {
+function toggleAnalysisDetails(messageId: any) {
   const next = new Set(expandedAnalysisMessageIds.value)
   if (next.has(messageId)) next.delete(messageId)
   else next.add(messageId)
   expandedAnalysisMessageIds.value = next
 }
 
-function mapTurnToMessage(turn) {
+function mapTurnToMessage(turn: any) {
   if (!turn || typeof turn !== 'object') return null
   return {
     id: turn.id,
@@ -256,8 +256,8 @@ function mapTurnToMessage(turn) {
     resultExplanation: String(turn?.metadata?.result_explanation || turn.assistant_text || ''),
     codeExplanation: String(turn?.metadata?.code_explanation || ''),
     analysisMetadata: turn?.metadata && typeof turn.metadata === 'object' ? { ...turn.metadata } : {},
-    attachments: Array.isArray(turn?.metadata?.user_attachments) ? turn.metadata.user_attachments.map((item) => ({ ...item })) : [],
-    toolEvents: Array.isArray(turn?.tool_events) ? turn.tool_events.map((event) => ({ ...event })) : null,
+    attachments: Array.isArray(turn?.metadata?.user_attachments) ? turn.metadata.user_attachments.map((item: any) => ({ ...item })) : [],
+    toolEvents: Array.isArray(turn?.tool_events) ? turn.tool_events.map((event: any) => ({ ...event })) : null,
     streamTrace: null,
     codeSnapshot: String(turn.code_snapshot || ''),
     codeUpdated: Boolean(String(turn.code_snapshot || '').trim()),
@@ -278,7 +278,7 @@ const displayedChatHistory = computed(() => {
 
   const activeTurnId = String(conversationStore.activeTurnId || '').trim()
   if (activeTurnId) {
-    const existing = localHistory.find((message) => String(message?.id || '').trim() === activeTurnId)
+    const existing = localHistory.find((message: any) => String(message?.id || '').trim() === activeTurnId)
     if (existing) return [existing]
   }
 
@@ -292,23 +292,23 @@ const SCROLL_THRESHOLD_PX = 100
 const SHOW_SCROLL_BUTTON_THRESHOLD_PX = 220
 const QUESTION_REFERENCE_RE = /\b[A-Za-z_][A-Za-z0-9_]*\."(?:[^"]|"")+"|\b[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*/g
 
-function attachmentPreviewSrc(attachment) {
+function attachmentPreviewSrc(attachment: any) {
   const mediaType = String(attachment?.media_type || 'image/png').trim()
   const dataBase64 = String(attachment?.data_base64 || '').trim()
   if (!dataBase64) return ''
   return `data:${mediaType};base64,${dataBase64}`
 }
 
-function tableUsageSummary(message) {
+function tableUsageSummary(message: any) {
   const metadata = message?.analysisMetadata
   if (!metadata || typeof metadata !== 'object') return ''
   const tables = Array.isArray(metadata.tables_used)
-    ? metadata.tables_used.map((item) => String(item || '').trim()).filter(Boolean)
+    ? metadata.tables_used.map((item: any) => String(item || '').trim()).filter(Boolean)
     : []
   if (tables.length === 0) return ''
   const joinsUsed = Boolean(metadata.joins_used)
   const joinKeys = Array.isArray(metadata.join_keys)
-    ? metadata.join_keys.map((item) => String(item || '').trim()).filter(Boolean)
+    ? metadata.join_keys.map((item: any) => String(item || '').trim()).filter(Boolean)
     : []
   if (!joinsUsed) {
     return `Tables used: ${tables.join(', ')}`
@@ -320,7 +320,7 @@ function tableUsageSummary(message) {
 }
 
 
-function escapeHtml(rawValue) {
+function escapeHtml(rawValue: any) {
   return String(rawValue || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -329,7 +329,7 @@ function escapeHtml(rawValue) {
     .replace(/'/g, '&#39;')
 }
 
-function renderQuestionWithHighlights(question) {
+function renderQuestionWithHighlights(question: any) {
   const text = String(question || '')
   if (!text) return ''
   const matcher = new RegExp(QUESTION_REFERENCE_RE.source, 'g')
@@ -354,7 +354,7 @@ function renderQuestionWithHighlights(question) {
 }
 
 
-const EPHEMERAL_LABELS = {
+const EPHEMERAL_LABELS: Record<string, string | null> = {
   check_safety: 'Checking if query is safe to process',
   check_relevancy: 'Checking if query matches your data',
   require_code: 'Determining whether code generation is needed',
@@ -410,10 +410,10 @@ onUnmounted(() => {
 })
 
 
-const copiedUserMessageId = ref(null)
-const copiedAssistantMessageId = ref(null)
+const copiedUserMessageId = ref<any>(null)
+const copiedAssistantMessageId = ref<any>(null)
 
-async function copyQuestion(message) {
+async function copyQuestion(message: any) {
   if (!message) return
   try {
     await navigator.clipboard.writeText(message.question || '')
@@ -423,13 +423,13 @@ async function copyQuestion(message) {
         copiedUserMessageId.value = null
       }
     }, 3000)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to copy question:', error)
     toast.error('Copy failed', 'Unable to copy question to clipboard')
   }
 }
 
-async function copyExplanation(message) {
+async function copyExplanation(message: any) {
   if (!message) return
   try {
     await navigator.clipboard.writeText(message.explanation || '')
@@ -439,40 +439,40 @@ async function copyExplanation(message) {
         copiedAssistantMessageId.value = null
       }
     }, 3000)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to copy explanation:', error)
     toast.error('Copy failed', 'Unable to copy explanation to clipboard')
   }
 }
 
-function streamPlanText(message) {
+function streamPlanText(message: any) {
   return String(message?.streamTrace?.planText || '').trim()
 }
 
-function streamTraceEvents(message) {
+function streamTraceEvents(message: any) {
   const events = message?.streamTrace?.events
   return Array.isArray(events) ? events : []
 }
 
-function streamReasoningEvents(message) {
+function streamReasoningEvents(message: any) {
   const events = message?.streamTrace?.reasoning
   return Array.isArray(events) ? events : []
 }
 
-function streamToolCalls(message) {
+function streamToolCalls(message: any) {
   const calls = message?.streamTrace?.toolCalls
   return Array.isArray(calls) ? calls : []
 }
 
-function hasFinalResponse(message) {
+function hasFinalResponse(message: any) {
   return Boolean(String(message?.explanation || '').trim())
 }
 
-function toolActivityRows(message) {
+function toolActivityRows(message: any) {
   return streamToolCalls(message).filter((activity) => String(activity?.tool || '').trim().toLowerCase() !== 'execute_python')
 }
 
-function isToolActivityOutputCollapsed(message, activityIndex) {
+function isToolActivityOutputCollapsed(message: any, activityIndex: any) {
   const rows = toolActivityRows(message)
   const activity = rows[activityIndex]
   if (!toolOutputHasRenderableContent(activity)) return false
@@ -482,7 +482,7 @@ function isToolActivityOutputCollapsed(message, activityIndex) {
     .some((nextActivity) => toolOutputHasRenderableContent(nextActivity))
 }
 
-function reasoningRows(message) {
+function reasoningRows(message: any) {
   if (hasFinalResponse(message)) return []
   return streamReasoningEvents(message)
     .map((event, index) => ({
@@ -498,19 +498,19 @@ const GENERIC_REASONING_PATTERNS = [
   'deciding whether more schema/data lookup is required before code generation',
 ]
 
-const REASONING_SECTION_LABELS = {
+const REASONING_SECTION_LABELS: Record<string, string> = {
   has: 'Has',
   wants: 'Wants',
   next: 'Next',
 }
 
-function isGenericReasoningMessage(message) {
+function isGenericReasoningMessage(message: any) {
   const normalized = String(message || '').trim().toLowerCase()
   if (!normalized) return true
   return GENERIC_REASONING_PATTERNS.some((pattern) => normalized.includes(pattern))
 }
 
-function parseReasoningSections(message) {
+function parseReasoningSections(message: any) {
   const raw = String(message || '').trim()
   if (!raw) return []
 
@@ -519,7 +519,7 @@ function parseReasoningSections(message) {
     extractReasoningSection(normalized, 'has'),
     extractReasoningSection(normalized, 'wants'),
     extractReasoningSection(normalized, 'next'),
-  ].filter((section) => section && section.text)
+  ].filter((section): section is { label: string; text: string } => Boolean(section?.text))
 
   if (explicitSections.length === 3) {
     return explicitSections
@@ -533,8 +533,8 @@ function parseReasoningSections(message) {
   return []
 }
 
-function extractReasoningSection(text, kind) {
-  const patterns = {
+function extractReasoningSection(text: any, kind: any) {
+  const patterns: Record<string, RegExp[]> = {
     has: [
       /(?:what i (?:already )?(?:have|know)|what it already has|what the assistant already has|already have|already know|has|context)\s*:\s*/i,
     ],
@@ -563,7 +563,7 @@ function extractReasoningSection(text, kind) {
   return null
 }
 
-function inferReasoningSectionsFromSentences(text) {
+function inferReasoningSectionsFromSentences(text: any) {
   const sentences = String(text || '')
     .split(/(?<=[.!?])\s+/)
     .map((part) => normalizeEphemeralText(part))
@@ -576,13 +576,13 @@ function inferReasoningSectionsFromSentences(text) {
   ]
 }
 
-function normalizeNodeName(nodeName) {
+function normalizeNodeName(nodeName: any) {
   return String(nodeName || '')
     .trim()
     .toLowerCase()
 }
 
-function describeNode(nodeName) {
+function describeNode(nodeName: any) {
   const normalized = normalizeNodeName(nodeName)
   if (normalized === 'agent_status') return null // handled by message field
   if (EPHEMERAL_LABELS[normalized]) return EPHEMERAL_LABELS[normalized]
@@ -594,7 +594,7 @@ function describeNode(nodeName) {
     .join(' ')
 }
 
-function eventOutputText(event, message) {
+function eventOutputText(event: any, message: any) {
   const type = String(event?.type || '').toLowerCase()
   const node = normalizeNodeName(event?.node)
   const stage = String(event?.stage || '').trim().toLowerCase()
@@ -623,7 +623,7 @@ function eventOutputText(event, message) {
   return ''
 }
 
-function isLikelyCodeText(text) {
+function isLikelyCodeText(text: any) {
   const normalized = String(text || '').trim().toLowerCase()
   if (!normalized) return false
   const markers = [
@@ -642,7 +642,7 @@ function isLikelyCodeText(text) {
   return markers.some((marker) => normalized.includes(marker))
 }
 
-function normalizeEphemeralText(value) {
+function normalizeEphemeralText(value: any) {
   const text = String(value || '')
     .replace(/\r?\n+/g, ' ')
     .replace(/\s+/g, ' ')
@@ -658,7 +658,7 @@ function normalizeEphemeralText(value) {
   return text
 }
 
-function ephemeralRows(message) {
+function ephemeralRows(message: any) {
   if (hasFinalResponse(message)) return []
   const events = streamTraceEvents(message)
   return events
@@ -698,18 +698,18 @@ function ephemeralRows(message) {
     .filter((row) => row.action || row.detail)
 }
 
-function hasStreamTrace(message) {
+function hasStreamTrace(message: any) {
   return reasoningRows(message).length > 0 || ephemeralRows(message).length > 0
 }
 
-function hasActionProgress(message) {
+function hasActionProgress(message: any) {
   return Boolean(
     (SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length > 0) ||
     toolActivityRows(message).length > 0
   )
 }
 
-function hasAnalysisDetails(message) {
+function hasAnalysisDetails(message: any) {
   return Boolean(
     reasoningRows(message).length > 0 ||
     hasActionProgress(message) ||
@@ -717,7 +717,7 @@ function hasAnalysisDetails(message) {
   )
 }
 
-function hasAssistantContent(message) {
+function hasAssistantContent(message: any) {
   return Boolean(
     message?.explanation ||
     hasAnalysisDetails(message) ||
@@ -725,18 +725,18 @@ function hasAssistantContent(message) {
   )
 }
 
-function explanationHasCodeBlocks(message) {
+function explanationHasCodeBlocks(message: any) {
   const explanation = String(message?.explanation || '')
   return /```[a-zA-Z0-9_-]*\n[\s\S]*?```/.test(explanation)
 }
 
-function shouldRenderCodeSnapshot(message) {
+function shouldRenderCodeSnapshot(message: any) {
   const hasSnapshot = Boolean(String(message?.codeSnapshot || '').trim())
   if (!hasSnapshot) return false
   return !explanationHasCodeBlocks(message)
 }
 
-function shouldRenderCodeDetails(message) {
+function shouldRenderCodeDetails(message: any) {
   return Boolean(
     String(message?.codeExplanation || '').trim() ||
     shouldRenderCodeSnapshot(message) ||
@@ -760,7 +760,7 @@ function getScrollContainer() {
   return scrollHost.value || chatContainer.value
 }
 
-function updateScrollState(options = {}) {
+function updateScrollState(options: any = {}) {
   const fromUserScroll = options?.fromUserScroll === true
   const previousTop = Number.isFinite(options?.previousTop) ? options.previousTop : lastScrollTop
   const container = getScrollContainer()
@@ -786,7 +786,7 @@ function updateScrollState(options = {}) {
   lastScrollTop = container.scrollTop
 }
 
-function scrollToBottom(options = {}) {
+function scrollToBottom(options: any = {}) {
   const resolvedBehavior = String(options?.behavior || '').trim() || (executionStore.isConversationRunning(conversationStore.activeConversationId) ? 'auto' : 'smooth')
   const force = options?.force === true
   const hardAlign = options?.hardAlign === true
@@ -830,7 +830,7 @@ function handleScrollToBottomClick() {
   scrollToBottom({ behavior: 'auto', force: true })
 }
 
-async function copyCodeFromBlock(copyButton) {
+async function copyCodeFromBlock(copyButton: any) {
   const block = copyButton?.closest?.('.chat-code-block')
   const codeNode = block?.querySelector('.chat-code-scroll code')
   const codeText = String(codeNode?.textContent || '').trimEnd()
@@ -840,13 +840,13 @@ async function copyCodeFromBlock(copyButton) {
     copyButton.setAttribute('data-copied', 'true')
     window.setTimeout(() => copyButton.removeAttribute('data-copied'), 1200)
     toast.success('Copied!', 'Code block copied to clipboard')
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to copy code block:', error)
     toast.error('Copy failed', 'Unable to copy code block')
   }
 }
 
-function handleChatContainerClick(event) {
+function handleChatContainerClick(event: any) {
   const target = event?.target instanceof Element ? event.target : null
   if (!target) return
   const copyButton = target.closest('.chat-code-copy')

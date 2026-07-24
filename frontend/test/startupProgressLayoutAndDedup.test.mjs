@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync } from './sourceText.mjs'
 import { resolve } from 'node:path'
 
 test('desktop startup screen uses minimal centered layout', () => {
@@ -31,6 +31,6 @@ test('desktop startup polls the native Go startup state for live progress', () =
   const source = readFileSync(appPath, 'utf-8')
 
   assert.equal(source.includes('async function readDesktopStartupState()'), true)
-  assert.equal(source.includes('wailsApp()?.GetStartupState'), true)
+  assert.equal(source.includes('if (app?.GetStartupState)'), true)
   assert.equal(source.includes('const state = await readDesktopStartupState()'), true)
 })

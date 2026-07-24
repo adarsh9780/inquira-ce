@@ -188,7 +188,7 @@
   />
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useUiStore } from '../../stores/uiStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
@@ -237,21 +237,21 @@ const isDownloading = ref(false)
 const isDeletingArtifact = ref(false)
 const isDeleteDialogOpen = ref(false)
 const tableActionsOpen = ref(false)
-const tableActionsButtonRef = ref(null)
+const tableActionsButtonRef = ref<any>(null)
 const tableActionsPosition = ref({ x: 0, y: 0 })
 const isPageLoading = ref(false)
 const isLoadingArtifacts = ref(false)
 
 // The artifact_id the user has explicitly selected (null = nothing selected)
-const selectedArtifactId = ref(null)
+const selectedArtifactId = ref<any>(null)
 
 // Artifacts fetched from the active conversation turn.
-const workspaceArtifacts = ref([])
+const workspaceArtifacts = ref<any[]>([])
 
 const isMounted = ref(false)
-const serverRows = ref([])
-const clientRows = ref([])
-const serverColumns = ref([])
+const serverRows = ref<any[]>([])
+const clientRows = ref<any[]>([])
+const serverColumns = ref<any[]>([])
 const rowCountValue = ref(0)
 const windowStart = ref(0)
 const windowEnd = ref(0)
@@ -261,11 +261,11 @@ const tableQuery = ref(createTableQuery({ pageSize }))
 const tableError = ref('')
 const artifactListError = ref('')
 const pendingControllers = new Set()
-let listAbortController = null
+let listAbortController: AbortController | null = null
 let serializedRequestQueue = Promise.resolve()
 let selectedArtifactLoadToken = 0
 let currentPageRequestToken = 0
-let tableSearchDebounceTimer = null
+let tableSearchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 const pendingRestorePageByArtifact = new Map()
 const tableActionItems = computed(() => [
   { id: 'delete', label: 'Delete table', destructive: true, disabled: !canDeleteSelectedArtifact.value || isDeletingArtifact.value },
@@ -277,7 +277,7 @@ function toggleTableActions() {
   tableActionsOpen.value = !tableActionsOpen.value
 }
 
-function handleTableAction(action) {
+function handleTableAction(action: any) {
   if (action === 'delete') openDeleteDialog()
 }
 
@@ -296,7 +296,7 @@ onUnmounted(() => {
 
 const allArtifacts = computed(() => (Array.isArray(workspaceArtifacts.value) ? workspaceArtifacts.value : []))
 
-function normalizeClientRowsFromDataframeValue(value) {
+function normalizeClientRowsFromDataframeValue(value: any) {
   if (Array.isArray(value)) {
     return value
       .filter((row) => row && typeof row === 'object' && !Array.isArray(row))
@@ -307,16 +307,16 @@ function normalizeClientRowsFromDataframeValue(value) {
   const rawRows = Array.isArray(value.data) ? value.data : []
   if (!rawRows.length) return []
   if (rawRows[0] && typeof rawRows[0] === 'object' && !Array.isArray(rawRows[0])) {
-    return rawRows.map((row) => ({ ...row }))
+    return rawRows.map((row: any) => ({ ...row }))
   }
 
-  const columns = Array.isArray(value.columns) ? value.columns.map((column) => String(column)) : []
+  const columns = Array.isArray(value.columns) ? value.columns.map((column: any) => String(column)) : []
   if (!columns.length) return []
   return rawRows
-    .map((row) => {
+    .map((row: any) => {
       if (!Array.isArray(row)) return null
-      const mapped = {}
-      columns.forEach((column, idx) => {
+      const mapped: Record<string, unknown> = {}
+      columns.forEach((column: any, idx: any) => {
         mapped[column] = row[idx]
       })
       return mapped
@@ -324,11 +324,11 @@ function normalizeClientRowsFromDataframeValue(value) {
     .filter(Boolean)
 }
 
-function normalizeLiveDataframeArtifact(item, index) {
+function normalizeLiveDataframeArtifact(item: any, index: any) {
   const data = item?.data && typeof item.data === 'object' ? item.data : item
   const rows = normalizeClientRowsFromDataframeValue(data)
   const columns = Array.isArray(data?.columns) && data.columns.length > 0
-    ? data.columns.map((column) => String(column))
+    ? data.columns.map((column: any) => String(column))
     : (rows[0] ? Object.keys(rows[0]) : [])
   const artifactId = String(data?.artifact_id || item?.artifact_id || `live-dataframe-${index + 1}`).trim()
   const logicalName = String(data?.logical_name || item?.logical_name || item?.name || `dataframe_${index + 1}`).trim()
@@ -338,7 +338,7 @@ function normalizeLiveDataframeArtifact(item, index) {
     logical_name: logicalName,
     display_name: String(data?.display_name || item?.display_name || logicalName).trim(),
     row_count: Number(data?.row_count || rows.length || 0),
-    schema: columns.map((name) => ({ name })),
+    schema: columns.map((name: any) => ({ name })),
     preview_rows: rows,
     source: item?.promoted ? 'revision' : 'live',
   }
@@ -354,7 +354,7 @@ const liveDataframeArtifacts = computed(() => {
   const workspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
   const scopeKey = conversationId ? `conversation:${conversationId}` : `workspace:${workspaceId || 'unscoped'}`
   const userRevisions = (Array.isArray(artifactStore.promotedUserDataframes) ? artifactStore.promotedUserDataframes : [])
-    .filter((item) => String(item?.scopeKey || '') === scopeKey)
+    .filter((item: any) => String(item?.scopeKey || '') === scopeKey)
   return [...userRevisions, ...(Array.isArray(artifactStore.dataframes) ? artifactStore.dataframes : [])]
     .map((item, index) => normalizeLiveDataframeArtifact(item, index))
     .filter((artifact) => artifact.artifact_id && !persistedIds.has(artifact.artifact_id))
@@ -423,7 +423,7 @@ watch(
   },
 )
 
-function resolvePreferredTableSelectionId(availableArtifactIds) {
+function resolvePreferredTableSelectionId(availableArtifactIds: any) {
   const currentSelection = String(selectedArtifactId.value || '').trim()
   if (currentSelection && availableArtifactIds.has(currentSelection)) return currentSelection
   return displayArtifacts.value[0]?.artifact_id || null
@@ -435,18 +435,18 @@ function createAbortError(message = 'Request aborted') {
   return error
 }
 
-function isAbortError(error) {
+function isAbortError(error: any) {
   return error?.name === 'AbortError'
 }
 
-function isArtifactMissingError(error) {
+function isArtifactMissingError(error: any) {
   const status = Number(error?.response?.status ?? error?.status ?? 0)
   if (status === 404) return true
   const detail = String(error?.response?.data?.detail || error?.message || '').toLowerCase()
   return detail.includes('artifact not found')
 }
 
-function clearMissingSelectedArtifact(artifactId) {
+function clearMissingSelectedArtifact(artifactId: any) {
   const normalizedArtifactId = String(artifactId || selectedArtifactId.value || '').trim()
   if (!normalizedArtifactId) return
   const workspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
@@ -463,7 +463,7 @@ function clearMissingSelectedArtifact(artifactId) {
   resetTableState()
 }
 
-function enqueueSerializedRequest(task) {
+function enqueueSerializedRequest(task: any) {
   const next = serializedRequestQueue.catch(() => {}).then(task)
   serializedRequestQueue = next.catch(() => {})
   return next
@@ -486,11 +486,12 @@ async function loadActiveTurnArtifacts() {
   artifactListError.value = ''
   artifactStore.clearDataPaneError()
   try {
-    const response = await enqueueSerializedRequest(() => artifactApi.listTurn(
+    const controller = listAbortController
+    const response: any = await enqueueSerializedRequest(() => artifactApi.listTurn(
       conversationId,
       turnId,
       'dataframe',
-      { signal: listAbortController.signal }
+      { signal: controller.signal }
     ))
     const artifacts = Array.isArray(response?.artifacts) ? response.artifacts : []
     workspaceArtifacts.value = artifacts
@@ -509,12 +510,12 @@ async function loadActiveTurnArtifacts() {
         selectedArtifactId.value = displayArtifacts.value[0]?.artifact_id || null
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     if (isAbortError(error)) return
     console.warn('Failed to load active turn artifacts:', error)
     const brief = error?.response?.data?.detail || error?.message || 'Failed to load tables'
     artifactListError.value = brief
-    uiStore.setDataPaneError(brief)
+    artifactStore.setDataPaneError(brief)
     workspaceArtifacts.value = []
   } finally {
     isLoadingArtifacts.value = false
@@ -557,7 +558,7 @@ watch(
 
     try {
       await prepareArtifact(nextSelection)
-    } catch (error) {
+    } catch (error: any) {
       if (isAbortError(error)) return
       tableError.value = error?.message || 'Failed to load selected table.'
     }
@@ -596,7 +597,7 @@ watch(selectedArtifactId, async (newId) => {
     if (liveArtifact.source_artifact_id) {
       try {
         await prepareArtifact(newId)
-      } catch (error) {
+      } catch (error: any) {
         if (isAbortError(error)) return
         tableError.value = error?.message || 'Failed to load selected table.'
       }
@@ -628,7 +629,7 @@ watch(selectedArtifactId, async (newId) => {
   if (loadToken !== selectedArtifactLoadToken) return
   try {
     await prepareArtifact(newId)
-  } catch (error) {
+  } catch (error: any) {
     if (isAbortError(error)) return
     tableError.value = error?.message || 'Failed to load selected table.'
   }
@@ -721,7 +722,7 @@ const tableColumns = computed(() => {
 })
 
 function cancelPendingRequests() {
-  for (const controller of pendingControllers) {
+  for (const controller of pendingControllers as Set<AbortController>) {
     try { controller.abort() } catch (_) { /* no-op */ }
   }
   pendingControllers.clear()
@@ -764,7 +765,7 @@ function updateTableViewport() {
   artifactStore.setTableViewport(start, end, total)
 }
 
-function restoredArtifactPage(artifactId) {
+function restoredArtifactPage(artifactId: any) {
   if (!artifactId || String(tableSearch.value || '').trim()) return 0
   const rememberedPage = pendingRestorePageByArtifact.get(artifactId)
     ?? artifactStore.getTablePageOffset(workspaceStore.activeWorkspaceId, artifactId)
@@ -774,7 +775,7 @@ function restoredArtifactPage(artifactId) {
   return Math.min(rememberedPage, Math.max(0, Math.ceil(knownTotal / pageSize) - 1))
 }
 
-function handleTableQueryChange(nextQuery) {
+function handleTableQueryChange(nextQuery: any) {
   const normalizedQuery = createTableQuery(nextQuery)
   tableQuery.value = normalizedQuery
   const artifactId = String(selectedArtifactId.value || '').trim()
@@ -787,7 +788,7 @@ function handleTableQueryChange(nextQuery) {
   updateTableViewport()
 }
 
-function columnsChanged(nextColumns) {
+function columnsChanged(nextColumns: any) {
   if (!Array.isArray(nextColumns)) return false
   if (nextColumns.length !== serverColumns.value.length) return true
   for (let i = 0; i < nextColumns.length; i += 1) {
@@ -799,7 +800,7 @@ function columnsChanged(nextColumns) {
 // ---------------------------------------------------------------------------
 // Data loading
 // ---------------------------------------------------------------------------
-async function prepareArtifact(artifactId) {
+async function prepareArtifact(artifactId: any) {
   if (!artifactId || !workspaceStore.activeWorkspaceId) return
   const sourceArtifactId = String(selectedArtifactMeta.value?.source_artifact_id || '').trim()
   if (!sourceArtifactId && (!conversationStore.activeConversationId || !conversationStore.activeTurnId)) return
@@ -811,7 +812,7 @@ async function prepareArtifact(artifactId) {
   await loadServerPage(artifactId, tableQuery.value)
 }
 
-async function loadServerPage(artifactId, query = tableQuery.value) {
+async function loadServerPage(artifactId: any, query = tableQuery.value) {
   const workspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
   const conversationId = String(conversationStore.activeConversationId || '').trim()
   const turnId = String(conversationStore.activeTurnId || '').trim()
@@ -829,7 +830,7 @@ async function loadServerPage(artifactId, query = tableQuery.value) {
     const pageIndex = Math.max(0, Number(query?.pageIndex || 0))
     const requestLimit = Math.max(1, Math.min(pageSize, Number(query?.pageSize || pageSize)))
     const startRow = pageIndex * requestLimit
-    const payload = await enqueueSerializedRequest(async () => {
+    const payload: any = await enqueueSerializedRequest(async () => {
       if (workspaceId !== String(workspaceStore.activeWorkspaceId || '').trim()) throw createAbortError()
       if (!sourceArtifactId && conversationId !== String(conversationStore.activeConversationId || '').trim()) throw createAbortError()
       if (!sourceArtifactId && turnId !== String(conversationStore.activeTurnId || '').trim()) throw createAbortError()
@@ -865,7 +866,7 @@ async function loadServerPage(artifactId, query = tableQuery.value) {
     if (requestToken !== currentPageRequestToken) return
     const rows = Array.isArray(payload?.rows) ? payload.rows : []
     const nextColumns = Array.isArray(payload?.columns)
-      ? payload.columns.map((c) => String(c))
+      ? payload.columns.map((c: any) => String(c))
       : (rows[0] ? Object.keys(rows[0]) : [])
     if (columnsChanged(nextColumns)) {
       serverColumns.value = nextColumns
@@ -885,7 +886,7 @@ async function loadServerPage(artifactId, query = tableQuery.value) {
     rowCountValue.value = nextRowCount
     tableQuery.value = createTableQuery(query)
     updateTableViewport()
-  } catch (error) {
+  } catch (error: any) {
     if (isAbortError(error)) return
     if (isArtifactMissingError(error)) {
       clearMissingSelectedArtifact(normalizedArtifactId)
@@ -932,7 +933,7 @@ async function downloadCsv() {
       return
     }
     toast.success('Export complete', `${filename} saved.`)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to download CSV:', error)
     toast.error('Export failed', 'Unable to save CSV file.')
   } finally {
@@ -940,7 +941,7 @@ async function downloadCsv() {
   }
 }
 
-function convertToCSV(data) {
+function convertToCSV(data: any) {
   if (!data || data.length === 0) return ''
   const headers = Object.keys(data[0])
   const csvRows = [headers.map(header => `"${header}"`).join(',')]
@@ -960,7 +961,7 @@ async function retrySelectedArtifact() {
   resetTableState()
   try {
     await prepareArtifact(selectedArtifactId.value)
-  } catch (error) {
+  } catch (error: any) {
     if (isAbortError(error)) return
     tableError.value = error?.message || 'Failed to load selected table.'
   }
@@ -995,7 +996,7 @@ async function deleteSelectedArtifact() {
       resetTableState()
       artifactStore.clearTableViewport()
     }
-  } catch (error) {
+  } catch (error: any) {
     if (isAbortError(error)) return
     tableError.value = error?.message || 'Failed to delete table artifact.'
   } finally {

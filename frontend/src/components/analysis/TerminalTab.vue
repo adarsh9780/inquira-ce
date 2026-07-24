@@ -25,7 +25,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { defineAsyncComponent } from 'vue'
 import { useUiStore } from '../../stores/uiStore'
 import nativeTerminalService from '../../services/nativeTerminalService'

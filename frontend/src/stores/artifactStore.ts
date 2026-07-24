@@ -7,11 +7,11 @@ export const useArtifactStore = defineStore('artifacts', () => {
   const activeTurnArtifactRefreshKey = ref(0)
   const resultData = ref<unknown>(null)
   const plotlyFigure = ref<unknown>(null)
-  const dataframes = ref<unknown[]>([])
-  const figures = ref<unknown[]>([])
-  const scalars = ref<unknown[]>([])
-  const promotedUserDataframes = ref<unknown[]>([])
-  const promotedUserFigures = ref<unknown[]>([])
+  const dataframes = ref<Record<string, any>[]>([])
+  const figures = ref<Record<string, any>[]>([])
+  const scalars = ref<Record<string, any>[]>([])
+  const promotedUserDataframes = ref<Record<string, any>[]>([])
+  const promotedUserFigures = ref<Record<string, any>[]>([])
   const dataframeCount = ref(0)
   const tableRowCount = ref(0)
   const tableWindowStart = ref(0)
@@ -35,7 +35,7 @@ export const useArtifactStore = defineStore('artifacts', () => {
   }
 
   function setDataframes(items: unknown) {
-    dataframes.value = Array.isArray(items) ? items : []
+    dataframes.value = Array.isArray(items) ? items as Record<string, any>[] : []
     dataframeCount.value = dataframes.value.length
   }
 
@@ -66,7 +66,7 @@ export const useArtifactStore = defineStore('artifacts', () => {
   }
 
   function setScalars(items: unknown) {
-    scalars.value = Array.isArray(items) ? items : []
+    scalars.value = Array.isArray(items) ? items as Record<string, any>[] : []
   }
 
   function removeResultArtifact(artifactId: unknown) {

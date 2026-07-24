@@ -126,7 +126,7 @@
   </DialogShell>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import {
   ArrowPathIcon,
@@ -177,8 +177,8 @@ const loadError = ref('')
 const activeIndex = ref(0)
 const selectingConversationId = ref('')
 const commandActionBusyId = ref('')
-const searchInputRef = ref(null)
-const conversationsByWorkspace = ref({})
+const searchInputRef = ref<any>(null)
+const conversationsByWorkspace = ref<Record<string, any>>({})
 let loadRequestId = 0
 
 const normalizedQuery = computed(() => String(query.value || '').trim().toLowerCase())
@@ -188,7 +188,7 @@ const workspaceItems = computed(() => (
   Array.isArray(workspaceStore.workspaces) ? workspaceStore.workspaces : []
 ))
 
-function shortcutText(shortcutId) {
+function shortcutText(shortcutId: any) {
   const shortcut = SHORTCUTS.find((item) => item.id === shortcutId)
   return shortcut ? shortcutLabel(shortcut, platform) : ''
 }
@@ -368,7 +368,7 @@ const conversationStartIndex = computed(() => filteredCommandActions.value.lengt
 
 const groupedConversationSections = computed(() => {
   let paletteIndex = conversationStartIndex.value
-  const workspaceOrder = new Map(workspaceItems.value.map((workspace, index) => [
+  const workspaceOrder = new Map(workspaceItems.value.map((workspace: any, index: any) => [
     String(workspace?.id || '').trim(),
     index,
   ]))
@@ -393,7 +393,7 @@ const groupedConversationSections = computed(() => {
     })
     .map((section) => ({
       ...section,
-      rows: section.rows.map((row) => ({
+      rows: section.rows.map((row: any) => ({
         ...row,
         paletteIndex: paletteIndex++,
       })),
@@ -423,21 +423,21 @@ const footerLabel = computed(() => {
   return `${commandCount} ${commandSuffix} · ${conversationCount} ${conversationSuffix}`
 })
 
-function conversationTimestampValue(conversation) {
+function conversationTimestampValue(conversation: any) {
   return conversation?.last_turn_at || conversation?.updated_at || conversation?.created_at
 }
 
-function timestampMs(value) {
+function timestampMs(value: any) {
   const date = parseTimestamp(value)
   return date ? date.getTime() : 0
 }
 
-function formatCreatedLabel(value) {
+function formatCreatedLabel(value: any) {
   const exact = formatExactTimestamp(value)
   return exact === 'No date available' ? 'Created date unavailable' : `Created ${exact}`
 }
 
-function formatLastActiveLabel(value) {
+function formatLastActiveLabel(value: any) {
   const label = formatCompactRelativeTimestamp(value)
   return label ? `Last active ${label}` : ''
 }
@@ -451,9 +451,9 @@ async function loadConversations() {
       await workspaceStore.fetchWorkspaces()
     }
     const workspaces = workspaceItems.value
-    const entries = {}
+    const entries: Record<string, any[]> = {}
     let failedCount = 0
-    await Promise.all(workspaces.map(async (workspace) => {
+    await Promise.all(workspaces.map(async (workspace: any) => {
       const workspaceId = String(workspace?.id || '').trim()
       if (!workspaceId) return
       try {
@@ -478,22 +478,22 @@ async function loadConversations() {
   }
 }
 
-async function selectConversation(row) {
+async function selectConversation(row: any) {
   if (!row?.id || selectingConversationId.value) return
   selectingConversationId.value = row.id
   try {
     if (row.workspaceId !== String(workspaceStore.activeWorkspaceId || '').trim()) {
       await workspaceActivation.activateWorkspace(row.workspaceId)
-      await conversationStore.fetchConversations()
+      await conversationStore.fetchConversations(row.workspaceId)
     } else if (!Array.isArray(conversationStore.conversations) || conversationStore.conversations.length === 0) {
-      await conversationStore.fetchConversations()
+      await conversationStore.fetchConversations(workspaceStore.activeWorkspaceId)
     }
     conversationStore.setActiveConversationId(row.id)
     uiStore.setWorkspacePane('chat')
     uiStore.setActiveTab('workspace')
     await conversationStore.fetchConversationTurns({ preferLatest: true })
     emit('close')
-  } catch (error) {
+  } catch (error: any) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to load conversation'))
   } finally {
     selectingConversationId.value = ''
@@ -512,25 +512,25 @@ async function createConversationFromPalette() {
   emit('close')
 }
 
-async function runCommandAction(row) {
+async function runCommandAction(row: any) {
   if (!row?.run || row.disabled || commandActionBusyId.value) return
   commandActionBusyId.value = row.id
   try {
     await row.run()
-  } catch (error) {
+  } catch (error: any) {
     toast.error('Command Failed', extractApiErrorMessage(error, `Failed to run ${row.title}`))
   } finally {
     commandActionBusyId.value = ''
   }
 }
 
-function moveActiveIndex(step) {
+function moveActiveIndex(step: any) {
   const total = paletteRows.value.length
   if (total === 0) return
   activeIndex.value = (activeIndex.value + step + total) % total
 }
 
-function handlePaletteKeydown(event) {
+function handlePaletteKeydown(event: any) {
   if (event.key === 'Escape') {
     event.preventDefault()
     emit('close')

@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
 test('Wails session snapshots load and save through the native Go bridge', () => {
-  const service = read('src/services/localStateService.js')
+  const service = read('src/services/localStateService.ts')
   const goApp = read('../app.go')
 
   assert.equal(service.includes('app?.LoadLocalState'), true)
@@ -19,7 +19,7 @@ test('Wails session snapshots load and save through the native Go bridge', () =>
 })
 
 test('Wails snapshot failures remain best effort', () => {
-  const service = read('src/services/localStateService.js')
+  const service = read('src/services/localStateService.ts')
 
   assert.equal(service.includes("console.warn('Failed to load local state snapshot through Wails:'"), true)
   assert.equal(service.includes("console.warn('Failed to save local state snapshot through Wails:'"), true)

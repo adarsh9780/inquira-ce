@@ -33,19 +33,22 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 
-defineProps({
-  attachments: {
-    type: Array,
-    default: () => [],
-  },
-  formatSize: {
-    type: Function,
-    required: true,
-  },
+interface ChatAttachment {
+  attachment_id: string
+  preview_url?: string
+  filename?: string
+  size?: number
+}
+
+withDefaults(defineProps<{
+  attachments?: ChatAttachment[]
+  formatSize: (size: unknown) => string
+}>(), {
+  attachments: () => [],
 })
 
-const emit = defineEmits(['remove'])
+const emit = defineEmits<{ remove: [attachmentId: string] }>()
 </script>

@@ -330,7 +330,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useUiStore } from '../../stores/uiStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
@@ -378,19 +378,19 @@ const artifactPresentation = useArtifactPresentation()
 const authStore = useAuthStore()
 
 // ─── UI State ────────────────────────────────────────────────────────────────
-const editingId         = ref(null)
+const editingId         = ref<any>(null)
 const editingTitleValue = ref('')
 const isSaving          = ref(false)
 
-const conversationMenuId       = ref(null)
+const conversationMenuId       = ref<any>(null)
 const conversationMenuPosition = ref({ x: 0, y: 0 })
 const profileMenuOpen      = ref(false)
-const profileMenuRef       = ref(null)
-const profileMenuButtonRef = ref(null)
+const profileMenuRef       = ref<any>(null)
+const profileMenuButtonRef = ref<any>(null)
 const profileMenuPosition  = ref({ left: 0, top: 0 })
-const sidebarConversationsByWorkspace = ref({})
-const loadingConversationsByWorkspace = ref({})
-const visibleConversationCountByWorkspace = ref({})
+const sidebarConversationsByWorkspace = ref<Record<string, any>>({})
+const loadingConversationsByWorkspace = ref<Record<string, any>>({})
+const visibleConversationCountByWorkspace = ref<Record<string, any>>({})
 const DEFAULT_VISIBLE_CONVERSATION_COUNT = sidebarConversationPageSize
 useSidebarConversations()
 
@@ -438,7 +438,7 @@ const filteredSidebarWorkspaces = computed(() => {
 })
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function conversationsForWorkspace(workspaceId) {
+function conversationsForWorkspace(workspaceId: any) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return []
   if (normalizedWorkspaceId === String(workspaceStore.activeWorkspaceId || '').trim()) {
@@ -449,19 +449,19 @@ function conversationsForWorkspace(workspaceId) {
     : []
 }
 
-function visibleConversationsForSidebar(workspace) {
+function visibleConversationsForSidebar(workspace: any) {
   const workspaceId = String(workspace?.id || '').trim()
   const conversations = conversationsForWorkspace(workspaceId)
   return conversations.slice(0, visibleConversationCount(workspaceId))
 }
 
-function hasHiddenConversationsForSidebar(workspace) {
+function hasHiddenConversationsForSidebar(workspace: any) {
   const workspaceId = String(workspace?.id || '').trim()
   if (!workspaceId) return false
   return conversationsForWorkspace(workspaceId).length > visibleConversationCount(workspaceId)
 }
 
-function visibleConversationCount(workspaceId) {
+function visibleConversationCount(workspaceId: any) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   const value = Number(visibleConversationCountByWorkspace.value?.[normalizedWorkspaceId])
   return Number.isFinite(value) && value > 0
@@ -469,7 +469,7 @@ function visibleConversationCount(workspaceId) {
     : DEFAULT_VISIBLE_CONVERSATION_COUNT
 }
 
-function showMoreConversations(workspaceId) {
+function showMoreConversations(workspaceId: any) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return
   visibleConversationCountByWorkspace.value = {
@@ -478,7 +478,7 @@ function showMoreConversations(workspaceId) {
   }
 }
 
-function updateSidebarConversationCache(workspaceId, conversations) {
+function updateSidebarConversationCache(workspaceId: any, conversations: any) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return
   sidebarConversationsByWorkspace.value = {
@@ -487,10 +487,10 @@ function updateSidebarConversationCache(workspaceId, conversations) {
   }
 }
 
-function findSidebarConversation(conversationId) {
+function findSidebarConversation(conversationId: any) {
   const normalizedConversationId = String(conversationId || '').trim()
   if (!normalizedConversationId) return null
-  const activeMatch = conversationStore.conversations.find((conversation) => String(conversation?.id || '').trim() === normalizedConversationId)
+  const activeMatch = conversationStore.conversations.find((conversation: any) => String(conversation?.id || '').trim() === normalizedConversationId)
   if (activeMatch) return activeMatch
   for (const conversations of Object.values(sidebarConversationsByWorkspace.value || {})) {
     const match = Array.isArray(conversations)
@@ -501,10 +501,10 @@ function findSidebarConversation(conversationId) {
   return null
 }
 
-function removeConversationFromSidebarCache(conversationId) {
+function removeConversationFromSidebarCache(conversationId: any) {
   const normalizedConversationId = String(conversationId || '').trim()
   if (!normalizedConversationId) return
-  const nextCache = {}
+  const nextCache: Record<string, any[]> = {}
   for (const [workspaceId, conversations] of Object.entries(sidebarConversationsByWorkspace.value || {})) {
     nextCache[workspaceId] = Array.isArray(conversations)
       ? conversations.filter((conversation) => String(conversation?.id || '').trim() !== normalizedConversationId)
@@ -513,11 +513,11 @@ function removeConversationFromSidebarCache(conversationId) {
   sidebarConversationsByWorkspace.value = nextCache
 }
 
-function isWorkspaceConversationsLoading(workspaceId) {
+function isWorkspaceConversationsLoading(workspaceId: any) {
   return Boolean(loadingConversationsByWorkspace.value?.[String(workspaceId || '').trim()])
 }
 
-async function loadSidebarConversations(workspaceId, { force = false } = {}) {
+async function loadSidebarConversations(workspaceId: any, { force = false } = {}) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return []
   if (!force && sidebarConversationsByWorkspace.value?.[normalizedWorkspaceId]) {
@@ -556,11 +556,11 @@ function openConversationTree() {
   uiStore.setActiveTab('conversation-tree')
 }
 
-function conversationTimestampValue(conversation) {
+function conversationTimestampValue(conversation: any) {
   return conversation?.last_turn_at || conversation?.updated_at || conversation?.created_at
 }
 
-function formatConversationTimestamp(conversation) {
+function formatConversationTimestamp(conversation: any) {
   if (executionStore.isConversationRunning(conversation?.id)) return 'Run'
   return formatCompactRelativeTimestamp(conversationTimestampValue(conversation)) || '-'
 }
@@ -597,7 +597,7 @@ function closeProfileMenu() {
   profileMenuOpen.value = false
 }
 
-function openProfileSection(tab) {
+function openProfileSection(tab: any) {
   closeProfileMenu()
   uiStore.openSettings(tab)
 }
@@ -612,13 +612,13 @@ function openKeyboardShortcuts() {
   uiStore.openKeyboardShortcuts()
 }
 
-function shortcutTooltip(shortcutId, fallback) {
+function shortcutTooltip(shortcutId: any, fallback: any) {
   const platform = typeof navigator !== 'undefined' ? navigator.platform : ''
   return shortcutTitle(shortcutId, fallback, platform)
 }
 
 // ─── Global click — close menus ───────────────────────────────────────────────
-function handleGlobalClick(event) {
+function handleGlobalClick(event: any) {
   const target = event?.target
   if (!(target instanceof Element)) return
   if (target.closest('[data-conversation-actions-menu]')) return
@@ -628,25 +628,25 @@ function handleGlobalClick(event) {
 }
 
 // ─── Settings open-from-outside ───────────────────────────────────────────────
-function handleOpenSettingsRequest(event) {
+function handleOpenSettingsRequest(event: any) {
   const tab  = String(event?.detail?.tab  || 'api').trim() || 'api'
   uiStore.openSettings(tab)
 }
 
 // ─── Conversations ────────────────────────────────────────────────────────────
-async function selectWorkspace(workspaceId) {
+async function selectWorkspace(workspaceId: any) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return
   try {
     if (normalizedWorkspaceId !== String(workspaceStore.activeWorkspaceId || '').trim()) {
       await workspaceActivation.activateWorkspace(normalizedWorkspaceId)
     }
-    await conversationStore.fetchConversations()
+    await conversationStore.fetchConversations(normalizedWorkspaceId)
     updateSidebarConversationCache(normalizedWorkspaceId, conversationStore.conversations)
     await loadSidebarConversations(normalizedWorkspaceId, { force: true })
     uiStore.setWorkspacePane('chat')
     uiStore.setActiveTab('workspace')
-  } catch (error) {
+  } catch (error: any) {
     toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to open workspace'))
   }
 }
@@ -656,7 +656,7 @@ async function createConversation(workspaceId = workspaceStore.activeWorkspaceId
   try {
     if (normalizedWorkspaceId && normalizedWorkspaceId !== String(workspaceStore.activeWorkspaceId || '').trim()) {
       await workspaceActivation.activateWorkspace(normalizedWorkspaceId)
-      await conversationStore.fetchConversations()
+      await conversationStore.fetchConversations(normalizedWorkspaceId)
     }
     const conversation = await conversationStore.createConversation(workspaceStore.activeWorkspaceId)
     updateSidebarConversationCache(String(workspaceStore.activeWorkspaceId || '').trim(), conversationStore.conversations)
@@ -664,12 +664,12 @@ async function createConversation(workspaceId = workspaceStore.activeWorkspaceId
       conversationStore.setActiveConversationId(conversation.id)
       await conversationStore.fetchConversationTurns()
     }
-  } catch (error) {
+  } catch (error: any) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to create conversation'))
   }
 }
 
-async function selectConversation(workspaceId, id) {
+async function selectConversation(workspaceId: any, id: any) {
   closeConversationMenu()
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   const target = String(id || '').trim()
@@ -678,7 +678,7 @@ async function selectConversation(workspaceId, id) {
   try {
     if (normalizedWorkspaceId && normalizedWorkspaceId !== String(workspaceStore.activeWorkspaceId || '').trim()) {
       await workspaceActivation.activateWorkspace(normalizedWorkspaceId)
-      await conversationStore.fetchConversations()
+      await conversationStore.fetchConversations(normalizedWorkspaceId)
       updateSidebarConversationCache(normalizedWorkspaceId, conversationStore.conversations)
     }
     if (target !== current) {
@@ -688,13 +688,13 @@ async function selectConversation(workspaceId, id) {
       uiStore.setActiveTab('workspace')
     }
     await conversationStore.fetchConversationTurns({ preferLatest: true })
-  } catch (error) {
+  } catch (error: any) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to load conversation'))
   }
 }
 
 // ─── Inline title editing ─────────────────────────────────────────────────────
-function startEditing(conv) {
+function startEditing(conv: any) {
   closeConversationMenu()
   editingId.value         = conv.id
   editingTitleValue.value = conv.title || 'Untitled'
@@ -705,7 +705,7 @@ function cancelEditing() {
   editingTitleValue.value = ''
 }
 
-async function saveTitle(id) {
+async function saveTitle(id: any) {
   if (editingId.value !== id || isSaving.value) return
 
   const newTitle = editingTitleValue.value.trim()
@@ -727,9 +727,9 @@ async function saveTitle(id) {
       await conversationStore.updateConversationTitle(newTitle)
     } else {
       const updated = await conversationApi.update(id, newTitle)
-      const idx = conversationStore.conversations.findIndex((conversation) => conversation.id === id)
+      const idx = conversationStore.conversations.findIndex((conversation: any) => conversation.id === id)
       if (idx !== -1) {
-        conversationStore.conversations[idx] = { ...conversationStore.conversations[idx], title: updated.title }
+        conversationStore.conversations[idx] = { ...conversationStore.conversations[idx], title: String(updated.title || '') }
       }
       for (const [workspaceId, conversations] of Object.entries(sidebarConversationsByWorkspace.value || {})) {
         const cachedIndex = Array.isArray(conversations)
@@ -742,7 +742,7 @@ async function saveTitle(id) {
         break
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     toast.error('Rename Failed', extractApiErrorMessage(error, 'Failed to update title'))
   } finally {
     isSaving.value = false
@@ -751,7 +751,7 @@ async function saveTitle(id) {
 }
 
 // ─── Conversation context menu ────────────────────────────────────────────────
-function clampMenuPosition(x, y, width = 208, height = 128) {
+function clampMenuPosition(x: any, y: any, width = 208, height = 128) {
   const gap = 8
   const viewportWidth = typeof window === 'undefined' ? width + gap * 2 : window.innerWidth
   const viewportHeight = typeof window === 'undefined' ? height + gap * 2 : window.innerHeight
@@ -761,7 +761,7 @@ function clampMenuPosition(x, y, width = 208, height = 128) {
   }
 }
 
-function positionConversationMenuFromEvent(event) {
+function positionConversationMenuFromEvent(event: any) {
   const rect = event?.currentTarget?.getBoundingClientRect?.()
   if (rect) {
     return clampMenuPosition(rect.right - 208, rect.bottom + 4, 208, 128)
@@ -769,14 +769,14 @@ function positionConversationMenuFromEvent(event) {
   return clampMenuPosition(event?.clientX || 0, event?.clientY || 0, 208, 128)
 }
 
-function openSingleConversationMenu(conversationId, position) {
+function openSingleConversationMenu(conversationId: any, position: any) {
   const id = String(conversationId || '').trim()
   if (!id) return
   conversationMenuPosition.value = position
   conversationMenuId.value = id
 }
 
-function toggleConversationMenu(event, conversationId) {
+function toggleConversationMenu(event: any, conversationId: any) {
   const id = String(conversationId || '').trim()
   if (!id) return
   if (conversationMenuId.value === id) {
@@ -786,14 +786,14 @@ function toggleConversationMenu(event, conversationId) {
   openSingleConversationMenu(id, positionConversationMenuFromEvent(event))
 }
 
-function openConversationContextMenu(event, conversationId) {
+function openConversationContextMenu(event: any, conversationId: any) {
   closeConversationMenu()
   const id = String(conversationId || '').trim()
   if (!id) return
   openSingleConversationMenu(id, clampMenuPosition(event?.clientX || 0, event?.clientY || 0, 208, 128))
 }
 
-function startEditingFromMenu(conv) {
+function startEditingFromMenu(conv: any) {
   if (!conv?.id) {
     closeConversationMenu()
     return
@@ -807,7 +807,7 @@ function closeConversationMenu() {
 }
 
 // ─── Delete conversation ──────────────────────────────────────────────────────
-function confirmDeleteConversation(conversationId) {
+function confirmDeleteConversation(conversationId: any) {
   cancelEditing()
   closeConversationMenu()
 
@@ -832,7 +832,7 @@ async function confirmDelete() {
     removeConversationFromSidebarCache(pendingDeleteId.value)
     toast.success('Conversation Deleted', 'Conversation has been removed.')
     closeDeleteDialog()
-  } catch (error) {
+  } catch (error: any) {
     toast.error('Delete Error', extractApiErrorMessage(error, 'Failed to delete'))
   }
 }
@@ -844,7 +844,7 @@ onMounted(async () => {
   try {
     await workspaceStore.fetchWorkspaces()
     if (workspaceStore.activeWorkspaceId) {
-      await conversationStore.fetchConversations()
+      await conversationStore.fetchConversations(workspaceStore.activeWorkspaceId)
       updateSidebarConversationCache(workspaceStore.activeWorkspaceId, conversationStore.conversations)
     }
   } catch {
@@ -865,7 +865,7 @@ onUnmounted(() => {
 
 watch(() => workspaceStore.activeWorkspaceId, async (newId) => {
   if (newId) {
-    await conversationStore.fetchConversations()
+    await conversationStore.fetchConversations(newId)
     updateSidebarConversationCache(newId, conversationStore.conversations)
   }
 })

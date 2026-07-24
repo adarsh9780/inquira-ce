@@ -22,8 +22,8 @@ test('app motion primitives share intentional timing and reduced-motion behavior
 test('floating overlays animate from their anchor and are positioned before enter', () => {
   const headerDropdown = read('src/components/ui/HeaderDropdown.vue')
   const floatingMenu = read('src/components/ui/FloatingActionMenu.vue')
-  const floatingPosition = read('src/composables/useFloatingDropdown.js')
-  const sharedDropdown = read('src/components/ui/dropdownShared.js')
+  const floatingPosition = read('src/composables/useFloatingDropdown.ts')
+  const sharedDropdown = read('src/components/ui/dropdownShared.ts')
 
   assert.match(headerDropdown, /ui-combobox-content\[data-state='open'\]/)
   assert.match(headerDropdown, /animation: combobox-in/)

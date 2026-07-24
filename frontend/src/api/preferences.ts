@@ -4,13 +4,13 @@ type RecordValue = Record<string, unknown>
 
 export const preferencesApi = {
   get(provider: unknown = null) {
-    return invokeNative<RecordValue>('GetModelPreferences', String(provider || ''))
+    return invokeNative('GetModelPreferences', String(provider || ''))
   },
   update(payload: RecordValue = {}) {
-    return invokeNative<RecordValue>('UpdateModelPreferences', payload)
+    return invokeNative('UpdateModelPreferences', payload)
   },
   searchModels(provider: unknown, query: unknown, limit = 25) {
-    return invokeNative<unknown[]>(
+    return invokeNative(
       'SearchProviderModels',
       String(provider || ''),
       String(query || ''),
@@ -18,6 +18,6 @@ export const preferencesApi = {
     )
   },
   terms() {
-    return invokeNative<RecordValue>('GetTermsAndConditions')
+    return invokeNative('GetTermsAndConditions')
   },
 }

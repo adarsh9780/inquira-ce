@@ -2,14 +2,14 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { toast, useToast } from '../src/composables/useToast.js'
+import { toast, useToast } from '../src/composables/useToast.ts'
 
 test('toast system keeps session history and renders right-edge timeout progress', () => {
-  const toastComposable = readFileSync(resolve(process.cwd(), 'src/composables/useToast.js'), 'utf-8')
+  const toastComposable = readFileSync(resolve(process.cwd(), 'src/composables/useToast.ts'), 'utf-8')
   const toastContainer = readFileSync(resolve(process.cwd(), 'src/components/ui/ToastContainer.vue'), 'utf-8')
   const toastNotification = readFileSync(resolve(process.cwd(), 'src/components/ui/ToastNotification.vue'), 'utf-8')
 
-  assert.equal(toastComposable.includes('const notificationHistory = ref([])'), true)
+  assert.equal(toastComposable.includes('const notificationHistory = ref<'), true)
   assert.equal(toastComposable.includes('const MAX_NOTIFICATION_HISTORY = 100'), true)
   assert.equal(toastComposable.includes('const DUPLICATE_NOTIFICATION_WINDOW_MS = 60_000'), true)
   assert.equal(toastComposable.includes('markAllNotificationsRead'), true)

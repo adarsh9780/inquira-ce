@@ -231,7 +231,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { useUiStore } from '../../stores/uiStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
@@ -345,11 +345,11 @@ function selectNextRun() {
   selectedRunId.value = executionItems.value[selectedRunIndex.value - 1]?.id || selectedRunId.value
 }
 
-function focusRun(id) {
+function focusRun(id: any) {
   focusedRunId.value = id
 }
 
-function deleteRun(execution) {
+function deleteRun(execution: any) {
   if (!execution?.entryId) return
   const currentIndex = executionItems.value.findIndex((item) => item.id === execution.id)
   const fallback = executionItems.value[currentIndex - 1] || executionItems.value[currentIndex + 1] || null
@@ -358,7 +358,7 @@ function deleteRun(execution) {
   if (focusedRunId.value === execution.id) focusedRunId.value = ''
 }
 
-function hasOutput(execution) {
+function hasOutput(execution: any) {
   return Boolean(
     execution.stdout
     || execution.stderr
@@ -368,11 +368,11 @@ function hasOutput(execution) {
   )
 }
 
-function hasTextOutput(execution) {
+function hasTextOutput(execution: any) {
   return Boolean(execution.stdout || execution.stderr || execution.scalarOutputs.length)
 }
 
-function formatScalarValue(value) {
+function formatScalarValue(value: any) {
   if (value === undefined) return 'Result payload is unavailable.'
   if (value === null) return 'null'
   if (typeof value === 'string') return value
@@ -384,7 +384,7 @@ function formatScalarValue(value) {
   }
 }
 
-function hasLargeInlineOutput(execution) {
+function hasLargeInlineOutput(execution: any) {
   return (
     String(execution.stdout || '').length > INLINE_TEXT_LIMIT
     || String(execution.stderr || '').length > INLINE_TEXT_LIMIT
@@ -392,17 +392,17 @@ function hasLargeInlineOutput(execution) {
   )
 }
 
-function displayText(value, execution) {
+function displayText(value: any, execution: any) {
   const text = String(value || '')
   if (focusedRunId.value === execution.id || text.length <= INLINE_TEXT_LIMIT) return text
   return `${text.slice(0, INLINE_TEXT_LIMIT)}\n…`
 }
 
-function displayScalar(value, execution) {
+function displayScalar(value: any, execution: any) {
   return displayText(formatScalarValue(value), execution)
 }
 
-function outputSummary(execution) {
+function outputSummary(execution: any) {
   if (execution.status === 'running') return 'Running'
   const parts = []
   if (execution.stdout) parts.push('text')
@@ -413,7 +413,7 @@ function outputSummary(execution) {
   return parts.length ? parts.join(' · ') : 'No output'
 }
 
-function historySummary(execution) {
+function historySummary(execution: any) {
   if (execution.status === 'running') return 'Running'
   if (execution.status === 'error' || execution.stderr) return 'Error'
   if (execution.chartOutputs.length) return 'Chart'
@@ -423,15 +423,15 @@ function historySummary(execution) {
   return 'No output'
 }
 
-function promoteTable(execution, table, index) {
+function promoteTable(execution: any, table: any, index: any) {
   artifactPresentation.promoteUserRunTable(table, { runId: execution.runId, outputId: table.id, index })
 }
 
-function promoteChart(execution, chart, index) {
+function promoteChart(execution: any, chart: any, index: any) {
   artifactPresentation.promoteUserRunFigure(chart, { runId: execution.runId, outputId: chart.id, index })
 }
 
-function formatTimestamp(raw) {
+function formatTimestamp(raw: any) {
   const value = String(raw || '').trim()
   if (!value) return ''
   const date = new Date(value)
@@ -439,7 +439,7 @@ function formatTimestamp(raw) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-function formatDuration(durationMs) {
+function formatDuration(durationMs: any) {
   const value = Number(durationMs)
   if (!Number.isFinite(value) || value < 0) return ''
   return `${(value / 1000).toFixed(2)}s`

@@ -89,7 +89,7 @@
   />
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { useUiStore } from '../../stores/uiStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
@@ -123,24 +123,24 @@ const conversationStore = useConversationStore()
 const workspaceActivation = useWorkspaceActivation()
 const artifactPresentation = useArtifactPresentation()
 
-const plotContainer = ref(null)
-let ro = null
+const plotContainer = ref<any>(null)
+let ro: ResizeObserver | null = null
 const isDownloading = ref(false)
 const isLoadingArtifacts = ref(false)
 const isLoadingFigure = ref(false)
 const isDeletingArtifact = ref(false)
 const isDeleteDialogOpen = ref(false)
-const selectedArtifactId = ref(null)
+const selectedArtifactId = ref<any>(null)
 const isMounted = ref(false)
-const workspaceFigureArtifacts = ref([])
-const selectedFigurePayload = ref(null)
+const workspaceFigureArtifacts = ref<any[]>([])
+const selectedFigurePayload = ref<any>(null)
 const artifactListError = ref('')
 const exportMenuOpen = ref(false)
-const exportMenuButtonRef = ref(null)
+const exportMenuButtonRef = ref<any>(null)
 const exportMenuPosition = ref({ x: 0, y: 0 })
-let listAbortController = null
-let figureAbortController = null
-let plotly = null
+let listAbortController: AbortController | null = null
+let figureAbortController: AbortController | null = null
+let plotly: any = null
 
 const exportMenuItems = computed(() => [
   { id: 'png', label: 'PNG image (.png)' },
@@ -162,7 +162,7 @@ const liveFigureArtifacts = computed(() => {
   const workspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
   const scopeKey = conversationId ? `conversation:${conversationId}` : `workspace:${workspaceId || 'unscoped'}`
   const userRevisions = (Array.isArray(artifactStore.promotedUserFigures) ? artifactStore.promotedUserFigures : [])
-    .filter((item) => String(item?.scopeKey || '') === scopeKey)
+    .filter((item: any) => String(item?.scopeKey || '') === scopeKey)
   return [...userRevisions, ...(Array.isArray(artifactStore.figures) ? artifactStore.figures : [])]
     .map((fig, index) => {
       const figurePayload = normalizePlotlyFigure(fig?.data ?? fig)
@@ -223,7 +223,7 @@ function toggleExportMenu() {
   exportMenuOpen.value = !exportMenuOpen.value
 }
 
-function handleExportMenuSelect(action) {
+function handleExportMenuSelect(action: any) {
   if (action === 'png') void downloadPng()
   if (action === 'html') void downloadHtml()
   if (action === 'delete') openDeleteDialog()
@@ -374,7 +374,7 @@ async function loadActiveTurnFigureArtifacts() {
   isLoadingArtifacts.value = true
   artifactListError.value = ''
   try {
-    const response = await artifactApi.listTurn(
+    const response: any = await artifactApi.listTurn(
       conversationId,
       turnId,
       'figure',
@@ -401,7 +401,7 @@ async function loadActiveTurnFigureArtifacts() {
     } else if (selectedArtifactId.value && !selectedFigurePayload.value) {
       await loadSelectedFigurePayload(selectedArtifactId.value)
     }
-  } catch (error) {
+  } catch (error: any) {
     if (error?.name === 'AbortError') return
     console.warn('Failed to load active turn figure artifacts:', error)
     artifactListError.value = error?.message || 'Failed to load charts.'
@@ -415,7 +415,7 @@ async function loadActiveTurnFigureArtifacts() {
   }
 }
 
-async function loadSelectedFigurePayload(artifactId) {
+async function loadSelectedFigurePayload(artifactId: any) {
   const conversationId = String(conversationStore.activeConversationId || '').trim()
   const turnId = String(conversationStore.activeTurnId || '').trim()
   const normalizedArtifactId = String(artifactId || '').trim()
@@ -441,7 +441,7 @@ async function loadSelectedFigurePayload(artifactId) {
   figureAbortController = new AbortController()
   isLoadingFigure.value = true
   try {
-    const metadata = await artifactApi.metadata(
+    const metadata: any = await artifactApi.metadata(
       conversationId,
       turnId,
       normalizedArtifactId,
@@ -454,7 +454,7 @@ async function loadSelectedFigurePayload(artifactId) {
     if (selectedArtifactId.value !== normalizedArtifactId) return
     selectedFigurePayload.value = figurePayload
     artifactStore.setPlotlyFigure(figurePayload)
-  } catch (error) {
+  } catch (error: any) {
     if (error?.name === 'AbortError') return
     console.warn('Failed to load selected figure payload:', error)
     selectedFigurePayload.value = null
@@ -475,7 +475,7 @@ async function waitForContainer(retries = 10) {
   return false
 }
 
-function escapeHtml(value) {
+function escapeHtml(value: any) {
   return String(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -526,7 +526,7 @@ async function renderPlot() {
       try { plotly?.Plots.resize(plotContainer.value) } catch (e) {}
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to render plot:', error)
   }
 }
@@ -538,7 +538,7 @@ function getExportBaseName() {
   return logicalName || 'chart'
 }
 
-function decodeBase64ToBytes(base64Text) {
+function decodeBase64ToBytes(base64Text: any) {
   const raw = atob(String(base64Text || ''))
   const bytes = new Uint8Array(raw.length)
   for (let i = 0; i < raw.length; i += 1) {
@@ -571,7 +571,7 @@ async function downloadPng() {
       browserFileTypes: [{ description: 'PNG Image', accept: { 'image/png': ['.png'] } }]
     })
     if (exported) toast.success('Export complete', 'Chart saved as PNG.')
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to download PNG:', error)
     toast.error('Export failed', 'Unable to save PNG file.')
   } finally {
@@ -612,7 +612,7 @@ async function downloadHtml() {
 <body>
     <h1>${escapedChartTitle}</h1>
     <div id="chart"></div>
-    <script>
+    <script lang="ts">
         Plotly.newPlot(
           'chart',
           ${JSON.stringify(figureData.data || [])},
@@ -633,7 +633,7 @@ async function downloadHtml() {
       browserFileTypes: [{ description: 'HTML File', accept: { 'text/html': ['.html'] } }]
     })
     if (exported) toast.success('Export complete', 'Chart saved as HTML.')
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to download HTML:', error)
     toast.error('Export failed', 'Unable to save HTML file.')
   } finally {
@@ -670,7 +670,7 @@ async function deleteSelectedFigure() {
       selectedFigurePayload.value = null
       artifactStore.setPlotlyFigure(null)
     }
-  } catch (error) {
+  } catch (error: any) {
     if (error?.name === 'AbortError') return
     artifactListError.value = error?.message || 'Failed to delete chart.'
   } finally {

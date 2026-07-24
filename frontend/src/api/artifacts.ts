@@ -1,3 +1,4 @@
+import type { NativeRowsRequest } from '../types/native'
 import { invokeNative, withAbortSignal } from './native.ts'
 
 type RecordValue = Record<string, unknown>
@@ -33,7 +34,7 @@ function writeCache(key: string, payload: unknown) {
 }
 
 async function getRows(
-  method: string,
+  method: 'GetWorkspaceArtifactRows' | 'GetTurnArtifactRows',
   prefix: string,
   arguments_: unknown[],
   offset: number,
@@ -58,17 +59,24 @@ async function getRows(
   if (cached) return withAbortSignal(Promise.resolve(cached), options.signal || null)
   let request = rowsInFlight.get(key)
   if (!request) {
-    request = invokeNative(
-      method,
-      ...arguments_.map((value) => String(value || '')),
-      {
-        offset: Number(offset || 0),
-        limit: Number(limit || 0),
-        sort_model: sortModel,
-        filter_model: filterModel,
-        search_text: searchText,
-      },
-    ).then((payload) => {
+    const normalizedArguments = arguments_.map((value) => String(value || ''))
+    const rowsRequest: NativeRowsRequest = {
+      offset: Number(offset || 0),
+      limit: Number(limit || 0),
+      sort_model: sortModel,
+      filter_model: filterModel,
+      search_text: searchText,
+    }
+    const nativeRequest = method === 'GetWorkspaceArtifactRows'
+      ? invokeNative(method, normalizedArguments[0] || '', normalizedArguments[1] || '', rowsRequest)
+      : invokeNative(
+        method,
+        normalizedArguments[0] || '',
+        normalizedArguments[1] || '',
+        normalizedArguments[2] || '',
+        rowsRequest,
+      )
+    request = nativeRequest.then((payload) => {
       writeCache(key, payload)
       return clone(payload)
     }).finally(() => rowsInFlight.delete(key))
@@ -98,24 +106,34 @@ export const artifactApi = {
       options,
     )
   },
-  listTurn(conversationId: unknown, turnId: unknown, kind = 'dataframe') {
-    return invokeNative<unknown[]>(
+  listTurn(
+    conversationId: unknown,
+    turnId: unknown,
+    kind = 'dataframe',
+    options: { signal?: AbortSignal | null } = {},
+  ) {
+    return withAbortSignal(invokeNative(
       'ListTurnArtifactSummaries',
       String(conversationId || ''),
       String(turnId || ''),
       String(kind || ''),
-    )
+    ), options.signal || null)
   },
-  metadata(conversationId: unknown, turnId: unknown, artifactId: unknown) {
-    return invokeNative<RecordValue>(
+  metadata(
+    conversationId: unknown,
+    turnId: unknown,
+    artifactId: unknown,
+    options: { signal?: AbortSignal | null } = {},
+  ) {
+    return withAbortSignal(invokeNative(
       'GetTurnArtifactMetadata',
       String(conversationId || ''),
       String(turnId || ''),
       String(artifactId || ''),
-    )
+    ), options.signal || null)
   },
   remove(conversationId: unknown, turnId: unknown, artifactId: unknown) {
-    return invokeNative<RecordValue>(
+    return invokeNative(
       'DeleteTurnArtifact',
       String(conversationId || ''),
       String(turnId || ''),

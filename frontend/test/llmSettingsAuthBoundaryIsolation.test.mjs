@@ -18,7 +18,7 @@ test('llm settings tab resets key state and reloads preferences when auth user c
 })
 
 test('llm config composable exposes auth-boundary reset for provider/key presence caches', () => {
-  const source = readSource('src/composables/useLLMConfig.js')
+  const source = readSource('src/composables/useLLMConfig.ts')
 
   assert.equal(source.includes('function resetForAuthBoundary()'), true)
   assert.equal(source.includes('apiKeyPresenceByProvider.value = {}'), true)

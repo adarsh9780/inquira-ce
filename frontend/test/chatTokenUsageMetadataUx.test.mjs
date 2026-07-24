@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 
 test('status bar renders provider usage only when token metadata is available', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/layout/StatusBar.vue'), 'utf8')
-  const formatter = readFileSync(resolve(process.cwd(), 'src/utils/usageFormat.js'), 'utf8')
+  const formatter = readFileSync(resolve(process.cwd(), 'src/utils/usageFormat.ts'), 'utf8')
 
   assert.equal(source.includes('conversationStore.activeConversationUsage'), true)
   assert.equal(source.includes('conversationStore.liveTokenUsage'), true)

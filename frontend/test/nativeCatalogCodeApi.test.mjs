@@ -23,6 +23,6 @@ test('manual Code-tab execution uses the persisted native run API', () => {
 })
 
 test('schema regeneration uses the native generator', () => {
-  assert.match(source, /invokeNative<RecordValue>\('RegenerateWorkspaceDatasetSchema'/)
+  assert.match(source, /invokeNative\('RegenerateWorkspaceDatasetSchema'/)
   assert.doesNotMatch(source, /AI schema regeneration has not been migrated/)
 })

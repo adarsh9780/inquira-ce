@@ -247,7 +247,7 @@
   </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import {
   FlexRender,
@@ -292,13 +292,13 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:query'])
-const filterMenuElement = ref(null)
-const filterMenu = reactive({ columnId: '', x: 0, y: 0 })
-const filterDraft = reactive({ kind: 'text', operator: 'contains', value: '', valueTo: '' })
+const filterMenuElement = ref<any>(null)
+const filterMenu = reactive<any>({ columnId: '', x: 0, y: 0 })
+const filterDraft = reactive<any>({ kind: 'text', operator: 'contains', value: '', valueTo: '' })
 
 const tableColumns = computed(() => props.columns.map((name) => ({
   id: String(name),
-  accessorFn: (row) => row?.[String(name)],
+  accessorFn: (row: any) => row?.[String(name)],
   header: String(name),
   minSize: 120,
   size: 160,
@@ -379,7 +379,7 @@ onUnmounted(() => {
   window.removeEventListener('resize', closeFilterMenu)
 })
 
-function emitQuery(patch) {
+function emitQuery(patch: any) {
   emit('update:query', {
     pageIndex: pagination.value.pageIndex,
     pageSize: pagination.value.pageSize,
@@ -389,34 +389,34 @@ function emitQuery(patch) {
   })
 }
 
-function columnSizeStyle(size) {
+function columnSizeStyle(size: any) {
   return { width: `${size}px`, minWidth: `${size}px`, maxWidth: `${size}px` }
 }
 
-function columnAriaSort(column) {
+function columnAriaSort(column: any) {
   const sort = column.getIsSorted()
   if (sort === 'asc') return 'ascending'
   if (sort === 'desc') return 'descending'
   return 'none'
 }
 
-function sortButtonLabel(column) {
+function sortButtonLabel(column: any) {
   const sort = column.getIsSorted()
   if (sort === 'asc') return `Sort ${column.id} descending`
   if (sort === 'desc') return `Clear sorting for ${column.id}`
   return `Sort ${column.id} ascending`
 }
 
-function hasColumnFilter(columnId) {
-  return (props.query?.filters || []).some((entry) => entry?.columnId === columnId)
+function hasColumnFilter(columnId: any) {
+  return (props.query?.filters || []).some((entry: any) => entry?.columnId === columnId)
 }
 
-function openFilterMenu(event, columnId) {
+function openFilterMenu(event: any, columnId: any) {
   if (filterMenu.columnId === columnId) {
     closeFilterMenu()
     return
   }
-  const existing = (props.query?.filters || []).find((entry) => entry?.columnId === columnId)
+  const existing = (props.query?.filters || []).find((entry: any) => entry?.columnId === columnId)
   const kind = existing?.kind || inferTableFilterKind(props.rows, columnId)
   const rect = event.currentTarget.getBoundingClientRect()
   const menuWidth = 248
@@ -442,7 +442,7 @@ function applyColumnFilter() {
     value: filterDraft.value,
     valueTo: filterDraft.valueTo,
   }
-  const filters = (props.query?.filters || []).filter((entry) => entry?.columnId !== filterMenu.columnId)
+  const filters = (props.query?.filters || []).filter((entry: any) => entry?.columnId !== filterMenu.columnId)
   filters.push(nextFilter)
   emitQuery({ pageIndex: 0, filters })
   closeFilterMenu()
@@ -450,31 +450,31 @@ function applyColumnFilter() {
 
 function clearColumnFilter() {
   if (!filterMenu.columnId) return
-  const filters = (props.query?.filters || []).filter((entry) => entry?.columnId !== filterMenu.columnId)
+  const filters = (props.query?.filters || []).filter((entry: any) => entry?.columnId !== filterMenu.columnId)
   emitQuery({ pageIndex: 0, filters })
   closeFilterMenu()
 }
 
-function onDocumentPointerDown(event) {
+function onDocumentPointerDown(event: any) {
   if (!filterMenu.columnId || filterMenuElement.value?.contains(event.target)) return
   closeFilterMenu()
 }
 
-function onDocumentKeyDown(event) {
+function onDocumentKeyDown(event: any) {
   if (event.key === 'Escape') closeFilterMenu()
 }
 
-function formatCellValue(value) {
+function formatCellValue(value: any) {
   const formatted = typeof value === 'number' ? value.toLocaleString() : String(value)
   return formatted.length > 120 ? `${formatted.slice(0, 120)}…` : formatted
 }
 
-function cellTitle(value) {
+function cellTitle(value: any) {
   if (value == null) return 'null'
   return typeof value === 'number' ? value.toLocaleString() : String(value)
 }
 
-async function copyCellOnShortcut(event, value) {
+async function copyCellOnShortcut(event: any, value: any) {
   if (!(event.key.toLowerCase() === 'c' && (event.metaKey || event.ctrlKey))) return
   event.preventDefault()
   const text = value == null ? '' : String(value)

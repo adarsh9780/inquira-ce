@@ -150,7 +150,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ChevronRightIcon } from '@heroicons/vue/24/outline'
 import {
@@ -170,24 +170,30 @@ const NODE_WIDTH = TURN_TREE_GRAPH_NODE_WIDTH
 const NODE_HEIGHT = TURN_TREE_GRAPH_NODE_HEIGHT
 const PORT_RADIUS = TURN_TREE_GRAPH_PORT_RADIUS
 
-const props = defineProps({
-  conversations: { type: Array, default: () => [] },
-  currentTurnId: { type: String, default: '' },
-  currentParentTurnId: { type: String, default: '' },
-  emptyLabel: { type: String, default: 'No turns yet.' },
-  variant: { type: String, default: 'modal' },
+const props = withDefaults(defineProps<{
+  conversations?: any[]
+  currentTurnId?: string
+  currentParentTurnId?: string
+  emptyLabel?: string
+  variant?: string
+}>(), {
+  conversations: () => [],
+  currentTurnId: '',
+  currentParentTurnId: '',
+  emptyLabel: 'No turns yet.',
+  variant: 'modal',
 })
 const emit = defineEmits(['select', 'mark-final', 'delete-turn'])
-const nodeActionsRef = ref(null)
-const canvasRefs = new Map()
-const viewports = reactive({})
-const canvasSizes = reactive({})
-const expandedConversationIds = ref(new Set())
-let resizeObserver = null
+const nodeActionsRef = ref<any>(null)
+const canvasRefs = new Map<string, HTMLElement>()
+const viewports = reactive<any>({})
+const canvasSizes = reactive<any>({})
+const expandedConversationIds = ref(new Set<string>())
+let resizeObserver: ResizeObserver | null = null
 
 const rootClass = computed(() => props.variant === 'page' ? 'min-h-0 flex-1 overflow-y-auto px-1 py-3' : 'min-h-0 flex-1 overflow-y-auto px-3 py-3')
 const graphConversations = computed(() => (Array.isArray(props.conversations) ? props.conversations : []).map((conversation) => {
-  const layout = layoutTurnTree(conversation?.roots)
+  const layout: any = layoutTurnTree(conversation?.roots)
   return {
     id: String(conversation?.id || '').trim(),
     title: String(conversation?.title || '').trim(),
@@ -201,27 +207,27 @@ const graphConversations = computed(() => (Array.isArray(props.conversations) ? 
 }).filter((conversation) => conversation.id))
 const isEmpty = computed(() => graphConversations.value.length === 0 || graphConversations.value.every((conversation) => conversation.layout.nodes.length === 0))
 
-function ensureViewport(conversationId) {
+function ensureViewport(conversationId: any) {
   if (!viewports[conversationId]) viewports[conversationId] = { x: 0, y: 0, scale: 1, pointerId: null, lastX: 0, lastY: 0 }
   return viewports[conversationId]
 }
 
-function resolveGraphFinalTurnId(layout, configuredFinalTurnId) {
-  const configuredFinal = layout.nodes.find((node) => node.id === configuredFinalTurnId)
+function resolveGraphFinalTurnId(layout: any, configuredFinalTurnId: any) {
+  const configuredFinal = layout.nodes.find((node: any) => node.id === configuredFinalTurnId)
   if (configuredFinal && (!Array.isArray(configuredFinal.children) || configuredFinal.children.length === 0)) {
     return configuredFinal.id
   }
-  const leaves = layout.nodes.filter((node) => !Array.isArray(node.children) || node.children.length === 0)
-  return leaves.reduce((latest, node) => (
+  const leaves = layout.nodes.filter((node: any) => !Array.isArray(node.children) || node.children.length === 0)
+  return leaves.reduce((latest: any, node: any) => (
     !latest || Number(node.display_no || 0) > Number(latest.display_no || 0) ? node : latest
   ), null)?.id || ''
 }
 
-function isExpanded(conversationId) {
+function isExpanded(conversationId: any) {
   return expandedConversationIds.value.has(String(conversationId || '').trim())
 }
 
-function toggleConversation(conversationId, forceOpen = false) {
+function toggleConversation(conversationId: any, forceOpen = false) {
   const id = String(conversationId || '').trim()
   if (!id) return
   const next = new Set(expandedConversationIds.value)
@@ -231,20 +237,20 @@ function toggleConversation(conversationId, forceOpen = false) {
   if (next.has(id)) void nextTick(() => fitToView(id))
 }
 
-function turnCountLabel(conversation) {
+function turnCountLabel(conversation: any) {
   const count = conversation.layout.nodes.length
   return `${count} ${count === 1 ? 'turn' : 'turns'}`
 }
 
-function conversationUsageLabel(conversation) {
+function conversationUsageLabel(conversation: any) {
   return formatUsageCompact(conversation?.usageSummary?.usage)
 }
 
-function conversationUsageTooltip(conversation) {
+function conversationUsageTooltip(conversation: any) {
   return formatUsageTooltip(conversation?.usageSummary?.usage, conversation?.usageSummary)
 }
 
-function setCanvasRef(conversationId, element) {
+function setCanvasRef(conversationId: any, element: any) {
   const previous = canvasRefs.get(conversationId)
   if (previous && resizeObserver) resizeObserver.unobserve(previous)
   if (!element) {
@@ -258,7 +264,7 @@ function setCanvasRef(conversationId, element) {
   if (resizeObserver) resizeObserver.observe(element)
 }
 
-function updateCanvasSize(conversationId, element = canvasRefs.get(conversationId)) {
+function updateCanvasSize(conversationId: any, element = canvasRefs.get(conversationId)) {
   if (!element) return
   const rect = element.getBoundingClientRect?.()
   const width = Math.max(1, Math.round(element.clientWidth || rect?.width || 1))
@@ -268,17 +274,17 @@ function updateCanvasSize(conversationId, element = canvasRefs.get(conversationI
   canvasSizes[conversationId] = { width, height }
 }
 
-function svgViewBox(conversationId) {
+function svgViewBox(conversationId: any) {
   const size = canvasSizes[conversationId] || { width: 1, height: 1 }
   return `0 0 ${size.width} ${size.height}`
 }
 
-function viewportTransform(conversationId) {
+function viewportTransform(conversationId: any) {
   const viewport = ensureViewport(conversationId)
   return `translate(${viewport.x} ${viewport.y}) scale(${viewport.scale})`
 }
 
-function viewportLayerStyle(conversationId) {
+function viewportLayerStyle(conversationId: any) {
   const viewport = ensureViewport(conversationId)
   return {
     transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})`,
@@ -286,7 +292,7 @@ function viewportLayerStyle(conversationId) {
   }
 }
 
-function nodeStyle(node) {
+function nodeStyle(node: any) {
   return {
     left: `${node.x}px`,
     top: `${node.y}px`,
@@ -295,21 +301,21 @@ function nodeStyle(node) {
   }
 }
 
-function conversationById(conversationId) {
+function conversationById(conversationId: any) {
   return graphConversations.value.find((conversation) => conversation.id === conversationId)
 }
 
-function edgePath(conversation, edge) {
-  const parent = conversation.layout.nodes.find((node) => node.id === edge.parentId)
-  const child = conversation.layout.nodes.find((node) => node.id === edge.childId)
+function edgePath(conversation: any, edge: any) {
+  const parent = conversation.layout.nodes.find((node: any) => node.id === edge.parentId)
+  const child = conversation.layout.nodes.find((node: any) => node.id === edge.childId)
   return turnTreeGraphEdgePath(parent, child)
 }
 
-function activeEdgeIds(conversation) {
+function activeEdgeIds(conversation: any) {
   const activeId = String(props.currentTurnId || '').trim()
   if (!activeId) return new Set()
-  const childToEdge = new Map(conversation.layout.edges.map((edge) => [edge.childId, edge]))
-  const ids = new Set()
+  const childToEdge = new Map<string, any>(conversation.layout.edges.map((edge: any) => [String(edge.childId), edge]))
+  const ids = new Set<string>()
   let cursor = activeId
   while (cursor) {
     const edge = childToEdge.get(cursor)
@@ -320,15 +326,15 @@ function activeEdgeIds(conversation) {
   return ids
 }
 
-function nodeInputPort(node) {
+function nodeInputPort(node: any) {
   return turnTreeGraphPort(node, 'input')
 }
 
-function nodeOutputPort(node) {
+function nodeOutputPort(node: any) {
   return turnTreeGraphPort(node, 'output')
 }
 
-function fitToView(conversationId) {
+function fitToView(conversationId: any) {
   const element = canvasRefs.get(conversationId)
   const conversation = conversationById(conversationId)
   if (!element || !conversation || conversation.layout.bounds.width === 0) return
@@ -342,7 +348,7 @@ function fitToView(conversationId) {
   viewport.y = (height - (conversation.layout.bounds.height * scale)) / 2
 }
 
-function zoomBy(conversationId, factor, clientX = null, clientY = null) {
+function zoomBy(conversationId: any, factor: any, clientX = null, clientY = null) {
   const element = canvasRefs.get(conversationId)
   if (!element) return
   const viewport = ensureViewport(conversationId)
@@ -357,11 +363,11 @@ function zoomBy(conversationId, factor, clientX = null, clientY = null) {
   viewport.y = pointY - (graphY * nextScale)
 }
 
-function handleWheel(conversationId, event) {
+function handleWheel(conversationId: any, event: any) {
   zoomBy(conversationId, event.deltaY < 0 ? 1.12 : 1 / 1.12, event.clientX, event.clientY)
 }
 
-function startPan(conversationId, event) {
+function startPan(conversationId: any, event: any) {
   if (event.button !== 0 || event.target?.closest?.('[data-graph-interactive]')) return
   const viewport = ensureViewport(conversationId)
   viewport.pointerId = event.pointerId
@@ -370,7 +376,7 @@ function startPan(conversationId, event) {
   event.currentTarget?.setPointerCapture?.(event.pointerId)
 }
 
-function movePan(conversationId, event) {
+function movePan(conversationId: any, event: any) {
   const viewport = ensureViewport(conversationId)
   if (viewport.pointerId !== event.pointerId) return
   viewport.x += event.clientX - viewport.lastX
@@ -379,47 +385,47 @@ function movePan(conversationId, event) {
   viewport.lastY = event.clientY
 }
 
-function stopPan(conversationId, event) {
+function stopPan(conversationId: any, event: any) {
   const viewport = ensureViewport(conversationId)
   if (viewport.pointerId !== event.pointerId) return
   viewport.pointerId = null
   event.currentTarget?.releasePointerCapture?.(event.pointerId)
 }
 
-function selectNode(conversationId, turnId) {
+function selectNode(conversationId: any, turnId: any) {
   emit('select', { conversationId, turnId })
 }
 
-function openNodeMenu(conversationId, turnId, event) {
+function openNodeMenu(conversationId: any, turnId: any, event: any) {
   nodeActionsRef.value?.open({ conversationId, turnId, x: event?.clientX || 0, y: event?.clientY || 0 })
 }
 
-function nodeClass(conversation, node) {
+function nodeClass(conversation: any, node: any) {
   if (String(props.currentTurnId || '').trim() === node.id) return 'border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-base))] shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-accent)_30%,transparent)]'
   if (String(props.currentParentTurnId || '').trim() === node.id) return 'border-[var(--color-border-hover)] bg-[color-mix(in_srgb,var(--color-text-main)_4%,var(--color-base))]'
   return 'border-[var(--color-border)] bg-[var(--color-base)] opacity-80 hover:opacity-100'
 }
 
-function isFinal(conversation, node) {
+function isFinal(conversation: any, node: any) {
   return conversation.finalTurnId === node.id
 }
 
-function questionLine(node) {
+function questionLine(node: any) {
   return String(node?.user_text || '').trim() || `Turn ${node?.display_no || ''}`.trim()
 }
 
-function answerLine(node) {
+function answerLine(node: any) {
   return String(node?.assistant_text || '').replace(/\s+/g, ' ').trim() || 'No response saved'
 }
 
-function nodeUsageTooltip(node) {
+function nodeUsageTooltip(node: any) {
   return [
     `Open turn ${node?.display_no || node?.id || ''}`.trim(),
     formatUsageTooltip(node?.usage || null),
   ].join('\n')
 }
 
-function clamp(value, minimum, maximum) {
+function clamp(value: any, minimum: any, maximum: any) {
   return Math.min(maximum, Math.max(minimum, value))
 }
 
@@ -435,7 +441,7 @@ onMounted(() => {
       for (const entry of entries) {
         const match = [...canvasRefs.entries()].find(([, element]) => element === entry.target)
         if (match) {
-          updateCanvasSize(match[0], entry.target)
+          updateCanvasSize(match[0], entry.target as HTMLElement)
           fitToView(match[0])
         }
       }

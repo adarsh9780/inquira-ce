@@ -118,7 +118,7 @@
   </header>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import {
   ChevronLeftIcon,
@@ -138,6 +138,7 @@ import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation
 import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import { preferencesApi } from '../../api/preferences'
 import ModelSelector from '../ui/ModelSelector.vue'
+import type { NativeSearchResponse } from '../../types/native'
 
 const uiStore = useUiStore()
 const preferencesStore = usePreferencesStore()
@@ -211,7 +212,7 @@ const workspaceModelOptions = computed(() => {
   return values
 })
 
-async function handleModelChange(model) {
+async function handleModelChange(model: string) {
   const config = workspaceStore.workspaceAIConfig
   if (!config || !workspaceStore.activeWorkspaceId) {
     preferencesStore.setSelectedModel(model)
@@ -230,13 +231,14 @@ async function handleModelChange(model) {
   })
 }
 
-async function searchProviderModels(query, limit = 25) {
+async function searchProviderModels(query: string, limit = 25): Promise<unknown[]> {
   const response = await preferencesApi.searchModels(
     effectiveWorkspaceProvider.value,
     query,
     limit,
   )
-  return Array.isArray(response?.models) ? response.models : []
+  const result = response as NativeSearchResponse
+  return Array.isArray(result?.models) ? result.models : []
 }
 </script>
 

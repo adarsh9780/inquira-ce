@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync } from './sourceText.mjs'
 import { resolve } from 'node:path'
 
 test('chat input exposes independent stop-generation and voice-input states', () => {
@@ -18,7 +18,8 @@ test('chat input exposes independent stop-generation and voice-input states', ()
   assert.equal(source.includes('v-if="executionStore.isConversationRunning(conversationStore.activeConversationId)"'), true)
   assert.equal(source.includes('execution.abortConversationRun(id)'), true)
   assert.equal(source.includes('stoppedConversationIds'), true)
-  assert.equal(source.includes('window.SpeechRecognition || window.webkitSpeechRecognition'), true)
+  assert.equal(source.includes('const speechWindow = window'), true)
+  assert.equal(source.includes('speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition'), true)
   assert.equal(source.includes('Voice input unavailable on this device/browser'), true)
   assert.equal(source.includes('Microphone permission is required for voice input.'), true)
 })

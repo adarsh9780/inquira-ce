@@ -69,14 +69,34 @@
   </Transition>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { conversationApi } from '../../api/conversations'
 import { formatTimestamp } from '../../utils/dateUtils'
 import { formatUsageCompact, formatUsageTooltip } from '../../utils/usageFormat'
 import FloatingActionMenu from '../ui/FloatingActionMenu.vue'
 
-const emit = defineEmits(['select', 'mark-final', 'delete-turn'])
+type RecordValue = Record<string, unknown>
+interface TurnDetails extends RecordValue {
+  id?: string
+  created_at?: string | number | null
+  user_text?: unknown
+  assistant_text?: unknown
+  metadata?: RecordValue
+  tool_events?: unknown[]
+}
+interface TurnActionPayload {
+  conversationId?: unknown
+  turnId?: unknown
+  x?: unknown
+  y?: unknown
+}
+
+const emit = defineEmits<{
+  select: [payload: { conversationId: string; turnId: string }]
+  'mark-final': [payload: { conversationId: string; turnId: string }]
+  'delete-turn': [payload: { conversationId: string; turnId: string }]
+}>()
 const actions = [
   { id: 'open', label: 'Open' },
   { id: 'mark-final', label: 'Mark Final' },
@@ -85,15 +105,19 @@ const actions = [
 ]
 const contextMenu = ref({ open: false, conversationId: '', turnId: '', x: 0, y: 0 })
 const detailModalOpen = ref(false)
-const detailTurn = ref(null)
+const detailTurn = ref<TurnDetails | null>(null)
 const detailUsage = computed(() => detailTurn.value?.metadata?.token_usage || null)
 const detailUsageLabel = computed(() => formatUsageCompact(detailUsage.value))
 const detailUsageTooltip = computed(() => formatUsageTooltip(detailUsage.value))
 
 const detailArtifacts = computed(() => {
   const events = Array.isArray(detailTurn.value?.tool_events) ? detailTurn.value.tool_events : []
-  return events.filter((event) => event && event.type === 'artifact' && event.data).map((event, index) => {
-    const artifact = event.data || {}
+  return events.filter((value) => {
+    const event = value as RecordValue
+    return event && event.type === 'artifact' && event.data
+  }).map((value, index) => {
+    const event = value as RecordValue
+    const artifact = (event.data && typeof event.data === 'object' ? event.data : {}) as RecordValue
     const kind = String(artifact.kind || 'artifact')
     const label = String(artifact.display_name || artifact.logical_name || artifact.artifact_id || `artifact_${index + 1}`)
     const columns = Array.isArray(artifact.schema) ? artifact.schema.length : 0
@@ -105,7 +129,7 @@ const detailArtifacts = computed(() => {
   })
 })
 
-function open(payload) {
+function open(payload: TurnActionPayload) {
   const conversationId = String(payload?.conversationId || '').trim()
   const turnId = String(payload?.turnId || '').trim()
   if (!conversationId || !turnId) return
@@ -116,14 +140,14 @@ function closeContextMenu() {
   contextMenu.value = { open: false, conversationId: '', turnId: '', x: 0, y: 0 }
 }
 
-async function handleContextAction(action) {
+async function handleContextAction(action: string) {
   const { conversationId, turnId } = contextMenu.value
   closeContextMenu()
   if (action === 'open') emit('select', { conversationId, turnId })
   else if (action === 'mark-final') emit('mark-final', { conversationId, turnId })
   else if (action === 'delete') emit('delete-turn', { conversationId, turnId })
   else if (action === 'view-details') {
-    detailTurn.value = await conversationApi.getTurn(conversationId, turnId)
+    detailTurn.value = await conversationApi.getTurn(conversationId, turnId) as TurnDetails | null
     detailModalOpen.value = true
   }
 }
@@ -133,7 +157,7 @@ function closeDetailModal() {
   detailTurn.value = null
 }
 
-function handleEscape(event) {
+function handleEscape(event: KeyboardEvent) {
   if (event.key === 'Escape' && detailModalOpen.value) {
     event.stopImmediatePropagation()
     closeDetailModal()

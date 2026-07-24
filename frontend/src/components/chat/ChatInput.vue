@@ -162,7 +162,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useUiStore } from '../../stores/uiStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
@@ -209,10 +209,10 @@ const primaryWorkspaceTableName = computed(() => {
   const summaryTable = (Array.isArray(workspaceStore.activeWorkspaceSummary?.table_names)
     ? workspaceStore.activeWorkspaceSummary.table_names
     : []
-  ).map((name) => String(name || '').trim()).find(Boolean)
+  ).map((name: any) => String(name || '').trim()).find(Boolean)
   if (summaryTable) return summaryTable
   const catalogItem = (Array.isArray(workspaceStore.columnCatalog) ? workspaceStore.columnCatalog : [])
-    .find((item) => String(item?.table_name || '').trim())
+    .find((item: any) => String(item?.table_name || '').trim())
   return String(catalogItem?.table_name || '').trim()
 })
 const { formatAttachmentSize } = useChatAttachments()
@@ -220,24 +220,24 @@ useChatAutocomplete()
 useVoiceInput()
 
 const question = ref('')
-const textareaRef = ref(null)
-const inputCardRef = ref(null)
-const attachmentInputRef = ref(null)
-const commandSuggestions = ref([])
+const textareaRef = ref<any>(null)
+const inputCardRef = ref<any>(null)
+const attachmentInputRef = ref<any>(null)
+const commandSuggestions = ref<any[]>([])
 const selectedCommandIndex = ref(0)
-const columnSuggestions = ref([])
+const columnSuggestions = ref<any[]>([])
 const selectedColumnIndex = ref(0)
 const questionHistoryIndex = ref(-1)
 const questionHistoryDraft = ref('')
 const activeTokenRange = ref({ start: 0, end: 0, token: '' })
 const suggestionsOpenUp = ref(false)
 const dismissedSuggestionSignature = ref('')
-const pendingAttachments = ref([])
+const pendingAttachments = ref<any[]>([])
 const isAttachmentDragActive = ref(false)
 const dragDepth = ref(0)
 const supportsVoiceInput = ref(false)
 const isVoiceInputActive = ref(false)
-const speechRecognition = ref(null)
+const speechRecognition = ref<any>(null)
 const voiceDraftPrefix = ref('')
 
 const showCommandSuggestions = computed(() => commandSuggestions.value.length > 0)
@@ -269,7 +269,7 @@ const FREE_MODEL_ANALYZE_CANCEL_TIMEOUT_MS = 900000
 const DEFAULT_SLOW_REQUEST_WARNING_TIMEOUT_MS = 120000
 
 
-function resolveAnalyzeCancelTimeoutMs(modelId) {
+function resolveAnalyzeCancelTimeoutMs(modelId: any) {
   const normalized = String(modelId || '').trim().toLowerCase()
   if (!normalized) return DEFAULT_ANALYZE_CANCEL_TIMEOUT_MS
   if (normalized.includes('/free') || normalized.endsWith('-free') || normalized.includes(':free')) {
@@ -278,14 +278,14 @@ function resolveAnalyzeCancelTimeoutMs(modelId) {
   return DEFAULT_ANALYZE_CANCEL_TIMEOUT_MS
 }
 
-function resolveSlowRequestWarningTimeoutMs(seconds) {
+function resolveSlowRequestWarningTimeoutMs(seconds: any) {
   const parsed = Number.parseInt(seconds, 10)
   if (!Number.isFinite(parsed)) return DEFAULT_SLOW_REQUEST_WARNING_TIMEOUT_MS
   const clampedSeconds = Math.min(600, Math.max(5, parsed))
   return clampedSeconds * 1000
 }
 
-async function refreshRuntimeStatusAfterExplicitWork(workspaceId) {
+async function refreshRuntimeStatusAfterExplicitWork(workspaceId: any) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return
   try {
@@ -296,14 +296,14 @@ async function refreshRuntimeStatusAfterExplicitWork(workspaceId) {
   }
 }
 
-function parseArtifactTimestampMs(value) {
+function parseArtifactTimestampMs(value: any) {
   const raw = String(value || '').trim()
   if (!raw) return 0
   const parsed = Date.parse(raw)
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-function sortArtifactsNewestFirst(items) {
+function sortArtifactsNewestFirst(items: any) {
   if (!Array.isArray(items)) return []
   return [...items].sort((left, right) => {
     const delta = parseArtifactTimestampMs(right?.created_at) - parseArtifactTimestampMs(left?.created_at)
@@ -312,7 +312,7 @@ function sortArtifactsNewestFirst(items) {
   })
 }
 
-function buildAttachmentId(file) {
+function buildAttachmentId(file: any) {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${String(file?.name || 'image')}`
 }
 
@@ -324,7 +324,7 @@ function openAttachmentPicker() {
   attachmentInputRef.value?.click()
 }
 
-async function fileToBase64(file) {
+async function fileToBase64(file: any) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => {
@@ -336,12 +336,12 @@ async function fileToBase64(file) {
   })
 }
 
-async function appendPendingAttachments(files) {
+async function appendPendingAttachments(files: any) {
   if (!imageAttachmentsSupported.value) {
     toast.error('Images Not Supported', 'Switch to a vision-capable model before attaching images.')
     return
   }
-  const normalizedFiles = Array.from(files || []).filter((file) => SUPPORTED_CHAT_IMAGE_TYPES.has(String(file?.type || '').toLowerCase()))
+  const normalizedFiles = (Array.from(files || []) as File[]).filter((file) => SUPPORTED_CHAT_IMAGE_TYPES.has(String(file.type || '').toLowerCase()))
   if (normalizedFiles.length === 0) {
     toast.error('Unsupported File', 'Only PNG, JPG, WEBP, and GIF images can be attached.')
     return
@@ -360,17 +360,17 @@ async function appendPendingAttachments(files) {
   }
 }
 
-async function handleAttachmentSelection(event) {
+async function handleAttachmentSelection(event: any) {
   try {
     await appendPendingAttachments(event?.target?.files || [])
-  } catch (error) {
+  } catch (error: any) {
     toast.error('Image Attach Failed', extractApiErrorMessage(error, 'Failed to attach image.'))
   } finally {
     if (event?.target) event.target.value = ''
   }
 }
 
-function removePendingAttachment(attachmentId) {
+function removePendingAttachment(attachmentId: any) {
   const targetId = String(attachmentId || '').trim()
   pendingAttachments.value = pendingAttachments.value.filter(
     (item) => String(item?.attachment_id || '') !== targetId
@@ -395,19 +395,20 @@ function handleAttachmentDragLeave() {
   }
 }
 
-async function handleAttachmentDrop(event) {
+async function handleAttachmentDrop(event: any) {
   dragDepth.value = 0
   isAttachmentDragActive.value = false
   try {
     await appendPendingAttachments(event?.dataTransfer?.files || [])
-  } catch (error) {
+  } catch (error: any) {
     toast.error('Image Attach Failed', extractApiErrorMessage(error, 'Failed to attach image.'))
   }
 }
 
 function initializeVoiceInput() {
   if (typeof window === 'undefined') return
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+  const speechWindow = window as any
+  const SpeechRecognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition
   if (!SpeechRecognition) {
     supportsVoiceInput.value = false
     speechRecognition.value = null
@@ -426,7 +427,7 @@ function initializeVoiceInput() {
     recognition.onend = () => {
       isVoiceInputActive.value = false
     }
-    recognition.onerror = (event) => {
+    recognition.onerror = (event: any) => {
       isVoiceInputActive.value = false
       const errorCode = String(event?.error || 'unknown')
       if (errorCode === 'not-allowed' || errorCode === 'service-not-allowed') {
@@ -437,7 +438,7 @@ function initializeVoiceInput() {
         toast.error('Voice Input Error', `Voice input failed (${errorCode}).`)
       }
     }
-    recognition.onresult = (event) => {
+    recognition.onresult = (event: any) => {
       const transcriptParts = []
       for (let i = 0; i < event.results.length; i += 1) {
         const text = String(event.results[i]?.[0]?.transcript || '').trim()
@@ -487,15 +488,15 @@ function handleStopGeneration() {
   runControl.stopConversation(conversationStore.activeConversationId)
 }
 
-function isSimpleIdentifier(value) {
+function isSimpleIdentifier(value: any) {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(value || '').trim())
 }
 
-function quoteSqlIdentifier(value) {
+function quoteSqlIdentifier(value: any) {
   return `"${String(value || '').replace(/"/g, '""')}"`
 }
 
-function buildColumnReference(tableName, columnName) {
+function buildColumnReference(tableName: any, columnName: any) {
   const table = String(tableName || '').trim()
   const column = String(columnName || '').trim()
   if (!table || !column) return ''
@@ -505,7 +506,7 @@ function buildColumnReference(tableName, columnName) {
   return `${table}.${quoteSqlIdentifier(column)}`
 }
 
-function buildColumnSuggestion(item) {
+function buildColumnSuggestion(item: any) {
   const tableName = String(item?.table_name || '').trim()
   const columnName = String(item?.column_name || '').trim()
   if (!tableName || !columnName) return null
@@ -524,10 +525,10 @@ function buildColumnSuggestion(item) {
 }
 
 function collectColumnCandidates() {
-  const merged = []
+  const merged: any[] = []
   const seen = new Set()
 
-  const addCandidate = (tableName, columnName, dtype = '') => {
+  const addCandidate = (tableName: any, columnName: any, dtype = '') => {
     const table = String(tableName || '').trim()
     const column = String(columnName || '').trim()
     if (!table || !column) return
@@ -543,7 +544,7 @@ function collectColumnCandidates() {
   }
 
   const catalogItems = Array.isArray(workspaceStore.columnCatalog) ? workspaceStore.columnCatalog : []
-  catalogItems.forEach((item) => {
+  catalogItems.forEach((item: any) => {
     addCandidate(item?.table_name, item?.column_name, item?.dtype)
   })
 
@@ -575,7 +576,7 @@ function currentCursorPosition() {
   return Number(target.selectionStart || 0)
 }
 
-function tokenRangeAtCursor(text, cursor) {
+function tokenRangeAtCursor(text: any, cursor: any) {
   const safeText = String(text || '')
   const safeCursor = Math.max(0, Math.min(Number(cursor || 0), safeText.length))
   const prefix = safeText.slice(0, safeCursor)
@@ -595,7 +596,7 @@ function buildSuggestionDismissSignature(text = question.value, cursor = current
   return `${range.start}:${range.end}:${token}:${safeText}`
 }
 
-function applyTokenReplacement(replacement, { appendSpace = false } = {}) {
+function applyTokenReplacement(replacement: any, { appendSpace = false } = {}) {
   const value = String(question.value || '')
   const { start, end } = activeTokenRange.value
   const safeStart = Math.max(0, Math.min(start, value.length))
@@ -614,21 +615,21 @@ function applyTokenReplacement(replacement, { appendSpace = false } = {}) {
   })
 }
 
-function acceptCommandSuggestion(item = null) {
+function acceptCommandSuggestion(item: any = null) {
   const selected = item || commandSuggestions.value[selectedCommandIndex.value]
   if (!selected) return
   applyTokenReplacement(`/${selected.name}`, { appendSpace: true })
   clearSuggestions()
 }
 
-function acceptColumnSuggestion(item = null) {
+function acceptColumnSuggestion(item: any = null) {
   const selected = item || columnSuggestions.value[selectedColumnIndex.value]
   if (!selected) return
   applyTokenReplacement(String(selected.insertText || `${selected.table_name}.${selected.column_name}`))
   clearSuggestions()
 }
 
-function navigateSuggestion(step) {
+function navigateSuggestion(step: any) {
   if (showCommandSuggestions.value) {
     const size = commandSuggestions.value.length
     if (!size) return
@@ -717,7 +718,7 @@ function handleInputChange() {
 
 const SUGGESTION_NAVIGATION_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Tab', 'Enter', 'Escape'])
 
-function handleCaretInteraction(event = null) {
+function handleCaretInteraction(event: any = null) {
   if (
     event &&
     SUGGESTION_NAVIGATION_KEYS.has(String(event.key || '')) &&
@@ -728,7 +729,7 @@ function handleCaretInteraction(event = null) {
   void updateAutocompleteSuggestions()
 }
 
-function setQuestionFromHistory(value) {
+function setQuestionFromHistory(value: any) {
   question.value = String(value || '')
   clearSuggestions()
   nextTick(() => {
@@ -741,7 +742,7 @@ function setQuestionFromHistory(value) {
   })
 }
 
-function isHistoryNavigationAllowed(event, step) {
+function isHistoryNavigationAllowed(event: any, step: any) {
   if (!event) return false
   if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return false
   if (showCommandSuggestions.value || showColumnSuggestions.value) return false
@@ -754,7 +755,7 @@ function isHistoryNavigationAllowed(event, step) {
   return false
 }
 
-function navigateQuestionHistory(step) {
+function navigateQuestionHistory(step: any) {
   const history = Array.isArray(conversationStore.questionHistory) ? conversationStore.questionHistory : []
   if (history.length === 0) return false
 
@@ -786,7 +787,7 @@ function navigateQuestionHistory(step) {
   return false
 }
 
-function handleKeydown(event) {
+function handleKeydown(event: any) {
   if (!event) return
 
   if ((showCommandSuggestions.value || showColumnSuggestions.value) && event.key === 'ArrowDown') {
@@ -839,11 +840,11 @@ function handleKeydown(event) {
   }
 }
 
-function applyCommandResultToStore(commandResult) {
+function applyCommandResultToStore(commandResult: any) {
   const payload = commandResult?.result && typeof commandResult.result === 'object'
     ? commandResult.result
     : null
-  const columns = Array.isArray(payload?.columns) ? payload.columns.map((col) => String(col)) : []
+  const columns = Array.isArray(payload?.columns) ? payload.columns.map((col: any) => String(col)) : []
   const rows = Array.isArray(payload?.data) ? payload.data : []
   const hasTablePayload = columns.length > 0
 
@@ -889,7 +890,7 @@ function applyCommandResultToStore(commandResult) {
   })
 }
 
-function appendChatExecutionOutput(response, conversationId = conversationStore.activeConversationId, code = '') {
+function appendChatExecutionOutput(response: any, conversationId = conversationStore.activeConversationId, code = '') {
   const execution = response?.execution && typeof response.execution === 'object'
     ? response.execution
     : null
@@ -901,11 +902,11 @@ function appendChatExecutionOutput(response, conversationId = conversationStore.
   const artifacts = Array.isArray(response?.artifacts) ? response.artifacts : []
   const hasTableOutput = Boolean(
     (response?.result?.columns && response?.result?.data)
-    || artifacts.some((item) => String(item?.kind || '').toLowerCase() === 'dataframe'),
+    || artifacts.some((item: any) => String(item?.kind || '').toLowerCase() === 'dataframe'),
   )
   const hasChartOutput = Boolean(
     normalizePlotlyFigure(response?.plotly_figure || response?.result)
-    || artifacts.some((item) => String(item?.kind || '').toLowerCase() === 'figure'),
+    || artifacts.some((item: any) => String(item?.kind || '').toLowerCase() === 'figure'),
   )
   const hasOutput = Boolean(stdout.trim() || stderr.trim() || scalarResult)
   if (!hasOutput) return false
@@ -938,7 +939,7 @@ function appendChatExecutionOutput(response, conversationId = conversationStore.
   return true
 }
 
-function scalarDisplayValue(value) {
+function scalarDisplayValue(value: any) {
   if (value === undefined) return ''
   if (value === null) return 'null'
   if (typeof value === 'string') return value
@@ -952,7 +953,7 @@ function scalarDisplayValue(value) {
   }
 }
 
-function normalizeScalarResult(response) {
+function normalizeScalarResult(response: any) {
   const execution = response?.execution && typeof response.execution === 'object'
     ? response.execution
     : {}
@@ -973,14 +974,14 @@ function normalizeScalarResult(response) {
   }
 }
 
-function preferredDataPane(payload = {}) {
+function preferredDataPane(payload: any = {}) {
   if (payload?.hasFigures) return 'figure'
   if (payload?.hasDataframes) return 'table'
   if (payload?.hasOutput) return 'output'
   return uiStore.dataPane || 'table'
 }
 
-function applyConversationResultState(conversationId, statePatch = {}, revealPayload = {}) {
+function applyConversationResultState(conversationId: any, statePatch: any = {}, revealPayload: any = {}) {
   const targetConversationId = String(conversationId || '').trim()
   if (!targetConversationId) return
   const active = targetConversationId === String(conversationStore.activeConversationId || '').trim()
@@ -1002,7 +1003,7 @@ function applyConversationResultState(conversationId, statePatch = {}, revealPay
   })
 }
 
-async function handleSlashCommand(questionText) {
+async function handleSlashCommand(questionText: any) {
   let commandMessageCreated = false
   let requestConversationId = ''
   let operationId = ''
@@ -1041,8 +1042,8 @@ async function handleSlashCommand(questionText) {
       conversationStore.setActiveConversationId(persistedConversationId)
     }
     if (persistedConversationId) {
-      await conversationStore.fetchConversations()
-      await conversationStore.loadWorkspaceTurnTree()
+      await conversationStore.fetchConversations(workspaceStore.activeWorkspaceId)
+      await conversationStore.loadWorkspaceTurnTree(workspaceStore.activeWorkspaceId)
       try {
         await conversationStore.fetchActiveConversationUsage(persistedConversationId)
       } catch (_error) {
@@ -1057,7 +1058,7 @@ async function handleSlashCommand(questionText) {
     if (requestConversationId === String(conversationStore.activeConversationId || '').trim()) {
       applyCommandResultToStore(result)
     }
-  } catch (error) {
+  } catch (error: any) {
     commandFailed = true
     const message = extractApiErrorMessage(error, 'Failed to run command.')
     if (commandMessageCreated) {
@@ -1086,7 +1087,7 @@ async function handleSlashCommand(questionText) {
     }
   } finally {
     if (requestConversationId) {
-      executionStore.clearConversationRun(requestConversationId)
+      executionStore.setConversationRun(requestConversationId, null)
     }
     if (operationId) {
       executionStore.finishBackgroundOperation(operationId, {
@@ -1143,7 +1144,7 @@ async function handleSubmit() {
   let requestConversationId = ''
   try {
     requestConversationId = String(await conversationStore.ensureActiveConversation(workspaceStore.activeWorkspaceId, 'New chat') || '').trim()
-  } catch (error) {
+  } catch (error: any) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Could not create a chat.'))
     question.value = rawQuestionText
     pendingAttachments.value = attachmentsPayload.map((item) => ({
@@ -1204,7 +1205,7 @@ async function handleSubmit() {
       abortController.abort()
     }, cancelAfterMs)
 
-    let response
+    let response: any
     const selectedParentTurnId = String(conversationStore.activeTurnId || '').trim()
     response = await executionApi.analyze(
       {
@@ -1221,7 +1222,7 @@ async function handleSubmit() {
       },
       {
         signal,
-        onEvent: (event) => chatStream.applyStreamEvent(event, localMessageId, requestConversationId)
+        onEvent: (event: any) => chatStream.applyStreamEvent(event, localMessageId, requestConversationId)
       }
     )
 
@@ -1231,7 +1232,7 @@ async function handleSubmit() {
       requestConversationId === String(conversationStore.activeConversationId || '').trim()
     ) {
       conversationStore.setActiveConversationId(response.conversation_id)
-      await conversationStore.fetchConversations()
+      await conversationStore.fetchConversations(workspaceStore.activeWorkspaceId)
     }
 
     const responseTurnId = String(response?.turn_id || '').trim()
@@ -1241,7 +1242,7 @@ async function handleSubmit() {
         await conversationStore.loadActiveTurnRelations(responseTurnId)
         await conversationStore.loadFinalTurn()
       }
-      await conversationStore.loadWorkspaceTurnTree()
+      await conversationStore.loadWorkspaceTurnTree(workspaceStore.activeWorkspaceId)
     }
 
     const { is_safe, code, current_code, explanation, result_explanation, code_explanation } = response
@@ -1262,7 +1263,7 @@ async function handleSubmit() {
     }
 
     conversationStore.updateLastMessageExplanation(finalExplanation, localMessageId, { conversationId: requestConversationId })
-    const finalStatePatch = {}
+    const finalStatePatch: Record<string, any> = {}
     if (finalCode.trim()) {
       finalStatePatch.generatedCode = finalCode
       finalStatePatch.pythonFileContent = finalCode
@@ -1320,7 +1321,7 @@ async function handleSubmit() {
             logical_name: item?.logical_name || undefined,
             display_name: item?.display_name || undefined,
             row_count: Number(item?.row_count || 0),
-            columns: Array.isArray(item?.schema) ? item.schema.map((col) => String(col?.name || '')) : [],
+            columns: Array.isArray(item?.schema) ? item.schema.map((col: any) => String(col?.name || '')) : [],
             data: Array.isArray(item?.preview_rows) ? item.preview_rows : [],
             created_at: String(item?.created_at || ''),
           }
@@ -1367,7 +1368,7 @@ async function handleSubmit() {
       finalStatePatch.scalars = inlineScalarResult ? [...scalarArtifacts, inlineScalarResult] : scalarArtifacts
       finalStatePatch.figureCount = figureArtifacts.length
       if (figureArtifacts.length > 0) {
-        finalStatePatch.plotlyFigure = figureArtifacts[0].data
+        finalStatePatch.plotlyFigure = figureArtifacts[0]?.data
         applyConversationResultState(requestConversationId, finalStatePatch, { hasFigures: true })
       } else if (dataframeArtifacts.length > 0) {
         finalStatePatch.resultData = dataframeArtifacts[0].data
@@ -1393,7 +1394,7 @@ async function handleSubmit() {
       }
     }, 200)
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Analysis failed:', error)
 
     if (warningTimer) clearTimeout(warningTimer)
@@ -1465,7 +1466,7 @@ async function handleSubmit() {
     if (cancelTimer) clearTimeout(cancelTimer)
     await refreshRuntimeStatusAfterExplicitWork(workspaceStore.activeWorkspaceId)
     runControl.clearStopped(requestConversationId)
-    executionStore.clearConversationRun(requestConversationId)
+    executionStore.setConversationRun(requestConversationId, null)
     executionStore.finishBackgroundOperation(operationId, {
       status: operationStatus,
       title: operationStatus === 'failed' ? 'Chat response failed' : 'Chat response complete',
@@ -1474,7 +1475,7 @@ async function handleSubmit() {
   }
 }
 
-function handleNewLine(event) {
+function handleNewLine(event: any) {
   const textarea = event.target
   const start = textarea.selectionStart
   const end = textarea.selectionEnd

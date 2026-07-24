@@ -6,7 +6,7 @@
   </header>
 </template>
 
-<script setup>
+<script setup lang="ts">
 defineProps({
   ariaLabel: { type: String, default: 'Toolbar' },
 })

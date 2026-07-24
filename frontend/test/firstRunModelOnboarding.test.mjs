@@ -7,7 +7,7 @@ const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
 test('Wails startup gates the app on persisted model onboarding', () => {
   const app = read('src/App.vue')
-  const service = read('src/services/modelConnectionService.js')
+  const service = read('src/services/modelConnectionService.ts')
 
   assert.match(app, /<FirstRunModelOnboarding/)
   assert.match(app, /modelOnboarding\.checked && modelOnboarding\.required/)

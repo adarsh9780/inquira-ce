@@ -28,7 +28,7 @@ test('native workspace data exposes local files and explicit Excel sheet selecti
 })
 
 test('connection service uses the Wails bridge for every connection operation', () => {
-  const service = read('src/services/connectionService.js')
+  const service = read('src/services/connectionService.ts')
   assert.match(service, /DiscoverLocalConnection/)
   assert.match(service, /CreateLocalConnection/)
   assert.match(service, /RefreshConnection/)

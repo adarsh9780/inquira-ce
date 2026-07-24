@@ -2,18 +2,19 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { conversationApi } from '../api/conversations'
 import { mergeUsageTotals, normalizeUsage } from '../utils/usageFormat'
+import type { ConversationSummary } from '../types/conversation'
 
 type RecordValue = Record<string, any>
 const MAX_QUESTION_HISTORY = 30
 
 export const useConversationStore = defineStore('conversations', () => {
-  const chatHistory = ref<unknown[]>([])
+  const chatHistory = ref<RecordValue[]>([])
   const questionHistory = ref<string[]>([])
   const currentQuestion = ref('')
   const liveTokenUsage = ref<Record<string, unknown> | null>(null)
   const activeConversationUsage = ref<Record<string, unknown> | null>(null)
   const conversationUsageById = ref<Record<string, unknown>>({})
-  const conversations = ref<unknown[]>([])
+  const conversations = ref<ConversationSummary[]>([])
   const activeConversationId = ref('')
   const conversationStateById = ref<Record<string, unknown>>({})
   const activeTurnId = ref('')
@@ -274,7 +275,7 @@ export const useConversationStore = defineStore('conversations', () => {
       return []
     }
     const response = await conversationApi.list(target, 50)
-    conversations.value = Array.isArray(response?.conversations) ? response.conversations : []
+    conversations.value = (Array.isArray(response?.conversations) ? response.conversations : []) as ConversationSummary[]
     return conversations.value
   }
 
@@ -282,7 +283,7 @@ export const useConversationStore = defineStore('conversations', () => {
     const target = String(workspaceId || '').trim()
     if (!target) throw new Error('Select a workspace before creating a conversation.')
     const conversation = await conversationApi.create(target, title)
-    conversations.value = [conversation, ...conversations.value.filter(
+    conversations.value = [conversation as unknown as ConversationSummary, ...conversations.value.filter(
       (item: any) => String(item?.id || '') !== String(conversation?.id || ''),
     )]
     setActiveConversationId(conversation?.id)

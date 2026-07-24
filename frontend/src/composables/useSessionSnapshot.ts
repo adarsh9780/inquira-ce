@@ -1,4 +1,4 @@
-import { localStateService } from '../services/localStateService.js'
+import { localStateService } from '../services/localStateService'
 import { useArtifactStore } from '../stores/artifactStore'
 import { useConversationStore } from '../stores/conversationStore'
 import { useExecutionStore } from '../stores/executionStore'

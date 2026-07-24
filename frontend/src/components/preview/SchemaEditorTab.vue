@@ -146,7 +146,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { workspaceApi } from '../../api/workspaces'
 import { useUiStore } from '../../stores/uiStore'
@@ -162,7 +162,7 @@ import MarkdownIt from 'markdown-it'
 
 // Custom Directive for autofocusing inline edit inputs
 const vFocus = {
-  mounted: (el) => el.focus()
+  mounted: (el: any) => el.focus()
 }
 
 const md = new MarkdownIt({ breaks: true, linkify: true })
@@ -179,7 +179,7 @@ const schemaLoading = ref(false)
 const regeneratingTableName = ref('')
 const schemaEdited = ref(false)
 const dirtyTables = ref(new Set())
-const workspaceColumns = ref([])
+const workspaceColumns = ref<any[]>([])
 
 // Workspace context editing state
 const schemaContext = ref('')
@@ -187,7 +187,7 @@ const isEditingContext = ref(false)
 const tempContext = ref('')
 
 // Inline editing state
-const editingCell = ref(null) // { col: Object, field: 'description' | 'aliases', value: String }
+const editingCell = ref<any>(null) // { col: Object, field: 'description' | 'aliases', value: String }
 
 const hasWorkspace = computed(() => !!workspaceStore.activeWorkspaceId)
 
@@ -197,7 +197,7 @@ const renderedContext = computed(() => {
 })
 
 const groupedSchema = computed(() => {
-  const groups = {}
+  const groups: Record<string, any[]> = {}
   workspaceColumns.value.forEach(col => {
     const t = col.table_name || 'Unknown Table'
     if (!groups[t]) groups[t] = []
@@ -216,9 +216,9 @@ async function loadWorkspaceContext() {
   try {
     const summary = await workspaceApi.summary(workspaceStore.activeWorkspaceId)
     schemaContext.value = String(summary?.schema_context || '').trim()
-  } catch (error) {
+  } catch (error: any) {
     // Silently fail or use store fallback
-    schemaContext.value = String(workspaceStore.workspaces.find(w => w.id === workspaceStore.activeWorkspaceId)?.schema_context || '').trim()
+    schemaContext.value = String(workspaceStore.workspaces.find((w: any) => w.id === workspaceStore.activeWorkspaceId)?.schema_context || '').trim()
   }
 }
 
@@ -227,11 +227,11 @@ async function fetchWorkspaceSchema(forceRefresh = false) {
   schemaLoading.value = true
   try {
     const workspaceId = workspaceStore.activeWorkspaceId
-    const datasetResponse = await workspaceApi.listDatasets(workspaceId)
+    const datasetResponse: any = await workspaceApi.listDatasets(workspaceId)
     const datasets = datasetResponse?.datasets || []
 
     const schemas = await Promise.all(
-      datasets.map(async (ds) => {
+      datasets.map(async (ds: any) => {
         try {
           return await workspaceApi.getDatasetSchema(workspaceId, ds.table_name)
         } catch (err) {
@@ -240,11 +240,11 @@ async function fetchWorkspaceSchema(forceRefresh = false) {
       })
     )
 
-    const columns = []
-    schemas.forEach(schema => {
+    const columns: any[] = []
+    schemas.forEach((schema: any) => {
       const tableName = schema.table_name
       const cols = schema.columns || []
-      cols.forEach(c => {
+      cols.forEach((c: any) => {
         columns.push({
           ...c,
           table_name: tableName,
@@ -257,7 +257,7 @@ async function fetchWorkspaceSchema(forceRefresh = false) {
     dirtyTables.value.clear()
     schemaEdited.value = false
     if (forceRefresh) toast.success('Schema refreshed', 'Loaded latest workspace schema.')
-  } catch (error) {
+  } catch (error: any) {
     toast.error('Failed to load schema', error?.message || 'Unknown error occurred.')
   } finally {
     schemaLoading.value = false
@@ -277,17 +277,17 @@ function cancelEditContext() {
 async function saveEditContext() {
   if (!workspaceStore.activeWorkspaceId) return
   try {
-    const workspace = workspaceStore.workspaces.find(w => w.id === workspaceStore.activeWorkspaceId)
+    const workspace = workspaceStore.workspaces.find((w: any) => w.id === workspaceStore.activeWorkspaceId)
     await workspaceApi.update(workspaceStore.activeWorkspaceId, workspace?.name ?? null, tempContext.value.trim())
     schemaContext.value = tempContext.value.trim()
     isEditingContext.value = false
     toast.success('Workspace context saved')
-  } catch (error) {
+  } catch (error: any) {
     toast.error('Failed to save context', error?.message)
   }
 }
 
-function normalizeAliasList(value) {
+function normalizeAliasList(value: any) {
   if (Array.isArray(value)) return value
   if (typeof value === 'string') {
     return value.split(',').map(s => s.trim()).filter(Boolean)
@@ -295,7 +295,7 @@ function normalizeAliasList(value) {
   return []
 }
 
-function startInlineEdit(col, field) {
+function startInlineEdit(col: any, field: any) {
   if (editingCell.value && editingCell.value.col === col && editingCell.value.field === field) return
 
   // Save previous edit if exists
@@ -359,7 +359,7 @@ async function saveAllSchema() {
     for (const group of tablesToSave) {
       await workspaceApi.saveDatasetSchema(workspaceId, group.tableName, {
         context: schemaContext.value || '',
-        columns: group.columns.map(c => ({
+        columns: group.columns.map((c: any) => ({
           name: c.name,
           dtype: c.dtype || c.type || 'VARCHAR',
           description: c.description || '',
@@ -371,7 +371,7 @@ async function saveAllSchema() {
     schemaEdited.value = false
     dirtyTables.value.clear()
     toast.success('Schema saved', `Saved changes for ${tablesToSave.length} table(s).`)
-  } catch (error) {
+  } catch (error: any) {
     toast.error('Failed to save schema', error?.message)
   } finally {
     schemaLoading.value = false
@@ -379,7 +379,7 @@ async function saveAllSchema() {
 }
 
 
-async function regenerateTableSchema(tableName) {
+async function regenerateTableSchema(tableName: any) {
   if (!workspaceStore.activeWorkspaceId || !tableName) return
   if (regeneratingTableName.value) return
   regeneratingTableName.value = tableName
@@ -392,12 +392,12 @@ async function regenerateTableSchema(tableName) {
   })
   try {
     toast.info('Regenerating table schema', `Generating AI descriptions for ${tableName}...`)
-    const regenerated = await workspaceApi.regenerateDatasetSchema(workspaceStore.activeWorkspaceId, tableName, {
+    const regenerated: any = await workspaceApi.regenerateDatasetSchema(workspaceStore.activeWorkspaceId, tableName, {
       context: schemaContext.value || ''
     })
 
     const restColumns = workspaceColumns.value.filter(c => c.table_name !== tableName)
-    const newColumns = (regenerated.columns || []).map(c => ({
+    const newColumns = (regenerated.columns || []).map((c: any) => ({
       ...c,
       table_name: tableName,
       aliases: normalizeAliasList(c.aliases)
@@ -413,7 +413,7 @@ async function regenerateTableSchema(tableName) {
       message: `Schema updated for ${tableName}.`,
     })
     toast.success('Table schema regenerated', `AI descriptions updated for ${tableName}.`)
-  } catch (error) {
+  } catch (error: any) {
     executionStore.finishBackgroundOperation(operationId, {
       status: 'failed',
       title: 'Schema regeneration failed',
@@ -425,7 +425,7 @@ async function regenerateTableSchema(tableName) {
   }
 }
 
-async function handleDatasetSchemaReady(event) {
+async function handleDatasetSchemaReady(event: any) {
   await fetchWorkspaceSchema()
 }
 
