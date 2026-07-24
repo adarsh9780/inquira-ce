@@ -6,7 +6,10 @@ import test from 'node:test'
 const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
 test('workspace settings separate General, Data sources, and AI without losing workspace context', () => {
-  const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
+  const workspace = [
+    read('src/components/modals/tabs/WorkspaceTab.vue'),
+    read('src/composables/useWorkspaceSettings.ts'),
+  ].join('\n')
 
   assert.match(workspace, /aria-label="Workspace settings sections"/)
   assert.match(workspace, /role="tablist"/)

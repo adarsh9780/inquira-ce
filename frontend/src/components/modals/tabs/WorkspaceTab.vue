@@ -412,6 +412,7 @@ import { filenameFromPath } from '../../../utils/pathUtils'
 import ConfirmationModal from '../ConfirmationModal.vue'
 import WorkspaceContextSection from './workspace/WorkspaceContextSection.vue'
 import WorkspaceListPanel from './workspace/WorkspaceListPanel.vue'
+import { useWorkspaceSettings } from '../../../composables/useWorkspaceSettings'
 
 const props = defineProps({
   activeWorkspaceId: {
@@ -439,12 +440,11 @@ const conversationStore = useConversationStore()
 const workspaceActivation = useWorkspaceActivation()
 const artifactPresentation = useArtifactPresentation()
 const isNativeWorkspaceMetadata = workspaceApi.isAvailable()
-const workspaceSections = [
-  { id: 'general', label: 'General' },
-  { id: 'connections', label: 'Data sources' },
-  { id: 'ai', label: 'AI' },
-]
-const activeWorkspaceSection = ref('general')
+const {
+  workspaceSections,
+  activeWorkspaceSection,
+  moveWorkspaceSection,
+} = useWorkspaceSettings(computed(() => props.initialSection))
 const nativeConnections = ref([])
 const pendingConnection = ref(null)
 const connectionActionLoading = ref(false)
@@ -507,15 +507,6 @@ function handleWorkspaceActionsPointerDown(event) {
   workspaceActionsOpen.value = false
 }
 
-function moveWorkspaceSection(direction, event) {
-  const currentIndex = workspaceSections.findIndex((section) => section.id === activeWorkspaceSection.value)
-  const nextIndex = (currentIndex + direction + workspaceSections.length) % workspaceSections.length
-  activeWorkspaceSection.value = workspaceSections[nextIndex].id
-  nextTick(() => {
-    const tabs = event?.currentTarget?.parentElement?.querySelectorAll?.('[role="tab"]') || []
-    tabs[nextIndex]?.focus?.()
-  })
-}
 
 const workspaceSummaries = ref({})
 const workspaceDetail = ref(null)
@@ -584,15 +575,6 @@ const workspaceDeleteDialogMessage = computed(() => {
   const name = String(target?.name || 'this workspace').trim()
   return `Are you sure you want to delete "${name}"? This cannot be undone.`
 })
-watch(
-  () => props.initialSection,
-  (section) => {
-    const normalized = String(section || '').trim().toLowerCase()
-    const requested = normalized === 'data' ? 'connections' : normalized
-    activeWorkspaceSection.value = workspaceSections.some((item) => item.id === requested) ? requested : 'general'
-  },
-  { immediate: true },
-)
 watch(
   () => props.workspaces,
   async () => { await hydrateWorkspaceCards() },
