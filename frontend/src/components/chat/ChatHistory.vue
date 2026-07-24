@@ -52,7 +52,7 @@
       <ChatAssistantMessage v-if="hasAssistantContent(message)">
         <div class="px-3 py-2.5 rounded-2xl rounded-tl-sm" style="background-color: transparent">
           <div v-if="message.explanation" class="chat-markdown-content final-response-body max-w-none" style="color: var(--color-text-main);">
-            <div v-html="renderMarkdown(message.explanation)"></div>
+            <MarkdownContent :content="message.explanation" />
           </div>
 
           <div
@@ -120,7 +120,7 @@
                 class="chat-markdown-content text-[14px] leading-[1.7] max-w-none mb-3"
                 style="color: var(--color-text-main);"
               >
-                <div v-html="renderMarkdown(message.codeExplanation)"></div>
+                <MarkdownContent :content="message.codeExplanation" />
               </div>
               <div v-if="shouldRenderCodeSnapshot(message)" class="chat-code-block">
                 <div class="chat-code-header">
@@ -134,7 +134,7 @@
                     Open Code
                   </button>
                 </div>
-                <pre class="chat-code-scroll"><code class="language-python" v-html="renderCodeSnapshot(message.codeSnapshot)"></code></pre>
+                <MarkdownContent :content="message.codeSnapshot" mode="code" />
               </div>
             </div>
             </div>
@@ -193,7 +193,7 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue'
+import { ref, watch, nextTick, onMounted, onUnmounted, computed, defineAsyncComponent } from 'vue'
 import { useUiStore } from '../../stores/uiStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
 import { useArtifactStore } from '../../stores/artifactStore'
@@ -211,24 +211,10 @@ import ToolActivityCard from './ToolActivityCard.vue'
 import ChatAssistantMessage from './ChatAssistantMessage.vue'
 import ChatUserMessage from './ChatUserMessage.vue'
 import { toolOutputHasRenderableContent } from '../../utils/toolOutputPreview'
-import MarkdownIt from 'markdown-it'
-import markdownItKatexModule from '@vscode/markdown-it-katex'
-import DOMPurify from 'dompurify'
-import Prism from 'prismjs'
-import 'prismjs/components/prism-python'
-import 'prismjs/components/prism-sql'
 import { formatTimestamp } from '../../utils/dateUtils'
 import { toast } from '../../composables/useToast'
 import { useChatScrollFollow } from '../../composables/useChatScrollFollow'
-import 'katex/dist/katex.min.css'
-
-// Configure DOMPurify to add security attributes to links
-DOMPurify.addHook('afterSanitizeAttributes', function(node) {
-  if (node.tagName === 'A' && node.getAttribute('href')) {
-    node.setAttribute('rel', 'noopener noreferrer')
-    node.setAttribute('target', '_blank')
-  }
-})
+const MarkdownContent = defineAsyncComponent(() => import('./MarkdownContent.vue'))
 
 
 const uiStore = useUiStore()
@@ -367,59 +353,6 @@ function renderQuestionWithHighlights(question) {
   return parts.join('')
 }
 
-// Markdown parser
-const markdownItKatex = markdownItKatexModule.default || markdownItKatexModule
-const md = new MarkdownIt({
-  html: false,
-  linkify: true,
-  typographer: true,
-  breaks: true
-})
-md.use(markdownItKatex)
-
-function resolvePrismLanguage(rawLanguage) {
-  const normalized = String(rawLanguage || '').trim().toLowerCase()
-  if (!normalized) return 'python'
-  if (normalized === 'python' || normalized === 'py') return 'python'
-  if (
-    normalized === 'sql' ||
-    normalized === 'sqlite' ||
-    normalized === 'duckdb' ||
-    normalized === 'postgres' ||
-    normalized === 'postgresql'
-  ) return 'sql'
-  return 'python'
-}
-
-md.renderer.rules.fence = (tokens, idx) => {
-  const token = tokens[idx]
-  const rawInfo = String(token.info || '').trim()
-  const requestedLanguage = rawInfo.split(/\s+/).filter(Boolean)[0] || 'python'
-  const prismLanguage = resolvePrismLanguage(requestedLanguage)
-  const langEscaped = md.utils.escapeHtml(prismLanguage)
-  const rawCode = String(token.content || '')
-  const grammar = Prism.languages[prismLanguage]
-  const highlightedCode = grammar
-    ? Prism.highlight(rawCode, grammar, prismLanguage)
-    : md.utils.escapeHtml(rawCode)
-  const copyIconSvg = (
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
-    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<rect x="9" y="9" width="13" height="13" rx="2"></rect>' +
-      '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>' +
-    '</svg>'
-  )
-
-  return (
-    `<div class="chat-code-block">` +
-      `<div class="chat-code-header">` +
-        `<span>${langEscaped}</span>` +
-        `<button type="button" class="chat-code-copy" aria-label="Copy code" title="Copy code">${copyIconSvg}</button>` +
-      `</div>` +
-      `<pre class="chat-code-scroll"><code class="language-${langEscaped}">${highlightedCode}</code></pre>` +
-    `</div>`
-  )
-}
 
 const EPHEMERAL_LABELS = {
   check_safety: 'Checking if query is safe to process',
@@ -510,49 +443,6 @@ async function copyExplanation(message) {
     console.error('Failed to copy explanation:', error)
     toast.error('Copy failed', 'Unable to copy explanation to clipboard')
   }
-}
-
-function renderMarkdown(text) {
-  if (!text) return ''
-  const normalized = String(text)
-    .replace(/\\r\\n/g, '\n')
-    .replace(/\\n/g, '\n')
-  const html = md.render(normalized)
-  return DOMPurify.sanitize(html, {
-    ADD_TAGS: ['button', 'svg', 'rect', 'path'],
-    ADD_ATTR: [
-      'aria-hidden',
-      'aria-label',
-      'class',
-      'fill',
-      'stroke',
-      'stroke-width',
-      'stroke-linecap',
-      'stroke-linejoin',
-      'title',
-      'type',
-      'viewBox',
-      'x',
-      'y',
-      'width',
-      'height',
-      'rx',
-      'd'
-    ]
-  })
-}
-
-function renderCodeSnapshot(code) {
-  const rawCode = String(code || '')
-  if (!rawCode) return ''
-  const grammar = Prism.languages.python
-  const highlighted = grammar
-    ? Prism.highlight(rawCode, grammar, 'python')
-    : md.utils.escapeHtml(rawCode)
-  return DOMPurify.sanitize(highlighted, {
-    ALLOWED_TAGS: ['span'],
-    ALLOWED_ATTR: ['class']
-  })
 }
 
 function streamPlanText(message) {

@@ -26,7 +26,7 @@ test('premium UI foundation exposes semantic surface, focus, motion, and chart t
 
 test('workspace shell, composer, and chart surfaces use shared premium primitives', () => {
   const styles = read('src/style.css')
-  const app = read('src/App.vue')
+  const appShell = read('src/components/layout/AppShell.vue')
   const composer = read('src/components/chat/ChatInput.vue')
   const figure = read('src/components/analysis/FigureTab.vue')
   const runChart = read('src/components/analysis/runs/RunChartOutput.vue')
@@ -38,7 +38,7 @@ test('workspace shell, composer, and chart surfaces use shared premium primitive
   assert.match(styles, /:focus-visible[\s\S]*--color-focus-ring/)
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/)
 
-  assert.match(app, /class="flex-1 flex overflow-hidden app-shell-frame relative"/)
+  assert.match(appShell, /app-shell-frame/)
   assert.match(composer, /chat-composer-surface/)
   assert.equal(figure.includes('plotly-surface'), true)
   assert.equal(runChart.includes('plotly-surface'), true)

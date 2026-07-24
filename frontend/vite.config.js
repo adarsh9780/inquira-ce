@@ -45,20 +45,10 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
-      'codemirror',
-      '@codemirror/state',
-      '@codemirror/view',
-      '@codemirror/lang-python',
-      '@codemirror/autocomplete',
-      '@codemirror/search',
-      '@codemirror/commands',
       'vue',
       'pinia',
       '@heroicons/vue',
-      'reka-ui',
-      'markdown-it',
-      'dompurify',
-      'plotly.js-dist-min'
+      'reka-ui'
     ]
   },
   server: {

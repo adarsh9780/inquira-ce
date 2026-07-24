@@ -4,12 +4,16 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('app keeps one sidebar container with a collapsed state only', () => {
-  const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
+  const rootSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
+  const appSource = [
+    rootSource,
+    readFileSync(resolve(process.cwd(), 'src/components/layout/AppShell.vue'), 'utf-8'),
+  ].join('\n')
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
-  assert.equal(appSource.includes('function toggleSidebarVisibility() {'), false)
-  assert.equal(appSource.includes('class="h-full shrink-0 app-nav-pane"'), true)
-  assert.equal(appSource.includes("'app-nav-pane-collapsed': uiStore.isSidebarCollapsed"), true)
+  assert.equal(rootSource.includes('function toggleSidebarVisibility() {'), false)
+  assert.equal(appSource.includes('class="app-nav-pane h-full shrink-0"'), true)
+  assert.equal(appSource.includes("'app-nav-pane-collapsed': sidebarCollapsed"), true)
   assert.equal(appSource.includes('app-nav-pane-hidden'), false)
   assert.equal(appSource.includes(':aria-hidden="!appStore.showSidebar"'), false)
   assert.equal(appSource.includes('class="app-sidebar-rail"'), false)

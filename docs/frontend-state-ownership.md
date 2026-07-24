@@ -1,10 +1,10 @@
 # Frontend state ownership
 
-This inventory is the migration contract for the temporary `useAppStore` facade. The
-facade may forward these names while consumers move, but it does not own domain
-state. New code imports the target store or coordinator directly.
+This inventory records the completed domain-store migration. The temporary
+`useAppStore` facade has been removed. Production code imports the owning store or
+an explicit cross-domain coordinator directly.
 
-| Target | Facade fields and actions |
+| Target | Owned fields and actions |
 | --- | --- |
 | `uiStore.ts` | `activeTab`, `workspacePane`, `dataPane`, `leftPaneWidth`, `isTerminalOpen`, `terminalHeight`, `terminalConsentGranted`, `terminalCwd`, `isSidebarCollapsed`, `isKeyboardShortcutsOpen`, `isCommandPaletteOpen`, `connectionFlowRequestId`, `editorLine`, `editorCol`, `isEditorFocused`, `isLoading`, `isSettingsOpen`, `settingsInitialTab`, `setActiveTab`, `setWorkspacePane`, `setDataPane`, `setLeftPaneWidth`, `setTerminalHeight`, `toggleTerminal`, `setTerminalConsentGranted`, `setTerminalCwd`, `setSidebarCollapsed`, `openKeyboardShortcuts`, `closeKeyboardShortcuts`, `openCommandPalette`, `closeCommandPalette`, `toggleCommandPalette`, `setEditorPosition`, `setEditorFocused`, `setLoading`, `openSettings` |
 | `preferencesStore.ts` | `llmProvider`, `availableProviders`, `selectedModel`, `selectedLiteModel`, `selectedCodingModel`, `slowRequestWarningSeconds`, `availableModels`, `providerMainModels`, `providerLiteModels`, `providerModelSearchLoading`, `providerModelCatalogs`, `providerRequiresApiKey`, `apiKeyPresenceByProvider`, `selectedProviderApiKeyPresent`, `apiKey`, `apiKeyConfigured`, `allowLlmDataSamples`, `uiTheme`, `availableThemes`, `uiFont`, `availableFonts`, `uiCodeFont`, `availableCodeFonts`, `setApiKey`, `setSelectedModel`, `searchProviderModels`, `mergeProviderModelOptions`, `clearProviderModelSearchState`, `setUiTheme`, `setUiFont`, `setUiCodeFont`, `applyPreferencesResponse`, `loadUserPreferences` |
@@ -17,3 +17,9 @@ state. New code imports the target store or coordinator directly.
 Snapshot persistence stays versioned and moves to `useSessionSnapshot`; workspace
 activation moves to `useWorkspaceActivation`. These coordinators are the only
 allowed place for workflows that intentionally touch multiple stores.
+
+The Wails application uses typed domain modules under `frontend/src/api`. Those
+modules are the only boundary between stores/components and generated Wails
+bindings. This replaces the HTTP/OpenAPI/Tauri transport shape from the original
+plan while preserving its core rule: components never construct transport calls
+or endpoint strings.

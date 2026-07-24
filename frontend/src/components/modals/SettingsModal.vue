@@ -71,15 +71,15 @@
             </header>
 
             <div class="relative flex-1 overflow-hidden">
-              <section :class="panelClass('setup')" :aria-hidden="currentPanel !== 'setup'" :inert="currentPanel !== 'setup'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
+              <section v-if="currentPanel === 'setup'" :class="panelClass('setup')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
                 <SetupTab />
               </section>
 
-              <section :class="panelClass('connections')" :aria-hidden="currentPanel !== 'connections'" :inert="currentPanel !== 'connections'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
+              <section v-if="currentPanel === 'connections'" :class="panelClass('connections')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
                 <LLMSettingsTab @close-request="closeModal" />
               </section>
 
-              <section :class="panelClass('workspace')" :aria-hidden="currentPanel !== 'workspace'" :inert="currentPanel !== 'workspace'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
+              <section v-if="currentPanel === 'workspace'" :class="panelClass('workspace')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
                 <WorkspaceTab
                   :active-workspace-id="activeWorkspaceId"
                   :initial-section="workspaceInitialSection"
@@ -90,13 +90,13 @@
                 />
               </section>
 
-              <section :class="panelClass('appearance')" :aria-hidden="currentPanel !== 'appearance'" :inert="currentPanel !== 'appearance'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
+              <section v-if="currentPanel === 'appearance'" :class="panelClass('appearance')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
                 <AppearanceTab />
               </section>
 
 
 
-              <section :class="panelClass('account')" :aria-hidden="currentPanel !== 'account'" :inert="currentPanel !== 'account'" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
+              <section v-if="currentPanel === 'account'" :class="panelClass('account')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
                 <AccountTab />
               </section>
             </div>
@@ -106,7 +106,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useLLMConfig } from '../../composables/useLLMConfig'
 import { useUiStore } from '../../stores/uiStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
@@ -117,11 +117,6 @@ import { useConversationStore } from '../../stores/conversationStore'
 import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
 import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import { filenameFromPath } from '../../utils/pathUtils'
-import LLMSettingsTab from './tabs/LLMSettingsTab.vue'
-import WorkspaceTab from './tabs/WorkspaceTab.vue'
-import AppearanceTab from './tabs/AppearanceTab.vue'
-import AccountTab from './tabs/AccountTab.vue'
-import SetupTab from './tabs/SetupTab.vue'
 import { DialogShell } from '../ui/dialog'
 import {
   CheckCircleIcon,
@@ -141,6 +136,12 @@ const props = defineProps({
     default: 'setup',
   },
 })
+
+const SetupTab = defineAsyncComponent(() => import('./tabs/SetupTab.vue'))
+const LLMSettingsTab = defineAsyncComponent(() => import('./tabs/LLMSettingsTab.vue'))
+const WorkspaceTab = defineAsyncComponent(() => import('./tabs/WorkspaceTab.vue'))
+const AppearanceTab = defineAsyncComponent(() => import('./tabs/AppearanceTab.vue'))
+const AccountTab = defineAsyncComponent(() => import('./tabs/AccountTab.vue'))
 
 const emit = defineEmits(['update:modelValue'])
 

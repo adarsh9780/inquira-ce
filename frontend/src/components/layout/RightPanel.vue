@@ -131,17 +131,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, onUnmounted } from 'vue'
 import { useUiStore } from '../../stores/uiStore'
 import WorkspaceLeftPane from './WorkspaceLeftPane.vue'
 import WorkspaceRightPane from './WorkspaceRightPane.vue'
 import WorkspaceContextBar from './WorkspaceContextBar.vue'
 import SidebarGlobalTurnTree from './sidebar/SidebarGlobalTurnTree.vue'
-import TerminalTab from '../analysis/TerminalTab.vue'
 import SchemaEditorTab from '../preview/SchemaEditorTab.vue'
 import { CommandLineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 
 const uiStore = useUiStore()
+const TerminalTab = defineAsyncComponent(() => import('../analysis/TerminalTab.vue'))
 const isWorkspaceActive = computed(() => uiStore.activeTab === 'workspace')
 const leftPaneWidth = computed(() => uiStore.leftPaneWidth)
 const rightPaneWidth = computed(() => 100 - uiStore.leftPaneWidth)

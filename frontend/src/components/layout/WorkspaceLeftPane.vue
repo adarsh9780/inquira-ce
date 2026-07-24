@@ -13,10 +13,10 @@
 
     <div class="workspace-left-content min-h-0 flex-1 flex flex-col p-2.5 sm:p-3 pb-0">
       <div class="min-h-0 flex-1">
-      <div v-show="uiStore.workspacePane === 'code'" class="h-full">
+      <div v-if="uiStore.workspacePane === 'code'" class="h-full">
         <CodeTab />
       </div>
-      <div v-show="uiStore.workspacePane === 'chat'" class="h-full">
+      <div v-else class="h-full">
         <ChatTab />
       </div>
       </div>
@@ -33,7 +33,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { useUiStore } from '../../stores/uiStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
 import { useArtifactStore } from '../../stores/artifactStore'
@@ -42,7 +42,6 @@ import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useConversationStore } from '../../stores/conversationStore'
 import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
 import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
-import CodeTab from '../analysis/CodeTab.vue'
 import ChatTab from '../chat/ChatTab.vue'
 import ChatInput from '../chat/ChatInput.vue'
 import AppToolbar from '../ui/AppToolbar.vue'
@@ -60,6 +59,7 @@ const workspaceStore = useWorkspaceStore()
 const conversationStore = useConversationStore()
 const workspaceActivation = useWorkspaceActivation()
 const artifactPresentation = useArtifactPresentation()
+const CodeTab = defineAsyncComponent(() => import('../analysis/CodeTab.vue'))
 const workspacePaneOptions = [
   { value: 'chat', label: 'Chat', icon: ChatBubbleLeftRightIcon },
   { value: 'code', label: 'Code', icon: CodeBracketIcon },

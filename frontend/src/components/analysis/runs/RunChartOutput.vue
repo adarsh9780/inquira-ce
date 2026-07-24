@@ -4,9 +4,9 @@
 
 <script setup>
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import Plotly from 'plotly.js-dist-min'
 import { usePreferencesStore } from '../../../stores/preferencesStore'
 import { normalizePlotlyFigure } from '../../../utils/figurePayload'
+import { loadPlotly } from '../../../utils/loadPlotly'
 import { applyPlotlyConfigTheme, applyPlotlyTheme, PLOTLY_THEME_MODE } from '../../../utils/plotlyTheme'
 
 const props = defineProps({
@@ -16,10 +16,12 @@ const props = defineProps({
 const preferencesStore = usePreferencesStore()
 const plotContainer = ref(null)
 let resizeObserver = null
+let plotly = null
 
 async function renderPlot() {
   const rawFigure = normalizePlotlyFigure(props.output?.data ?? props.output)
   if (!rawFigure || !plotContainer.value) return
+  plotly = await loadPlotly()
   await nextTick()
   const mode = PLOTLY_THEME_MODE.SOFT
   const figure = applyPlotlyTheme(rawFigure, { mode, context: 'panel' }) || rawFigure
@@ -29,8 +31,8 @@ async function renderPlot() {
     modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
     responsive: true,
   }, { mode })
-  Plotly.purge(plotContainer.value)
-  await Plotly.newPlot(
+  plotly.purge(plotContainer.value)
+  await plotly.newPlot(
     plotContainer.value,
     figure.data || [],
     { ...(figure.layout || {}), autosize: true },
@@ -42,7 +44,7 @@ onMounted(() => {
   void renderPlot()
   if ('ResizeObserver' in window) {
     resizeObserver = new ResizeObserver(() => {
-      try { Plotly.Plots.resize(plotContainer.value) } catch (_error) {}
+      try { plotly?.Plots.resize(plotContainer.value) } catch (_error) {}
     })
     resizeObserver.observe(plotContainer.value)
   }
@@ -52,6 +54,6 @@ watch(() => [props.output, preferencesStore.uiTheme], () => void renderPlot(), {
 
 onUnmounted(() => {
   resizeObserver?.disconnect()
-  if (plotContainer.value) Plotly.purge(plotContainer.value)
+  if (plotContainer.value) plotly?.purge(plotContainer.value)
 })
 </script>

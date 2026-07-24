@@ -26,10 +26,11 @@
 </template>
 
 <script setup>
+import { defineAsyncComponent } from 'vue'
 import { useUiStore } from '../../stores/uiStore'
-import NativeTerminalPane from './NativeTerminalPane.vue'
 import nativeTerminalService from '../../services/nativeTerminalService'
 
 const uiStore = useUiStore()
+const NativeTerminalPane = defineAsyncComponent(() => import('./NativeTerminalPane.vue'))
 const nativeTerminalAvailable = nativeTerminalService.isNativeRuntime()
 </script>

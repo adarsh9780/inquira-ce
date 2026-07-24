@@ -17,8 +17,7 @@ test('settings modal is viewport bounded and exposes dialog keyboard semantics',
 test('inactive settings panels are removed from keyboard and accessibility navigation', () => {
   const source = read('src/components/modals/SettingsModal.vue')
 
-  assert.equal((source.match(/:inert="currentPanel !==/g) || []).length, 5)
-  assert.equal((source.match(/:aria-hidden="currentPanel !==/g) || []).length, 5)
+  assert.equal((source.match(/v-if="currentPanel ===/g) || []).length, 5)
   assert.doesNotMatch(source, /handleDialogKeydown/)
 })
 
@@ -70,11 +69,13 @@ test('composer defers readiness guidance and keeps its direct controls labelled'
 
 test('global UI honors reduced motion and startup states are announced', () => {
   const styles = read('src/style.css')
-  const app = read('src/App.vue')
+  const startup = read('src/components/startup/StartupScreen.vue')
+  const failure = read('src/components/startup/StartupFailureScreen.vue')
+  const overlay = read('src/components/startup/BlockingOperationOverlay.vue')
 
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/)
   assert.match(styles, /transition-duration: 0\.01ms !important/)
-  assert.match(app, /role="status"/)
-  assert.match(app, /role="alert"/)
-  assert.match(app, /:aria-hidden="blockingOverlayActive \? 'false' : 'true'"/)
+  assert.match(startup, /role="status"/)
+  assert.match(failure, /role="alert"/)
+  assert.match(overlay, /:aria-hidden="active \? 'false' : 'true'"/)
 })

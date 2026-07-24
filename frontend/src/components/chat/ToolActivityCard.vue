@@ -25,8 +25,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import ToolOutputPreview from './ToolOutputPreview.vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { toolOutputHasRenderableContent } from '../../utils/toolOutputPreview'
 
 const props = defineProps({
@@ -39,6 +38,8 @@ const props = defineProps({
     default: false,
   },
 })
+
+const ToolOutputPreview = defineAsyncComponent(() => import('./ToolOutputPreview.vue'))
 
 const toolName = computed(() => String(props.activity?.tool || '').trim())
 const toolLabel = computed(() => toolName.value || 'tool')

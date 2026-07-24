@@ -99,13 +99,13 @@ import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useConversationStore } from '../../stores/conversationStore'
 import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
 import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
-import Plotly from 'plotly.js-dist-min'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import FloatingActionMenu from '../ui/FloatingActionMenu.vue'
 import AppEmptyState from '../ui/AppEmptyState.vue'
 import { artifactApi } from '../../api/artifacts'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
+import { loadPlotly } from '../../utils/loadPlotly'
 import { persistExportFile } from '../../utils/exportFile'
 import { applyPlotlyTheme, applyPlotlyConfigTheme, PLOTLY_THEME_MODE } from '../../utils/plotlyTheme'
 import { toast } from '../../composables/useToast'
@@ -140,6 +140,7 @@ const exportMenuButtonRef = ref(null)
 const exportMenuPosition = ref({ x: 0, y: 0 })
 let listAbortController = null
 let figureAbortController = null
+let plotly = null
 
 const exportMenuItems = computed(() => [
   { id: 'png', label: 'PNG image (.png)' },
@@ -234,7 +235,7 @@ onMounted(async () => {
   if ('ResizeObserver' in window) {
     ro = new ResizeObserver(() => {
       if (plotContainer.value) {
-        try { Plotly.Plots.resize(plotContainer.value) } catch (e) {}
+        try { plotly?.Plots.resize(plotContainer.value) } catch (e) {}
       }
     })
   }
@@ -253,7 +254,7 @@ onUnmounted(() => {
   listAbortController?.abort()
   figureAbortController?.abort()
   if (plotContainer.value) {
-    Plotly.purge(plotContainer.value)
+    plotly?.purge(plotContainer.value)
   }
   if (ro && plotContainer.value) {
     try { ro.unobserve(plotContainer.value) } catch (e) {}
@@ -491,6 +492,7 @@ async function renderPlot() {
   if (!ready) return
 
   try {
+    plotly = await loadPlotly()
     // Ensure container fills parent
     plotContainer.value.style.width = '100%'
     plotContainer.value.style.height = '100%'
@@ -516,12 +518,12 @@ async function renderPlot() {
     )
 
     // Render (use newPlot for clean re-render)
-    Plotly.purge(plotContainer.value)
-    await Plotly.newPlot(plotContainer.value, figureData.data || [], layout, config)
+    plotly.purge(plotContainer.value)
+    await plotly.newPlot(plotContainer.value, figureData.data || [], layout, config)
 
     // Final resize pass once plotted
     requestAnimationFrame(() => {
-      try { Plotly.Plots.resize(plotContainer.value) } catch (e) {}
+      try { plotly?.Plots.resize(plotContainer.value) } catch (e) {}
     })
 
   } catch (error) {
@@ -551,8 +553,9 @@ async function downloadPng() {
   isDownloading.value = true
 
   try {
+    plotly = await loadPlotly()
     const filename = `${getExportBaseName()}_${new Date().toISOString().split('T')[0]}.png`
-    const dataUrl = await Plotly.toImage(plotContainer.value, {
+    const dataUrl = await plotly.toImage(plotContainer.value, {
       format: 'png',
       width: 1200,
       height: 800

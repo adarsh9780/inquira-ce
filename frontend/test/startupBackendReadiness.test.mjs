@@ -7,7 +7,7 @@ test('authenticated workspace shell mounts only after account bootstrap complete
   const source = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
 
   assert.equal(
-    source.includes('<div v-if="authStore.isAuthenticated && appBootstrap.ready && !modelOnboarding.required" class="flex flex-col h-screen">'),
+    /<AppShell\s+v-if="authStore\.isAuthenticated && appBootstrap\.ready && !modelOnboarding\.required"/.test(source),
     true,
     'main workspace shell must not mount hidden child components before backend and workspace bootstrap finish',
   )

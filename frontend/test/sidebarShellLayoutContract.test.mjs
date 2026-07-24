@@ -4,11 +4,14 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('app shell owns sidebar rail sizing while UnifiedSidebar fills the provided space', () => {
-  const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
+  const appSource = [
+    readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8'),
+    readFileSync(resolve(process.cwd(), 'src/components/layout/AppShell.vue'), 'utf-8'),
+  ].join('\n')
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
-  assert.equal(appSource.includes('class="h-full shrink-0 app-nav-pane"'), true)
-  assert.equal(appSource.includes("'app-nav-pane-collapsed': uiStore.isSidebarCollapsed"), true)
+  assert.equal(appSource.includes('class="app-nav-pane h-full shrink-0"'), true)
+  assert.equal(appSource.includes("'app-nav-pane-collapsed': sidebarCollapsed"), true)
   assert.equal(appSource.includes('app-nav-pane-hidden'), false)
   assert.equal(appSource.includes('.app-nav-pane {'), true)
   assert.equal(appSource.includes('width: 260px;'), true)

@@ -2,78 +2,23 @@
   <div class="min-h-screen bg-[var(--color-base)] flex flex-col">
     <ToastContainer />
 
-    <div
+    <StartupScreen
       v-show="!startupFailure && (!desktopStartup.ready || !modelOnboarding.checked)"
-      class="fixed inset-0 flex items-center justify-center bg-[var(--color-base)]"
-      role="status"
-      aria-live="polite"
-    >
-      <div class="w-full max-w-md px-6 text-center">
-        <!-- Logo -->
-        <div class="flex justify-center mb-8">
-          <img
-            :src="logo"
-            alt="Inquira logo"
-            class="h-16 w-16"
-          />
-        </div>
+      :logo="logo"
+      :title="desktopStartupTitle"
+      :message="desktopStartupMessage"
+      :progress="progressPercent"
+    />
 
-        <!-- Brand -->
-        <h1 class="text-2xl font-semibold tracking-tight text-[var(--color-text-main)]">
-          {{ desktopStartupTitle }}
-        </h1>
-        <p class="mt-3 text-sm text-[var(--color-text-muted)]">
-          {{ desktopStartupMessage }}
-        </p>
-
-        <!-- Progress -->
-        <div class="mt-10">
-          <div class="h-px w-full bg-[var(--color-border)]">
-            <div
-              class="h-full bg-[var(--color-text-main)] transition-all duration-500 ease-out"
-              :style="{ width: progressPercent + '%' }"
-            ></div>
-          </div>
-          <div class="mt-4 flex items-center justify-center gap-2">
-            <div class="h-1.5 w-1.5 rounded-full bg-[var(--color-text-muted)] animate-pulse"></div>
-            <span class="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">Starting</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div
+    <StartupFailureScreen
       v-show="startupFailure"
-      class="fixed inset-0 flex items-center justify-center bg-[var(--color-base)]"
-      role="alert"
-    >
-      <div class="w-full max-w-md px-6 text-center">
-        <!-- Logo -->
-        <div class="flex justify-center mb-8">
-          <img :src="logo" alt="Inquira logo" class="h-16 w-16" />
-        </div>
-
-        <!-- Error -->
-        <h1 class="text-xl font-semibold tracking-tight text-[var(--color-text-main)]">
-          Startup Failed
-        </h1>
-        <p class="mt-3 text-sm text-[var(--color-text-muted)]">
-          The desktop services could not reach a healthy state.
-        </p>
-
-        <!-- Error details -->
-        <div class="mt-8 rounded-lg border border-[var(--color-accent-border)] bg-[var(--color-danger-bg)] px-4 py-3 text-left">
-          <p class="text-xs font-medium uppercase tracking-wider text-[var(--color-danger-text)]">Error</p>
-          <p class="mt-2 text-sm text-[var(--color-danger-text)]">{{ startupFailure }}</p>
-        </div>
-        <StartupFailureActions
-          :message="startupRecoveryMessage"
-          @restart="restartDesktopApp"
-          @open-logs="openStartupLogs"
-          @copy-diagnostics="copyStartupDiagnostics"
-        />
-      </div>
-    </div>
+      :logo="logo"
+      :error="startupFailure"
+      :recovery-message="startupRecoveryMessage"
+      @restart="restartDesktopApp"
+      @open-logs="openStartupLogs"
+      @copy-diagnostics="copyStartupDiagnostics"
+    />
 
     <FirstRunModelOnboarding
       v-if="modelOnboarding.checked && modelOnboarding.required"
@@ -81,21 +26,10 @@
       @complete="handleModelOnboardingComplete"
     />
 
-    <div v-if="authStore.isAuthenticated && appBootstrap.ready && !modelOnboarding.required" class="flex flex-col h-screen">
-      <div class="flex-1 flex overflow-hidden app-shell-frame relative">
-        <div
-          class="h-full shrink-0 app-nav-pane"
-          :class="{
-            'app-nav-pane-collapsed': uiStore.isSidebarCollapsed,
-          }"
-        >
-          <UnifiedSidebar />
-        </div>
-        <div class="flex-1 flex flex-col overflow-hidden app-workspace-pane">
-          <RightPanel />
-        </div>
-      </div>
-      <StatusBar />
+    <AppShell
+      v-if="authStore.isAuthenticated && appBootstrap.ready && !modelOnboarding.required"
+      :sidebar-collapsed="uiStore.isSidebarCollapsed"
+    >
       <SettingsModal
         v-model="uiStore.isSettingsOpen"
         :initial-tab="uiStore.settingsInitialTab"
@@ -108,58 +42,21 @@
         :is-open="uiStore.isKeyboardShortcutsOpen"
         @close="uiStore.closeKeyboardShortcuts()"
       />
-    </div>
+    </AppShell>
 
-    <Teleport to="body">
-      <div
-        data-testid="startup-overlay"
-        :data-active="blockingOverlayActive ? 'true' : 'false'"
-        :aria-hidden="blockingOverlayActive ? 'false' : 'true'"
-        role="status"
-        aria-live="polite"
-        class="layer-blocking fixed inset-0 flex items-center justify-center bg-[var(--color-base)] transition-opacity duration-300"
-        :class="blockingOverlayActive ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
-      >
-        <div class="w-full max-w-md px-6 text-center">
-          <!-- Logo -->
-          <div class="flex justify-center mb-6">
-            <img
-              :src="logo"
-              alt="Inquira logo"
-              class="h-16 w-16"
-            />
-          </div>
-
-          <!-- Status -->
-          <p class="text-xs font-medium uppercase tracking-widest text-[var(--color-text-muted)]">
-            {{ startupOverlayPill }}
-          </p>
-          <h1 class="mt-4 text-2xl font-semibold tracking-tight text-[var(--color-text-main)]">
-            {{ startupOverlayTitle }}
-          </h1>
-          <p class="mt-3 text-sm text-[var(--color-text-muted)]">
-            {{ startupOverlayMessage }}
-          </p>
-
-          <!-- Spinner + elapsed only; keep a single status message above -->
-          <div class="mt-8 flex items-center justify-center gap-3">
-            <div class="relative h-8 w-8 shrink-0" aria-hidden="true">
-              <div class="absolute inset-0 rounded-full border-2 border-[var(--color-border)]"></div>
-              <div class="absolute inset-0 rounded-full border-2 border-t-[var(--color-text-main)] border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
-            </div>
-            <p class="text-xs text-[var(--color-text-muted)]">
-              {{ currentStartupElapsedLabel }}
-            </p>
-          </div>
-        </div>
-      </div>
-
-    </Teleport>
+    <BlockingOperationOverlay
+      :active="blockingOverlayActive"
+      :logo="logo"
+      :pill="startupOverlayPill"
+      :title="startupOverlayTitle"
+      :message="startupOverlayMessage"
+      :elapsed="currentStartupElapsedLabel"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useAuthStore } from './stores/authStore'
 import { useUiStore } from './stores/uiStore'
 import { usePreferencesStore } from './stores/preferencesStore'
@@ -168,6 +65,8 @@ import { useConversationStore } from './stores/conversationStore'
 import { useExecutionStore } from './stores/executionStore'
 import { useSessionSnapshot } from './composables/useSessionSnapshot'
 import { useWorkspaceActivation } from './composables/useWorkspaceActivation'
+import { useGlobalShortcuts } from './composables/useGlobalShortcuts'
+import { useNativeDatasetDrop } from './composables/useNativeDatasetDrop'
 import { modelConnectionService } from './services/modelConnectionService'
 import { themeService } from './services/themeService'
 import { fontService } from './services/fontService'
@@ -175,33 +74,35 @@ import { toast } from './composables/useToast'
 import { extractApiErrorMessage } from './utils/apiError'
 import { normalizeThemeId } from './constants/themes'
 import { normalizeAppFontId, normalizeCodeFontId } from './constants/fonts'
-import { matchShortcut } from './utils/keyboardShortcuts'
 import logo from './assets/favicon.svg'
-import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
-import RightPanel from './components/layout/RightPanel.vue'
-import StatusBar from './components/layout/StatusBar.vue'
+import AppShell from './components/layout/AppShell.vue'
 import ToastContainer from './components/ui/ToastContainer.vue'
-import StartupFailureActions from './components/startup/StartupFailureActions.vue'
-import SettingsModal from './components/modals/SettingsModal.vue'
+import StartupScreen from './components/startup/StartupScreen.vue'
+import StartupFailureScreen from './components/startup/StartupFailureScreen.vue'
+import BlockingOperationOverlay from './components/startup/BlockingOperationOverlay.vue'
 import CommandPaletteModal from './components/modals/CommandPaletteModal.vue'
 import KeyboardShortcutsModal from './components/modals/KeyboardShortcutsModal.vue'
 import FirstRunModelOnboarding from './components/onboarding/FirstRunModelOnboarding.vue'
+
+const SettingsModal = defineAsyncComponent(() => import('./components/modals/SettingsModal.vue'))
 
 const uiStore = useUiStore()
 const preferencesStore = usePreferencesStore()
 const workspaceStore = useWorkspaceStore()
 const conversationStore = useConversationStore()
 const executionStore = useExecutionStore()
+const authStore = useAuthStore()
 const sessionSnapshot = useSessionSnapshot()
 const workspaceActivation = useWorkspaceActivation()
+const openGlobalDatasetPicker = () => workspaceActivation.openDataConnectionFlow()
+useGlobalShortcuts(computed(() => authStore.isAuthenticated), openGlobalDatasetPicker)
+useNativeDatasetDrop(openGlobalDatasetPicker)
 sessionSnapshot.configurePersistence()
 
 function wailsApp() {
   if (typeof window === 'undefined') return null
   return window.go?.main?.App || null
 }
-const authStore = useAuthStore()
-
 const appBootstrap = reactive({
   active: false,
   ready: false,
@@ -441,80 +342,6 @@ function applyDocumentCodeFont(fontId) {
   document.documentElement.setAttribute('data-code-font', normalized)
 }
 
-function openGlobalDatasetPicker() {
-  workspaceActivation.openDataConnectionFlow()
-}
-
-function handleAppDatasetDragOver(event) {
-  if (event.defaultPrevented) return
-  if (!event?.dataTransfer?.types?.includes?.('Files')) return
-  event.preventDefault()
-}
-
-function handleAppDatasetDrop(event) {
-  if (event.defaultPrevented) return
-  const files = Array.from(event?.dataTransfer?.files || [])
-  if (files.length === 0) return
-  event.preventDefault()
-  workspaceActivation.openDataConnectionFlow()
-}
-
-function handleGlobalShortcuts(event) {
-  if (!authStore.isAuthenticated) return
-  if (event.defaultPrevented) return
-  if (event.repeat) return
-
-  const hasPrimaryModifier = event.metaKey || event.ctrlKey
-  if (!hasPrimaryModifier || event.altKey) return
-
-  if (matchShortcut(event, 'conversation-tree')) {
-    event.preventDefault()
-    uiStore.setActiveTab('conversation-tree')
-    return
-  }
-
-  if (matchShortcut(event, 'command-palette')) {
-    event.preventDefault()
-    uiStore.toggleCommandPalette()
-    return
-  }
-
-  if (matchShortcut(event, 'settings')) {
-    event.preventDefault()
-    uiStore.openSettings('setup')
-    return
-  }
-
-  if (matchShortcut(event, 'sidebar')) {
-    event.preventDefault()
-    uiStore.setSidebarCollapsed(!uiStore.isSidebarCollapsed)
-    return
-  }
-
-  if (matchShortcut(event, 'schema')) {
-    event.preventDefault()
-    uiStore.setActiveTab('schema-editor')
-    return
-  }
-
-  if (matchShortcut(event, 'dataset-import')) {
-    event.preventDefault()
-    void openGlobalDatasetPicker()
-    return
-  }
-
-  if (matchShortcut(event, 'terminal')) {
-    event.preventDefault()
-    uiStore.toggleTerminal()
-    return
-  }
-
-}
-
-function handleOpenDatasetPickerRequest() {
-  workspaceActivation.openDataConnectionFlow()
-}
-
 async function readDesktopStartupState() {
   if (wailsApp()?.GetStartupState) {
     try {
@@ -727,10 +554,6 @@ onMounted(async () => {
   startupClockTimer = window.setInterval(() => {
     startupClock.value = Date.now()
   }, 1000)
-  document.addEventListener('keydown', handleGlobalShortcuts)
-  document.addEventListener('dragover', handleAppDatasetDragOver)
-  document.addEventListener('drop', handleAppDatasetDrop)
-  window.addEventListener('inquira:open-dataset-picker', handleOpenDatasetPickerRequest)
   const startupOk = await waitForDesktopStartupReady()
   if (!startupOk) {
     return
@@ -803,10 +626,6 @@ onUnmounted(() => {
     window.clearInterval(startupClockTimer)
     startupClockTimer = null
   }
-  document.removeEventListener('keydown', handleGlobalShortcuts)
-  document.removeEventListener('dragover', handleAppDatasetDragOver)
-  document.removeEventListener('drop', handleAppDatasetDrop)
-  window.removeEventListener('inquira:open-dataset-picker', handleOpenDatasetPickerRequest)
   window.removeEventListener('beforeunload', handleAppUnload)
 })
 </script>
