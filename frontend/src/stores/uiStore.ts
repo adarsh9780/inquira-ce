@@ -163,6 +163,27 @@ export const useUiStore = defineStore('ui', () => {
     isLoading.value = Boolean(loading)
   }
 
+  function reset() {
+    activeTab.value = 'workspace'
+    workspacePane.value = 'chat'
+    dataPane.value = 'table'
+    leftPaneWidth.value = 50
+    terminalConsentGranted.value = false
+    isTerminalOpen.value = false
+    terminalHeight.value = 30
+    terminalCwd.value = ''
+    isSidebarCollapsed.value = false
+    isKeyboardShortcutsOpen.value = false
+    isCommandPaletteOpen.value = false
+    connectionFlowRequestId.value = 0
+    editorLine.value = 1
+    editorCol.value = 1
+    isEditorFocused.value = false
+    isLoading.value = false
+    isSettingsOpen.value = false
+    settingsInitialTab.value = 'setup'
+  }
+
   return {
     activeTab,
     workspacePane,
@@ -202,5 +223,6 @@ export const useUiStore = defineStore('ui', () => {
     setEditorPosition,
     setEditorFocused,
     setLoading,
+    reset,
   }
 })

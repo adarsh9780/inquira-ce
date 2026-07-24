@@ -173,6 +173,26 @@ export const useArtifactStore = defineStore('artifacts', () => {
     return String(selectedFigureArtifactsByWorkspace.value[selectionKey(workspaceId, turnId)] || '').trim()
   }
 
+  function reset() {
+    activeTurnArtifactRefreshKey.value = 0
+    resultData.value = null
+    plotlyFigure.value = null
+    dataframes.value = []
+    figures.value = []
+    scalars.value = []
+    promotedUserDataframes.value = []
+    promotedUserFigures.value = []
+    dataframeCount.value = 0
+    tableRowCount.value = 0
+    tableWindowStart.value = 0
+    tableWindowEnd.value = 0
+    tablePageOffsets.value = {}
+    selectedTableArtifactsByWorkspace.value = {}
+    selectedFigureArtifactsByWorkspace.value = {}
+    dataPaneError.value = ''
+    figureCount.value = 0
+  }
+
   return {
     activeTurnArtifactRefreshKey,
     resultData,
@@ -210,5 +230,6 @@ export const useArtifactStore = defineStore('artifacts', () => {
     getSelectedTableArtifact,
     setSelectedFigureArtifact,
     getSelectedFigureArtifact,
+    reset,
   }
 })

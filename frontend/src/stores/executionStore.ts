@@ -294,6 +294,22 @@ export const useExecutionStore = defineStore('execution', () => {
     }
   }
 
+  function reset() {
+    pythonFileContent.value = ''
+    userEditedCode.value = ''
+    hasUserEditedCode.value = false
+    codeEditorSource.value = 'agent'
+    generatedCode.value = ''
+    conversationRuns.value = {}
+    workspaceRuntimeStatusById.value = {}
+    terminalOutput.value = ''
+    terminalEntries.value = []
+    terminalEntriesTrimmedCount.value = 0
+    runtimeError.value = ''
+    isCodeRunning.value = false
+    backgroundOperations.value = []
+  }
+
   return {
     pythonFileContent,
     userEditedCode,
@@ -330,5 +346,6 @@ export const useExecutionStore = defineStore('execution', () => {
     getConversationRun,
     abortConversationRun,
     setCodeRunning,
+    reset,
   }
 })
