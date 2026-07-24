@@ -186,6 +186,7 @@ import ChatComposerActions from './ChatComposerActions.vue'
 import { useChatAttachments } from '../../composables/useChatAttachments'
 import { useChatAutocomplete } from '../../composables/useChatAutocomplete'
 import { useVoiceInput } from '../../composables/useVoiceInput'
+import { useChatStream } from '../../composables/useChatStream'
 import {
   PlusIcon,
   PhotoIcon,
@@ -200,6 +201,7 @@ const workspaceStore = useWorkspaceStore()
 const conversationStore = useConversationStore()
 const workspaceActivation = useWorkspaceActivation()
 const artifactPresentation = useArtifactPresentation()
+const chatStream = useChatStream(conversationStore, extractApiErrorMessage)
 const effectiveWorkspaceModel = computed(() => workspaceStore.workspaceAIConfig?.effective?.main_model || preferencesStore.selectedModel)
 const primaryWorkspaceTableName = computed(() => {
   const summaryTable = (Array.isArray(workspaceStore.activeWorkspaceSummary?.table_names)
@@ -261,43 +263,10 @@ const voiceButtonTitle = computed(() => (
     : 'Voice input unavailable on this device/browser'
 ))
 
-const FINAL_STREAM_NODES = new Set([
-  'explain_code',
-  'noncode_generator',
-  'general_purpose',
-  'unsafe_rejector',
-  'finalize',
-  'chat',
-  'reject'
-])
 const DEFAULT_ANALYZE_CANCEL_TIMEOUT_MS = 300000
 const FREE_MODEL_ANALYZE_CANCEL_TIMEOUT_MS = 900000
 const DEFAULT_SLOW_REQUEST_WARNING_TIMEOUT_MS = 120000
 
-function extractLangGraphTokenText(payload) {
-  if (!payload) return ''
-  if (typeof payload === 'string') return payload
-  if (Array.isArray(payload)) {
-    for (const item of payload) {
-      const nested = extractLangGraphTokenText(item)
-      if (nested) return nested
-    }
-    return ''
-  }
-  if (typeof payload === 'object') {
-    if (typeof payload.text === 'string' && payload.text) return payload.text
-    if (typeof payload.content === 'string' && payload.content) return payload.content
-    const content = payload.content
-    if (Array.isArray(content)) {
-      for (const item of content) {
-        if (item && typeof item === 'object' && item.type === 'text' && typeof item.text === 'string') {
-          if (item.text) return item.text
-        }
-      }
-    }
-  }
-  return ''
-}
 
 function resolveAnalyzeCancelTimeoutMs(modelId) {
   const normalized = String(modelId || '').trim().toLowerCase()
@@ -1254,80 +1223,7 @@ async function handleSubmit() {
       },
       {
         signal,
-        onEvent: (evt) => {
-          if ((evt.event === 'messages' || evt.event === 'messages/partial' || evt.event === 'messages-tuple')) {
-            const text = extractLangGraphTokenText(evt.data)
-            if (text) {
-              conversationStore.appendLastMessageExplanationChunk(text, localMessageId, { conversationId: requestConversationId })
-            }
-            return
-          }
-          if (evt.event === 'updates') {
-            return
-          }
-          if (evt.event === 'token' && typeof evt.data?.text === 'string') {
-            const nodeName = String(evt.data?.node || '').trim().toLowerCase()
-            if (FINAL_STREAM_NODES.has(nodeName)) {
-              conversationStore.appendLastMessageExplanationChunk(evt.data.text, localMessageId, { conversationId: requestConversationId })
-            } else {
-              conversationStore.appendLastMessagePlanChunk(evt.data.text, evt.data.node || '', localMessageId, { conversationId: requestConversationId })
-            }
-            return
-          }
-          if (evt.event === 'llm_progress' && evt.data?.message) {
-            conversationStore.appendLastMessageTraceEvent({
-              type: 'llm_progress',
-              stage: evt.data?.stage || '',
-              message: evt.data.message,
-              output: ''
-            }, localMessageId, { conversationId: requestConversationId })
-            return
-          }
-          if (evt.event === 'reasoning' && evt.data?.message) {
-            conversationStore.appendLastMessageReasoningEvent({
-              stage: evt.data?.stage || 'intent',
-              message: evt.data.message,
-              route: evt.data?.route || ''
-            }, localMessageId, { conversationId: requestConversationId })
-            return
-          }
-          if (evt.event === 'agent_status' && evt.data?.message) {
-            conversationStore.appendLastMessageTraceEvent({
-              type: 'status',
-              node: 'agent_status',
-              stage: evt.data.step || '',
-              message: evt.data.message,
-              output: evt.data?.detail || evt.data?.output || ''
-            }, localMessageId, { conversationId: requestConversationId })
-            return
-          }
-          if (evt.event === 'tool_call' && evt.data?.call_id) {
-            conversationStore.appendLastMessageToolCall(evt.data, localMessageId, { conversationId: requestConversationId })
-            return
-          }
-          if (evt.event === 'tool_progress' && evt.data?.call_id) {
-            conversationStore.appendLastMessageToolProgress(evt.data, localMessageId, { conversationId: requestConversationId })
-            return
-          }
-          if (evt.event === 'tool_result' && evt.data?.call_id) {
-            conversationStore.appendLastMessageToolResult(evt.data, localMessageId, { conversationId: requestConversationId })
-            return
-          }
-          if (evt.event === 'error') {
-            const streamErrorMessage = extractApiErrorMessage(
-              { data: evt.data },
-              'Streaming analysis failed.',
-            )
-            conversationStore.updateLastMessageExplanation(streamErrorMessage, localMessageId, { conversationId: requestConversationId })
-            return
-          }
-          if (evt.event === 'token_usage' && evt.data && typeof evt.data === 'object') {
-            const tokenUsage = evt.data?.token_usage
-            if (tokenUsage && typeof tokenUsage === 'object') {
-              conversationStore.setLiveTokenUsageForCurrentTurn(tokenUsage, { conversationId: requestConversationId })
-            }
-          }
-        }
+        onEvent: (event) => chatStream.applyStreamEvent(event, localMessageId, requestConversationId)
       }
     )
 
