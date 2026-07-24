@@ -187,6 +187,7 @@ import { useChatAttachments } from '../../composables/useChatAttachments'
 import { useChatAutocomplete } from '../../composables/useChatAutocomplete'
 import { useVoiceInput } from '../../composables/useVoiceInput'
 import { useChatStream } from '../../composables/useChatStream'
+import { useConversationRunControl } from '../../composables/useConversationRunControl'
 import {
   PlusIcon,
   PhotoIcon,
@@ -202,6 +203,7 @@ const conversationStore = useConversationStore()
 const workspaceActivation = useWorkspaceActivation()
 const artifactPresentation = useArtifactPresentation()
 const chatStream = useChatStream(conversationStore, extractApiErrorMessage)
+const runControl = useConversationRunControl(executionStore)
 const effectiveWorkspaceModel = computed(() => workspaceStore.workspaceAIConfig?.effective?.main_model || preferencesStore.selectedModel)
 const primaryWorkspaceTableName = computed(() => {
   const summaryTable = (Array.isArray(workspaceStore.activeWorkspaceSummary?.table_names)
@@ -237,7 +239,6 @@ const supportsVoiceInput = ref(false)
 const isVoiceInputActive = ref(false)
 const speechRecognition = ref(null)
 const voiceDraftPrefix = ref('')
-const stoppedConversationIds = ref(new Set())
 
 const showCommandSuggestions = computed(() => commandSuggestions.value.length > 0)
 const showColumnSuggestions = computed(() => columnSuggestions.value.length > 0)
@@ -483,10 +484,7 @@ function stopVoiceInput() {
 }
 
 function handleStopGeneration() {
-  const conversationId = String(conversationStore.activeConversationId || '').trim()
-  if (!conversationId) return
-  stoppedConversationIds.value = new Set([...stoppedConversationIds.value, conversationId])
-  executionStore.abortConversationRun(conversationId)
+  runControl.stopConversation(conversationStore.activeConversationId)
 }
 
 function isSimpleIdentifier(value) {
@@ -1407,7 +1405,7 @@ async function handleSubmit() {
     const backendDetail = extractApiErrorMessage(error, '')
 
     if (error.name === 'AbortError' || signal.aborted) {
-      if (stoppedConversationIds.value.has(requestConversationId)) {
+      if (runControl.wasStopped(requestConversationId)) {
         errorTitle = 'Generation Stopped'
         errorMessage = 'Response generation was stopped.'
         operationStatus = 'failed'
@@ -1466,9 +1464,7 @@ async function handleSubmit() {
     if (warningTimer) clearTimeout(warningTimer)
     if (cancelTimer) clearTimeout(cancelTimer)
     await refreshRuntimeStatusAfterExplicitWork(workspaceStore.activeWorkspaceId)
-    const nextStopped = new Set(stoppedConversationIds.value)
-    nextStopped.delete(requestConversationId)
-    stoppedConversationIds.value = nextStopped
+    runControl.clearStopped(requestConversationId)
     executionStore.clearConversationRun(requestConversationId)
     executionStore.finishBackgroundOperation(operationId, {
       status: operationStatus,

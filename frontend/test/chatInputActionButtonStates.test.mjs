@@ -5,7 +5,10 @@ import { resolve } from 'node:path'
 
 test('chat input exposes independent stop-generation and voice-input states', () => {
   const componentPath = resolve(process.cwd(), 'src/components/chat/ChatInput.vue')
-  const source = readFileSync(componentPath, 'utf-8')
+  const source = [
+    readFileSync(componentPath, 'utf-8'),
+    readFileSync(resolve(process.cwd(), 'src/composables/useConversationRunControl.ts'), 'utf-8'),
+  ].join('\n')
 
   assert.equal(source.includes('handleActionButtonClick'), false)
   assert.equal(source.includes('v-if="isVoiceInputActive"'), true)
@@ -13,7 +16,7 @@ test('chat input exposes independent stop-generation and voice-input states', ()
   assert.equal(source.includes('@click="stopVoiceInput"'), true)
   assert.equal(source.includes('@click="handleStopGeneration"'), true)
   assert.equal(source.includes('v-if="executionStore.isConversationRunning(conversationStore.activeConversationId)"'), true)
-  assert.equal(source.includes('executionStore.abortConversationRun(conversationId)'), true)
+  assert.equal(source.includes('execution.abortConversationRun(id)'), true)
   assert.equal(source.includes('stoppedConversationIds'), true)
   assert.equal(source.includes('window.SpeechRecognition || window.webkitSpeechRecognition'), true)
   assert.equal(source.includes('Voice input unavailable on this device/browser'), true)
