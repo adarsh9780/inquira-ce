@@ -1,0 +1,436 @@
+name: Release desktop
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+env:
+  GO_VERSION: "1.26.5"
+  NODE_VERSION: "24.18.0"
+  UV_VERSION: "0.11.28"
+  WAILS_VERSION: "v2.13.0"
+
+jobs:
+  guard:
+    name: Validate release
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+    outputs:
+      release_sha: ${{ steps.release.outputs.release_sha }}
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Validate tag and main-branch ancestry
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ github.event.release.tag_name }}"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Stable releases must use a vMajor.Minor.Patch tag such as v0.6.0."
+            exit 1
+          fi
+
+          release_sha="$(git rev-list -n 1 "$tag")"
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$release_sha" origin/main; then
+            echo "Release tag $tag does not point to a commit on main."
+            exit 1
+          fi
+
+          {
+            echo "release_sha=$release_sha"
+            echo "tag=$tag"
+            echo "version=${tag#v}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Require successful CI for the release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ steps.release.outputs.release_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          successful_runs="$(
+            gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow ci.yml \
+              --commit "$RELEASE_SHA" \
+              --status success \
+              --limit 1 \
+              --json databaseId \
+              --jq 'length'
+          )"
+          if [ "$successful_runs" -lt 1 ]; then
+            echo "No successful CI run exists for release commit $RELEASE_SHA."
+            echo "Wait for CI to pass, then re-run this release workflow."
+            exit 1
+          fi
+
+  build_frontend:
+    name: Build release frontend
+    needs: guard
+    runs-on: ubuntu-latest
+    env:
+      INQUIRA_BUILD_VERSION: ${{ needs.guard.outputs.version }}
+    steps:
+      - name: Check out verified release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.guard.outputs.release_sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build versioned frontend assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --prefix frontend
+          npm run build --prefix frontend
+
+      - name: Upload release frontend
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: inquira-frontend-${{ needs.guard.outputs.tag }}
+          path: frontend/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  build_macos:
+    name: Build macOS ARM64
+    needs:
+      - guard
+      - build_frontend
+    runs-on: macos-14
+    env:
+      INQUIRA_BUILD_VERSION: ${{ needs.guard.outputs.version }}
+    steps:
+      - name: Check out verified release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.guard.outputs.release_sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Restore release frontend
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: inquira-frontend-${{ needs.guard.outputs.tag }}
+          path: frontend/dist
+
+      - name: Install the pinned Wails CLI
+        shell: bash
+        run: go install "github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}"
+
+      - name: Prepare release metadata and bundled UV
+        shell: bash
+        run: |
+          set -euo pipefail
+          go run ./cmd/releaseprep -version "$INQUIRA_BUILD_VERSION"
+          go run ./cmd/prepareuv -version "$UV_VERSION"
+
+      - name: Test macOS Go packages
+        shell: bash
+        run: go test ./...
+
+      - name: Build macOS application
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$(go env GOPATH)/bin/wails" build -clean -platform darwin/arm64 -trimpath -s
+          ./scripts/runtime-info.sh inquira-go
+
+      - name: Verify and package macOS application
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="build/bin/inquira-go.app"
+          embedded_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_path/Contents/Info.plist")"
+          if [ "$embedded_version" != "$INQUIRA_BUILD_VERSION" ]; then
+            echo "macOS bundle version $embedded_version does not match $INQUIRA_BUILD_VERSION."
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+
+          package_root="${RUNNER_TEMP}/inquira-dmg"
+          mkdir -p "$package_root"
+          cp -R "$app_path" "$package_root/Inquira.app"
+          ln -s /Applications "$package_root/Applications"
+          hdiutil create \
+            -volname "Inquira" \
+            -srcfolder "$package_root" \
+            -ov \
+            -format UDZO \
+            "build/bin/Inquira-${INQUIRA_BUILD_VERSION}-macOS-arm64.dmg"
+
+      - name: Upload macOS installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: inquira-macos-${{ needs.guard.outputs.tag }}
+          path: build/bin/Inquira-${{ needs.guard.outputs.version }}-macOS-arm64.dmg
+          if-no-files-found: error
+          retention-days: 1
+
+  build_windows:
+    name: Build Windows x64
+    needs:
+      - guard
+      - build_frontend
+    runs-on: windows-2025
+    env:
+      INQUIRA_BUILD_VERSION: ${{ needs.guard.outputs.version }}
+    steps:
+      - name: Check out verified release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.guard.outputs.release_sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Restore release frontend
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: inquira-frontend-${{ needs.guard.outputs.tag }}
+          path: frontend/dist
+
+      - name: Ensure NSIS is available
+        shell: pwsh
+        run: |
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
+            choco install nsis --yes --no-progress
+          }
+
+      - name: Install the pinned Wails CLI
+        shell: pwsh
+        run: go install "github.com/wailsapp/wails/v2/cmd/wails@$env:WAILS_VERSION"
+
+      - name: Prepare release metadata and bundled UV
+        shell: pwsh
+        run: |
+          go run ./cmd/releaseprep -version "$env:INQUIRA_BUILD_VERSION"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go run ./cmd/prepareuv -version "$env:UV_VERSION"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Test Windows Go packages
+        shell: pwsh
+        run: go test ./...
+
+      - name: Build Windows application and NSIS installer
+        shell: pwsh
+        run: |
+          $wails = Join-Path (go env GOPATH) "bin\wails.exe"
+          & $wails build -clean -platform windows/amd64 -trimpath -nsis -s
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          bash ./scripts/runtime-info.sh inquira-go
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify and name Windows installer
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path build/bin -Filter "*-installer.exe" | Select-Object -First 1
+          if (-not $installer) {
+            throw "Wails did not produce an NSIS installer."
+          }
+
+          $destination = "build/bin/Inquira-$env:INQUIRA_BUILD_VERSION-windows-x64-setup.exe"
+          Copy-Item $installer.FullName $destination -Force
+
+          $embeddedVersion = (Get-Item $destination).VersionInfo.ProductVersion
+          if (-not $embeddedVersion.StartsWith($env:INQUIRA_BUILD_VERSION)) {
+            throw "Windows installer version $embeddedVersion does not match $env:INQUIRA_BUILD_VERSION."
+          }
+
+          $signature = Get-AuthenticodeSignature $destination
+          Write-Host "Windows Authenticode status: $($signature.Status) (unsigned distribution is currently expected)."
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: inquira-windows-${{ needs.guard.outputs.tag }}
+          path: build/bin/Inquira-${{ needs.guard.outputs.version }}-windows-x64-setup.exe
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish GitHub and Cloudflare downloads
+    needs:
+      - guard
+      - build_macos
+      - build_windows
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      R2_BUCKET: ${{ vars.CLOUDFLARE_R2_BUCKET || 'inquira-releases' }}
+      PUBLIC_DOWNLOADS_BASE_URL: ${{ vars.PUBLIC_DOWNLOADS_BASE_URL || 'https://downloads.inquiraai.com' }}
+      PUBLIC_RELEASE_NOTES_URL: ${{ vars.PUBLIC_RELEASE_NOTES_URL || 'https://inquiraai.com/docs/getting-started/distribution' }}
+    steps:
+      - name: Check out verified release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.guard.outputs.release_sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download macOS installer
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: inquira-macos-${{ needs.guard.outputs.tag }}
+          path: artifacts/macos
+
+      - name: Download Windows installer
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: inquira-windows-${{ needs.guard.outputs.tag }}
+          path: artifacts/windows
+
+      - name: Generate checksums and public download manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          go run ./cmd/releasemanifest \
+            -version "${{ needs.guard.outputs.tag }}" \
+            -macos "artifacts/macos/Inquira-${{ needs.guard.outputs.version }}-macOS-arm64.dmg" \
+            -windows "artifacts/windows/Inquira-${{ needs.guard.outputs.version }}-windows-x64-setup.exe" \
+            -output release-stage \
+            -base-url "$PUBLIC_DOWNLOADS_BASE_URL" \
+            -release-notes-url "$PUBLIC_RELEASE_NOTES_URL"
+
+          maximum_upload_bytes=$((300 * 1024 * 1024))
+          for installer in release-stage/${{ needs.guard.outputs.tag }}/*.dmg release-stage/${{ needs.guard.outputs.tag }}/*.exe; do
+            installer_size="$(wc -c < "$installer")"
+            if [ "$installer_size" -gt "$maximum_upload_bytes" ]; then
+              echo "$(basename "$installer") exceeds the 300 MiB release upload safety limit."
+              exit 1
+            fi
+          done
+
+      - name: Attach installers and checksums to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_directory="release-stage/${{ needs.guard.outputs.tag }}"
+          gh release upload \
+            "${{ needs.guard.outputs.tag }}" \
+            "$version_directory/Inquira-${{ needs.guard.outputs.version }}-macOS-arm64.dmg" \
+            "$version_directory/Inquira-${{ needs.guard.outputs.version }}-windows-x64-setup.exe" \
+            "$version_directory/SHA256SUMS.txt" \
+            "$version_directory/manifest.json" \
+            --clobber \
+            --repo "$GITHUB_REPOSITORY"
+
+      - name: Validate Cloudflare configuration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${CLOUDFLARE_API_TOKEN:?Missing GitHub secret CLOUDFLARE_API_TOKEN}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?Missing GitHub variable CLOUDFLARE_ACCOUNT_ID}"
+          : "${R2_BUCKET:?Missing GitHub variable CLOUDFLARE_R2_BUCKET}"
+
+      - name: Publish versioned downloads to Cloudflare R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ needs.guard.outputs.tag }}"
+          version="${{ needs.guard.outputs.version }}"
+          version_directory="release-stage/$tag"
+
+          npx --yes wrangler@4.105.0 r2 object put \
+            "$R2_BUCKET/$tag/Inquira-$version-macOS-arm64.dmg" \
+            --file="$version_directory/Inquira-$version-macOS-arm64.dmg" \
+            --content-type="application/x-apple-diskimage" \
+            --content-disposition="attachment; filename=Inquira-$version-macOS-arm64.dmg" \
+            --cache-control="public, max-age=31536000, immutable" \
+            --remote
+
+          npx --yes wrangler@4.105.0 r2 object put \
+            "$R2_BUCKET/$tag/Inquira-$version-windows-x64-setup.exe" \
+            --file="$version_directory/Inquira-$version-windows-x64-setup.exe" \
+            --content-type="application/vnd.microsoft.portable-executable" \
+            --content-disposition="attachment; filename=Inquira-$version-windows-x64-setup.exe" \
+            --cache-control="public, max-age=31536000, immutable" \
+            --remote
+
+          npx --yes wrangler@4.105.0 r2 object put \
+            "$R2_BUCKET/$tag/SHA256SUMS.txt" \
+            --file="$version_directory/SHA256SUMS.txt" \
+            --content-type="text/plain; charset=utf-8" \
+            --cache-control="public, max-age=31536000, immutable" \
+            --remote
+
+          npx --yes wrangler@4.105.0 r2 object put \
+            "$R2_BUCKET/$tag/manifest.json" \
+            --file="$version_directory/manifest.json" \
+            --content-type="application/json" \
+            --cache-control="public, max-age=31536000, immutable" \
+            --remote
+
+      - name: Atomically publish the latest release pointer
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.105.0 r2 object put \
+            "$R2_BUCKET/latest.json" \
+            --file="release-stage/latest.json" \
+            --content-type="application/json" \
+            --cache-control="public, max-age=60, must-revalidate" \
+            --remote
+
+      - name: Verify public download publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ needs.guard.outputs.tag }}"
+          version="${{ needs.guard.outputs.version }}"
+          manifest_version="$(curl -fsSL "$PUBLIC_DOWNLOADS_BASE_URL/latest.json?release=$tag" | jq -r '.version')"
+          if [ "$manifest_version" != "$version" ]; then
+            echo "Published latest.json reports $manifest_version instead of $version."
+            exit 1
+          fi
+          curl -fsI "$PUBLIC_DOWNLOADS_BASE_URL/$tag/Inquira-$version-macOS-arm64.dmg" >/dev/null
+          curl -fsI "$PUBLIC_DOWNLOADS_BASE_URL/$tag/Inquira-$version-windows-x64-setup.exe" >/dev/null

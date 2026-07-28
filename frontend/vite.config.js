@@ -9,7 +9,9 @@ const frontendRoot = fileURLToPath(new URL('.', import.meta.url))
 const frontendPackage = JSON.parse(
   readFileSync(resolve(frontendRoot, 'package.json'), 'utf-8')
 )
-const frontendVersion = String(frontendPackage.version || '0.0.0').trim() || '0.0.0'
+const frontendVersion = String(
+  process.env.INQUIRA_BUILD_VERSION || frontendPackage.version || '0.0.0'
+).trim() || '0.0.0'
 
 const manualChunkGroups = {
   'vue-vendor': ['node_modules/vue/', 'node_modules/@vue/devtools-api/'],

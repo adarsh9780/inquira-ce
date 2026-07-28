@@ -200,6 +200,19 @@ make runtime-info
 
 The helper locates the macOS, Windows, or Unix build output.
 
+## Automatic desktop releases
+
+Publishing a stable `vMajor.Minor.Patch` GitHub Release triggers native macOS
+ARM64 and Windows x64 builds. The workflow requires successful CI for the exact
+release commit, attaches the installers and checksums to the private GitHub
+Release, then publishes public downloads to Cloudflare R2. The public
+`latest.json` pointer is written only after every versioned object succeeds.
+
+The release workflow does not run on pull requests and does not run Playwright.
+See [`docs/release-management.md`](docs/release-management.md) for the release
+procedure, required GitHub configuration, failure behavior, and unsigned
+distribution boundary.
+
 ## Runtime validation
 
 Exercise the production Go-to-Python pipeline in a fresh isolated runtime:

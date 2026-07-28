@@ -19,12 +19,18 @@ ACTIONLINT_VERSION := v1.7.12
 GITHUB_OWNER ?= $(shell gh api user --jq .login 2>/dev/null)
 GITHUB_REPOSITORY ?= $(GITHUB_OWNER)/$(APP_NAME)
 VISIBILITY ?= private
+RELEASE_VERSION ?=
+MACOS_INSTALLER ?=
+WINDOWS_INSTALLER ?=
+RELEASE_STAGE_DIR ?= release-stage
+PUBLIC_DOWNLOADS_BASE_URL ?= https://downloads.inquiraai.com
+PUBLIC_RELEASE_NOTES_URL ?= https://inquiraai.com/docs/getting-started/distribution
 
 .PHONY: help doctor versions bootstrap dev frontend-dev frontend-embed prepare-uv runtime-info \
 	fmt fmt-check lint lint-go lint-actions typecheck test test-go test-python test-frontend \
 	test-frontend-source test-runtime test-runtime-e2e test-live-provider test-full \
 	frontend-build bundle-check audit audit-go audit-python audit-frontend audit-secrets \
-	ci build package release-check github-check github-publish clean
+	ci build package release-stage release-check github-check github-publish clean
 
 help: ## Show available development commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-24s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -133,6 +139,18 @@ build: prepare-uv ## Build the production Wails desktop application.
 	$(WAILS) build -clean
 
 package: build ## Build the platform package for the current host.
+
+release-stage: ## Stage installers, checksums, and download manifests for manual release recovery.
+	@test -n "$(RELEASE_VERSION)" || (echo "RELEASE_VERSION is required"; exit 1)
+	@test -n "$(MACOS_INSTALLER)" || (echo "MACOS_INSTALLER is required"; exit 1)
+	@test -n "$(WINDOWS_INSTALLER)" || (echo "WINDOWS_INSTALLER is required"; exit 1)
+	go run ./cmd/releasemanifest \
+		-version "$(RELEASE_VERSION)" \
+		-macos "$(MACOS_INSTALLER)" \
+		-windows "$(WINDOWS_INSTALLER)" \
+		-output "$(RELEASE_STAGE_DIR)" \
+		-base-url "$(PUBLIC_DOWNLOADS_BASE_URL)" \
+		-release-notes-url "$(PUBLIC_RELEASE_NOTES_URL)"
 
 release-check: ci build ## Run every local release gate.
 

@@ -10,6 +10,7 @@ test('build version stays available without cluttering the minimal status bar', 
   assert.equal(viteConfigSource.includes('const frontendPackage = JSON.parse('), true)
   assert.equal(viteConfigSource.includes("const frontendRoot = fileURLToPath(new URL('.', import.meta.url))"), true)
   assert.equal(viteConfigSource.includes("readFileSync(resolve(frontendRoot, 'package.json'), 'utf-8')"), true)
+  assert.equal(viteConfigSource.includes('process.env.INQUIRA_BUILD_VERSION || frontendPackage.version'), true)
   assert.equal(viteConfigSource.includes('__APP_VERSION__'), true)
   assert.equal(viteConfigSource.includes('JSON.stringify(frontendVersion)'), true)
   assert.equal(viteConfigSource.includes('chunkSizeWarningLimit: 5000'), true)
