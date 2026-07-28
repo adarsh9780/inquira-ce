@@ -31,7 +31,7 @@ func (f *fakeGateway) Discover(_ context.Context, request AdapterRequest) (Disco
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	result := f.discovery
-	if result.Objects == nil && (request.AdapterKind == AdapterCSV || request.AdapterKind == AdapterParquet) {
+	if result.Objects == nil && (request.AdapterKind == AdapterCSV || request.AdapterKind == AdapterParquet || request.AdapterKind == AdapterJSON) {
 		result.Objects = []SourceObject{{ID: "file", Name: "file", Kind: "table"}}
 	}
 	return result, f.discoverErr
@@ -171,7 +171,7 @@ func TestCreateValidatesWorkspaceNameKindSourceAndSelection(t *testing.T) {
 		{"missing workspace", CreateRequest{Name: "Data", AdapterKind: AdapterCSV, SourcePath: csvPath, SelectedObjectIDs: []string{"file"}}, "workspace_required"},
 		{"unknown workspace", CreateRequest{WorkspaceID: "missing", Name: "Data", AdapterKind: AdapterCSV, SourcePath: csvPath, SelectedObjectIDs: []string{"file"}}, "workspace_not_found"},
 		{"blank name", CreateRequest{WorkspaceID: workspaceID, Name: " ", AdapterKind: AdapterCSV, SourcePath: csvPath, SelectedObjectIDs: []string{"file"}}, "connection_name_required"},
-		{"unsupported kind", CreateRequest{WorkspaceID: workspaceID, Name: "Data", AdapterKind: AdapterSQLite, SourcePath: csvPath, SelectedObjectIDs: []string{"file"}}, "adapter_not_supported"},
+		{"unsupported kind", CreateRequest{WorkspaceID: workspaceID, Name: "Data", AdapterKind: AdapterKind("postgres"), SourcePath: csvPath, SelectedObjectIDs: []string{"file"}}, "adapter_not_supported"},
 		{"missing source", CreateRequest{WorkspaceID: workspaceID, Name: "Data", AdapterKind: AdapterCSV, SourcePath: filepath.Join(t.TempDir(), "missing.csv"), SelectedObjectIDs: []string{"file"}}, "source_not_found"},
 		{"directory source", CreateRequest{WorkspaceID: workspaceID, Name: "Data", AdapterKind: AdapterCSV, SourcePath: t.TempDir(), SelectedObjectIDs: []string{"file"}}, "source_not_file"},
 		{"wrong extension", CreateRequest{WorkspaceID: workspaceID, Name: "Data", AdapterKind: AdapterParquet, SourcePath: csvPath, SelectedObjectIDs: []string{"file"}}, "source_extension_mismatch"},

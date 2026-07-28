@@ -23,6 +23,7 @@ func TestExtractWritesTheWorkerProjectAndIsRepeatable(t *testing.T) {
 		"src/inquira_data_worker/runtime.py",
 		"src/inquira_data_worker/commands.py",
 		"src/inquira_data_worker/adapters/file.py",
+		"src/inquira_data_worker/adapters/sqlite.py",
 	} {
 		content, err := os.ReadFile(filepath.Join(target, relative))
 		if err != nil || len(content) == 0 {

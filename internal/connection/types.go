@@ -8,6 +8,7 @@ const (
 	AdapterCSV     AdapterKind = "csv"
 	AdapterParquet AdapterKind = "parquet"
 	AdapterExcel   AdapterKind = "excel"
+	AdapterJSON    AdapterKind = "json"
 	AdapterSQLite  AdapterKind = "sqlite"
 )
 

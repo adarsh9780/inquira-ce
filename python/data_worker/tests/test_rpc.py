@@ -46,7 +46,7 @@ def test_rpc_discover_preview_and_materialize_round_trip(tmp_path: Path) -> None
         ({}, "invalid_request"),
         ({"id": "1", "method": "unknown", "params": {}}, "method_not_found"),
         ({"id": "1", "method": "discover", "params": {"adapter_kind": "csv"}}, "invalid_params"),
-        ({"id": "1", "method": "discover", "params": {"adapter_kind": "sqlite", "source_path": "/tmp/a.sqlite"}}, "adapter_not_supported"),
+        ({"id": "1", "method": "discover", "params": {"adapter_kind": "postgres", "source_path": "/tmp/a.db"}}, "adapter_not_supported"),
     ],
 )
 def test_rpc_returns_structured_errors(payload: dict, code: str) -> None:

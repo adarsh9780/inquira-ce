@@ -108,7 +108,7 @@ test('active workspace summary separates selection, saved context, and connectio
   assert.equal(template.includes('v-if="isWorkspaceActive"'), true)
   assert.equal(template.includes('Add data source'), true)
   assert.equal(template.includes('No data sources yet'), true)
-  assert.equal(template.includes('CSV, Parquet, or Excel'), true)
+  assert.equal(template.includes('CSV, Parquet, Excel, JSON, and SQLite'), true)
   assert.equal(workspace.includes('pendingConnection'), true)
   assert.equal(workspace.includes('nativeConnections'), true)
   assert.equal(workspace.includes('isDatasetIngesting'), false)

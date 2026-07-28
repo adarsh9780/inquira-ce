@@ -19,3 +19,12 @@ distribution.
 
 No open-source license is granted by the current repository contents. Keep the
 repository private until the ownership and license decision is complete.
+
+## Current repository controls
+
+CI validates frontend, Go, Python, secret history, dependency vulnerabilities,
+and clean macOS/Windows builds. Dependabot alerts and automated security fixes
+are enabled. The current GitHub account tier does not permit branch protection
+or native secret-scanning push protection on a private repository; enable those
+controls after upgrading the account or when an approved public-release plan
+makes the repository public.

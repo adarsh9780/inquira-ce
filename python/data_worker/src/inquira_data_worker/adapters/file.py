@@ -36,6 +36,12 @@ def _json_value(value: Any) -> Any:
         return str(value)
     if isinstance(value, bytes):
         return value.hex()
+    if isinstance(value, list):
+        return [_json_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [_json_value(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _json_value(item) for key, item in value.items()}
     return value
 
 
@@ -49,7 +55,7 @@ def _fingerprint(path: Path) -> str:
 
 class FileAdapter:
     kind: str
-    suffix: str
+    suffixes: tuple[str, ...]
     reader: str
 
     def _source(self, value: str) -> Path:
@@ -60,8 +66,9 @@ class FileAdapter:
             raise AdapterError("source_not_found", f"Source file does not exist: {raw}")
         if not raw.is_file():
             raise AdapterError("source_not_file", "Source path must be a regular file.")
-        if raw.suffix.lower() != self.suffix:
-            raise AdapterError("source_extension_mismatch", f"Expected a {self.suffix} file extension.")
+        if raw.suffix.lower() not in self.suffixes:
+            expected = ", ".join(self.suffixes)
+            raise AdapterError("source_extension_mismatch", f"Expected one of these file extensions: {expected}.")
         if raw.stat().st_size == 0:
             raise AdapterError("source_unreadable", f"Could not read {self.kind} source: file is empty.")
         return raw.resolve(strict=True)
@@ -157,11 +164,21 @@ class FileAdapter:
 
 class CSVAdapter(FileAdapter):
     kind = "csv"
-    suffix = ".csv"
+    suffixes = (".csv",)
     reader = "read_csv"
 
 
 class ParquetAdapter(FileAdapter):
     kind = "parquet"
-    suffix = ".parquet"
+    suffixes = (".parquet",)
     reader = "read_parquet"
+
+
+class JSONAdapter(FileAdapter):
+    kind = "json"
+    suffixes = (".json", ".jsonl", ".ndjson")
+    reader = "read_json_auto"
+
+    def _relation(self, path: Path) -> str:
+        reader = "read_ndjson_auto" if path.suffix.lower() in {".jsonl", ".ndjson"} else self.reader
+        return f"{reader}({_sql_string(path)})"

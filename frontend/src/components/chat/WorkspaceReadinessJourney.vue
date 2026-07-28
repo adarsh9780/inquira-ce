@@ -58,7 +58,7 @@ const journeyContent: Record<ReadinessState, {
   },
   no_data: {
     title: 'Connect your data',
-    description: 'Add a local CSV, Parquet, or Excel source to create a refreshable snapshot.',
+    description: 'Add a CSV, Parquet, Excel, JSON, or read-only SQLite source to create a refreshable snapshot.',
     actionLabel: 'Add data',
     actionHint: 'Choose a file, review its contents, and select the tables or sheets to use.',
   },

@@ -338,7 +338,7 @@ func validateName(value string) (string, string, error) {
 
 func validateSource(kind AdapterKind, value string) (string, error) {
 	if !supportedAdapter(kind) {
-		return "", apperror.New("adapter_not_supported", "Only CSV, Parquet, and XLSX connections are supported right now.")
+		return "", apperror.New("adapter_not_supported", "Supported adapters are CSV, Parquet, Excel, JSON, and SQLite.")
 	}
 	path := strings.TrimSpace(value)
 	if path == "" {
@@ -358,7 +358,7 @@ func validateSource(kind AdapterKind, value string) (string, error) {
 	if !info.Mode().IsRegular() {
 		return "", apperror.New("source_not_file", "The selected source must be a regular file.")
 	}
-	if strings.ToLower(filepath.Ext(absolute)) != expectedExtension(kind) {
+	if !adapterAcceptsExtension(kind, strings.ToLower(filepath.Ext(absolute))) {
 		return "", apperror.New("source_extension_mismatch", fmt.Sprintf("Selected source does not match the %s adapter.", kind))
 	}
 	resolved, err := filepath.EvalSymlinks(absolute)
