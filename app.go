@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -1017,6 +1019,12 @@ func (a *App) RuntimePlan(config runtimeprovision.Config) (runtimeprovision.Plan
 	return a.provisioner.PlanPreview(config)
 }
 
+func (a *App) emitRuntimeProgress(progress runtimeprovision.Progress) {
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, runtimeprovision.RuntimeProgressEvent, progress)
+	}
+}
+
 // ProvisionRuntime creates the selected Python runtime using the embedded UV binary.
 func (a *App) ProvisionRuntime(config runtimeprovision.Config) (runtimeprovision.Result, error) {
 	if a.worker != nil {
@@ -1024,7 +1032,7 @@ func (a *App) ProvisionRuntime(config runtimeprovision.Config) (runtimeprovision
 			return runtimeprovision.Result{}, fmt.Errorf("stop the active data worker before runtime setup: %w", err)
 		}
 	}
-	result, err := a.provisioner.Provision(a.appContext(), config)
+	result, err := a.provisioner.ProvisionWithProgress(a.appContext(), config, a.emitRuntimeProgress)
 	if err != nil {
 		return runtimeprovision.Result{}, err
 	}
@@ -1042,6 +1050,59 @@ func (a *App) CancelRuntimeProvisioning() bool {
 	return a.provisioner.Cancel()
 }
 
+// RepairRuntime transactionally rebuilds the runtime from its saved,
+// non-secret configuration. The existing verified environment remains active
+// if repair is cancelled or fails.
+func (a *App) RepairRuntime() (runtimeprovision.Result, error) {
+	if a.worker != nil {
+		if err := a.worker.Stop(); err != nil {
+			return runtimeprovision.Result{}, fmt.Errorf("stop the active data worker before runtime repair: %w", err)
+		}
+	}
+	result, err := a.provisioner.Repair(a.appContext(), a.emitRuntimeProgress)
+	if err != nil {
+		return runtimeprovision.Result{}, err
+	}
+	if a.worker != nil {
+		if err := a.worker.Stop(); err != nil {
+			return runtimeprovision.Result{}, fmt.Errorf("restart the data worker after runtime repair: %w", err)
+		}
+	}
+	return result, nil
+}
+
+// ResetRuntime removes only Inquira-managed runtime installations. Workspace
+// data and connected source files are not part of the runtime directory.
+func (a *App) ResetRuntime() (bool, error) {
+	if a.worker != nil {
+		if err := a.worker.Stop(); err != nil {
+			return false, fmt.Errorf("stop the active data worker before runtime reset: %w", err)
+		}
+	}
+	if err := a.provisioner.Reset(a.emitRuntimeProgress); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// ExportRuntimeDiagnostics writes a bounded JSON report containing runtime
+// versions and health flags. The report excludes paths, workspace data,
+// credentials, network configuration, and raw command output.
+func (a *App) ExportRuntimeDiagnostics() (bool, error) {
+	report := a.provisioner.DiagnosticReport(a.appContext())
+	content, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return false, fmt.Errorf("encode runtime diagnostics: %w", err)
+	}
+	return a.SaveExportFile(desktop.ExportRequest{
+		DefaultFileName: "inquira-runtime-diagnostics.json",
+		ContentBase64:   base64.StdEncoding.EncodeToString(append(content, '\n')),
+		Filters: []desktop.ExportFilter{
+			{Name: "JSON diagnostics", Extensions: []string{"json"}},
+		},
+	})
+}
+
 // RollbackRuntime restores the last verified runtime and keeps the replaced
 // environment available in case the user needs to reverse the rollback.
 func (a *App) RollbackRuntime() (runtimeprovision.Result, error) {
@@ -1050,7 +1111,7 @@ func (a *App) RollbackRuntime() (runtimeprovision.Result, error) {
 			return runtimeprovision.Result{}, fmt.Errorf("stop the active data worker before runtime rollback: %w", err)
 		}
 	}
-	result, err := a.provisioner.Rollback()
+	result, err := a.provisioner.RollbackWithProgress(a.emitRuntimeProgress)
 	if err != nil {
 		return runtimeprovision.Result{}, err
 	}

@@ -14,6 +14,9 @@ var RuntimeCapabilities = []string{
 	"cancellable-setup",
 	"external-python",
 	"managed-python",
+	"runtime-diagnostics",
+	"runtime-repair",
+	"runtime-reset",
 	"runtime-rollback",
 }
 

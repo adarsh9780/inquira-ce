@@ -14,6 +14,7 @@ import (
 
 	"inquira-go/internal/appdirs"
 	"inquira-go/internal/desktop"
+	"inquira-go/internal/runtimeprovision"
 )
 
 type desktopCommandRecorder struct {
@@ -71,6 +72,35 @@ func TestSaveExportFileValidatesBeforeOpeningDialogAndPropagatesDialogErrors(t *
 	})
 	if err == nil || !strings.Contains(err.Error(), "dialog unavailable") || dialogCalls != 1 {
 		t.Fatalf("dialog error = %v; dialog calls = %d", err, dialogCalls)
+	}
+}
+
+func TestExportRuntimeDiagnosticsUsesPrivacySafeJSONExport(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "runtime-diagnostics.json")
+	app := &App{
+		provisioner: runtimeprovision.NewProvisioner(filepath.Join(t.TempDir(), "private-runtime")),
+		saveDialog: func(_ context.Context, options runtime.SaveDialogOptions) (string, error) {
+			if options.DefaultFilename != "inquira-runtime-diagnostics.json" || len(options.Filters) != 1 || options.Filters[0].Pattern != "*.json" {
+				t.Fatalf("diagnostic export options = %#v", options)
+			}
+			return target, nil
+		},
+	}
+	saved, err := app.ExportRuntimeDiagnostics()
+	if err != nil || !saved {
+		t.Fatalf("ExportRuntimeDiagnostics() = %v, %v", saved, err)
+	}
+	content, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"private-runtime", "runtimeRoot", "pythonExecutable", "certificateBundle"} {
+		if strings.Contains(string(content), forbidden) {
+			t.Fatalf("diagnostic export leaked %q: %s", forbidden, content)
+		}
+	}
+	if !strings.Contains(string(content), `"schemaVersion": 1`) || !strings.Contains(string(content), `"platform"`) {
+		t.Fatalf("diagnostic export missing bounded metadata: %s", content)
 	}
 }
 
