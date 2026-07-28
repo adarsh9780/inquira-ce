@@ -71,10 +71,11 @@ type Service struct {
 }
 
 type session struct {
-	id      string
-	process Process
-	service *Service
-	once    sync.Once
+	id       string
+	process  Process
+	service  *Service
+	once     sync.Once
+	waitDone chan struct{}
 }
 
 func NewService(factory Factory, emitter Emitter) *Service {
@@ -123,8 +124,10 @@ func (s *Service) Start(ctx context.Context, request StartRequest) (StartRespons
 	if s.closed {
 		s.mu.Unlock()
 		_ = process.Kill()
+		_ = process.Wait()
 		return StartResponse{}, errors.New("terminal service is closed")
 	}
+	created.waitDone = make(chan struct{})
 	s.sessions[id] = created
 	s.mu.Unlock()
 	go created.readOutput()
@@ -216,11 +219,12 @@ func (current *session) readOutput() {
 func (current *session) wait() {
 	_ = current.process.Wait()
 	current.finish()
+	close(current.waitDone)
 }
 
 func (current *session) terminate() error {
 	err := current.process.Kill()
-	current.finish()
+	<-current.waitDone
 	return err
 }
 

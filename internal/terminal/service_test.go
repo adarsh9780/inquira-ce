@@ -54,7 +54,7 @@ func (p *fakeProcess) Kill() error {
 func (p *fakeProcess) Wait() error { return <-p.waitResult }
 
 type fakeStart struct {
-	process    *fakeProcess
+	process    Process
 	shell      string
 	err        error
 	cwd        string
@@ -78,6 +78,27 @@ func (f *fakeFactory) Start(_ context.Context, cwd string, cols, rows int) (Proc
 type capturedEvent struct {
 	name    string
 	payload any
+}
+
+type delayedWaitProcess struct {
+	*fakeProcess
+	killObserved chan struct{}
+	releaseWait  chan struct{}
+}
+
+func newDelayedWaitProcess() *delayedWaitProcess {
+	return &delayedWaitProcess{
+		fakeProcess:  newFakeProcess(),
+		killObserved: make(chan struct{}),
+		releaseWait:  make(chan struct{}),
+	}
+}
+
+func (p *delayedWaitProcess) Wait() error {
+	err := <-p.waitResult
+	close(p.killObserved)
+	<-p.releaseWait
+	return err
 }
 
 func TestTerminalSessionStreamsWritesResizesAndStops(t *testing.T) {
@@ -131,6 +152,50 @@ func TestTerminalSessionStreamsWritesResizesAndStops(t *testing.T) {
 	}
 	if err := service.Write("workspace:one", "pwd\r"); !errors.Is(err, ErrSessionNotFound) {
 		t.Fatalf("missing write error = %v", err)
+	}
+}
+
+func TestTerminalStopWaitsForProcessCleanup(t *testing.T) {
+	process := newDelayedWaitProcess()
+	factory := &fakeFactory{starts: []*fakeStart{{process: process, shell: "/bin/zsh"}}}
+	service := NewService(factory, nil)
+	t.Cleanup(func() { _ = service.Close() })
+
+	if _, err := service.Start(context.Background(), StartRequest{
+		SessionID: "workspace:one", Cwd: t.TempDir(), Cols: 80, Rows: 24,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	type stopResult struct {
+		stopped bool
+		err     error
+	}
+	result := make(chan stopResult, 1)
+	go func() {
+		stopped, err := service.Stop("workspace:one")
+		result <- stopResult{stopped: stopped, err: err}
+	}()
+
+	select {
+	case <-process.killObserved:
+	case <-time.After(2 * time.Second):
+		t.Fatal("process did not begin waiting for cleanup")
+	}
+	select {
+	case returned := <-result:
+		t.Fatalf("Stop returned before process cleanup completed: %#v", returned)
+	default:
+	}
+
+	close(process.releaseWait)
+	select {
+	case returned := <-result:
+		if returned.err != nil || !returned.stopped {
+			t.Fatalf("Stop() = %#v", returned)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Stop did not return after process cleanup completed")
 	}
 }
 
