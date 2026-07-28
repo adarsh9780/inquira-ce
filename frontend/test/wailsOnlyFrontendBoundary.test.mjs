@@ -11,7 +11,16 @@ test('frontend package keeps one direct Wails bridge architecture', () => {
   const apiService = readFileSync(resolve(sourceRoot, 'api/native.ts'), 'utf8')
   assert.equal(packageJson.scripts.build, 'vite build')
   assert.match(apiService, /window\.go\?\.main\?\.App/)
+  assert.match(apiService, /window\.runtime\?\.EventsOnMultiple/)
   assert.match(apiService, /requireNativeMethod/)
+})
+
+test('production source does not import generated Wails JavaScript', () => {
+  const execution = readFileSync(resolve(sourceRoot, 'api/execution.ts'), 'utf8')
+  const terminal = readFileSync(resolve(sourceRoot, 'services/nativeTerminalService.ts'), 'utf8')
+
+  assert.equal(execution.includes('wailsjs/'), false)
+  assert.equal(terminal.includes('wailsjs/'), false)
 })
 
 test('frontend omits retired workflow wrappers while retaining catalog preparation', () => {

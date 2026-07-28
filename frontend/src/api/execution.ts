@@ -1,7 +1,6 @@
-import { EventsOn } from '../../wailsjs/runtime/runtime.js'
 import { extractApiErrorMessage } from '../utils/apiError.ts'
 import { normalizeExecutionResponse } from '../utils/runtimeExecution.ts'
-import { invokeNative, nativeApp, withAbortSignal } from './native.ts'
+import { EventsOn, invokeNative, nativeApp, withAbortSignal } from './native.ts'
 
 type RecordValue = Record<string, unknown>
 type StreamEvent = { event: string; data: RecordValue }

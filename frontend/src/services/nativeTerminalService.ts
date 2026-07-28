@@ -1,5 +1,4 @@
-import { EventsOn } from '../../wailsjs/runtime/runtime'
-import { nativeApp, requireNativeMethod } from '../api/native'
+import { EventsOn, nativeApp, requireNativeMethod } from '../api/native'
 import type { NativeMethod, NativeMethodName, NativeRecord } from '../types/native'
 
 interface StartTerminalOptions {

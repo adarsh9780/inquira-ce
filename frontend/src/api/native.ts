@@ -15,6 +15,15 @@ export function hasNativeBridge() {
   return Boolean(nativeApp())
 }
 
+export function EventsOn(
+  eventName: string,
+  callback: (...data: unknown[]) => void,
+): () => void {
+  if (typeof window === 'undefined') return () => {}
+  const unsubscribe = window.runtime?.EventsOnMultiple?.(eventName, callback, -1)
+  return typeof unsubscribe === 'function' ? unsubscribe : () => {}
+}
+
 export function requireNativeMethod<Method extends NativeMethodName>(
   method: Method,
 ): NativeMethod<Method> {

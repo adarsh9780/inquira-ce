@@ -20,7 +20,7 @@ GITHUB_OWNER ?= $(shell gh api user --jq .login 2>/dev/null)
 GITHUB_REPOSITORY ?= $(GITHUB_OWNER)/$(APP_NAME)
 VISIBILITY ?= private
 
-.PHONY: help doctor versions bootstrap dev frontend-dev prepare-uv runtime-info \
+.PHONY: help doctor versions bootstrap dev frontend-dev frontend-embed prepare-uv runtime-info \
 	fmt fmt-check lint lint-go lint-actions typecheck test test-go test-python test-frontend \
 	test-frontend-source test-runtime test-runtime-e2e test-live-provider test-full \
 	frontend-build bundle-check audit audit-go audit-python audit-frontend audit-secrets \
@@ -67,7 +67,12 @@ fmt-check: ## Verify tracked Go source files are formatted.
 
 lint: lint-go lint-actions typecheck ## Run static checks for Go, GitHub Actions, and TypeScript.
 
-lint-go: ## Run Go vet across the application.
+frontend-embed:
+	@if [ ! -f "$(FRONTEND_DIR)/dist/index.html" ]; then \
+		$(MAKE) frontend-build; \
+	fi
+
+lint-go: frontend-embed ## Run Go vet across the application.
 	go vet ./...
 
 lint-actions: ## Validate GitHub Actions workflow syntax.
@@ -78,7 +83,7 @@ typecheck: ## Type-check the Vue/TypeScript frontend.
 
 test: test-go test-frontend test-python ## Run every deterministic unit and contract test.
 
-test-go: ## Run all Go tests.
+test-go: frontend-embed ## Run all Go tests.
 	go test ./...
 
 test-python: ## Run the locked Python worker test suite.
@@ -109,7 +114,7 @@ bundle-check: ## Build the frontend and enforce bundle budgets.
 
 audit: audit-go audit-python audit-frontend audit-secrets ## Run dependency, vulnerability, and secret audits.
 
-audit-go: ## Scan reachable Go code with the pinned govulncheck release.
+audit-go: frontend-embed ## Scan reachable Go code with the pinned govulncheck release.
 	go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
 
 audit-python: ## Audit the active locked Python worker environment.
