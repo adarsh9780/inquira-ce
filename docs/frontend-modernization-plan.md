@@ -4,6 +4,9 @@ Date: 2026-07-23
 
 Status: Implemented (2026-07-24)
 
+Follow-up: complete production-source TypeScript migration according to
+`docs/frontend-typescript-migration-plan.md`.
+
 ## Outcome
 
 Modernize the existing Vue frontend without replacing Vue or rewriting the product as a different application architecture.
