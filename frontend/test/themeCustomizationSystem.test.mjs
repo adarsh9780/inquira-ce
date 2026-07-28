@@ -79,7 +79,7 @@ test('style sheet declares theme presets and shared token aliases', () => {
   assert.equal(source.includes(':root[data-theme="evergreen"]'), false)
   assert.equal(source.includes(':root[data-theme="daddylight"]'), false)
   assert.equal(source.includes(':root[data-theme="daddydark"]'), false)
-  assert.equal(source.includes('--color-text-sub: var(--color-text-muted);'), true)
+  assert.equal(source.includes('--color-text-sub: var(--color-text-secondary);'), true)
   assert.equal(source.includes('--color-base-soft: var(--color-surface);'), true)
   assert.equal(source.includes('--color-base-muted:'), true)
   assert.equal(source.includes('--color-border-strong: var(--color-border-hover);'), true)

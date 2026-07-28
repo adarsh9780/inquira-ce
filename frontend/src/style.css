@@ -35,7 +35,10 @@
   /* Deep navy for primary text */
   --color-text-muted: #6B7280;
   /* Muted metadata tone */
-  --color-text-sub: var(--color-text-muted);
+  --color-text-primary: var(--color-text-main);
+  --color-text-secondary: color-mix(in srgb, var(--color-text-main) 28%, var(--color-text-muted) 72%);
+  --color-text-tertiary: var(--color-text-muted);
+  --color-text-sub: var(--color-text-secondary);
   /* Secondary text alias used by older settings views */
 
   --color-base-soft: var(--color-surface);
@@ -113,18 +116,26 @@
   --font-ui: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
   --font-display: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
   --font-mono: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
-  --text-caption: 0.6875rem;
-  --font-size-xs: 0.75rem;
-  --text-ui: 0.8125rem;
-  --font-size-sm: 0.875rem;
-  --font-size-base: 1rem;
-  --font-size-lg: 1.125rem;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
-  --line-height-tight: 1.25;
+  --text-caption: 0.75rem;
+  --text-ui: 0.875rem;
+  --text-title: 1rem;
+  --text-heading: 1.125rem;
+  --font-size-xs: var(--text-caption);
+  --font-size-sm: var(--text-ui);
+  --font-size-base: var(--text-title);
+  --font-size-lg: var(--text-heading);
+  --font-weight-body: 400;
+  --font-weight-label: 500;
+  --font-weight-heading: 600;
+  --font-weight-strong: 700;
+  --font-weight-medium: var(--font-weight-label);
+  --font-weight-semibold: var(--font-weight-heading);
+  --font-weight-bold: var(--font-weight-strong);
+  --line-height-caption: 1.4;
   --line-height-ui: 1.4;
   --line-height-body: 1.55;
+  --line-height-heading: 1.25;
+  --line-height-tight: var(--line-height-heading);
 
   /* Motion and Effects */
   --motion-duration-fast: 150ms;
@@ -308,7 +319,10 @@
 
 :root,
 [data-theme] {
-  --color-text-sub: var(--color-text-muted);
+  --color-text-primary: var(--color-text-main);
+  --color-text-secondary: color-mix(in srgb, var(--color-text-main) 28%, var(--color-text-muted) 72%);
+  --color-text-tertiary: var(--color-text-muted);
+  --color-text-sub: var(--color-text-secondary);
   --color-base-soft: var(--color-surface);
   --color-base-muted: color-mix(in srgb, var(--color-base) 72%, var(--color-border) 28%);
   --color-surface-subtle: color-mix(in srgb, var(--color-surface) 78%, var(--color-base) 22%);

@@ -7,11 +7,11 @@ function read(relativePath) {
   return readFileSync(resolve(process.cwd(), relativePath), 'utf8')
 }
 
-test('shared visual tokens define a compact desktop typography scale', () => {
+test('shared visual tokens define a readable compact desktop typography scale', () => {
   const styles = read('src/style.css')
 
-  assert.match(styles, /--text-caption: 0\.6875rem;/)
-  assert.match(styles, /--text-ui: 0\.8125rem;/)
+  assert.match(styles, /--text-caption: 0\.75rem;/)
+  assert.match(styles, /--text-ui: 0\.875rem;/)
   assert.match(styles, /--line-height-ui: 1\.4;/)
   assert.match(styles, /body \{[\s\S]*font-size: var\(--font-size-sm\);[\s\S]*line-height: var\(--line-height-body\);/)
   assert.match(styles, /\.app-toolbar \{[\s\S]*height: 2\.625rem;/)
