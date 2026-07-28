@@ -2,6 +2,8 @@ package runtimeprovision
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -12,14 +14,14 @@ import (
 )
 
 func TestManagedRuntimeOnlyAcceptsWorkerCompatiblePython(t *testing.T) {
-	for _, version := range []string{"", "3.11", "3.13", "python3.12", "3.12-rc"} {
+	for _, version := range []string{"", "3.11", "3.12", "3.12.9", "3.13", "python3.12", "3.12-rc"} {
 		config := DefaultConfig()
 		config.PythonVersion = version
 		if err := config.Validate(); err == nil {
 			t.Fatalf("expected incompatible Python version %q to be rejected", version)
 		}
 	}
-	for _, version := range []string{"3.12", "3.12.9"} {
+	for _, version := range []string{"3.12.13"} {
 		config := DefaultConfig()
 		config.PythonVersion = version
 		if err := config.Validate(); err != nil {
@@ -155,15 +157,17 @@ func TestConcurrentRuntimeProvisioningIsRejectedBeforeMachineChanges(t *testing.
 
 func TestFailedWorkerVerificationDoesNotMarkRuntimeReady(t *testing.T) {
 	runtimeRoot := filepath.Join(t.TempDir(), "runtime")
+	workerLock := []byte("lock")
+	lockDigest := sha256.Sum256(workerLock)
 	provisioner := NewProvisioner(runtimeRoot)
-	provisioner.bundle = testBundleFS(t)
+	provisioner.bundle = testBundleFS(t, hex.EncodeToString(lockDigest[:]))
 	config := DefaultConfig()
 	config.Mode = ModeExternalPython
 	config.PythonExecutable = testPythonExecutable(t)
 	if err := os.MkdirAll(filepath.Join(runtimeRoot, "worker"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(runtimeRoot, "worker", "uv.lock"), []byte("lock"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(runtimeRoot, "worker", "uv.lock"), workerLock, 0o600); err != nil {
 		t.Fatal(err)
 	}
 

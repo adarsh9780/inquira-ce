@@ -153,20 +153,33 @@
                     {{ nativeRuntimeStatus.ready ? runtimeConfigurationSummary : 'Set up the local Python runtime before adding a data source.' }}
                   </p>
                 </div>
-                <button v-if="nativeRuntimeStatus.ready && !runtimeConfigurationOpen" type="button" class="btn-secondary shrink-0 px-3 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="startRuntimeReconfiguration">Runtime settings</button>
+                <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  <button v-if="nativeRuntimeStatus.rollbackAvailable && !runtimeConfigurationOpen" type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="runtimeOperationActive" @click="rollbackDataRuntime">
+                    Roll back
+                  </button>
+                  <button v-if="nativeRuntimeStatus.ready && !runtimeConfigurationOpen" type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="runtimeOperationActive" @click="startRuntimeReconfiguration">
+                    Runtime settings
+                  </button>
+                  <button v-if="runtimeProvisioning" type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="cancelRuntimeSetup">
+                    Cancel setup
+                  </button>
+                </div>
               </div>
               <p v-if="runtimeProvisionError" class="mt-3 rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-xs text-[var(--color-danger-text)]" role="alert">{{ runtimeProvisionError }}</p>
+              <p v-if="nativeRuntimeStatus.incompleteSetup && !runtimeProvisioning" class="mt-3 rounded-lg bg-[var(--color-warning-bg)] px-3 py-2 text-xs leading-5 text-[var(--color-warning-text)]" role="status">
+                An earlier setup was interrupted. Starting setup again will safely replace the incomplete staging files.
+              </p>
 
               <div v-if="!nativeRuntimeStatus.ready && !runtimeConfigurationOpen" class="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <p class="max-w-sm text-[10px] leading-4 text-[var(--color-warning-text)]">
-                  Managed setup installs the supported Python version and data packages for you.
+                <p class="max-w-sm text-xs leading-5 text-[var(--color-warning-text)]">
+                  Recommended setup installs approved Python {{ approvedPythonVersion }} and the locked data packages for you.
                 </p>
                 <div class="flex flex-wrap items-center justify-end gap-2">
-                  <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="startRuntimeReconfiguration">
+                  <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="runtimeOperationActive" @click="startRuntimeReconfiguration">
                     Company-managed setup
                   </button>
-                  <button type="button" class="btn-primary px-4 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="setupManagedRuntime">
-                    {{ runtimeProvisioning ? 'Setting up managed runtime…' : 'Set up managed runtime' }}
+                  <button type="button" class="btn-primary px-4 py-1.5 text-xs" :disabled="runtimeOperationActive" @click="setupManagedRuntime">
+                    {{ runtimeProvisioning ? 'Setting up managed runtime…' : 'Install recommended runtime' }}
                   </button>
                 </div>
               </div>
@@ -174,7 +187,7 @@
               <div v-if="runtimeConfigurationOpen" class="mt-4 border-t border-[var(--color-border)] pt-4">
                 <div class="mb-3">
                   <h5 class="text-xs font-semibold text-[var(--color-text-main)]">{{ nativeRuntimeStatus.ready ? 'Runtime settings' : 'Company-managed setup' }}</h5>
-                  <p class="mt-1 text-[10px] leading-4 text-[var(--color-text-muted)]">
+                  <p class="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
                     Use a company Python installation, internal package mirror, proxy, or certificate bundle.
                   </p>
                 </div>
@@ -188,8 +201,8 @@
                   </select>
                 </label>
                 <label v-if="runtimeConfig.mode !== 'external-python'" class="block">
-                  <span class="input-label">Python version</span>
-                  <input v-model="runtimeConfig.pythonVersion" class="input-base input-outlined" placeholder="3.12" :disabled="runtimeProvisioning" />
+                  <span class="input-label">Approved Python</span>
+                  <span class="input-base input-outlined block cursor-default text-xs" aria-readonly="true">{{ approvedPythonVersion }}</span>
                 </label>
                 <label v-if="runtimeConfig.mode === 'external-python'" class="block sm:col-span-2">
                   <span class="input-label">Python executable path</span>
@@ -230,11 +243,14 @@
                   </div>
                 </label>
               </div>
+              <p class="mt-3 text-xs leading-5 text-[var(--color-text-muted)]">
+                Compatibility manifest v{{ nativeRuntimeStatus.bundle?.schemaVersion || 1 }} · UV {{ nativeRuntimeStatus.bundle?.version || 'bundled' }} · worker protocol {{ nativeRuntimeStatus.bundle?.workerProtocolVersion || 1 }}. New environments are verified before activation, and the previous verified runtime is retained for rollback.
+              </p>
               <div class="mt-4 flex items-center justify-between gap-3">
-                <p class="text-[10px] text-[var(--color-text-muted)]">Proxy, mirror, and index values are cleared after every setup attempt and are never saved by Inquira. {{ runtimePlanSummary }}</p>
+                <p class="text-xs leading-5 text-[var(--color-text-muted)]">Proxy, mirror, and index values are cleared after every setup attempt and are never saved by Inquira. {{ runtimePlanSummary }}</p>
                 <div class="flex shrink-0 items-center gap-2">
-                  <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="cancelRuntimeReconfiguration">Cancel</button>
-                  <button type="button" class="btn-primary px-4 py-1.5 text-xs" :disabled="runtimeProvisioning" @click="provisionDataRuntime()">{{ runtimeProvisioning ? 'Validating and setting up…' : 'Apply runtime setup' }}</button>
+                  <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="runtimeOperationActive" @click="cancelRuntimeReconfiguration">Cancel</button>
+                  <button type="button" class="btn-primary px-4 py-1.5 text-xs" :disabled="runtimeOperationActive" @click="provisionDataRuntime()">{{ runtimeProvisioning ? 'Validating and setting up…' : 'Apply runtime setup' }}</button>
                 </div>
               </div>
               </div>
@@ -448,13 +464,14 @@ const objectSearch = ref('')
 const refreshingConnectionIds = ref(new Set())
 const nativeRuntimeStatus = ref<any>({ ready: false })
 const runtimeProvisioning = ref(false)
+const runtimeRecoveryLoading = ref(false)
 const runtimeProvisionError = ref('')
 const runtimeConfigurationOpen = ref(false)
 const runtimePlanSummary = ref('')
 const isWorkspaceTabMounted = ref(false)
 const runtimeConfig = ref({
   mode: 'managed',
-  pythonVersion: '3.12',
+  pythonVersion: '3.12.13',
   pythonExecutable: '',
   pythonInstallMirror: '',
   defaultIndex: '',
@@ -548,6 +565,8 @@ const selectedWorkspaceContext = computed(() => String(workspaceDetail.value?.sc
 const normalizedSetupWorkspaceContext = computed(() => String(setupWorkspaceContext.value || '').trim())
 const isWorkspaceContextDirty = computed(() => normalizedSetupWorkspaceContext.value !== String(savedWorkspaceContext.value || '').trim())
 const workspaceRuntimeStatus = computed(() => executionStore.getWorkspaceRuntimeStatus(props.activeWorkspaceId))
+const runtimeOperationActive = computed(() => runtimeProvisioning.value || runtimeRecoveryLoading.value)
+const approvedPythonVersion = computed(() => String(nativeRuntimeStatus.value?.bundle?.pythonVersion || '3.12.13'))
 const workspaceRuntimeReady = computed(() => ['ready', 'busy'].includes(workspaceRuntimeStatus.value))
 const runtimeStatusTone = computed(() => {
   if (workspaceRuntimeStatus.value === 'error') return 'danger'
@@ -635,13 +654,13 @@ const runtimeConfigurationSummary = computed(() => {
   if (!configuration) return `Runtime ready at ${nativeRuntimeStatus.value?.pythonExecutable || 'the managed environment'}.`
   if (configuration.mode === 'external-python') return `Runtime ready using company Python at ${configuration.pythonExecutable}.`
   if (configuration.mode === 'internal-mirror') return `Runtime ready using Python ${configuration.pythonVersion} from an internal mirror.`
-  return `Runtime ready using managed Python ${configuration.pythonVersion || '3.12'}.`
+  return `Runtime ready using managed Python ${configuration.pythonVersion || approvedPythonVersion.value}.`
 })
 
 function applySavedRuntimeConfiguration(configuration: any) {
   if (!configuration || typeof configuration !== 'object') return
   runtimeConfig.value.mode = configuration.mode || 'managed'
-  runtimeConfig.value.pythonVersion = configuration.pythonVersion || '3.12'
+  runtimeConfig.value.pythonVersion = configuration.pythonVersion || approvedPythonVersion.value
   runtimeConfig.value.pythonExecutable = configuration.pythonExecutable || ''
   runtimeConfig.value.useSystemCertificates = Boolean(configuration.useSystemCertificates)
   runtimeConfig.value.certificateBundle = configuration.certificateBundle || ''
@@ -664,7 +683,7 @@ function startRuntimeReconfiguration() {
 async function setupManagedRuntime() {
   runtimeConfig.value = {
     mode: 'managed',
-    pythonVersion: '3.12',
+    pythonVersion: approvedPythonVersion.value,
     pythonExecutable: '',
     pythonInstallMirror: '',
     defaultIndex: '',
@@ -708,6 +727,9 @@ async function provisionDataRuntime() {
   runtimeProvisioning.value = true
   runtimeProvisionError.value = ''
   try {
+    if (runtimeConfig.value.mode !== 'external-python') {
+      runtimeConfig.value.pythonVersion = approvedPythonVersion.value
+    }
     const plan: any = await runtimeProvisionService.plan({ ...runtimeConfig.value })
     runtimePlanSummary.value = `${Number(plan?.steps?.length || 0)} setup steps validated.`
     await runtimeProvisionService.provision({ ...runtimeConfig.value })
@@ -720,6 +742,31 @@ async function provisionDataRuntime() {
   } finally {
     clearTransientRuntimeConfig()
     runtimeProvisioning.value = false
+  }
+}
+
+async function cancelRuntimeSetup() {
+  try {
+    const cancelled = await runtimeProvisionService.cancel()
+    if (cancelled) {
+      toast.info('Stopping runtime setup', 'The active runtime will remain unchanged.')
+    }
+  } catch (error: any) {
+    runtimeProvisionError.value = extractApiErrorMessage(error, 'Could not cancel runtime setup.')
+  }
+}
+
+async function rollbackDataRuntime() {
+  runtimeRecoveryLoading.value = true
+  runtimeProvisionError.value = ''
+  try {
+    await runtimeProvisionService.rollback()
+    await loadNativeRuntimeStatus()
+    toast.success('Runtime rolled back', 'The previous verified data runtime is active.')
+  } catch (error: any) {
+    runtimeProvisionError.value = extractApiErrorMessage(error, 'Could not roll back the data runtime.')
+  } finally {
+    runtimeRecoveryLoading.value = false
   }
 }
 

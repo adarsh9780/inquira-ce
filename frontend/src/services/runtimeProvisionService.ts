@@ -33,6 +33,16 @@ export const runtimeProvisionService = {
     return Promise.reject(new Error('Runtime provisioning is available in the Wails application.'))
   },
 
+  cancel() {
+    if (this.isNative()) return callWails('CancelRuntimeProvisioning')
+    return Promise.resolve(false)
+  },
+
+  rollback() {
+    if (this.isNative()) return callWails('RollbackRuntime')
+    return Promise.reject(new Error('Runtime rollback is available in the Wails application.'))
+  },
+
   choosePythonExecutable() {
     if (this.isNative()) return callWails('ChoosePythonExecutable')
     return Promise.reject(new Error('Python selection is available in the Wails application.'))

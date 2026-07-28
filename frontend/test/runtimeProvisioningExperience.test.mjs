@@ -21,7 +21,7 @@ test('native runtime setup supports company Python mirrors proxies and certifica
   assert.match(workspace, /runtimeProvisionService\.plan/)
   assert.match(workspace, /Runtime settings/)
   assert.match(workspace, /Company-managed setup/)
-  assert.match(workspace, /Set up managed runtime/)
+  assert.match(workspace, /Install recommended runtime/)
   assert.match(workspace, /clearTransientRuntimeConfig/)
   assert.match(workspace, /runtimeProvisionError/)
   assert.match(service, /callWails\('RuntimePlan'/)
@@ -29,6 +29,28 @@ test('native runtime setup supports company Python mirrors proxies and certifica
   assert.match(service, /callWails\('ChooseCertificateBundle'/)
   assert.match(app, /func \(a \*App\) ChoosePythonExecutable/)
   assert.match(app, /func \(a \*App\) ChooseCertificateBundle/)
+})
+
+test('runtime setup is staged, cancellable, and reversible from settings', () => {
+  const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
+  const service = read('src/services/runtimeProvisionService.ts')
+  const app = read('../app.go')
+  const provisioner = read('../internal/runtimeprovision/provisioner.go')
+  const contract = read('../internal/runtimeprovision/contract/manifest.go')
+
+  assert.match(workspace, /Cancel setup/)
+  assert.match(workspace, /Roll back/)
+  assert.match(workspace, /incompleteSetup/)
+  assert.match(workspace, /approvedPythonVersion/)
+  assert.match(workspace, /Compatibility manifest/)
+  assert.match(service, /callWails\('CancelRuntimeProvisioning'/)
+  assert.match(service, /callWails\('RollbackRuntime'/)
+  assert.match(app, /func \(a \*App\) CancelRuntimeProvisioning/)
+  assert.match(app, /func \(a \*App\) RollbackRuntime/)
+  assert.match(provisioner, /data-worker\.staging/)
+  assert.match(provisioner, /data-worker\.previous/)
+  assert.match(provisioner, /activateStagedEnvironment/)
+  assert.match(contract, /ManagedPythonVersion\s+= "3\.12\.13"/)
 })
 
 test('runtime setup keeps only safe successful configuration in status', () => {

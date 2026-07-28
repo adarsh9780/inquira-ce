@@ -12,6 +12,8 @@ describe('runtimeProvisionService Wails bridge', () => {
       RuntimeStatus: vi.fn().mockResolvedValue({ ready: false }),
       RuntimePlan: vi.fn().mockResolvedValue({ steps: [] }),
       ProvisionRuntime: vi.fn().mockResolvedValue({ pythonExecutable: '/runtime/python' }),
+      CancelRuntimeProvisioning: vi.fn().mockResolvedValue(true),
+      RollbackRuntime: vi.fn().mockResolvedValue({ pythonExecutable: '/runtime/previous/python' }),
       ChoosePythonExecutable: vi.fn().mockResolvedValue('/company/python'),
       ChooseCertificateBundle: vi.fn().mockResolvedValue('/company/ca.pem'),
     }
@@ -26,11 +28,15 @@ describe('runtimeProvisionService Wails bridge', () => {
     await runtimeProvisionService.status()
     await runtimeProvisionService.plan(config)
     await runtimeProvisionService.provision(config)
+    await runtimeProvisionService.cancel()
+    await runtimeProvisionService.rollback()
     await runtimeProvisionService.choosePythonExecutable()
     await runtimeProvisionService.chooseCertificateBundle()
     expect(app.RuntimeStatus).toHaveBeenCalledOnce()
     expect(app.RuntimePlan).toHaveBeenCalledWith(config)
     expect(app.ProvisionRuntime).toHaveBeenCalledWith(config)
+    expect(app.CancelRuntimeProvisioning).toHaveBeenCalledOnce()
+    expect(app.RollbackRuntime).toHaveBeenCalledOnce()
     expect(app.ChoosePythonExecutable).toHaveBeenCalledOnce()
     expect(app.ChooseCertificateBundle).toHaveBeenCalledOnce()
   })

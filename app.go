@@ -1019,5 +1019,45 @@ func (a *App) RuntimePlan(config runtimeprovision.Config) (runtimeprovision.Plan
 
 // ProvisionRuntime creates the selected Python runtime using the embedded UV binary.
 func (a *App) ProvisionRuntime(config runtimeprovision.Config) (runtimeprovision.Result, error) {
-	return a.provisioner.Provision(a.appContext(), config)
+	if a.worker != nil {
+		if err := a.worker.Stop(); err != nil {
+			return runtimeprovision.Result{}, fmt.Errorf("stop the active data worker before runtime setup: %w", err)
+		}
+	}
+	result, err := a.provisioner.Provision(a.appContext(), config)
+	if err != nil {
+		return runtimeprovision.Result{}, err
+	}
+	if a.worker != nil {
+		if err := a.worker.Stop(); err != nil {
+			return runtimeprovision.Result{}, fmt.Errorf("restart the data worker after runtime setup: %w", err)
+		}
+	}
+	return result, nil
+}
+
+// CancelRuntimeProvisioning cancels the active setup command without changing
+// the previously verified runtime.
+func (a *App) CancelRuntimeProvisioning() bool {
+	return a.provisioner.Cancel()
+}
+
+// RollbackRuntime restores the last verified runtime and keeps the replaced
+// environment available in case the user needs to reverse the rollback.
+func (a *App) RollbackRuntime() (runtimeprovision.Result, error) {
+	if a.worker != nil {
+		if err := a.worker.Stop(); err != nil {
+			return runtimeprovision.Result{}, fmt.Errorf("stop the active data worker before runtime rollback: %w", err)
+		}
+	}
+	result, err := a.provisioner.Rollback()
+	if err != nil {
+		return runtimeprovision.Result{}, err
+	}
+	if a.worker != nil {
+		if err := a.worker.Stop(); err != nil {
+			return runtimeprovision.Result{}, fmt.Errorf("restart the data worker after runtime rollback: %w", err)
+		}
+	}
+	return result, nil
 }
