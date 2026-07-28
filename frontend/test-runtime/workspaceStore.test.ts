@@ -19,15 +19,38 @@ describe('workspaceStore', () => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
     window.go = { main: { App: bridge } }
-    bridge.ListWorkspaces.mockResolvedValue([])
+    bridge.ListWorkspaces.mockResolvedValue({ workspaces: [] })
     bridge.GetWorkspaceSummary.mockResolvedValue(null)
     bridge.GetWorkspaceAIConfig.mockResolvedValue(null)
+  })
+
+  it('hydrates every workspace from the native list response', async () => {
+    const store = useWorkspaceStore()
+    bridge.ListWorkspaces.mockResolvedValue({
+      workspaces: [
+        { id: 'workspace-a', name: 'Sales', is_active: false },
+        { id: 'workspace-b', name: 'Finance', is_active: true },
+        { id: 'workspace-c', name: 'Operations', is_active: false },
+      ],
+    })
+    bridge.GetWorkspaceSummary.mockResolvedValue({ id: 'workspace-b', table_count: 0 })
+
+    await expect(store.fetchWorkspaces()).resolves.toHaveLength(3)
+
+    expect(store.workspaces.map((workspace) => workspace.name)).toEqual([
+      'Sales',
+      'Finance',
+      'Operations',
+    ])
+    expect(store.activeWorkspaceId).toBe('workspace-b')
   })
 
   it('recovers a stale active workspace from the native list', async () => {
     const store = useWorkspaceStore()
     store.setActiveWorkspaceId('missing')
-    bridge.ListWorkspaces.mockResolvedValue([{ id: 'workspace-a', name: 'Sales' }])
+    bridge.ListWorkspaces.mockResolvedValue({
+      workspaces: [{ id: 'workspace-a', name: 'Sales' }],
+    })
     bridge.GetWorkspaceSummary.mockResolvedValue({ id: 'workspace-a', table_count: 1 })
     await store.fetchWorkspaces()
     expect(store.activeWorkspaceId).toBe('workspace-a')
