@@ -91,6 +91,7 @@
               @select-workspace="selectWorkspace"
               @activate-workspace="activateWorkspace"
               @workspace-created="handleWorkspaceCreated"
+              @workspace-setup-complete="handleWorkspaceSetupComplete"
             />
           </section>
 
@@ -294,6 +295,12 @@ function handleWorkspaceCreated(payload: { workspaceId?: unknown }) {
   if (!workspaceId) return
   activeWorkspaceId.value = workspaceId
   activeSection.value = 'workspace'
+  workspaceInitialSection.value = 'ai'
+}
+
+function handleWorkspaceSetupComplete(payload: { workspaceId?: unknown }) {
+  const workspaceId = String(payload?.workspaceId || '').trim()
+  if (workspaceId) activeWorkspaceId.value = workspaceId
   emit('update:modelValue', false)
 }
 

@@ -1,32 +1,241 @@
 <template>
   <section class="scrollbar-hidden h-full overflow-y-auto">
-    <div class="grid h-full min-h-0 grid-cols-[210px_1fr] gap-4">
+    <Transition name="motion-fade" mode="out-in">
+      <div
+        v-if="isWorkspaceCreationOpen"
+        :key="workspaceCreationStep"
+        class="flex min-h-full items-start justify-center px-2 py-3 sm:px-4 sm:py-5"
+      >
+        <div class="w-full max-w-2xl">
+          <header class="mb-4">
+            <div class="flex items-center justify-between gap-4">
+              <button
+                v-if="workspaceCreationStep === 'identity'"
+                type="button"
+                class="text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
+                :disabled="isCreatingWorkspace"
+                @click="cancelWorkspaceCreation"
+              >
+                Back to workspaces
+              </button>
+              <span v-else class="text-xs font-medium text-[var(--color-text-muted)]">Workspace created</span>
+              <span class="text-xs font-semibold text-[var(--color-text-muted)]">
+                Step {{ workspaceCreationStepNumber }} of 3
+              </span>
+            </div>
+            <div
+              class="mt-2 h-1 overflow-hidden rounded-full bg-[var(--color-base-muted)]"
+              role="progressbar"
+              :aria-valuenow="workspaceCreationStepNumber"
+              aria-valuemin="1"
+              aria-valuemax="3"
+              aria-label="Workspace setup progress"
+            >
+              <div
+                class="h-full rounded-full bg-[var(--color-accent)] transition-[width] duration-300 motion-reduce:transition-none"
+                :class="workspaceCreationProgressClass"
+              ></div>
+            </div>
+          </header>
+
+          <form
+            v-if="workspaceCreationStep === 'identity'"
+            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-base)] p-5 shadow-[var(--shadow-lifted)] sm:p-6"
+            @submit.prevent="createWorkspace"
+          >
+            <p class="text-xs font-semibold uppercase tracking-wide text-[var(--color-accent)]">Workspace setup</p>
+            <h2 class="mt-2 text-xl font-semibold leading-tight tracking-tight text-[var(--color-text-main)]">Create a focused place for your work</h2>
+            <p class="mt-2 max-w-xl text-sm leading-6 text-[var(--color-text-muted)]">
+              Give the workspace a clear name and optional context. You will review its AI and privacy choices next.
+            </p>
+
+            <div class="mt-5 space-y-4">
+              <label class="block">
+                <span class="input-label">Workspace name</span>
+                <input
+                  ref="workspaceNameInputRef"
+                  v-model="setupWorkspaceName"
+                  type="text"
+                  class="input-base input-outlined"
+                  placeholder="FINANCE ANALYSIS"
+                  autocomplete="off"
+                  :disabled="isCreatingWorkspace"
+                />
+                <span class="mt-1.5 block text-xs leading-5 text-[var(--color-text-muted)]">Use a name that will still make sense when you have several workspaces.</span>
+              </label>
+
+              <label class="block">
+                <span class="input-label">Purpose <span class="font-normal text-[var(--color-text-muted)]">(optional)</span></span>
+                <textarea
+                  v-model="setupWorkspaceContext"
+                  rows="3"
+                  class="input-base input-outlined resize-none"
+                  placeholder="What will you analyze here? Add useful business terms, goals, or boundaries."
+                  :disabled="isCreatingWorkspace"
+                ></textarea>
+                <span class="mt-1.5 block text-xs leading-5 text-[var(--color-text-muted)]">This context helps Inquira understand what belongs in this workspace.</span>
+              </label>
+            </div>
+
+            <div class="mt-6 flex items-center justify-end gap-3 border-t border-[var(--color-border)] pt-4">
+              <button type="button" class="btn-secondary px-4 py-2 text-sm" :disabled="isCreatingWorkspace" @click="cancelWorkspaceCreation">Cancel</button>
+              <button type="submit" class="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" :disabled="isCreatingWorkspace || !setupWorkspaceName.trim()">
+                {{ isCreatingWorkspace ? 'Creating…' : 'Create and continue' }}
+              </button>
+            </div>
+          </form>
+
+          <div
+            v-else-if="workspaceCreationStep === 'ai'"
+            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-base)] p-5 shadow-[var(--shadow-lifted)] sm:p-6"
+          >
+            <p class="text-xs font-semibold uppercase tracking-wide text-[var(--color-accent)]">Workspace setup</p>
+            <h2 class="mt-2 text-xl font-semibold leading-tight tracking-tight text-[var(--color-text-main)]">Review AI and privacy</h2>
+            <p class="mt-2 max-w-xl text-sm leading-6 text-[var(--color-text-muted)]">
+              Confirm how <span class="font-medium text-[var(--color-text-main)]">{{ setupWorkspaceName }}</span> uses your application models and whether bounded data samples may be sent to them.
+            </p>
+
+            <div class="mt-5 border-t border-[var(--color-border)] pt-4">
+              <WorkspaceAIConfigSection
+                v-if="createdWorkspaceId"
+                :workspace-id="createdWorkspaceId"
+                setup-mode
+                @saved="advanceToDataSetup"
+              />
+            </div>
+          </div>
+
+          <div
+            v-else
+            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-base)] p-5 shadow-[var(--shadow-lifted)] sm:p-6"
+          >
+            <p class="text-xs font-semibold uppercase tracking-wide text-[var(--color-accent)]">Workspace setup</p>
+            <h2 class="mt-2 text-xl font-semibold leading-tight tracking-tight text-[var(--color-text-main)]">Add your first data source</h2>
+            <p class="mt-2 max-w-xl text-sm leading-6 text-[var(--color-text-muted)]">
+              Connect a local file so <span class="font-medium text-[var(--color-text-main)]">{{ setupWorkspaceName }}</span> opens ready for analysis. Inquira creates a refreshable local snapshot.
+            </p>
+
+            <div v-if="!nativeRuntimeStatus.ready" class="mt-5 rounded-lg bg-[var(--color-warning-bg)] p-4">
+              <div class="flex items-start gap-3">
+                <span class="mt-1 h-2 w-2 shrink-0 rounded-full bg-[var(--color-warning)]"></span>
+                <div class="min-w-0 flex-1">
+                  <h3 class="text-sm font-semibold text-[var(--color-text-main)]">Prepare the local data runtime</h3>
+                  <p class="mt-1 text-xs leading-5 text-[var(--color-warning-text)]">
+                    Install approved Python {{ approvedPythonVersion }} and the locked data packages before connecting CSV, Parquet, Excel, JSON, or SQLite.
+                  </p>
+                  <p v-if="runtimeProvisionError" class="mt-3 text-xs leading-5 text-[var(--color-danger-text)]" role="alert">{{ runtimeProvisionError }}</p>
+                  <div class="mt-4 flex flex-wrap items-center gap-3">
+                    <button type="button" class="btn-primary px-4 py-2 text-sm" :disabled="runtimeOperationActive" @click="setupManagedRuntime">
+                      {{ runtimeProvisioning ? 'Installing runtime…' : 'Install recommended runtime' }}
+                    </button>
+                    <button type="button" class="text-xs font-semibold text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]" :disabled="runtimeOperationActive" @click="openAdvancedDataSettings">
+                      Advanced runtime options
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-else class="mt-5">
+              <p v-if="connectionError" class="mb-4 rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-xs text-[var(--color-danger-text)]" role="alert">{{ connectionError }}</p>
+
+              <div v-if="!pendingConnection" class="rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-base-soft)] px-5 py-6 text-center">
+                <h3 class="text-sm font-semibold text-[var(--color-text-main)]">Choose a local data source</h3>
+                <p class="mx-auto mt-1 max-w-md text-xs leading-5 text-[var(--color-text-muted)]">
+                  Supported formats: CSV, Parquet, Excel, JSON, and read-only SQLite.
+                </p>
+                <button type="button" class="btn-primary mt-4 px-4 py-2 text-sm" :disabled="connectionActionLoading || !isWorkspaceActive" @click="chooseConnectionFile">
+                  {{ connectionActionLoading ? 'Inspecting source…' : 'Choose data source' }}
+                </button>
+              </div>
+
+              <div v-else class="space-y-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-semibold text-[var(--color-text-main)]">{{ pendingConnection.source_path }}</p>
+                    <p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ adapterKindLabel(pendingConnection.adapter_kind) }} · {{ sourceObjectCountLabel(pendingConnection) }}</p>
+                  </div>
+                  <button type="button" class="text-xs font-semibold text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]" :disabled="connectionActionLoading" @click="cancelPendingConnection">Choose another</button>
+                </div>
+
+                <label class="block">
+                  <span class="input-label">Connection name</span>
+                  <input v-model="pendingConnection.name" class="input-base input-outlined" maxlength="120" :disabled="connectionActionLoading" />
+                </label>
+
+                <div v-if="isObjectSelectionAdapter(pendingConnection.adapter_kind)" class="space-y-2">
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="input-label">
+                      {{ pendingConnection.adapter_kind === 'excel' ? 'Select sheets' : 'Select tables and views' }} · {{ pendingConnection.selected_object_ids.length }} selected
+                    </span>
+                    <label v-if="pendingConnection.adapter_kind === 'excel'" class="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+                      Formula values
+                      <select v-model="pendingConnection.formula_mode" class="rounded border border-[var(--color-border)] bg-[var(--color-base)] px-2 py-1" :disabled="connectionActionLoading" @change="previewPendingObject(pendingConnection.active_object_id)">
+                        <option value="cached">Last saved values</option>
+                        <option value="formula">Formula text</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div v-if="pendingConnection.objects.length > 6" class="flex items-center gap-2">
+                    <input
+                      v-model="objectSearch"
+                      type="search"
+                      class="input-base input-outlined h-8 min-w-0 flex-1 text-xs"
+                      :placeholder="pendingConnection.adapter_kind === 'excel' ? 'Search sheets' : 'Search tables and views'"
+                      :aria-label="pendingConnection.adapter_kind === 'excel' ? 'Search Excel sheets' : 'Search SQLite tables and views'"
+                    />
+                    <button type="button" class="btn-ghost shrink-0 px-2 py-1 text-xs" :disabled="connectionActionLoading" @click="selectAllPendingObjects">Select all</button>
+                    <button v-if="pendingConnection.selected_object_ids.length" type="button" class="btn-ghost shrink-0 px-2 py-1 text-xs" :disabled="connectionActionLoading" @click="clearPendingObjectSelection">Clear</button>
+                  </div>
+                  <div class="grid max-h-48 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+                    <label v-for="object in filteredPendingObjects" :key="object.id" class="flex items-start gap-2 rounded-lg border p-2" :class="object.id === pendingConnection.active_object_id ? 'border-[var(--color-accent)]' : 'border-[var(--color-border)]'">
+                      <input v-model="pendingConnection.selected_object_ids" type="checkbox" :value="object.id" :disabled="connectionActionLoading || object.metadata?.selectable === false" />
+                      <span class="min-w-0 flex-1">
+                        <span class="block truncate text-xs font-medium text-[var(--color-text-main)]">{{ object.name }}</span>
+                        <span class="block text-xs text-[var(--color-text-muted)]">{{ sourceObjectSummary(object, pendingConnection.adapter_kind) }}</span>
+                      </span>
+                      <button v-if="object.metadata?.selectable !== false" type="button" class="text-xs font-medium text-[var(--color-accent)] hover:underline" :disabled="connectionActionLoading" @click.prevent="previewPendingObject(object.id)">Preview</button>
+                    </label>
+                  </div>
+                </div>
+
+                <div v-if="visiblePendingColumns.length" class="flex flex-wrap gap-1.5">
+                  <span v-for="column in visiblePendingColumns" :key="column.name" class="rounded-full bg-[var(--color-base-soft)] px-2 py-1 text-xs text-[var(--color-text-muted)]">
+                    {{ column.name }} · {{ column.data_type }}
+                  </span>
+                  <span v-if="pendingConnection.columns.length > visiblePendingColumns.length" class="rounded-full bg-[var(--color-base-soft)] px-2 py-1 text-xs font-medium text-[var(--color-text-main)]">
+                    +{{ pendingConnection.columns.length - visiblePendingColumns.length }} more
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-6 flex items-center justify-between gap-3 border-t border-[var(--color-border)] pt-4">
+              <button type="button" class="text-xs font-semibold text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]" :disabled="connectionActionLoading || runtimeOperationActive" @click="finishWorkspaceSetup('skipped')">Do this later</button>
+              <button
+                v-if="pendingConnection && nativeRuntimeStatus.ready"
+                type="button"
+                class="btn-primary px-4 py-2 text-sm"
+                :disabled="connectionActionLoading || !pendingConnection.name.trim() || !pendingConnection.selected_object_ids.length"
+                @click="createPendingConnection"
+              >
+                {{ connectionActionLoading ? 'Adding source…' : 'Add source and finish' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="grid h-full min-h-0 grid-cols-[210px_1fr] gap-4">
       <WorkspaceListPanel>
         <header class="mb-3 flex items-center justify-between">
           <h3 class="section-label">Workspaces</h3>
-          <button type="button" class="text-xs font-semibold text-[var(--color-accent)] hover:underline" @click="beginInlineCreate">
+          <button type="button" class="text-xs font-semibold text-[var(--color-accent)] hover:underline" @click="beginWorkspaceCreation">
             + New
           </button>
         </header>
 
         <div class="flex-1 space-y-1.5 overflow-y-auto pr-1 scrollbar-thin">
-          <div
-            v-if="isInlineCreating"
-            class="rounded-lg bg-[var(--color-accent-soft)] px-3 py-2.5 ring-1 ring-[var(--color-accent-border)]"
-          >
-            <input
-              ref="newWorkspaceInputRef"
-              v-model="setupWorkspaceName"
-              type="text"
-              class="w-full bg-transparent text-xs font-medium text-[var(--color-text-main)] outline-none placeholder:text-[var(--color-text-muted)]"
-              placeholder="New workspace name"
-              :disabled="isCreatingWorkspace"
-              @keydown.enter.prevent="createWorkspace"
-              @keydown.escape.prevent="cancelInlineCreate"
-            />
-            <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">Press Enter to create</p>
-          </div>
-
           <div
             v-for="workspace in workspaceCards"
             :key="workspace.id"
@@ -57,7 +266,7 @@
             <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">{{ workspace.conversationCount }} convs · {{ workspace.lastActiveLabel }}</p>
           </div>
 
-          <p v-if="!workspaceCards.length && !isInlineCreating" class="py-4 text-center text-xs text-[var(--color-text-muted)]">No workspaces yet</p>
+          <p v-if="!workspaceCards.length" class="py-4 text-center text-xs text-[var(--color-text-muted)]">No workspaces yet</p>
         </div>
       </WorkspaceListPanel>
 
@@ -386,10 +595,11 @@
 
         <div v-else class="flex flex-1 flex-col items-center justify-center rounded-lg bg-[var(--color-base-soft)] px-5 py-8 text-center">
           <p class="mb-4 text-sm text-[var(--color-text-sub)]">Create a workspace to add context and data sources.</p>
-          <button type="button" class="btn-primary px-4 py-2 text-sm" @click="beginInlineCreate">Create your first workspace</button>
+          <button type="button" class="btn-primary px-4 py-2 text-sm" @click="beginWorkspaceCreation">Create your first workspace</button>
         </div>
       </div>
-    </div>
+      </div>
+    </Transition>
 
     <ConfirmationModal
       :is-open="isWorkspaceDeleteDialogOpen"
@@ -440,7 +650,7 @@ const props = withDefaults(defineProps<{
   initialSection: 'general',
 })
 
-const emit = defineEmits(['select-workspace', 'activate-workspace', 'workspace-created'])
+const emit = defineEmits(['select-workspace', 'activate-workspace', 'workspace-created', 'workspace-setup-complete'])
 
 const uiStore = useUiStore()
 const preferencesStore = usePreferencesStore()
@@ -533,9 +743,11 @@ const setupWorkspaceName = ref('')
 const setupWorkspaceContext = ref('')
 const savedWorkspaceContext = ref('')
 const isSavingWorkspaceIdentity = ref(false)
-const isInlineCreating = ref(false)
+const isWorkspaceCreationOpen = ref(false)
+const workspaceCreationStep = ref<'identity' | 'ai' | 'data'>('identity')
+const createdWorkspaceId = ref('')
 const isEditingContext = ref(false)
-const newWorkspaceInputRef = ref<any>(null)
+const workspaceNameInputRef = ref<any>(null)
 
 function normalizeWorkspaceName(value: any) {
   return String(value || '').toUpperCase()
@@ -564,6 +776,12 @@ const isWorkspaceActive = computed(() => !!activeWorkspace.value && activeWorksp
 const selectedWorkspaceContext = computed(() => String(workspaceDetail.value?.schema_context ?? activeWorkspace.value?.schema_context ?? '').trim())
 const normalizedSetupWorkspaceContext = computed(() => String(setupWorkspaceContext.value || '').trim())
 const isWorkspaceContextDirty = computed(() => normalizedSetupWorkspaceContext.value !== String(savedWorkspaceContext.value || '').trim())
+const workspaceCreationStepNumber = computed(() => (
+  workspaceCreationStep.value === 'identity' ? 1 : workspaceCreationStep.value === 'ai' ? 2 : 3
+))
+const workspaceCreationProgressClass = computed(() => (
+  workspaceCreationStep.value === 'identity' ? 'w-1/3' : workspaceCreationStep.value === 'ai' ? 'w-2/3' : 'w-full'
+))
 const workspaceRuntimeStatus = computed(() => executionStore.getWorkspaceRuntimeStatus(props.activeWorkspaceId))
 const runtimeOperationActive = computed(() => runtimeProvisioning.value || runtimeRecoveryLoading.value)
 const approvedPythonVersion = computed(() => String(nativeRuntimeStatus.value?.bundle?.pythonVersion || '3.12.13'))
@@ -881,6 +1099,7 @@ async function createPendingConnection() {
   const pending = pendingConnection.value
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   if (!pending || !workspaceId) return
+  const completesWorkspaceSetup = isWorkspaceCreationOpen.value && workspaceCreationStep.value === 'data'
   connectionError.value = ''
   connectionActionLoading.value = true
   try {
@@ -895,7 +1114,11 @@ async function createPendingConnection() {
     pendingConnection.value = null
     objectSearch.value = ''
     await refreshNativeConnectionState(workspaceId)
-    toast.success('Connection created', 'The local snapshot is ready for analysis.')
+    if (completesWorkspaceSetup) {
+      finishWorkspaceSetup('connected')
+    } else {
+      toast.success('Connection created', 'The local snapshot is ready for analysis.')
+    }
   } catch (error: any) {
     connectionError.value = extractApiErrorMessage(error, 'Could not create the connection.')
   } finally {
@@ -998,22 +1221,32 @@ async function hydrateWorkspaceCards() {
 
 async function selectWorkspaceSummary(workspaceId: any) {
   isEditingContext.value = false
-  isInlineCreating.value = false
+  isWorkspaceCreationOpen.value = false
   await emitSelectedWorkspace(workspaceId)
 }
 
-async function beginInlineCreate() {
+async function beginWorkspaceCreation() {
   isEditingContext.value = false
-  isInlineCreating.value = true
+  isWorkspaceCreationOpen.value = true
+  workspaceCreationStep.value = 'identity'
+  createdWorkspaceId.value = ''
   setupWorkspaceName.value = ''
+  setupWorkspaceContext.value = ''
+  pendingConnection.value = null
+  connectionError.value = ''
   await nextTick()
-  newWorkspaceInputRef.value?.focus?.()
+  workspaceNameInputRef.value?.focus?.()
 }
 
-function cancelInlineCreate() {
+function cancelWorkspaceCreation() {
   if (isCreatingWorkspace.value) return
-  isInlineCreating.value = false
+  isWorkspaceCreationOpen.value = false
+  workspaceCreationStep.value = 'identity'
+  createdWorkspaceId.value = ''
   setupWorkspaceName.value = ''
+  setupWorkspaceContext.value = ''
+  pendingConnection.value = null
+  connectionError.value = ''
 }
 
 function startContextEdit() {
@@ -1215,7 +1448,7 @@ async function createWorkspace() {
   }
   isCreatingWorkspace.value = true
   try {
-    const context = ''
+    const context = normalizedSetupWorkspaceContext.value
     const workspace = await workspaceActivation.createWorkspace(name, context)
     const workspaceId = String(workspace?.id || workspaceStore.activeWorkspaceId || '').trim()
     if (!workspaceId) {
@@ -1227,13 +1460,46 @@ async function createWorkspace() {
       name,
       context,
     })
-    isInlineCreating.value = false
-    isEditingContext.value = true
+    createdWorkspaceId.value = workspaceId
+    workspaceCreationStep.value = 'ai'
   } catch (error: any) {
     toast.error('Create failed', extractApiErrorMessage(error, 'Failed to create workspace.'))
   } finally {
     isCreatingWorkspace.value = false
   }
+}
+
+function advanceToDataSetup() {
+  if (!createdWorkspaceId.value) return
+  pendingConnection.value = null
+  connectionError.value = ''
+  workspaceCreationStep.value = 'data'
+}
+
+function openAdvancedDataSettings() {
+  isWorkspaceCreationOpen.value = false
+  activeWorkspaceSection.value = 'connections'
+  workspaceCreationStep.value = 'identity'
+  createdWorkspaceId.value = ''
+}
+
+function finishWorkspaceSetup(outcome: 'connected' | 'skipped') {
+  const workspaceId = String(createdWorkspaceId.value || '').trim()
+  if (!workspaceId) return
+  const workspaceName = String(setupWorkspaceName.value || '').trim()
+  if (outcome === 'connected') {
+    toast.success('Workspace ready', `${workspaceName || 'Your workspace'} is ready for analysis.`)
+  } else {
+    toast.success('Workspace created', `You can add data to ${workspaceName || 'this workspace'} when you are ready.`)
+  }
+  emit('workspace-setup-complete', { workspaceId, dataConnected: outcome === 'connected' })
+  isWorkspaceCreationOpen.value = false
+  workspaceCreationStep.value = 'identity'
+  createdWorkspaceId.value = ''
+  setupWorkspaceName.value = ''
+  setupWorkspaceContext.value = ''
+  pendingConnection.value = null
+  connectionError.value = ''
 }
 
 function formatFilename(raw: any) {

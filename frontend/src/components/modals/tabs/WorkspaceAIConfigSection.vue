@@ -63,8 +63,12 @@
       </section>
 
       <div class="flex items-center justify-between gap-3 border-t border-[var(--color-border)] pt-3">
-        <p class="text-xs" :class="errorMessage ? 'text-[var(--color-danger)]' : isDirty ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'">{{ errorMessage || (isDirty ? 'Unsaved changes' : saveStateLabel) }}</p>
-        <button type="button" class="btn-primary px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50" :disabled="isSaving || !isDirty" @click="save">{{ isSaving ? 'Saving…' : 'Save AI settings' }}</button>
+        <p class="text-xs" :class="errorMessage ? 'text-[var(--color-danger)]' : isDirty || (setupMode && requiresReview) ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'">
+          {{ errorMessage || (isDirty ? 'Unsaved changes' : setupMode && requiresReview ? 'Confirm these choices to finish setup.' : saveStateLabel) }}
+        </p>
+        <button type="button" class="btn-primary px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50" :disabled="isSaving || !canSave" @click="save">
+          {{ isSaving ? 'Saving…' : setupMode ? 'Finish setup' : 'Save AI settings' }}
+        </button>
       </div>
     </div>
   </section>
@@ -89,7 +93,11 @@ type ProviderCatalog = Record<string, unknown> & {
   provider_available_lite_models?: unknown[]
 }
 
-const props = defineProps({ workspaceId: { type: String, required: true } })
+const props = defineProps({
+  workspaceId: { type: String, required: true },
+  setupMode: { type: Boolean, default: false },
+})
+const emit = defineEmits(['saved'])
 const uiStore = useUiStore()
 const preferencesStore = usePreferencesStore()
 const artifactStore = useArtifactStore()
@@ -131,6 +139,8 @@ const effectiveSummary = computed(() => {
 })
 const credentialLabel = computed(() => config.value?.readiness?.credential_ready ? 'Using application credential' : 'Application credential required')
 const isDirty = computed(() => Boolean(config.value) && payloadSignature(buildPayload()) !== initialPayloadSignature.value)
+const requiresReview = computed(() => Boolean(config.value) && !config.value?.readiness?.configuration_reviewed)
+const canSave = computed(() => Boolean(config.value) && (isDirty.value || (props.setupMode && requiresReview.value)))
 
 watch(config, hydrate, { immediate: true })
 watch(() => workspaceStore.workspaceAIConfig, (value: WorkspaceAIConfig | null) => {
@@ -139,7 +149,7 @@ watch(() => workspaceStore.workspaceAIConfig, (value: WorkspaceAIConfig | null) 
 watch(() => props.workspaceId, async (workspaceId) => {
   localConfig.value = null
   initialPayloadSignature.value = ''
-  saveStateLabel.value = 'Changes apply to this workspace only.'
+  saveStateLabel.value = props.setupMode ? 'Review these choices to continue.' : 'Changes apply to this workspace only.'
   if (workspaceId) localConfig.value = await workspaceStore.fetchWorkspaceAIConfig(workspaceId)
 }, { immediate: true })
 
@@ -190,6 +200,7 @@ async function save() {
     localConfig.value = savedConfig
     hydrate(savedConfig)
     saveStateLabel.value = 'Saved.'
+    emit('saved', savedConfig)
   } catch (error) { errorMessage.value = error instanceof Error ? error.message : 'Could not save AI settings.' } finally { isSaving.value = false }
 }
 </script>
