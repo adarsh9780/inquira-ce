@@ -80,6 +80,7 @@ export interface NativeMethodMap {
   ActivateWorkspace: (workspaceId: string) => Promise<NativeRecord>
   AnalyzeQuestion: (request: NativeAnalyzeRequest) => Promise<unknown>
   CancelAgentAnalysis: (workspaceId: string, clientRequestId: string) => Promise<boolean>
+  CancelRuntimeProvisioning: () => Promise<boolean>
   ChooseCertificateBundle: () => Promise<string>
   ChooseLocalConnectionFile: () => Promise<unknown>
   ChoosePythonExecutable: () => Promise<string>
@@ -154,6 +155,7 @@ export interface NativeMethodMap {
   ) => Promise<NativeRecord>
   ResizeTerminalSession: (sessionId: string, columns: number, rows: number) => Promise<void>
   RestartDesktopApp: () => Promise<void>
+  RollbackRuntime: () => Promise<unknown>
   RunManualCode: (request: NativeRunManualCodeRequest) => Promise<unknown>
   RuntimePlan: (configuration: NativeRecord) => Promise<unknown>
   RuntimeStatus: () => Promise<NativeRecord>

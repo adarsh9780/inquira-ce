@@ -52,10 +52,11 @@ selection becomes its own Parquet output. Cached Excel formula values are the
 default, with formula text available as an option.
 
 A fresh installation asks the user to configure the data runtime before any
-download. Managed Python, a company-provided Python executable, and internal
-Python/package mirrors are supported. Proxy, bypass, index, and system
-certificate settings are passed only to that setup run and are not saved by
-Inquira.
+download. The recommended path uses bundled UV to install the compatibility
+manifest's exact Python 3.12.13 build and locked worker packages. A
+company-provided Python 3.12 executable and internal Python/package mirrors are
+also supported. Proxy, bypass, index, and system certificate settings are
+passed only to that setup run and are not saved by Inquira.
 
 Legacy `.xls` files are not accepted because the streaming reader supports the
 modern Office Open XML format only. Before chat or code execution starts, Go
@@ -129,7 +130,7 @@ DuckDB, and Plotly analysis tools.
 
 The embedded UV runtime supports three provisioning policies:
 
-1. `managed`: UV installs the approved Python version.
+1. `managed`: UV installs the exact approved Python 3.12.13 version.
 2. `external-python`: Inquira uses an organization-provided Python executable
    and disables Python downloads.
 3. `internal-mirror`: UV installs Python and packages from organization-owned
@@ -145,6 +146,20 @@ Python version or executable path, and certificate preference. Proxy, mirror,
 index, and bypass values are cleared after every attempt and are never written
 to the runtime configuration. A ready runtime can be reviewed and replaced from
 Workspace → Connections → Data runtime setup.
+
+Each build embeds a versioned compatibility manifest containing the application
+compatibility range, UV source and checksums, exact managed-Python build,
+platform, worker protocol, worker lockfile hash, and supported runtime
+capabilities. Inquira rejects an incomplete manifest or a worker whose lockfile
+does not match it.
+
+Setup is transactional: Inquira creates and verifies a staging environment
+before activation. The active runtime remains untouched if setup fails or is
+cancelled, and the last verified runtime is retained for one-click rollback
+after a successful replacement. Retrying after an interrupted setup safely
+clears the incomplete staging environment. See
+[`docs/runtime-management.md`](docs/runtime-management.md) for the lifecycle and
+recovery contract.
 
 ## Build
 
