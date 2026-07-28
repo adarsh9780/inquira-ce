@@ -272,6 +272,7 @@ import WorkspaceContextSection from './workspace/WorkspaceContextSection.vue'
 import WorkspaceDatasetSection from './workspace/WorkspaceDatasetSection.vue'
 import WorkspaceListPanel from './workspace/WorkspaceListPanel.vue'
 import { useWorkspaceDatasets } from '../../../composables/useWorkspaceDatasets'
+import { filenameFromPath } from '../../../utils/pathUtils'
 
 const props = defineProps({
   activeWorkspaceId: {
@@ -413,7 +414,10 @@ const workspaceCards = computed(() => {
   })
 })
 
-const activeWorkspace = computed(() => workspaceCards.value.find((workspace) => workspace.id === String(props.activeWorkspaceId || '').trim()) || null)
+const activeWorkspace = computed(() => {
+  const cards = Array.isArray(workspaceCards.value) ? workspaceCards.value : []
+  return cards.find((workspace) => workspace.id === String(props.activeWorkspaceId || '').trim()) || null
+})
 const isWorkspaceActive = computed(() => !!activeWorkspace.value && activeWorkspace.value.id === String(appStore.activeWorkspaceId || '').trim())
 const selectedWorkspaceContext = computed(() => String(workspaceDetail.value?.schema_context ?? activeWorkspace.value?.schema_context ?? '').trim())
 const normalizedSetupWorkspaceContext = computed(() => String(setupWorkspaceContext.value || '').trim())
