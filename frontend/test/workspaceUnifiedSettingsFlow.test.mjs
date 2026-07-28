@@ -25,11 +25,11 @@ test('workspace settings uses one active-workspace management surface', () => {
   assert.equal(template.includes('Workspace runtime'), false)
 })
 
-test('new workspace uses a focused two-step setup and preserves context through creation', () => {
+test('new workspace uses a focused three-step setup through its first data source', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
 
   assert.equal(workspace.includes('v-if="isWorkspaceCreationOpen"'), true)
-  assert.equal(workspace.includes("const workspaceCreationStep = ref<'identity' | 'ai'>('identity')"), true)
+  assert.equal(workspace.includes("const workspaceCreationStep = ref<'identity' | 'ai' | 'data'>('identity')"), true)
   assert.equal(workspace.includes('ref="workspaceNameInputRef"'), true)
   assert.equal(workspace.includes('@submit.prevent="createWorkspace"'), true)
   assert.equal(workspace.includes('async function beginWorkspaceCreation()'), true)
@@ -37,8 +37,13 @@ test('new workspace uses a focused two-step setup and preserves context through 
   assert.equal(workspace.includes('const context = normalizedSetupWorkspaceContext.value'), true)
   assert.equal(workspace.includes("workspaceCreationStep.value = 'ai'"), true)
   assert.equal(workspace.includes('setup-mode'), true)
-  assert.equal(workspace.includes('@saved="finishWorkspaceSetup"'), true)
-  assert.equal(workspace.includes("emit('workspace-setup-complete', { workspaceId })"), true)
+  assert.equal(workspace.includes('@saved="advanceToDataSetup"'), true)
+  assert.equal(workspace.includes("workspaceCreationStep.value = 'data'"), true)
+  assert.equal(workspace.includes('Add your first data source'), true)
+  assert.equal(workspace.includes('Add source and finish'), true)
+  assert.equal(workspace.includes("@click=\"finishWorkspaceSetup('skipped')\""), true)
+  assert.equal(workspace.includes("finishWorkspaceSetup('connected')"), true)
+  assert.equal(workspace.includes("emit('workspace-setup-complete', { workspaceId, dataConnected: outcome === 'connected' })"), true)
   assert.equal(workspace.includes('Press Enter to create'), false)
 })
 

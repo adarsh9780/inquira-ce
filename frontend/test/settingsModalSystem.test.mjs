@@ -73,7 +73,7 @@ test('workspace tab separates focused creation from the unified management surfa
   assert.equal(tabSource.includes('rounded-xl border border-[var(--color-border)] bg-[var(--color-base)]'), true)
   assert.equal(tabSource.includes('const currentStep = ref(1)'), false)
   assert.equal(tabSource.includes('const savingStep = ref(0)'), false)
-  assert.equal(tabSource.includes("const workspaceCreationStep = ref<'identity' | 'ai'>('identity')"), true)
+  assert.equal(tabSource.includes("const workspaceCreationStep = ref<'identity' | 'ai' | 'data'>('identity')"), true)
   assert.equal(tabSource.includes("setInlineToast('Dataset added')"), false)
 })
 
