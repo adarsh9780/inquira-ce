@@ -224,9 +224,32 @@ jobs:
       - name: Ensure NSIS is available
         shell: pwsh
         run: |
-          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
+          $resolved = Get-Command makensis.exe -ErrorAction SilentlyContinue
+          if (-not $resolved) {
             choco install nsis --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+
+          $candidates = @()
+          if ($resolved) {
+            $candidates += $resolved.Source
+          }
+          $candidates += @(
+            "$env:ProgramFiles\NSIS\makensis.exe",
+            "${env:ProgramFiles(x86)}\NSIS\makensis.exe",
+            "$env:ChocolateyInstall\bin\makensis.exe"
+          )
+          $makensis = $candidates |
+            Where-Object { $_ -and (Test-Path $_ -PathType Leaf) } |
+            Select-Object -First 1
+          if (-not $makensis) {
+            throw "makensis.exe is unavailable after NSIS installation."
+          }
+
+          Split-Path $makensis -Parent |
+            Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          & $makensis /VERSION
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install the pinned Wails CLI
         shell: pwsh

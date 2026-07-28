@@ -20,6 +20,9 @@ test('desktop releases build only after a stable release is published', () => {
   assert.match(workflow, /-platform windows\/amd64 -trimpath -nsis -s/)
   assert.match(workflow, /Test macOS Go packages/)
   assert.match(workflow, /Test Windows Go packages/)
+  assert.match(workflow, /ProgramFiles\(x86\).*NSIS.*makensis\.exe/)
+  assert.match(workflow, /GITHUB_PATH/)
+  assert.match(workflow, /makensis\.exe is unavailable after NSIS installation/)
 })
 
 test('release publication archives assets and changes the public pointer last', () => {
