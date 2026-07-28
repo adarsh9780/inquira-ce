@@ -153,20 +153,38 @@
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
-  --space-overlay-gap: 0.5rem;
+
+  /* Spacing primitives: 0.25rem steps with semantic relationship aliases. */
+  --space-0: 0rem;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-related-tight: var(--space-1);
+  --space-related: var(--space-2);
+  --space-control-inline: var(--space-3);
+  --space-container: var(--space-4);
+  --space-container-roomy: var(--space-6);
+  --space-section: var(--space-8);
+
+  --space-overlay-gap: var(--space-related);
   --size-profile-menu-min-width: 13rem;
   --size-sidebar-brand-height: 5.75rem;
   --size-sidebar-brand-rail: 3rem;
   --size-sidebar-brand-logo: 2.25rem;
   --size-sidebar-brand-toggle: 2rem;
   --size-sidebar-profile-badge: 1.5rem;
-  --space-sidebar-brand-gap: 0.625rem;
-  --space-sidebar-panel-inline: 0.75rem;
-  --space-sidebar-list-indent: 3rem;
-  --space-sidebar-row-inline-end: 0.75rem;
-  --space-sidebar-section-block-start: 1rem;
-  --space-sidebar-section-block-end: 0.75rem;
-  --space-sidebar-row-gap: 0.5rem;
+  --space-sidebar-brand-gap: var(--space-related);
+  --space-sidebar-panel-inline: var(--space-control-inline);
+  --space-sidebar-list-indent: var(--space-12);
+  --space-sidebar-row-inline-end: var(--space-control-inline);
+  --space-sidebar-section-block-start: var(--space-container);
+  --space-sidebar-section-block-end: var(--space-control-inline);
+  --space-sidebar-row-gap: var(--space-related);
   --size-sidebar-row-height: 2.125rem;
   --size-sidebar-header-height: 2rem;
   --size-sidebar-inline-icon: 1rem;
