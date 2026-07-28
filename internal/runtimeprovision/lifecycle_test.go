@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -130,6 +131,143 @@ func TestStatusReportsAnIncompleteStagingEnvironment(t *testing.T) {
 	}
 	if !provisioner.Status().IncompleteSetup {
 		t.Fatal("incomplete setup was not reported")
+	}
+}
+
+func TestRepairRebuildsFromSavedConfigurationAndReportsProgress(t *testing.T) {
+	provisioner := newLifecycleProvisioner(t)
+	writeVerifiedEnvironment(t, provisioner, provisioner.activeEnvironmentDir(), DefaultConfig())
+	provisioner.runner = func(_ context.Context, _ map[string]string, step Step) error {
+		if step.Name == "create-data-environment" {
+			writeEnvironmentPython(t, provisioner.stagingEnvironmentDir(), "repaired python")
+		}
+		return nil
+	}
+	var progress []Progress
+	result, err := provisioner.Repair(t.Context(), func(update Progress) {
+		progress = append(progress, update)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Mode != ModeManaged || !provisioner.Ready() || !provisioner.Status().RollbackAvailable {
+		t.Fatalf("repaired runtime = %#v; status = %#v", result, provisioner.Status())
+	}
+	if len(progress) < 2 || progress[0].Operation != "repair" || progress[len(progress)-1].State != "completed" || progress[len(progress)-1].Percent != 100 {
+		t.Fatalf("repair progress = %#v", progress)
+	}
+}
+
+func TestFailedRepairPreservesTheVerifiedRuntime(t *testing.T) {
+	provisioner := newLifecycleProvisioner(t)
+	writeVerifiedEnvironment(t, provisioner, provisioner.activeEnvironmentDir(), DefaultConfig())
+	originalPython, err := os.ReadFile(provisioner.PythonExecutable())
+	if err != nil {
+		t.Fatal(err)
+	}
+	provisioner.runner = func(_ context.Context, _ map[string]string, step Step) error {
+		if step.Name == "verify-data-worker" {
+			return errors.New("repair verification failed")
+		}
+		return nil
+	}
+	if _, err := provisioner.Repair(t.Context(), nil); err == nil {
+		t.Fatal("expected repair failure")
+	}
+	currentPython, err := os.ReadFile(provisioner.PythonExecutable())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(currentPython) != string(originalPython) || !provisioner.Ready() {
+		t.Fatalf("failed repair changed the active runtime: %q", currentPython)
+	}
+}
+
+func TestInternalMirrorRepairRequiresTransientSettings(t *testing.T) {
+	provisioner := newLifecycleProvisioner(t)
+	writeVerifiedEnvironment(t, provisioner, provisioner.activeEnvironmentDir(), Config{
+		Mode:          ModeInternalMirror,
+		PythonVersion: DefaultConfig().PythonVersion,
+	})
+	if provisioner.Status().RepairAvailable {
+		t.Fatal("internal-mirror repair must not be offered without transient mirror settings")
+	}
+	if _, err := provisioner.Repair(t.Context(), nil); err == nil || !strings.Contains(err.Error(), "re-entering mirror") {
+		t.Fatalf("internal-mirror repair error = %v", err)
+	}
+}
+
+func TestResetRemovesOnlyManagedRuntimeAssets(t *testing.T) {
+	provisioner := newLifecycleProvisioner(t)
+	writeVerifiedEnvironment(t, provisioner, provisioner.activeEnvironmentDir(), DefaultConfig())
+	for _, path := range []string{
+		filepath.Join(provisioner.runtimeRoot, "tools", executableName("uv")),
+		filepath.Join(provisioner.runtimeRoot, "python", "managed-python"),
+		provisioner.previousEnvironmentDir(),
+	} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if path == provisioner.previousEnvironmentDir() {
+			if err := os.MkdirAll(path, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		if err := os.WriteFile(path, []byte("runtime asset"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	workerSource := filepath.Join(provisioner.runtimeRoot, "worker", "pyproject.toml")
+	if err := os.WriteFile(workerSource, []byte("worker source"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var progress []Progress
+	if err := provisioner.Reset(func(update Progress) {
+		progress = append(progress, update)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, removed := range []string{
+		filepath.Join(provisioner.runtimeRoot, "tools"),
+		filepath.Join(provisioner.runtimeRoot, "python"),
+		filepath.Join(provisioner.runtimeRoot, "environments"),
+	} {
+		if pathExists(removed) {
+			t.Fatalf("reset left runtime path %q", removed)
+		}
+	}
+	if content, err := os.ReadFile(workerSource); err != nil || string(content) != "worker source" {
+		t.Fatalf("reset changed bundled worker source: %q, %v", content, err)
+	}
+	if provisioner.Ready() || len(progress) == 0 || progress[len(progress)-1].State != "completed" {
+		t.Fatalf("reset status = %#v; progress = %#v", provisioner.Status(), progress)
+	}
+}
+
+func TestDiagnosticReportExcludesPathsAndConfigurationSecrets(t *testing.T) {
+	provisioner := newLifecycleProvisioner(t)
+	secretRoot := provisioner.runtimeRoot
+	externalPython := filepath.Join(t.TempDir(), "private", "python")
+	certificateBundle := filepath.Join(t.TempDir(), "private", "company-ca.pem")
+	writeVerifiedEnvironment(t, provisioner, provisioner.activeEnvironmentDir(), Config{
+		Mode:              ModeExternalPython,
+		PythonExecutable:  externalPython,
+		UseSystemCerts:    true,
+		CertificateBundle: certificateBundle,
+	})
+	report := provisioner.DiagnosticReport(t.Context())
+	content, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{secretRoot, externalPython, certificateBundle, "runtimeRoot", "pythonExecutable", "certificateBundle"} {
+		if strings.Contains(string(content), forbidden) {
+			t.Fatalf("diagnostic report leaked %q: %s", forbidden, content)
+		}
+	}
+	if !report.Runtime.ExternalPythonConfigured || !report.Runtime.CustomCertificateBundle || report.Runtime.Mode != ModeExternalPython {
+		t.Fatalf("diagnostic configuration flags = %#v", report.Runtime)
 	}
 }
 

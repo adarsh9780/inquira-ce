@@ -17,7 +17,10 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 )
+
+const RuntimeProgressEvent = "runtime-provision-progress"
 
 type Step struct {
 	Name       string   `json:"name"`
@@ -39,6 +42,7 @@ type Status struct {
 	SupportedModes     []Mode       `json:"supportedModes"`
 	Ready              bool         `json:"ready"`
 	Provisioning       bool         `json:"provisioning"`
+	RepairAvailable    bool         `json:"repairAvailable"`
 	RollbackAvailable  bool         `json:"rollbackAvailable"`
 	IncompleteSetup    bool         `json:"incompleteSetup"`
 	PythonExecutable   string       `json:"pythonExecutable"`
@@ -56,6 +60,52 @@ type Result struct {
 	Mode             Mode   `json:"mode"`
 	PythonExecutable string `json:"pythonExecutable"`
 	UVExecutable     string `json:"uvExecutable"`
+}
+
+type Progress struct {
+	Operation string `json:"operation"`
+	Stage     string `json:"stage"`
+	Message   string `json:"message"`
+	State     string `json:"state"`
+	Current   int    `json:"current"`
+	Total     int    `json:"total"`
+	Percent   int    `json:"percent"`
+}
+
+type ProgressReporter func(Progress)
+
+type DiagnosticPlatform struct {
+	OS           string `json:"os"`
+	Architecture string `json:"architecture"`
+}
+
+type DiagnosticRuntime struct {
+	BundleAvailable          bool   `json:"bundleAvailable"`
+	Ready                    bool   `json:"ready"`
+	OperationActive          bool   `json:"operationActive"`
+	RepairAvailable          bool   `json:"repairAvailable"`
+	RollbackAvailable        bool   `json:"rollbackAvailable"`
+	IncompleteSetup          bool   `json:"incompleteSetup"`
+	Mode                     Mode   `json:"mode,omitempty"`
+	PythonVersion            string `json:"pythonVersion,omitempty"`
+	ExternalPythonConfigured bool   `json:"externalPythonConfigured"`
+	SystemCertificates       bool   `json:"systemCertificates"`
+	CustomCertificateBundle  bool   `json:"customCertificateBundle"`
+}
+
+type DiagnosticUV struct {
+	Healthy bool   `json:"healthy"`
+	Version string `json:"version,omitempty"`
+}
+
+type DiagnosticReport struct {
+	SchemaVersion  int                `json:"schemaVersion"`
+	GeneratedAtUTC string             `json:"generatedAtUtc"`
+	Platform       DiagnosticPlatform `json:"platform"`
+	Runtime        DiagnosticRuntime  `json:"runtime"`
+	Bundle         BundleInfo         `json:"bundle"`
+	UV             DiagnosticUV       `json:"uv"`
+	Issues         []string           `json:"issues"`
 }
 
 type commandRunner func(context.Context, map[string]string, Step) error
@@ -92,6 +142,7 @@ func (p *Provisioner) Status() Status {
 		status.ConfigurationError = configurationErr.Error()
 	} else {
 		status.Configuration = configuration
+		status.RepairAvailable = configuration != nil && configuration.Mode != ModeInternalMirror
 	}
 	status.Ready = p.runtimeReady()
 	if err != nil {
@@ -122,6 +173,53 @@ func (p *Provisioner) Diagnostics(ctx context.Context) Diagnostics {
 	}
 	diagnostics.UVVersion = strings.TrimSpace(string(output))
 	return diagnostics
+}
+
+// DiagnosticReport returns a deliberately bounded, path-free view of runtime
+// health. It never includes workspace data, user paths, proxy or mirror URLs,
+// package-index values, credentials, or raw command errors.
+func (p *Provisioner) DiagnosticReport(ctx context.Context) DiagnosticReport {
+	diagnostics := p.Diagnostics(ctx)
+	status := diagnostics.Status
+	report := DiagnosticReport{
+		SchemaVersion:  1,
+		GeneratedAtUTC: time.Now().UTC().Format(time.RFC3339),
+		Platform: DiagnosticPlatform{
+			OS:           runtime.GOOS,
+			Architecture: runtime.GOARCH,
+		},
+		Runtime: DiagnosticRuntime{
+			BundleAvailable:   status.BundleAvailable,
+			Ready:             status.Ready,
+			OperationActive:   status.Provisioning,
+			RepairAvailable:   status.RepairAvailable,
+			RollbackAvailable: status.RollbackAvailable,
+			IncompleteSetup:   status.IncompleteSetup,
+		},
+		Bundle: status.Bundle,
+		UV: DiagnosticUV{
+			Healthy: diagnostics.Error == "",
+			Version: diagnostics.UVVersion,
+		},
+		Issues: []string{},
+	}
+	if status.Configuration != nil {
+		report.Runtime.Mode = status.Configuration.Mode
+		report.Runtime.PythonVersion = status.Configuration.PythonVersion
+		report.Runtime.ExternalPythonConfigured = strings.TrimSpace(status.Configuration.PythonExecutable) != ""
+		report.Runtime.SystemCertificates = status.Configuration.UseSystemCerts
+		report.Runtime.CustomCertificateBundle = strings.TrimSpace(status.Configuration.CertificateBundle) != ""
+	}
+	if !status.BundleAvailable {
+		report.Issues = append(report.Issues, "embedded-runtime-bundle-unavailable")
+	}
+	if status.ConfigurationError != "" {
+		report.Issues = append(report.Issues, "saved-runtime-configuration-invalid")
+	}
+	if diagnostics.Error != "" {
+		report.Issues = append(report.Issues, "embedded-uv-check-failed")
+	}
+	return report
 }
 
 func (p *Provisioner) Plan(config Config) (Plan, error) {
@@ -211,9 +309,23 @@ func (p *Provisioner) PlanPreview(config Config) (Plan, error) {
 }
 
 func (p *Provisioner) Provision(ctx context.Context, config Config) (Result, error) {
+	return p.ProvisionWithProgress(ctx, config, nil)
+}
+
+func (p *Provisioner) ProvisionWithProgress(ctx context.Context, config Config, reporter ProgressReporter) (result Result, resultErr error) {
+	return p.provision(ctx, config, "setup", reporter)
+}
+
+func (p *Provisioner) provision(ctx context.Context, config Config, operation string, reporter ProgressReporter) (result Result, resultErr error) {
 	if !p.provisioning.CompareAndSwap(false, true) {
 		return Result{}, fmt.Errorf("runtime provisioning is already in progress")
 	}
+	total := 0
+	defer func() {
+		if resultErr != nil {
+			reportProgress(reporter, operation, "failed", operationFailureMessage(operation), "failed", total, total)
+		}
+	}()
 	setupContext, cancel := context.WithCancel(ctx)
 	p.cancelMu.Lock()
 	p.cancel = cancel
@@ -230,6 +342,8 @@ func (p *Provisioner) Provision(ctx context.Context, config Config) (Result, err
 	if err != nil {
 		return Result{}, err
 	}
+	total = len(plan.Steps) + 3
+	reportProgress(reporter, operation, "validate", operationStartMessage(operation), "running", 1, total)
 	info, err := loadBundleInfo(p.bundle)
 	if err != nil {
 		return Result{}, err
@@ -241,6 +355,7 @@ func (p *Provisioner) Provision(ctx context.Context, config Config) (Result, err
 	if err != nil {
 		return Result{}, err
 	}
+	reportProgress(reporter, operation, "staging", "Preparing an isolated runtime environment.", "running", 2, total)
 	if err := p.clearStagingEnvironment(); err != nil {
 		return Result{}, err
 	}
@@ -252,6 +367,15 @@ func (p *Provisioner) Provision(ctx context.Context, config Config) (Result, err
 	}()
 
 	for index := range plan.Steps {
+		reportProgress(
+			reporter,
+			operation,
+			plan.Steps[index].Name,
+			stepProgressMessage(plan.Steps[index].Name),
+			"running",
+			index+3,
+			total,
+		)
 		if strings.HasSuffix(plan.Steps[index].Executable, executableName("uv")) {
 			plan.Steps[index].Executable = uvPath
 		}
@@ -268,16 +392,19 @@ func (p *Provisioner) Provision(ctx context.Context, config Config) (Result, err
 	if err := p.saveConfigurationAt(p.stagingEnvironmentDir(), config); err != nil {
 		return Result{}, err
 	}
+	reportProgress(reporter, operation, "activate", "Activating the verified runtime.", "running", total, total)
 	if err := p.activateStagedEnvironment(); err != nil {
 		return Result{}, err
 	}
 	activated = true
 
-	return Result{
+	result = Result{
 		Mode:             config.Mode,
 		PythonExecutable: p.PythonExecutable(),
 		UVExecutable:     uvPath,
-	}, nil
+	}
+	reportProgress(reporter, operation, "complete", operationCompleteMessage(operation), "completed", total, total)
+	return result, nil
 }
 
 // Cancel stops the active setup command. The previously active environment is
@@ -292,15 +419,88 @@ func (p *Provisioner) Cancel() bool {
 	return true
 }
 
+// Repair rebuilds a runtime from its saved, non-secret configuration. Internal
+// mirror credentials are intentionally not persisted, so that mode must be
+// re-applied through runtime settings instead.
+func (p *Provisioner) Repair(ctx context.Context, reporter ProgressReporter) (Result, error) {
+	configuration, err := p.loadConfiguration()
+	if err != nil {
+		return Result{}, err
+	}
+	if configuration == nil {
+		return Result{}, fmt.Errorf("no saved runtime configuration is available; install the runtime again")
+	}
+	if configuration.Mode == ModeInternalMirror {
+		return Result{}, fmt.Errorf("repairing an internal-mirror runtime requires re-entering mirror and package-index settings")
+	}
+	config := Config{
+		Mode:              configuration.Mode,
+		PythonVersion:     configuration.PythonVersion,
+		PythonExecutable:  configuration.PythonExecutable,
+		UseSystemCerts:    configuration.UseSystemCerts,
+		CertificateBundle: configuration.CertificateBundle,
+	}
+	if config.Mode == ModeManaged && strings.TrimSpace(config.PythonVersion) == "" {
+		config.PythonVersion = DefaultConfig().PythonVersion
+	}
+	return p.provision(ctx, config, "repair", reporter)
+}
+
+// Reset removes only Inquira-managed runtime tools, Python installations,
+// environments, and legacy runtime configuration. Worker source, workspaces,
+// conversations, and connected source files are outside this boundary.
+func (p *Provisioner) Reset(reporter ProgressReporter) (resultErr error) {
+	if !p.provisioning.CompareAndSwap(false, true) {
+		return fmt.Errorf("runtime provisioning is already in progress")
+	}
+	defer p.provisioning.Store(false)
+	targets := []struct {
+		stage   string
+		message string
+		path    string
+	}{
+		{stage: "remove-environments", message: "Removing installed data environments.", path: filepath.Join(p.runtimeRoot, "environments")},
+		{stage: "remove-python", message: "Removing the managed Python installation.", path: filepath.Join(p.runtimeRoot, "python")},
+		{stage: "remove-tools", message: "Removing extracted runtime tools.", path: filepath.Join(p.runtimeRoot, "tools")},
+		{stage: "remove-legacy-configuration", message: "Removing legacy runtime configuration.", path: p.legacyConfigurationPath()},
+	}
+	total := len(targets) + 1
+	defer func() {
+		if resultErr != nil {
+			reportProgress(reporter, "reset", "failed", operationFailureMessage("reset"), "failed", total, total)
+		}
+	}()
+	for index, target := range targets {
+		reportProgress(reporter, "reset", target.stage, target.message, "running", index+1, total)
+		if err := os.RemoveAll(target.path); err != nil {
+			return fmt.Errorf("%s: %w", target.stage, err)
+		}
+	}
+	reportProgress(reporter, "reset", "complete", operationCompleteMessage("reset"), "completed", total, total)
+	return nil
+}
+
 // Rollback swaps the current runtime with the last verified runtime.
 func (p *Provisioner) Rollback() (Result, error) {
+	return p.RollbackWithProgress(nil)
+}
+
+func (p *Provisioner) RollbackWithProgress(reporter ProgressReporter) (result Result, resultErr error) {
 	if !p.provisioning.CompareAndSwap(false, true) {
 		return Result{}, fmt.Errorf("runtime provisioning is already in progress")
 	}
 	defer p.provisioning.Store(false)
+	const total = 3
+	defer func() {
+		if resultErr != nil {
+			reportProgress(reporter, "rollback", "failed", operationFailureMessage("rollback"), "failed", total, total)
+		}
+	}()
+	reportProgress(reporter, "rollback", "validate", "Checking the previous verified runtime.", "running", 1, total)
 	if !p.runtimeReadyAt(p.previousEnvironmentDir()) {
 		return Result{}, fmt.Errorf("no verified previous runtime is available")
 	}
+	reportProgress(reporter, "rollback", "activate", "Restoring the previous verified runtime.", "running", 2, total)
 	if err := p.swapActiveAndPrevious(); err != nil {
 		return Result{}, err
 	}
@@ -318,11 +518,89 @@ func (p *Provisioner) Rollback() (Result, error) {
 		_ = p.swapActiveAndPrevious()
 		return Result{}, err
 	}
-	return Result{
+	result = Result{
 		Mode:             mode,
 		PythonExecutable: p.PythonExecutable(),
 		UVExecutable:     uvPath,
-	}, nil
+	}
+	reportProgress(reporter, "rollback", "complete", operationCompleteMessage("rollback"), "completed", total, total)
+	return result, nil
+}
+
+func reportProgress(reporter ProgressReporter, operation, stage, message, state string, current, total int) {
+	if reporter == nil {
+		return
+	}
+	if total < 1 {
+		total = 1
+	}
+	if current < 0 {
+		current = 0
+	}
+	if current > total {
+		current = total
+	}
+	reporter(Progress{
+		Operation: operation,
+		Stage:     stage,
+		Message:   message,
+		State:     state,
+		Current:   current,
+		Total:     total,
+		Percent:   current * 100 / total,
+	})
+}
+
+func stepProgressMessage(stage string) string {
+	switch stage {
+	case "install-python":
+		return "Downloading the approved Python runtime."
+	case "install-python-from-mirror":
+		return "Downloading approved Python from the internal mirror."
+	case "validate-external-python":
+		return "Checking the selected company Python."
+	case "create-data-environment":
+		return "Creating the isolated data environment."
+	case "install-data-worker":
+		return "Installing the locked data packages."
+	case "verify-data-worker":
+		return "Verifying the local data worker."
+	default:
+		return "Preparing the local data runtime."
+	}
+}
+
+func operationStartMessage(operation string) string {
+	if operation == "repair" {
+		return "Validating the saved runtime configuration."
+	}
+	return "Validating the runtime compatibility contract."
+}
+
+func operationCompleteMessage(operation string) string {
+	switch operation {
+	case "repair":
+		return "Runtime repair completed."
+	case "reset":
+		return "Runtime reset completed."
+	case "rollback":
+		return "Runtime rollback completed."
+	default:
+		return "Runtime setup completed."
+	}
+}
+
+func operationFailureMessage(operation string) string {
+	switch operation {
+	case "repair":
+		return "Runtime repair could not be completed."
+	case "reset":
+		return "Runtime reset could not be completed."
+	case "rollback":
+		return "Runtime rollback could not be completed."
+	default:
+		return "Runtime setup could not be completed."
+	}
 }
 
 func redactProvisionError(err error, config Config) error {

@@ -147,6 +147,13 @@ index, and bypass values are cleared after every attempt and are never written
 to the runtime configuration. A ready runtime can be reviewed and replaced from
 Workspace → Connections → Data runtime setup.
 
+Runtime maintenance provides transactional repair, reversible rollback,
+explicit reset, and stage-by-stage progress. Reset removes only
+Inquira-managed runtime files; it does not delete workspaces, conversations,
+connected sources, or snapshots. A privacy-safe JSON diagnostic export reports
+only platform, version, compatibility, and health fields without user paths,
+workspace data, credentials, or network configuration.
+
 Each build embeds a versioned compatibility manifest containing the application
 compatibility range, UV source and checksums, exact managed-Python build,
 platform, worker protocol, worker lockfile hash, and supported runtime

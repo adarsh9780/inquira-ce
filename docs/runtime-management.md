@@ -83,7 +83,20 @@ Workspace → Connections → Data runtime provides:
   certificates;
 - **Cancel setup** while provisioning is active;
 - **Runtime settings** to replace a ready runtime;
-- **Roll back** when a previous verified runtime exists.
+- **Repair runtime** to transactionally rebuild managed or external-Python
+  environments from their saved non-secret configuration;
+- **Roll back** when a previous verified runtime exists;
+- **Reset runtime** to remove only Inquira-managed tools, Python installations,
+  environments, and rollback state after explicit confirmation;
+- **Export diagnostics** to save a bounded JSON health report.
 
-Repair/reset actions and a sanitized diagnostic export are planned as the next
-runtime-management slice.
+Setup, repair, reset, and rollback publish stage-by-stage progress to Settings.
+Repair uses the same staging and verification boundary as setup, so a failed or
+cancelled repair leaves the active runtime unchanged. Internal-mirror
+credentials are never persisted; those users re-enter mirror and package-index
+settings through **Runtime settings** to rebuild the environment.
+
+The diagnostic report contains platform, compatibility-manifest, version, and
+boolean health information. It deliberately excludes workspace and
+conversation data, file paths, API keys, proxy and mirror addresses,
+package-index configuration, credentials, and raw command output.

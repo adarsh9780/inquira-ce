@@ -124,9 +124,22 @@
                     Install approved Python {{ approvedPythonVersion }} and the locked data packages before connecting CSV, Parquet, Excel, JSON, or SQLite.
                   </p>
                   <p v-if="runtimeProvisionError" class="mt-3 text-xs leading-5 text-[var(--color-danger-text)]" role="alert">{{ runtimeProvisionError }}</p>
+                  <div v-if="runtimeOperationActive && runtimeProgress" class="mt-4" role="status" aria-live="polite">
+                    <div class="flex items-center justify-between gap-3 text-xs">
+                      <span class="font-medium text-[var(--color-text-main)]">{{ runtimeProgress.message }}</span>
+                      <span class="shrink-0 tabular-nums text-[var(--color-text-muted)]">{{ runtimeProgressPercent }}%</span>
+                    </div>
+                    <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--color-base)]">
+                      <div class="h-full rounded-full bg-[var(--color-accent)] transition-[width] duration-300 ease-out" :style="{ width: `${runtimeProgressPercent}%` }"></div>
+                    </div>
+                    <p class="mt-1.5 text-[10px] text-[var(--color-text-muted)]">Step {{ runtimeProgress.current }} of {{ runtimeProgress.total }}</p>
+                  </div>
                   <div class="mt-4 flex flex-wrap items-center gap-3">
                     <button type="button" class="btn-primary px-4 py-2 text-sm" :disabled="runtimeOperationActive" @click="setupManagedRuntime">
                       {{ runtimeProvisioning ? 'Installing runtime…' : 'Install recommended runtime' }}
+                    </button>
+                    <button v-if="runtimeCancelable" type="button" class="btn-secondary px-3 py-2 text-xs" @click="cancelRuntimeSetup">
+                      Cancel
                     </button>
                     <button type="button" class="text-xs font-semibold text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]" :disabled="runtimeOperationActive" @click="openAdvancedDataSettings">
                       Advanced runtime options
@@ -369,8 +382,8 @@
                   <button v-if="nativeRuntimeStatus.ready && !runtimeConfigurationOpen" type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="runtimeOperationActive" @click="startRuntimeReconfiguration">
                     Runtime settings
                   </button>
-                  <button v-if="runtimeProvisioning" type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="cancelRuntimeSetup">
-                    Cancel setup
+                  <button v-if="runtimeCancelable" type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="cancelRuntimeSetup">
+                    Cancel {{ runtimeProgress?.operation === 'repair' ? 'repair' : 'setup' }}
                   </button>
                 </div>
               </div>
@@ -378,6 +391,16 @@
               <p v-if="nativeRuntimeStatus.incompleteSetup && !runtimeProvisioning" class="mt-3 rounded-lg bg-[var(--color-warning-bg)] px-3 py-2 text-xs leading-5 text-[var(--color-warning-text)]" role="status">
                 An earlier setup was interrupted. Starting setup again will safely replace the incomplete staging files.
               </p>
+              <div v-if="runtimeOperationActive && runtimeProgress" class="mt-4 rounded-lg border border-[var(--color-accent-border)] bg-[var(--color-base)] px-3 py-3" role="status" aria-live="polite">
+                <div class="flex items-center justify-between gap-3 text-xs">
+                  <span class="font-medium text-[var(--color-text-main)]">{{ runtimeProgress.message }}</span>
+                  <span class="shrink-0 tabular-nums text-[var(--color-text-muted)]">{{ runtimeProgressPercent }}%</span>
+                </div>
+                <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--color-base-soft)]">
+                  <div class="h-full rounded-full bg-[var(--color-accent)] transition-[width] duration-300 ease-out" :style="{ width: `${runtimeProgressPercent}%` }"></div>
+                </div>
+                <p class="mt-1.5 text-[10px] text-[var(--color-text-muted)]">Step {{ runtimeProgress.current }} of {{ runtimeProgress.total }}</p>
+              </div>
 
               <div v-if="!nativeRuntimeStatus.ready && !runtimeConfigurationOpen" class="mt-3 flex flex-wrap items-center justify-between gap-3">
                 <p class="max-w-sm text-xs leading-5 text-[var(--color-warning-text)]">
@@ -462,6 +485,33 @@
                   <button type="button" class="btn-primary px-4 py-1.5 text-xs" :disabled="runtimeOperationActive" @click="provisionDataRuntime()">{{ runtimeProvisioning ? 'Validating and setting up…' : 'Apply runtime setup' }}</button>
                 </div>
               </div>
+              </div>
+              <div v-if="!runtimeConfigurationOpen && !runtimeOperationActive" class="mt-4 border-t border-[var(--color-border)] pt-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div class="max-w-md">
+                    <h5 class="text-xs font-semibold text-[var(--color-text-main)]">Runtime maintenance</h5>
+                    <p class="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
+                      Repair the installed environment, export a privacy-safe health report, or reset only the local runtime.
+                    </p>
+                  </div>
+                  <div class="flex flex-wrap items-center justify-end gap-2">
+                    <button v-if="nativeRuntimeStatus.repairAvailable" type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="repairDataRuntime">
+                      Repair runtime
+                    </button>
+                    <button type="button" class="btn-secondary px-3 py-1.5 text-xs" :disabled="runtimeDiagnosticsLoading" @click="exportRuntimeDiagnostics">
+                      {{ runtimeDiagnosticsLoading ? 'Exporting…' : 'Export diagnostics' }}
+                    </button>
+                    <button v-if="runtimeHasInstalledAssets" type="button" class="rounded-md px-3 py-1.5 text-xs font-semibold text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger-bg)]" @click="requestRuntimeReset">
+                      Reset runtime
+                    </button>
+                  </div>
+                </div>
+                <p v-if="nativeRuntimeStatus.configuration?.mode === 'internal-mirror'" class="mt-2 text-[10px] leading-4 text-[var(--color-text-muted)]">
+                  Internal-mirror credentials are never saved. Open Runtime settings and re-enter them to rebuild this runtime.
+                </p>
+                <p class="mt-2 text-[10px] leading-4 text-[var(--color-text-muted)]">
+                  Diagnostic exports contain platform, version, and health flags only—never workspace data, file paths, API keys, proxies, or mirror addresses.
+                </p>
               </div>
             </section>
 
@@ -611,6 +661,16 @@
       @confirm="deleteWorkspace"
     />
 
+    <ConfirmationModal
+      :is-open="isRuntimeResetDialogOpen"
+      title="Reset data runtime"
+      message="This removes Inquira's downloaded Python, installed data packages, and rollback copy. Workspaces, conversations, connected files, and snapshots are not deleted. You will need to install the runtime again."
+      confirm-text="Reset runtime"
+      cancel-text="Cancel"
+      @close="closeRuntimeResetDialog"
+      @confirm="resetDataRuntime"
+    />
+
   </section>
 </template>
 
@@ -622,7 +682,7 @@ const handledConnectionFlowRequestIds = new WeakMap()
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { workspaceApi } from '../../../api/workspaces'
 import { connectionService } from '../../../services/connectionService'
-import { runtimeProvisionService } from '../../../services/runtimeProvisionService'
+import { runtimeProvisionService, type RuntimeProgress } from '../../../services/runtimeProvisionService'
 import { useUiStore } from '../../../stores/uiStore'
 import { usePreferencesStore } from '../../../stores/preferencesStore'
 import { useArtifactStore } from '../../../stores/artifactStore'
@@ -675,6 +735,10 @@ const refreshingConnectionIds = ref(new Set())
 const nativeRuntimeStatus = ref<any>({ ready: false })
 const runtimeProvisioning = ref(false)
 const runtimeRecoveryLoading = ref(false)
+const runtimeRecoveryOperation = ref<'repair' | 'reset' | 'rollback' | ''>('')
+const runtimeProgress = ref<RuntimeProgress | null>(null)
+const runtimeDiagnosticsLoading = ref(false)
+const isRuntimeResetDialogOpen = ref(false)
 const runtimeProvisionError = ref('')
 const runtimeConfigurationOpen = ref(false)
 const runtimePlanSummary = ref('')
@@ -784,6 +848,22 @@ const workspaceCreationProgressClass = computed(() => (
 ))
 const workspaceRuntimeStatus = computed(() => executionStore.getWorkspaceRuntimeStatus(props.activeWorkspaceId))
 const runtimeOperationActive = computed(() => runtimeProvisioning.value || runtimeRecoveryLoading.value)
+const runtimeCancelable = computed(() => (
+  runtimeOperationActive.value
+  && ['setup', 'repair'].includes(String(runtimeProgress.value?.operation || ''))
+))
+const runtimeProgressPercent = computed(() => {
+  const percent = Number(runtimeProgress.value?.percent || 0)
+  return Math.max(0, Math.min(100, Math.round(percent)))
+})
+const runtimeHasInstalledAssets = computed(() => (
+  Boolean(
+    nativeRuntimeStatus.value?.ready
+    || nativeRuntimeStatus.value?.rollbackAvailable
+    || nativeRuntimeStatus.value?.incompleteSetup
+    || nativeRuntimeStatus.value?.configuration,
+  )
+))
 const approvedPythonVersion = computed(() => String(nativeRuntimeStatus.value?.bundle?.pythonVersion || '3.12.13'))
 const workspaceRuntimeReady = computed(() => ['ready', 'busy'].includes(workspaceRuntimeStatus.value))
 const runtimeStatusTone = computed(() => {
@@ -943,6 +1023,15 @@ async function chooseCertificateBundle() {
 
 async function provisionDataRuntime() {
   runtimeProvisioning.value = true
+  runtimeProgress.value = {
+    operation: 'setup',
+    stage: 'prepare',
+    message: 'Preparing runtime setup.',
+    state: 'running',
+    current: 0,
+    total: 1,
+    percent: 0,
+  }
   runtimeProvisionError.value = ''
   try {
     if (runtimeConfig.value.mode !== 'external-python') {
@@ -950,7 +1039,7 @@ async function provisionDataRuntime() {
     }
     const plan: any = await runtimeProvisionService.plan({ ...runtimeConfig.value })
     runtimePlanSummary.value = `${Number(plan?.steps?.length || 0)} setup steps validated.`
-    await runtimeProvisionService.provision({ ...runtimeConfig.value })
+    await runtimeProvisionService.provision({ ...runtimeConfig.value }, handleRuntimeProgress)
     await loadNativeRuntimeStatus()
     if (!nativeRuntimeStatus.value?.ready) throw new Error('The data runtime did not become ready.')
     runtimeConfigurationOpen.value = false
@@ -976,15 +1065,114 @@ async function cancelRuntimeSetup() {
 
 async function rollbackDataRuntime() {
   runtimeRecoveryLoading.value = true
+  runtimeRecoveryOperation.value = 'rollback'
+  runtimeProgress.value = {
+    operation: 'rollback',
+    stage: 'prepare',
+    message: 'Preparing runtime rollback.',
+    state: 'running',
+    current: 0,
+    total: 1,
+    percent: 0,
+  }
   runtimeProvisionError.value = ''
   try {
-    await runtimeProvisionService.rollback()
+    await runtimeProvisionService.rollback(handleRuntimeProgress)
     await loadNativeRuntimeStatus()
     toast.success('Runtime rolled back', 'The previous verified data runtime is active.')
   } catch (error: any) {
     runtimeProvisionError.value = extractApiErrorMessage(error, 'Could not roll back the data runtime.')
   } finally {
     runtimeRecoveryLoading.value = false
+    runtimeRecoveryOperation.value = ''
+  }
+}
+
+function handleRuntimeProgress(progress: RuntimeProgress) {
+  runtimeProgress.value = {
+    ...progress,
+    current: Math.max(0, Number(progress.current || 0)),
+    total: Math.max(1, Number(progress.total || 1)),
+    percent: Math.max(0, Math.min(100, Number(progress.percent || 0))),
+  }
+}
+
+async function repairDataRuntime() {
+  runtimeRecoveryLoading.value = true
+  runtimeRecoveryOperation.value = 'repair'
+  runtimeProgress.value = {
+    operation: 'repair',
+    stage: 'prepare',
+    message: 'Preparing runtime repair.',
+    state: 'running',
+    current: 0,
+    total: 1,
+    percent: 0,
+  }
+  runtimeProvisionError.value = ''
+  try {
+    await runtimeProvisionService.repair(handleRuntimeProgress)
+    await loadNativeRuntimeStatus()
+    if (!nativeRuntimeStatus.value?.ready) throw new Error('The repaired data runtime did not become ready.')
+    toast.success('Runtime repaired', 'The verified data runtime has been rebuilt without changing workspace data.')
+  } catch (error: any) {
+    runtimeProvisionError.value = extractApiErrorMessage(error, 'Could not repair the data runtime.')
+  } finally {
+    runtimeRecoveryLoading.value = false
+    runtimeRecoveryOperation.value = ''
+  }
+}
+
+function requestRuntimeReset() {
+  if (runtimeOperationActive.value) return
+  isRuntimeResetDialogOpen.value = true
+}
+
+function closeRuntimeResetDialog() {
+  if (runtimeRecoveryOperation.value === 'reset') return
+  isRuntimeResetDialogOpen.value = false
+}
+
+async function resetDataRuntime() {
+  isRuntimeResetDialogOpen.value = false
+  runtimeRecoveryLoading.value = true
+  runtimeRecoveryOperation.value = 'reset'
+  runtimeProgress.value = {
+    operation: 'reset',
+    stage: 'prepare',
+    message: 'Preparing runtime reset.',
+    state: 'running',
+    current: 0,
+    total: 1,
+    percent: 0,
+  }
+  runtimeProvisionError.value = ''
+  try {
+    await runtimeProvisionService.reset(handleRuntimeProgress)
+    runtimeConfigurationOpen.value = false
+    runtimePlanSummary.value = ''
+    await loadNativeRuntimeStatus()
+    toast.success('Runtime reset', 'Runtime files were removed. Your workspaces and connected data were left unchanged.')
+  } catch (error: any) {
+    runtimeProvisionError.value = extractApiErrorMessage(error, 'Could not reset the data runtime.')
+  } finally {
+    runtimeRecoveryLoading.value = false
+    runtimeRecoveryOperation.value = ''
+  }
+}
+
+async function exportRuntimeDiagnostics() {
+  runtimeDiagnosticsLoading.value = true
+  runtimeProvisionError.value = ''
+  try {
+    const saved = await runtimeProvisionService.exportDiagnostics()
+    if (saved) {
+      toast.success('Diagnostics exported', 'The privacy-safe runtime report was saved.')
+    }
+  } catch (error: any) {
+    runtimeProvisionError.value = extractApiErrorMessage(error, 'Could not export runtime diagnostics.')
+  } finally {
+    runtimeDiagnosticsLoading.value = false
   }
 }
 
