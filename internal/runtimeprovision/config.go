@@ -5,9 +5,10 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
+
+	"inquira-go/internal/runtimeprovision/contract"
 )
 
 // Mode selects who supplies Python and where UV downloads approved artifacts.
@@ -44,12 +45,10 @@ type SavedConfig struct {
 	CertificateBundle string `json:"certificateBundle,omitempty"`
 }
 
-var compatiblePythonVersion = regexp.MustCompile(`^3\.12(?:\.\d+)?$`)
-
 func DefaultConfig() Config {
 	return Config{
 		Mode:           ModeManaged,
-		PythonVersion:  "3.12",
+		PythonVersion:  contract.ManagedPythonVersion,
 		UseSystemCerts: false,
 	}
 }
@@ -83,16 +82,16 @@ func (c Config) Validate() error {
 
 	switch c.Mode {
 	case ModeManaged:
-		if !compatiblePythonVersion.MatchString(strings.TrimSpace(c.PythonVersion)) {
-			return fmt.Errorf("managed mode requires Python 3.12")
+		if strings.TrimSpace(c.PythonVersion) != contract.ManagedPythonVersion {
+			return fmt.Errorf("managed mode requires approved Python %s", contract.ManagedPythonVersion)
 		}
 	case ModeExternalPython:
 		if err := validatePythonExecutable(c.PythonExecutable); err != nil {
 			return err
 		}
 	case ModeInternalMirror:
-		if !compatiblePythonVersion.MatchString(strings.TrimSpace(c.PythonVersion)) {
-			return fmt.Errorf("internal-mirror mode requires Python 3.12")
+		if strings.TrimSpace(c.PythonVersion) != contract.ManagedPythonVersion {
+			return fmt.Errorf("internal-mirror mode requires approved Python %s", contract.ManagedPythonVersion)
 		}
 		if strings.TrimSpace(c.PythonInstallMirror) == "" {
 			return fmt.Errorf("python install mirror is required for internal-mirror mode")

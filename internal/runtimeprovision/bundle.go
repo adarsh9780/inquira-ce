@@ -10,6 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+
+	"inquira-go/internal/runtimeprovision/contract"
 )
 
 // The build preparation command writes the target-specific UV binary and
@@ -18,13 +21,7 @@ import (
 //go:embed assets/*
 var bundledAssets embed.FS
 
-type BundleInfo struct {
-	Version string `json:"version"`
-	GOOS    string `json:"goos"`
-	GOARCH  string `json:"goarch"`
-	File    string `json:"file"`
-	SHA256  string `json:"sha256"`
-}
+type BundleInfo = contract.BundleInfo
 
 func loadBundleInfo(source fs.FS) (BundleInfo, error) {
 	payload, err := fs.ReadFile(source, "assets/manifest.json")
@@ -35,8 +32,26 @@ func loadBundleInfo(source fs.FS) (BundleInfo, error) {
 	if err := json.Unmarshal(payload, &info); err != nil {
 		return BundleInfo{}, fmt.Errorf("decode UV bundle manifest: %w", err)
 	}
-	if info.File == "" || info.Version == "" || info.SHA256 == "" {
+	if info.SchemaVersion != contract.ManifestSchemaVersion ||
+		info.InquiraCompatibility != contract.InquiraCompatibility ||
+		info.File == "" ||
+		info.Version == "" ||
+		info.SHA256 == "" ||
+		info.SourceURL == "" ||
+		info.ArchiveSHA256 == "" ||
+		info.ArchiveSize <= 0 ||
+		info.PythonImplementation != contract.PythonImplementation ||
+		info.PythonVersion != contract.ManagedPythonVersion ||
+		info.PythonDistribution != contract.PythonDistribution ||
+		info.WorkerProtocolVersion != contract.WorkerProtocolVersion ||
+		info.WorkerLockSHA256 == "" ||
+		len(info.Capabilities) == 0 {
 		return BundleInfo{}, fmt.Errorf("UV bundle manifest is incomplete")
+	}
+	for _, capability := range contract.RuntimeCapabilities {
+		if !slices.Contains(info.Capabilities, capability) {
+			return BundleInfo{}, fmt.Errorf("UV bundle manifest is missing required capability %q", capability)
+		}
 	}
 	return info, nil
 }

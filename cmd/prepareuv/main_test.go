@@ -75,8 +75,12 @@ func TestDownloadVerifiesArchiveChecksum(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	output := filepath.Join(t.TempDir(), "uv.tar.gz")
-	if err := download(server.URL, output, hex.EncodeToString(digest[:])); err != nil {
+	size, err := download(server.URL, output, hex.EncodeToString(digest[:]))
+	if err != nil {
 		t.Fatal(err)
+	}
+	if size != int64(len(payload)) {
+		t.Fatalf("downloaded %d bytes, want %d", size, len(payload))
 	}
 	actual, err := os.ReadFile(output)
 	if err != nil {
@@ -95,7 +99,7 @@ func TestDownloadRejectsArchiveChecksumMismatch(t *testing.T) {
 
 	output := filepath.Join(t.TempDir(), "uv.tar.gz")
 	wrongDigest := sha256.Sum256([]byte("different archive"))
-	if err := download(server.URL, output, hex.EncodeToString(wrongDigest[:])); err == nil {
+	if _, err := download(server.URL, output, hex.EncodeToString(wrongDigest[:])); err == nil {
 		t.Fatal("expected checksum mismatch to fail")
 	}
 	if _, err := os.Stat(output); !os.IsNotExist(err) {

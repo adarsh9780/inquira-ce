@@ -17,6 +17,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"inquira-go/internal/runtimeprovision/contract"
 )
 
 const (
@@ -39,14 +41,6 @@ var trustedUVArchiveSHA256 = map[string]map[string]string{
 }
 
 var downloadClient = &http.Client{Timeout: 5 * time.Minute}
-
-type manifest struct {
-	Version string `json:"version"`
-	GOOS    string `json:"goos"`
-	GOARCH  string `json:"goarch"`
-	File    string `json:"file"`
-	SHA256  string `json:"sha256"`
-}
 
 func main() {
 	version := flag.String("version", defaultUVVersion, "UV release version")
@@ -85,7 +79,8 @@ func prepare(version, goos, goarch, output string) error {
 	_ = temporary.Close()
 	defer os.Remove(temporaryPath)
 
-	if err := download(url, temporaryPath, expectedArchiveSHA256); err != nil {
+	archiveSize, err := download(url, temporaryPath, expectedArchiveSHA256)
+	if err != nil {
 		return err
 	}
 	payload, err := extractExecutable(temporaryPath, archiveType, executable)
@@ -100,12 +95,27 @@ func prepare(version, goos, goarch, output string) error {
 		return fmt.Errorf("write UV executable: %w", err)
 	}
 	digest := sha256.Sum256(payload)
-	info := manifest{
-		Version: version,
-		GOOS:    goos,
-		GOARCH:  goarch,
-		File:    executable,
-		SHA256:  hex.EncodeToString(digest[:]),
+	workerLockSHA256, err := fileSHA256(filepath.Join("python", "data_worker", "uv.lock"))
+	if err != nil {
+		return fmt.Errorf("fingerprint data worker lockfile: %w", err)
+	}
+	info := contract.BundleInfo{
+		SchemaVersion:         contract.ManifestSchemaVersion,
+		InquiraCompatibility:  contract.InquiraCompatibility,
+		Version:               version,
+		GOOS:                  goos,
+		GOARCH:                goarch,
+		File:                  executable,
+		SHA256:                hex.EncodeToString(digest[:]),
+		SourceURL:             url,
+		ArchiveSHA256:         expectedArchiveSHA256,
+		ArchiveSize:           archiveSize,
+		PythonImplementation:  contract.PythonImplementation,
+		PythonVersion:         contract.ManagedPythonVersion,
+		PythonDistribution:    contract.PythonDistribution,
+		WorkerProtocolVersion: contract.WorkerProtocolVersion,
+		WorkerLockSHA256:      workerLockSHA256,
+		Capabilities:          append([]string(nil), contract.RuntimeCapabilities...),
 	}
 	encoded, err := json.MarshalIndent(info, "", "  ")
 	if err != nil {
@@ -148,43 +158,52 @@ func targetDetails(goos, goarch string) (string, string, string, error) {
 	}
 }
 
-func download(url, output, expectedSHA256 string) error {
+func download(url, output, expectedSHA256 string) (int64, error) {
 	expectedDigest, err := hex.DecodeString(expectedSHA256)
 	if err != nil || len(expectedDigest) != sha256.Size {
-		return fmt.Errorf("trusted UV archive checksum is invalid")
+		return 0, fmt.Errorf("trusted UV archive checksum is invalid")
 	}
 	response, err := downloadClient.Get(url) // #nosec G107 -- URL is constructed from a pinned, checksummed GitHub release.
 	if err != nil {
-		return fmt.Errorf("download UV: %w", err)
+		return 0, fmt.Errorf("download UV: %w", err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("download UV: %s returned %s", url, response.Status)
+		return 0, fmt.Errorf("download UV: %s returned %s", url, response.Status)
 	}
 	file, err := os.Create(output)
 	if err != nil {
-		return fmt.Errorf("create UV archive: %w", err)
+		return 0, fmt.Errorf("create UV archive: %w", err)
 	}
 	hasher := sha256.New()
 	written, err := copyWithLimit(io.MultiWriter(file, hasher), response.Body, maxArchiveBytes)
 	if err != nil {
 		_ = file.Close()
 		_ = os.Remove(output)
-		return fmt.Errorf("save UV archive: %w", err)
+		return 0, fmt.Errorf("save UV archive: %w", err)
 	}
 	if err := file.Close(); err != nil {
 		_ = os.Remove(output)
-		return fmt.Errorf("save UV archive: %w", err)
+		return 0, fmt.Errorf("save UV archive: %w", err)
 	}
 	if written > maxArchiveBytes {
 		_ = os.Remove(output)
-		return fmt.Errorf("download UV: archive exceeds %d bytes", maxArchiveBytes)
+		return 0, fmt.Errorf("download UV: archive exceeds %d bytes", maxArchiveBytes)
 	}
 	if subtle.ConstantTimeCompare(hasher.Sum(nil), expectedDigest) != 1 {
 		_ = os.Remove(output)
-		return fmt.Errorf("download UV: archive checksum mismatch")
+		return 0, fmt.Errorf("download UV: archive checksum mismatch")
 	}
-	return nil
+	return written, nil
+}
+
+func fileSHA256(path string) (string, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256(content)
+	return hex.EncodeToString(digest[:]), nil
 }
 
 func copyWithLimit(destination io.Writer, source io.Reader, limit int64) (int64, error) {
