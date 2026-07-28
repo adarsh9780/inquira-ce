@@ -54,6 +54,14 @@
   --color-selected-border: color-mix(in srgb, var(--color-accent) 38%, var(--color-border));
   --color-icon-muted: color-mix(in srgb, var(--color-text-muted) 84%, var(--color-base) 16%);
   --color-control-surface: color-mix(in srgb, var(--color-surface) 82%, var(--color-base) 18%);
+  --color-surface-page: var(--color-shell-backdrop);
+  --color-surface-container: var(--color-surface);
+  --color-surface-raised: var(--color-base);
+  --color-surface-overlay: var(--color-panel-elevated);
+  --color-depth-highlight: rgb(255 255 255 / 72%);
+  --color-depth-shadow-soft: rgb(30 36 48 / 10%);
+  --color-depth-shadow-medium: rgb(30 36 48 / 16%);
+  --color-depth-shadow-strong: rgb(30 36 48 / 24%);
   --color-chart-accent: var(--color-secondary-accent);
   --color-chart-grid: var(--color-border);
   --color-chart-zero: var(--color-border-hover);
@@ -158,9 +166,17 @@
   --overlay-backdrop-color: color-mix(in srgb, var(--color-text-main) 36%, transparent);
   --overlay-backdrop-strong: color-mix(in srgb, var(--color-text-main) 56%, transparent);
   --overlay-backdrop-soft: color-mix(in srgb, var(--color-text-main) 10%, transparent);
-  --shadow-button: 0 1px 2px color-mix(in srgb, var(--color-text-main) 10%, transparent);
-  --shadow-modal: 0 24px 48px color-mix(in srgb, var(--color-text-main) 20%, transparent);
-  --shadow-lifted: 0 12px 32px color-mix(in srgb, var(--color-text-main) 14%, transparent);
+  --shadow-elevation-sm: inset 0 1px 0 var(--color-depth-highlight), 0 1px 2px var(--color-depth-shadow-soft);
+  --shadow-elevation-md: inset 0 1px 0 var(--color-depth-highlight), 0 2px 4px var(--color-depth-shadow-soft), 0 8px 18px var(--color-depth-shadow-medium);
+  --shadow-elevation-lg: inset 0 1px 0 var(--color-depth-highlight), 0 6px 16px var(--color-depth-shadow-medium), 0 24px 48px var(--color-depth-shadow-strong);
+  --shadow-recessed: inset 0 2px 4px var(--color-depth-shadow-soft), inset 0 -1px 0 var(--color-depth-highlight);
+  --shadow-sm: var(--shadow-elevation-sm);
+  --shadow-md: var(--shadow-elevation-md);
+  --shadow-lg: var(--shadow-elevation-md);
+  --shadow-xl: var(--shadow-elevation-md);
+  --shadow-button: var(--shadow-elevation-sm);
+  --shadow-lifted: var(--shadow-elevation-md);
+  --shadow-modal: var(--shadow-elevation-lg);
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
@@ -237,6 +253,10 @@
   --color-selected-border: #D8B59C;
   --color-icon-muted: #6D726F;
   --color-control-surface: #F6F1E8;
+  --color-depth-highlight: rgb(255 255 255 / 72%);
+  --color-depth-shadow-soft: rgb(30 36 48 / 10%);
+  --color-depth-shadow-medium: rgb(30 36 48 / 16%);
+  --color-depth-shadow-strong: rgb(30 36 48 / 24%);
   --color-chart-accent: #4F6FAF;
   --color-chart-grid: #DED5C8;
   --color-chart-zero: #CABDAD;
@@ -293,6 +313,10 @@
   --color-selected-border: #43617D;
   --color-icon-muted: #97A6B8;
   --color-control-surface: #17232F;
+  --color-depth-highlight: rgb(255 255 255 / 7%);
+  --color-depth-shadow-soft: rgb(0 0 0 / 28%);
+  --color-depth-shadow-medium: rgb(0 0 0 / 38%);
+  --color-depth-shadow-strong: rgb(0 0 0 / 50%);
   --color-chart-accent: #78A9E6;
   --color-chart-grid: #243341;
   --color-chart-zero: #3B4F62;
@@ -326,6 +350,10 @@
   --color-base-soft: var(--color-surface);
   --color-base-muted: color-mix(in srgb, var(--color-base) 72%, var(--color-border) 28%);
   --color-surface-subtle: color-mix(in srgb, var(--color-surface) 78%, var(--color-base) 22%);
+  --color-surface-page: var(--color-shell-backdrop);
+  --color-surface-container: var(--color-surface);
+  --color-surface-raised: var(--color-base);
+  --color-surface-overlay: var(--color-panel-elevated);
   --color-border-strong: var(--color-border-hover);
   --color-danger: var(--color-error);
   --color-success-bg: color-mix(in srgb, var(--color-success) 14%, var(--color-base));
@@ -338,9 +366,17 @@
   --overlay-backdrop-color: color-mix(in srgb, var(--color-text-main) 36%, transparent);
   --overlay-backdrop-strong: color-mix(in srgb, var(--color-text-main) 56%, transparent);
   --overlay-backdrop-soft: color-mix(in srgb, var(--color-text-main) 10%, transparent);
-  --shadow-button: 0 1px 2px color-mix(in srgb, var(--color-text-main) 10%, transparent);
-  --shadow-modal: 0 24px 48px color-mix(in srgb, var(--color-text-main) 20%, transparent);
-  --shadow-lifted: 0 12px 32px color-mix(in srgb, var(--color-text-main) 14%, transparent);
+  --shadow-elevation-sm: inset 0 1px 0 var(--color-depth-highlight), 0 1px 2px var(--color-depth-shadow-soft);
+  --shadow-elevation-md: inset 0 1px 0 var(--color-depth-highlight), 0 2px 4px var(--color-depth-shadow-soft), 0 8px 18px var(--color-depth-shadow-medium);
+  --shadow-elevation-lg: inset 0 1px 0 var(--color-depth-highlight), 0 6px 16px var(--color-depth-shadow-medium), 0 24px 48px var(--color-depth-shadow-strong);
+  --shadow-recessed: inset 0 2px 4px var(--color-depth-shadow-soft), inset 0 -1px 0 var(--color-depth-highlight);
+  --shadow-sm: var(--shadow-elevation-sm);
+  --shadow-md: var(--shadow-elevation-md);
+  --shadow-lg: var(--shadow-elevation-md);
+  --shadow-xl: var(--shadow-elevation-md);
+  --shadow-button: var(--shadow-elevation-sm);
+  --shadow-lifted: var(--shadow-elevation-md);
+  --shadow-modal: var(--shadow-elevation-lg);
 }
 
 :root[data-font="ubuntu"],
@@ -494,8 +530,12 @@ body {
 
   .segmented-control {
     align-items: center;
+    background: var(--color-surface-container);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-recessed);
     display: inline-flex;
     gap: 0.125rem;
+    padding: 0.125rem;
   }
 
   .segmented-control-item {
@@ -519,6 +559,7 @@ body {
 
   .segmented-control-item-active {
     background: var(--color-selected-surface);
+    box-shadow: var(--shadow-elevation-sm);
     color: var(--color-text-main);
   }
 
@@ -896,6 +937,7 @@ body {
     font-size: var(--text-ui);
     font-weight: 400;
     line-height: var(--line-height-ui);
+    box-shadow: var(--shadow-recessed);
   }
 
   .input-base::placeholder {
@@ -905,7 +947,7 @@ body {
 
   .input-base:focus {
     border-color: var(--color-border-hover);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-text-main) 6%, transparent);
+    box-shadow: var(--shadow-recessed), 0 0 0 3px color-mix(in srgb, var(--color-text-main) 6%, transparent);
   }
 
   .input-outlined {
@@ -916,7 +958,7 @@ body {
 
   .input-outlined:focus {
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 15%, transparent);
+    box-shadow: var(--shadow-recessed), 0 0 0 3px color-mix(in srgb, var(--color-accent) 15%, transparent);
     outline: none;
   }
 
