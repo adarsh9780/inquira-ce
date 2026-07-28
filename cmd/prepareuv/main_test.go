@@ -1,6 +1,14 @@
 package main
 
-import "testing"
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestTargetDetails(t *testing.T) {
 	tests := []struct {
@@ -30,5 +38,67 @@ func TestTargetDetails(t *testing.T) {
 func TestTargetDetailsRejectsUnsupportedTarget(t *testing.T) {
 	if _, _, _, err := targetDetails("plan9", "amd64"); err == nil {
 		t.Fatal("expected unsupported target to fail")
+	}
+}
+
+func TestEverySupportedTargetHasTrustedArchiveChecksum(t *testing.T) {
+	for _, goos := range []string{"darwin", "linux", "windows"} {
+		for _, goarch := range []string{"amd64", "arm64"} {
+			target, archiveType, _, err := targetDetails(goos, goarch)
+			if err != nil {
+				t.Fatal(err)
+			}
+			archiveName := "uv-" + target + "." + archiveType
+			digest, err := archiveSHA256(defaultUVVersion, archiveName)
+			if err != nil {
+				t.Fatalf("%s/%s: %v", goos, goarch, err)
+			}
+			if len(digest) != sha256.Size*2 {
+				t.Fatalf("%s/%s: invalid SHA-256 length %d", goos, goarch, len(digest))
+			}
+		}
+	}
+}
+
+func TestArchiveSHA256RejectsUntrustedVersion(t *testing.T) {
+	if _, err := archiveSHA256("99.0.0", "uv-aarch64-apple-darwin.tar.gz"); err == nil {
+		t.Fatal("expected untrusted UV version to fail")
+	}
+}
+
+func TestDownloadVerifiesArchiveChecksum(t *testing.T) {
+	payload := []byte("trusted UV archive")
+	digest := sha256.Sum256(payload)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = writer.Write(payload)
+	}))
+	t.Cleanup(server.Close)
+
+	output := filepath.Join(t.TempDir(), "uv.tar.gz")
+	if err := download(server.URL, output, hex.EncodeToString(digest[:])); err != nil {
+		t.Fatal(err)
+	}
+	actual, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(actual) != string(payload) {
+		t.Fatalf("downloaded %q, want %q", actual, payload)
+	}
+}
+
+func TestDownloadRejectsArchiveChecksumMismatch(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = writer.Write([]byte("untrusted archive"))
+	}))
+	t.Cleanup(server.Close)
+
+	output := filepath.Join(t.TempDir(), "uv.tar.gz")
+	wrongDigest := sha256.Sum256([]byte("different archive"))
+	if err := download(server.URL, output, hex.EncodeToString(wrongDigest[:])); err == nil {
+		t.Fatal("expected checksum mismatch to fail")
+	}
+	if _, err := os.Stat(output); !os.IsNotExist(err) {
+		t.Fatalf("untrusted archive was not removed: %v", err)
 	}
 }

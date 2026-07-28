@@ -1,0 +1,13 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated dependency, build, and bundled binary outputs"
+paths = [
+  '''^frontend/artifacts/''',
+  '''^frontend/dist/''',
+  '''^frontend/node_modules/''',
+  '''^internal/runtimeprovision/assets/manifest\.json$''',
+  '''^internal/runtimeprovision/assets/uv(?:\.exe)?$''',
+  '''^python/data_worker/\.venv/''',
+]

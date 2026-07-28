@@ -144,9 +144,23 @@ Workspace → Connections → Data runtime setup.
 
 ## Build
 
-Requirements for the desktop build are Go, Node.js, npm, and the Wails
-v2 CLI. The build command downloads the pinned, target-specific UV release and
-embeds it into the native executable.
+The release-equivalent development toolchain is Go 1.26.5, Node.js 24.18.0,
+Python 3.12.13, UV 0.11.28, npm, and the Wails v2 CLI. Inspect and bootstrap a
+checkout with:
+
+```sh
+make doctor
+make bootstrap
+```
+
+Run `make help` for the complete development interface. `make test` executes
+all deterministic Go, frontend, and Python tests; `make audit` runs dependency,
+reachable-vulnerability, and Git-history secret checks; and `make ci`
+reproduces the required GitHub checks.
+
+The build command downloads the pinned, target-specific UV release, validates
+the archive against Astral's published SHA-256 value, and embeds it into the
+native executable.
 
 ```sh
 make build
@@ -155,10 +169,10 @@ make build
 Verify the compiled executable's embedded runtime without launching the UI:
 
 ```sh
-./build/bin/inquira-go.app/Contents/MacOS/inquira-go runtime-info
+make runtime-info
 ```
 
-On Windows, run `build\\bin\\inquira-go.exe runtime-info`.
+The helper locates the macOS, Windows, or Unix build output.
 
 ## Runtime validation
 
@@ -202,4 +216,12 @@ internal/worker/               Persistent Python process and concurrent JSON-RPC
 internal/workspace/            Native workspace metadata and activation service
 python/data_worker/            Embedded DuckDB adapter worker and contract tests
 build/                         Wails platform packaging assets
+scripts/                       Guarded development and publication helpers
 ```
+
+## Security and distribution
+
+Report vulnerabilities through GitHub's private vulnerability-reporting flow
+as described in `SECURITY.md`. The repository is intended to remain private
+until the source license, third-party notices, signing, provenance, upgrade,
+and platform installation gates in `docs/release-readiness.md` are complete.
