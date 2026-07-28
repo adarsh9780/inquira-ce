@@ -205,10 +205,14 @@ watch(
   () => props.modelValue,
   async (isOpen) => {
     if (isOpen) {
-      await appStore.fetchWorkspaces()
+      initializePanelState(props.initialTab)
+      try {
+        await appStore.fetchWorkspaces()
+      } catch (error) {
+        console.warn('Failed to refresh workspaces while opening settings:', error)
+      }
       const initialWorkspace = String(appStore.activeWorkspaceId || '').trim() || String(workspaceItems.value[0]?.id || '').trim()
       activeWorkspaceId.value = initialWorkspace
-      initializePanelState(props.initialTab)
       return
     }
     llmConfig.clearSensitiveState()
