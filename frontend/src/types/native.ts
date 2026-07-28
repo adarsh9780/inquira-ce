@@ -100,6 +100,7 @@ export interface NativeMethodMap {
   DeleteWorkspace: (workspaceId: string) => Promise<NativeRecord>
   DiscoverLocalConnection: (request: NativeRecord) => Promise<unknown>
   ExecuteWorkspaceCommand: (request: NativeCommandRequest) => Promise<NativeRecord>
+  ExportRuntimeDiagnostics: () => Promise<boolean>
   GetConversationTurn: (turnId: string) => Promise<unknown>
   GetConversationUsage: (conversationId: string) => Promise<NativeRecord>
   GetFinalConversationTurn: (conversationId: string) => Promise<unknown>
@@ -148,6 +149,7 @@ export interface NativeMethodMap {
   OpenStartupLogs: () => Promise<void>
   PreviewLocalConnection: (request: NativeRecord) => Promise<unknown>
   ProvisionRuntime: (configuration: NativeRecord) => Promise<unknown>
+  RepairRuntime: () => Promise<unknown>
   RefreshConnection: (connectionId: string) => Promise<unknown>
   RefreshProviderModels: (request: NativeRecord) => Promise<NativeRecord>
   RegenerateWorkspaceDatasetSchema: (
@@ -155,6 +157,7 @@ export interface NativeMethodMap {
   ) => Promise<NativeRecord>
   ResizeTerminalSession: (sessionId: string, columns: number, rows: number) => Promise<void>
   RestartDesktopApp: () => Promise<void>
+  ResetRuntime: () => Promise<boolean>
   RollbackRuntime: () => Promise<unknown>
   RunManualCode: (request: NativeRunManualCodeRequest) => Promise<unknown>
   RuntimePlan: (configuration: NativeRecord) => Promise<unknown>
