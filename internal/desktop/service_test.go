@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -108,7 +109,7 @@ func TestAppendStartupLogCreatesPrivateSingleLineDiagnostics(t *testing.T) {
 		t.Fatalf("log contents = %q", contents)
 	}
 	info, err := os.Stat(path)
-	if err != nil || info.Mode().Perm()&0o077 != 0 {
+	if err != nil || (runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0) {
 		t.Fatalf("log permissions = %#o, %v", info.Mode().Perm(), err)
 	}
 }

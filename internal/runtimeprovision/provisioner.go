@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
 	"os/exec"
@@ -58,16 +59,17 @@ type commandRunner func(context.Context, map[string]string, Step) error
 
 type Provisioner struct {
 	runtimeRoot  string
+	bundle       fs.FS
 	runner       commandRunner
 	provisioning atomic.Bool
 }
 
 func NewProvisioner(runtimeRoot string) *Provisioner {
-	return &Provisioner{runtimeRoot: runtimeRoot, runner: runStep}
+	return &Provisioner{runtimeRoot: runtimeRoot, bundle: bundledAssets, runner: runStep}
 }
 
 func (p *Provisioner) Status() Status {
-	info, err := loadBundleInfo(bundledAssets)
+	info, err := loadBundleInfo(p.bundle)
 	status := Status{
 		RuntimeRoot:      p.runtimeRoot,
 		Bundle:           info,
@@ -94,7 +96,7 @@ func (p *Provisioner) Status() Status {
 // packaged executable's runtime-info command to verify the complete bundle.
 func (p *Provisioner) Diagnostics(ctx context.Context) Diagnostics {
 	diagnostics := Diagnostics{Status: p.Status()}
-	uvPath, _, err := extractBundle(bundledAssets, filepath.Join(p.runtimeRoot, "tools"))
+	uvPath, _, err := extractBundle(p.bundle, filepath.Join(p.runtimeRoot, "tools"))
 	if err != nil {
 		diagnostics.Error = err.Error()
 		return diagnostics
@@ -207,7 +209,7 @@ func (p *Provisioner) Provision(ctx context.Context, config Config) (Result, err
 	if err != nil {
 		return Result{}, err
 	}
-	uvPath, _, err := extractBundle(bundledAssets, filepath.Join(p.runtimeRoot, "tools"))
+	uvPath, _, err := extractBundle(p.bundle, filepath.Join(p.runtimeRoot, "tools"))
 	if err != nil {
 		return Result{}, err
 	}

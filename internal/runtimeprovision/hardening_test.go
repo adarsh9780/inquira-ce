@@ -120,6 +120,7 @@ func TestRuntimePlanPreviewAndErrorsRedactCredentialBearingURLs(t *testing.T) {
 func TestSavedRuntimeConfigurationExcludesTransientNetworkCredentials(t *testing.T) {
 	runtimeRoot := filepath.Join(t.TempDir(), "runtime")
 	provisioner := NewProvisioner(runtimeRoot)
+	provisioner.bundle = testBundleFS(t)
 	config := DefaultConfig()
 	config.DefaultIndex = "https://user:password@packages.company/simple"
 	config.HTTPProxy = "http://user:password@proxy.company:8080"
@@ -155,6 +156,7 @@ func TestConcurrentRuntimeProvisioningIsRejectedBeforeMachineChanges(t *testing.
 func TestFailedWorkerVerificationDoesNotMarkRuntimeReady(t *testing.T) {
 	runtimeRoot := filepath.Join(t.TempDir(), "runtime")
 	provisioner := NewProvisioner(runtimeRoot)
+	provisioner.bundle = testBundleFS(t)
 	config := DefaultConfig()
 	config.Mode = ModeExternalPython
 	config.PythonExecutable = testPythonExecutable(t)

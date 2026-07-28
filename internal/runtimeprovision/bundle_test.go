@@ -12,22 +12,10 @@ import (
 )
 
 func TestExtractBundleValidatesAndWritesExecutable(t *testing.T) {
-	payload := []byte("test UV payload")
-	digest := sha256.Sum256(payload)
-	info := BundleInfo{
-		Version: "test",
-		GOOS:    runtime.GOOS,
-		GOARCH:  runtime.GOARCH,
-		File:    executableName("uv"),
-		SHA256:  hex.EncodeToString(digest[:]),
-	}
-	manifest, err := json.Marshal(info)
+	source := testBundleFS(t)
+	info, err := loadBundleInfo(source)
 	if err != nil {
 		t.Fatal(err)
-	}
-	source := fstest.MapFS{
-		"assets/manifest.json": {Data: manifest},
-		"assets/" + info.File:  {Data: payload},
 	}
 
 	output, extracted, err := extractBundle(source, t.TempDir())
@@ -41,11 +29,32 @@ func TestExtractBundleValidatesAndWritesExecutable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(written) != string(payload) {
+	if string(written) != "test UV payload" {
 		t.Fatalf("unexpected extracted payload %q", written)
 	}
 	if filepath.Base(output) != info.File {
 		t.Fatalf("unexpected output path %q", output)
+	}
+}
+
+func testBundleFS(t *testing.T) fstest.MapFS {
+	t.Helper()
+	payload := []byte("test UV payload")
+	digest := sha256.Sum256(payload)
+	info := BundleInfo{
+		Version: "test",
+		GOOS:    runtime.GOOS,
+		GOARCH:  runtime.GOARCH,
+		File:    executableName("uv"),
+		SHA256:  hex.EncodeToString(digest[:]),
+	}
+	manifest, err := json.Marshal(info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fstest.MapFS{
+		"assets/manifest.json": {Data: manifest},
+		"assets/" + info.File:  {Data: payload},
 	}
 }
 

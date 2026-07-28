@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -68,7 +69,7 @@ func TestWriteExportAtomicallyReplacesTheSelectedFile(t *testing.T) {
 		t.Fatalf("export directory entries = %#v", entries)
 	}
 	info, err := os.Stat(target)
-	if err != nil || info.Mode().Perm()&0o077 != 0 {
+	if err != nil || (runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0) {
 		t.Fatalf("export permissions = %#o, %v", info.Mode().Perm(), err)
 	}
 }

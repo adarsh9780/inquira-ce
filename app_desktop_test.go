@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"testing"
 
@@ -120,7 +121,7 @@ func TestFallbackStartupLogDirectoryIsPrivate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !info.IsDir() || info.Mode().Perm()&0o077 != 0 {
+	if !info.IsDir() || (goruntime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0) {
 		t.Fatalf("fallback log mode = %v", info.Mode())
 	}
 }
