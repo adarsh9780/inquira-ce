@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -83,7 +84,7 @@ func TestUpdateWailsVersionPreservesConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fileInfo.Mode().Perm() != 0o640 {
+	if runtime.GOOS != "windows" && fileInfo.Mode().Perm() != 0o640 {
 		t.Fatalf("permissions = %o, want 640", fileInfo.Mode().Perm())
 	}
 }
