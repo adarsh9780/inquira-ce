@@ -28,8 +28,8 @@ test('primary navigation and settings use the compact shell metrics', () => {
   assert.match(app, /\.app-nav-pane-collapsed \{\s*width: 52px;/)
   assert.match(sidebar, /\.sidebar-brand-row \{[\s\S]*height: 3rem;/)
   assert.match(sidebar, /\.sidebar-row-label \{[\s\S]*font-weight: 500;/)
-  assert.match(settings, /h-\[min\(760px,calc\(100dvh-2rem\)\)\]/)
-  assert.match(settings, /w-\[176px\]/)
+  assert.match(settings, /h-\[min\(47\.5rem,calc\(100dvh-2rem\)\)\]/)
+  assert.match(settings, /w-44/)
 })
 
 test('brand mark is a crisp animated vector at sidebar scale', () => {

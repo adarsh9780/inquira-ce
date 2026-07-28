@@ -2,13 +2,14 @@
   <DialogShell
     :open="modelValue"
     title="Settings"
+    :description="activeSectionDescription"
     headerless
-    content-class="settings-modal-card h-[min(760px,calc(100dvh-2rem))] max-w-[1120px] text-[var(--color-text-main)]"
+    content-class="settings-modal-card h-[min(47.5rem,calc(100dvh-2rem))] max-w-[70rem] text-[var(--color-text-main)] max-sm:h-[calc(100dvh-1rem)] max-sm:max-h-[calc(100dvh-1rem)] max-sm:w-[calc(100vw-1rem)] max-sm:rounded-lg"
     @close="closeModal"
   >
     <button
       type="button"
-      class="btn-icon absolute right-3 top-3 z-20"
+      class="btn-icon absolute right-4 top-4 z-20 max-sm:right-2 max-sm:top-2"
       aria-label="Close settings"
       @click="closeModal"
     >
@@ -18,89 +19,90 @@
     </button>
 
     <div class="settings-modal-layout flex h-full">
-          <aside class="settings-modal-nav w-[176px] shrink-0 border-r border-[var(--color-border)] bg-[var(--color-base-soft)] px-2.5 py-3 flex flex-col justify-between select-none">
-            <div class="space-y-0.5">
-              <button
-                type="button"
-                :class="activeSection === 'setup' ? activeNavClass : inactiveNavClass"
-                @click="openLeafSection('setup')"
-              >
-                <CheckCircleIcon class="h-4 w-4 shrink-0" />
-                <span>Setup</span>
-              </button>
-              <button
-                type="button"
-                :class="activeSection === 'workspace' ? activeNavClass : inactiveNavClass"
-                @click="openWorkspaceSection"
-              >
-                <ListBulletIcon class="h-4 w-4 shrink-0" />
-                <span>Workspaces</span>
-              </button>
-              <button
-                type="button"
-                :class="activeSection === 'connections' ? activeNavClass : inactiveNavClass"
-                @click="openLeafSection('connections')"
-              >
-                <KeyIcon class="h-4 w-4 shrink-0" />
-                <span>AI providers</span>
-              </button>
-              <button
-                type="button"
-                :class="activeSection === 'appearance' ? activeNavClass : inactiveNavClass"
-                @click="openLeafSection('appearance')"
-              >
-                <PaintBrushIcon class="h-4 w-4 shrink-0" />
-                <span>Appearance</span>
-              </button>
-              <button
-                type="button"
-                :class="activeSection === 'account' ? activeNavClass : inactiveNavClass"
-                @click="openLeafSection('account')"
-              >
-                <UserIcon class="h-4 w-4 shrink-0" />
-                <span>Account</span>
-              </button>
-            </div>
-          </aside>
+      <aside class="settings-modal-nav flex w-44 shrink-0 select-none flex-col justify-between border-r border-[var(--color-border)] bg-[var(--color-base-soft)] px-3 py-4">
+        <div class="space-y-0.5">
+          <button
+            type="button"
+            :class="activeSection === 'setup' ? activeNavClass : inactiveNavClass"
+            @click="openLeafSection('setup')"
+          >
+            <CheckCircleIcon class="h-4 w-4 shrink-0" />
+            <span>Setup</span>
+          </button>
+          <button
+            type="button"
+            :class="activeSection === 'workspace' ? activeNavClass : inactiveNavClass"
+            @click="openWorkspaceSection"
+          >
+            <ListBulletIcon class="h-4 w-4 shrink-0" />
+            <span>Workspaces</span>
+          </button>
+          <button
+            type="button"
+            :class="activeSection === 'connections' ? activeNavClass : inactiveNavClass"
+            @click="openLeafSection('connections')"
+          >
+            <KeyIcon class="h-4 w-4 shrink-0" />
+            <span>AI providers</span>
+          </button>
+          <button
+            type="button"
+            :class="activeSection === 'appearance' ? activeNavClass : inactiveNavClass"
+            @click="openLeafSection('appearance')"
+          >
+            <PaintBrushIcon class="h-4 w-4 shrink-0" />
+            <span>Appearance</span>
+          </button>
+          <button
+            type="button"
+            :class="activeSection === 'account' ? activeNavClass : inactiveNavClass"
+            @click="openLeafSection('account')"
+          >
+            <UserIcon class="h-4 w-4 shrink-0" />
+            <span>Account</span>
+          </button>
+        </div>
+      </aside>
 
-          <main class="relative flex-1 flex flex-col overflow-hidden">
-            <!-- Header Zone -->
-            <header class="px-5 py-3 border-b border-[var(--color-border)] bg-[var(--color-base-soft)] shrink-0 select-none">
-              <h2 id="settings-modal-title" class="text-[13px] font-semibold tracking-tight text-[var(--color-text-main)]">{{ activeSectionTitle }}</h2>
-              <p class="text-[11px] text-[var(--color-text-muted)] mt-0.5 leading-snug">{{ activeSectionDescription }}</p>
-            </header>
+      <main class="relative flex flex-1 flex-col overflow-hidden">
+        <header class="shrink-0 select-none border-b border-[var(--color-border)] bg-[var(--color-base-soft)] px-6 py-4 max-sm:px-4 max-sm:py-3">
+          <h2 id="settings-modal-title" class="text-sm font-semibold leading-tight tracking-tight text-[var(--color-text-main)]">
+            {{ activeSectionTitle }}
+          </h2>
+          <p class="mt-1 pr-10 text-xs leading-5 text-[var(--color-text-muted)]">
+            {{ activeSectionDescription }}
+          </p>
+        </header>
 
-            <div class="relative flex-1 overflow-hidden">
-              <section v-if="currentPanel === 'setup'" :class="panelClass('setup')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
-                <SetupTab />
-              </section>
+        <div class="relative flex-1 overflow-hidden">
+          <section v-if="currentPanel === 'setup'" :class="panelClass('setup')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5 max-sm:px-4 max-sm:py-4">
+            <SetupTab />
+          </section>
 
-              <section v-if="currentPanel === 'connections'" :class="panelClass('connections')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
-                <LLMSettingsTab @close-request="closeModal" />
-              </section>
+          <section v-if="currentPanel === 'connections'" :class="panelClass('connections')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5 max-sm:px-4 max-sm:py-4">
+            <LLMSettingsTab @close-request="closeModal" />
+          </section>
 
-              <section v-if="currentPanel === 'workspace'" :class="panelClass('workspace')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
-                <WorkspaceTab
-                  :active-workspace-id="activeWorkspaceId"
-                  :initial-section="workspaceInitialSection"
-                  :workspaces="workspaceItems"
-                  @select-workspace="selectWorkspace"
-                  @activate-workspace="activateWorkspace"
-                  @workspace-created="handleWorkspaceCreated"
-                />
-              </section>
+          <section v-if="currentPanel === 'workspace'" :class="panelClass('workspace')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5 max-sm:px-4 max-sm:py-4">
+            <WorkspaceTab
+              :active-workspace-id="activeWorkspaceId"
+              :initial-section="workspaceInitialSection"
+              :workspaces="workspaceItems"
+              @select-workspace="selectWorkspace"
+              @activate-workspace="activateWorkspace"
+              @workspace-created="handleWorkspaceCreated"
+            />
+          </section>
 
-              <section v-if="currentPanel === 'appearance'" :class="panelClass('appearance')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
-                <AppearanceTab />
-              </section>
+          <section v-if="currentPanel === 'appearance'" :class="panelClass('appearance')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5 max-sm:px-4 max-sm:py-4">
+            <AppearanceTab />
+          </section>
 
-
-
-              <section v-if="currentPanel === 'account'" :class="panelClass('account')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-4">
-                <AccountTab />
-              </section>
-            </div>
-          </main>
+          <section v-if="currentPanel === 'account'" :class="panelClass('account')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5 max-sm:px-4 max-sm:py-4">
+            <AccountTab />
+          </section>
+        </div>
+      </main>
     </div>
   </DialogShell>
 </template>
@@ -198,10 +200,10 @@ watch(
   () => props.modelValue,
   async (isOpen) => {
     if (isOpen) {
+      initializePanelState(props.initialTab)
       await workspaceStore.fetchWorkspaces()
       const initialWorkspace = String(workspaceStore.activeWorkspaceId || '').trim() || String(workspaceItems.value[0]?.id || '').trim()
       activeWorkspaceId.value = initialWorkspace
-      initializePanelState(props.initialTab)
       return
     }
     llmConfig.clearSensitiveState()
@@ -249,7 +251,7 @@ function panelClass(panelId: string): string {
   if (currentPanel.value === panelId) {
     return 'translate-x-0 opacity-100 pointer-events-auto settings-panel-transition'
   }
-  const offset = panelDirection.value === 'backward' ? '-translate-x-[30px]' : 'translate-x-[30px]'
+  const offset = panelDirection.value === 'backward' ? '-translate-x-8' : 'translate-x-8'
   return `${offset} opacity-0 pointer-events-none settings-panel-transition`
 }
 
@@ -308,10 +310,6 @@ function closeModal() {
 }
 
 @media (max-width: 640px) {
-  .settings-modal-card {
-    height: calc(100dvh - 1rem);
-  }
-
   .settings-modal-layout {
     flex-direction: column;
   }
