@@ -163,7 +163,18 @@ export const useWorkspaceStore = defineStore('workspaces', () => {
     workspaceError.value = ''
     try {
       const response = await workspaceApi.list()
-      const items = (Array.isArray(response) ? response : []) as WorkspaceRecord[]
+      const nativeItems = (
+        response && typeof response === 'object'
+          ? (response as { workspaces?: unknown }).workspaces
+          : undefined
+      )
+      const items = (
+        Array.isArray(nativeItems)
+          ? nativeItems
+          : Array.isArray(response)
+            ? response
+            : []
+      ) as WorkspaceRecord[]
       workspaces.value = items
       if (!activeWorkspaceId.value && items.length > 0) {
         const active = items.find((workspace) => workspace.is_active) || items[0]
