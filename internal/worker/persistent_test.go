@@ -121,6 +121,29 @@ func TestPersistentTransportRestartsAfterWorkerCrash(t *testing.T) {
 	}
 }
 
+func TestPersistentTransportRestartsAfterExplicitStop(t *testing.T) {
+	transport := newHelperTransport(t)
+	defer transport.Close()
+	var before struct {
+		PID int `json:"pid"`
+	}
+	if err := transport.Call(context.Background(), "echo", map[string]any{"value": "before"}, &before); err != nil {
+		t.Fatal(err)
+	}
+	if err := transport.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	var after struct {
+		PID int `json:"pid"`
+	}
+	if err := transport.Call(context.Background(), "echo", map[string]any{"value": "after"}, &after); err != nil {
+		t.Fatal(err)
+	}
+	if before.PID == 0 || after.PID == 0 || before.PID == after.PID {
+		t.Fatalf("worker did not restart after stop: before=%#v after=%#v", before, after)
+	}
+}
+
 func TestPersistentTransportRejectsUnavailableRuntimeAndCallsAfterClose(t *testing.T) {
 	transport := NewPersistentTransport(Config{ReadinessCheck: func() bool { return false }})
 	if err := transport.Call(context.Background(), "ping", map[string]any{}, &struct{}{}); errorCode(err) != "runtime_not_ready" {

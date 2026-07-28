@@ -181,12 +181,24 @@ func (t *PersistentTransport) CallWithEvents(
 }
 
 func (t *PersistentTransport) Close() error {
+	return t.stop(true)
+}
+
+// Stop terminates the current worker process without closing the transport.
+// The next request starts a fresh process from the active runtime path.
+func (t *PersistentTransport) Stop() error {
+	return t.stop(false)
+}
+
+func (t *PersistentTransport) stop(closeTransport bool) error {
 	t.mu.Lock()
 	if t.closed {
 		t.mu.Unlock()
 		return nil
 	}
-	t.closed = true
+	if closeTransport {
+		t.closed = true
+	}
 	process := t.process
 	t.process = nil
 	pending := t.pending

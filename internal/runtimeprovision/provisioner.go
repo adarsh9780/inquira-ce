@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 )
 
@@ -38,6 +39,8 @@ type Status struct {
 	SupportedModes     []Mode       `json:"supportedModes"`
 	Ready              bool         `json:"ready"`
 	Provisioning       bool         `json:"provisioning"`
+	RollbackAvailable  bool         `json:"rollbackAvailable"`
+	IncompleteSetup    bool         `json:"incompleteSetup"`
 	PythonExecutable   string       `json:"pythonExecutable"`
 	Configuration      *SavedConfig `json:"configuration,omitempty"`
 	ConfigurationError string       `json:"configurationError,omitempty"`
@@ -62,6 +65,8 @@ type Provisioner struct {
 	bundle       fs.FS
 	runner       commandRunner
 	provisioning atomic.Bool
+	cancelMu     sync.Mutex
+	cancel       context.CancelFunc
 }
 
 func NewProvisioner(runtimeRoot string) *Provisioner {
@@ -70,12 +75,17 @@ func NewProvisioner(runtimeRoot string) *Provisioner {
 
 func (p *Provisioner) Status() Status {
 	info, err := loadBundleInfo(p.bundle)
+	if err == nil {
+		err = p.validateWorkerContract(info)
+	}
 	status := Status{
-		RuntimeRoot:      p.runtimeRoot,
-		Bundle:           info,
-		SupportedModes:   SupportedModes(),
-		PythonExecutable: p.PythonExecutable(),
-		Provisioning:     p.provisioning.Load(),
+		RuntimeRoot:       p.runtimeRoot,
+		Bundle:            info,
+		SupportedModes:    SupportedModes(),
+		PythonExecutable:  p.PythonExecutable(),
+		Provisioning:      p.provisioning.Load(),
+		RollbackAvailable: p.runtimeReadyAt(p.previousEnvironmentDir()),
+		IncompleteSetup:   pathExists(p.stagingEnvironmentDir()),
 	}
 	configuration, configurationErr := p.loadConfiguration()
 	if configurationErr != nil {
@@ -121,7 +131,7 @@ func (p *Provisioner) Plan(config Config) (Plan, error) {
 
 	uvPath := filepath.Join(p.runtimeRoot, "tools", executableName("uv"))
 	pythonDir := filepath.Join(p.runtimeRoot, "python")
-	environmentDir := filepath.Join(p.runtimeRoot, "environments", "data-worker")
+	environmentDir := p.stagingEnvironmentDir()
 	environment := map[string]string{
 		"UV_PYTHON_INSTALL_DIR":  pythonDir,
 		"UV_PROJECT_ENVIRONMENT": environmentDir,
@@ -204,35 +214,113 @@ func (p *Provisioner) Provision(ctx context.Context, config Config) (Result, err
 	if !p.provisioning.CompareAndSwap(false, true) {
 		return Result{}, fmt.Errorf("runtime provisioning is already in progress")
 	}
-	defer p.provisioning.Store(false)
+	setupContext, cancel := context.WithCancel(ctx)
+	p.cancelMu.Lock()
+	p.cancel = cancel
+	p.cancelMu.Unlock()
+	defer func() {
+		cancel()
+		p.cancelMu.Lock()
+		p.cancel = nil
+		p.cancelMu.Unlock()
+		p.provisioning.Store(false)
+	}()
+
 	plan, err := p.Plan(config)
 	if err != nil {
+		return Result{}, err
+	}
+	info, err := loadBundleInfo(p.bundle)
+	if err != nil {
+		return Result{}, err
+	}
+	if err := p.validateWorkerContract(info); err != nil {
 		return Result{}, err
 	}
 	uvPath, _, err := extractBundle(p.bundle, filepath.Join(p.runtimeRoot, "tools"))
 	if err != nil {
 		return Result{}, err
 	}
-	_ = os.Remove(p.workerMarkerPath())
+	if err := p.clearStagingEnvironment(); err != nil {
+		return Result{}, err
+	}
+	activated := false
+	defer func() {
+		if !activated {
+			_ = p.clearStagingEnvironment()
+		}
+	}()
+
 	for index := range plan.Steps {
 		if strings.HasSuffix(plan.Steps[index].Executable, executableName("uv")) {
 			plan.Steps[index].Executable = uvPath
 		}
-		if err := p.runner(ctx, plan.Environment, plan.Steps[index]); err != nil {
+		if err := p.runner(setupContext, plan.Environment, plan.Steps[index]); err != nil {
+			if errors.Is(setupContext.Err(), context.Canceled) {
+				return Result{}, fmt.Errorf("runtime setup was cancelled; the previous runtime was left unchanged")
+			}
 			return Result{}, redactProvisionError(fmt.Errorf("%s: %w", plan.Steps[index].Name, err), config)
 		}
 	}
-	if err := p.markWorkerReady(); err != nil {
+	if err := p.markWorkerReadyAt(p.stagingEnvironmentDir()); err != nil {
 		return Result{}, err
 	}
-	if err := p.saveConfiguration(config); err != nil {
-		_ = os.Remove(p.workerMarkerPath())
+	if err := p.saveConfigurationAt(p.stagingEnvironmentDir(), config); err != nil {
 		return Result{}, err
 	}
+	if err := p.activateStagedEnvironment(); err != nil {
+		return Result{}, err
+	}
+	activated = true
 
 	return Result{
 		Mode:             config.Mode,
-		PythonExecutable: environmentPython(filepath.Join(p.runtimeRoot, "environments", "data-worker")),
+		PythonExecutable: p.PythonExecutable(),
+		UVExecutable:     uvPath,
+	}, nil
+}
+
+// Cancel stops the active setup command. The previously active environment is
+// never modified until the staged environment has passed verification.
+func (p *Provisioner) Cancel() bool {
+	p.cancelMu.Lock()
+	defer p.cancelMu.Unlock()
+	if p.cancel == nil {
+		return false
+	}
+	p.cancel()
+	return true
+}
+
+// Rollback swaps the current runtime with the last verified runtime.
+func (p *Provisioner) Rollback() (Result, error) {
+	if !p.provisioning.CompareAndSwap(false, true) {
+		return Result{}, fmt.Errorf("runtime provisioning is already in progress")
+	}
+	defer p.provisioning.Store(false)
+	if !p.runtimeReadyAt(p.previousEnvironmentDir()) {
+		return Result{}, fmt.Errorf("no verified previous runtime is available")
+	}
+	if err := p.swapActiveAndPrevious(); err != nil {
+		return Result{}, err
+	}
+	configuration, err := p.loadConfiguration()
+	if err != nil {
+		_ = p.swapActiveAndPrevious()
+		return Result{}, fmt.Errorf("load rolled-back runtime configuration: %w", err)
+	}
+	mode := ModeManaged
+	if configuration != nil {
+		mode = configuration.Mode
+	}
+	uvPath, _, err := extractBundle(p.bundle, filepath.Join(p.runtimeRoot, "tools"))
+	if err != nil {
+		_ = p.swapActiveAndPrevious()
+		return Result{}, err
+	}
+	return Result{
+		Mode:             mode,
+		PythonExecutable: p.PythonExecutable(),
 		UVExecutable:     uvPath,
 	}, nil
 }
@@ -283,19 +371,26 @@ func displaySafeURL(value string) string {
 	return result
 }
 
+const environmentConfigurationFile = ".inquira-runtime-config.json"
+
 func (p *Provisioner) saveConfiguration(config Config) error {
+	return p.saveConfigurationAt(p.activeEnvironmentDir(), config)
+}
+
+func (p *Provisioner) saveConfigurationAt(environmentDir string, config Config) error {
 	content, err := json.MarshalIndent(savedConfigFrom(config), "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode runtime configuration: %w", err)
 	}
-	if err := os.MkdirAll(p.runtimeRoot, 0o700); err != nil {
-		return fmt.Errorf("create runtime directory: %w", err)
+	if err := os.MkdirAll(environmentDir, 0o700); err != nil {
+		return fmt.Errorf("create runtime environment directory: %w", err)
 	}
-	temporary := p.configurationPath() + ".tmp"
+	path := p.configurationPathAt(environmentDir)
+	temporary := path + ".tmp"
 	if err := os.WriteFile(temporary, append(content, '\n'), 0o600); err != nil {
 		return fmt.Errorf("write runtime configuration: %w", err)
 	}
-	if err := os.Rename(temporary, p.configurationPath()); err != nil {
+	if err := os.Rename(temporary, path); err != nil {
 		return fmt.Errorf("publish runtime configuration: %w", err)
 	}
 	return nil
@@ -303,6 +398,9 @@ func (p *Provisioner) saveConfiguration(config Config) error {
 
 func (p *Provisioner) loadConfiguration() (*SavedConfig, error) {
 	content, err := os.ReadFile(p.configurationPath())
+	if errors.Is(err, os.ErrNotExist) {
+		content, err = os.ReadFile(p.legacyConfigurationPath())
+	}
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
@@ -317,11 +415,23 @@ func (p *Provisioner) loadConfiguration() (*SavedConfig, error) {
 }
 
 func (p *Provisioner) configurationPath() string {
+	return p.configurationPathAt(p.activeEnvironmentDir())
+}
+
+func (p *Provisioner) configurationPathAt(environmentDir string) string {
+	return filepath.Join(environmentDir, environmentConfigurationFile)
+}
+
+func (p *Provisioner) legacyConfigurationPath() string {
 	return filepath.Join(p.runtimeRoot, "runtime-config.json")
 }
 
 func (p *Provisioner) runtimeReady() bool {
-	info, err := os.Stat(p.PythonExecutable())
+	return p.runtimeReadyAt(p.activeEnvironmentDir())
+}
+
+func (p *Provisioner) runtimeReadyAt(environmentDir string) bool {
+	info, err := os.Stat(environmentPython(environmentDir))
 	if err != nil || !info.Mode().IsRegular() {
 		return false
 	}
@@ -329,16 +439,20 @@ func (p *Provisioner) runtimeReady() bool {
 	if err != nil {
 		return false
 	}
-	marker, err := os.ReadFile(p.workerMarkerPath())
+	marker, err := os.ReadFile(p.workerMarkerPathAt(environmentDir))
 	return err == nil && strings.TrimSpace(string(marker)) == digest
 }
 
 func (p *Provisioner) markWorkerReady() error {
+	return p.markWorkerReadyAt(p.activeEnvironmentDir())
+}
+
+func (p *Provisioner) markWorkerReadyAt(environmentDir string) error {
 	digest, err := p.workerLockDigest()
 	if err != nil {
 		return fmt.Errorf("fingerprint data worker lockfile: %w", err)
 	}
-	marker := p.workerMarkerPath()
+	marker := p.workerMarkerPathAt(environmentDir)
 	if err := os.MkdirAll(filepath.Dir(marker), 0o700); err != nil {
 		return fmt.Errorf("create data worker environment directory: %w", err)
 	}
@@ -361,15 +475,107 @@ func (p *Provisioner) workerLockDigest() (string, error) {
 	return hex.EncodeToString(digest[:]), nil
 }
 
+func (p *Provisioner) validateWorkerContract(info BundleInfo) error {
+	digest, err := p.workerLockDigest()
+	if err != nil {
+		return fmt.Errorf("fingerprint data worker lockfile: %w", err)
+	}
+	if digest != info.WorkerLockSHA256 {
+		return fmt.Errorf("bundled data worker does not match the runtime compatibility manifest")
+	}
+	return nil
+}
+
 func (p *Provisioner) workerMarkerPath() string {
-	return filepath.Join(p.runtimeRoot, "environments", "data-worker", ".inquira-worker-lock")
+	return p.workerMarkerPathAt(p.activeEnvironmentDir())
+}
+
+func (p *Provisioner) workerMarkerPathAt(environmentDir string) string {
+	return filepath.Join(environmentDir, ".inquira-worker-lock")
 }
 
 func (p *Provisioner) PythonExecutable() string {
-	return environmentPython(filepath.Join(p.runtimeRoot, "environments", "data-worker"))
+	return environmentPython(p.activeEnvironmentDir())
 }
 
 func (p *Provisioner) Ready() bool { return p.runtimeReady() }
+
+func (p *Provisioner) activeEnvironmentDir() string {
+	return filepath.Join(p.runtimeRoot, "environments", "data-worker")
+}
+
+func (p *Provisioner) stagingEnvironmentDir() string {
+	return filepath.Join(p.runtimeRoot, "environments", "data-worker.staging")
+}
+
+func (p *Provisioner) previousEnvironmentDir() string {
+	return filepath.Join(p.runtimeRoot, "environments", "data-worker.previous")
+}
+
+func (p *Provisioner) clearStagingEnvironment() error {
+	if err := os.RemoveAll(p.stagingEnvironmentDir()); err != nil {
+		return fmt.Errorf("remove incomplete runtime staging directory: %w", err)
+	}
+	return nil
+}
+
+func (p *Provisioner) activateStagedEnvironment() error {
+	staging := p.stagingEnvironmentDir()
+	active := p.activeEnvironmentDir()
+	previous := p.previousEnvironmentDir()
+	if !p.runtimeReadyAt(staging) {
+		return fmt.Errorf("staged runtime failed readiness validation")
+	}
+	if err := os.MkdirAll(filepath.Dir(active), 0o700); err != nil {
+		return fmt.Errorf("create runtime environments directory: %w", err)
+	}
+	if err := os.RemoveAll(previous); err != nil {
+		return fmt.Errorf("remove superseded rollback runtime: %w", err)
+	}
+	hadActive := pathExists(active)
+	if hadActive {
+		if err := os.Rename(active, previous); err != nil {
+			return fmt.Errorf("preserve previous runtime: %w", err)
+		}
+	}
+	if err := os.Rename(staging, active); err != nil {
+		if hadActive {
+			_ = os.Rename(previous, active)
+		}
+		return fmt.Errorf("activate staged runtime: %w", err)
+	}
+	return nil
+}
+
+func (p *Provisioner) swapActiveAndPrevious() error {
+	active := p.activeEnvironmentDir()
+	previous := p.previousEnvironmentDir()
+	staging := p.stagingEnvironmentDir()
+	if !pathExists(active) {
+		return fmt.Errorf("the active runtime is unavailable")
+	}
+	if err := p.clearStagingEnvironment(); err != nil {
+		return err
+	}
+	if err := os.Rename(active, staging); err != nil {
+		return fmt.Errorf("stage current runtime for rollback: %w", err)
+	}
+	if err := os.Rename(previous, active); err != nil {
+		_ = os.Rename(staging, active)
+		return fmt.Errorf("activate previous runtime: %w", err)
+	}
+	if err := os.Rename(staging, previous); err != nil {
+		_ = os.Rename(active, previous)
+		_ = os.Rename(staging, active)
+		return fmt.Errorf("preserve replaced runtime: %w", err)
+	}
+	return nil
+}
+
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
 
 func runStep(ctx context.Context, environment map[string]string, step Step) error {
 	command := exec.CommandContext(ctx, step.Executable, step.Arguments...)

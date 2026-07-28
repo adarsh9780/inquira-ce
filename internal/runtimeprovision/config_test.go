@@ -160,13 +160,13 @@ func TestEveryRuntimePlanInstallsTheBundledDataWorkerIntoTheEnvironment(t *testi
 			t.Fatalf("%s install step = %#v", config.Mode, install)
 		}
 		verify := plan.Steps[len(plan.Steps)-1]
-		if verify.Name != "verify-data-worker" || verify.Executable != provisioner.PythonExecutable() {
+		if verify.Name != "verify-data-worker" || verify.Executable != environmentPython(provisioner.stagingEnvironmentDir()) {
 			t.Fatalf("%s verification step = %#v", config.Mode, verify)
 		}
 		if len(verify.Arguments) != 2 || verify.Arguments[0] != "-c" || !strings.Contains(verify.Arguments[1], "inquira_data_worker") {
 			t.Fatalf("%s verification command = %#v", config.Mode, verify.Arguments)
 		}
-		if got := plan.Environment["UV_PROJECT_ENVIRONMENT"]; got != filepath.Join(runtimeRoot, "environments", "data-worker") {
+		if got := plan.Environment["UV_PROJECT_ENVIRONMENT"]; got != provisioner.stagingEnvironmentDir() {
 			t.Fatalf("%s environment = %q", config.Mode, got)
 		}
 		if config.DefaultIndex != "" && plan.Environment["UV_DEFAULT_INDEX"] != config.DefaultIndex {
