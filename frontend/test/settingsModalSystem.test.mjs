@@ -53,12 +53,12 @@ test('settings modal selects its requested panel before loading workspace data',
   assert.equal(initializeIndex < fetchIndex, true)
 })
 
-test('workspace tab uses a unified active-workspace surface instead of panel or step routing', () => {
+test('workspace tab separates focused creation from the unified management surface', () => {
   const tabSource = read('src/components/modals/tabs/WorkspaceTab.vue')
 
   assert.equal(tabSource.includes('workspaceSurface'), false)
-  assert.equal(tabSource.includes('New workspace'), true)
-  assert.equal(tabSource.includes('@click="beginInlineCreate"'), true)
+  assert.equal(tabSource.includes('Workspace setup'), true)
+  assert.equal(tabSource.includes('@click="beginWorkspaceCreation"'), true)
   assert.equal(tabSource.includes('@click="returnToWorkspaceSummary"'), false)
   assert.equal(tabSource.includes('max-w-[660px]'), false)
   assert.equal(tabSource.includes('No workspaces yet'), true)
@@ -70,9 +70,10 @@ test('workspace tab uses a unified active-workspace surface instead of panel or 
   assert.equal(tabSource.includes('title="Remove dataset"'), false)
   assert.equal(tabSource.includes('@click="saveWorkspaceContext"'), true)
   assert.equal(tabSource.includes('workspace-stepper'), false)
-  assert.equal(tabSource.includes('rounded-xl border border-[var(--color-border)] bg-[var(--color-base)]'), false)
+  assert.equal(tabSource.includes('rounded-xl border border-[var(--color-border)] bg-[var(--color-base)]'), true)
   assert.equal(tabSource.includes('const currentStep = ref(1)'), false)
   assert.equal(tabSource.includes('const savingStep = ref(0)'), false)
+  assert.equal(tabSource.includes("const workspaceCreationStep = ref<'identity' | 'ai'>('identity')"), true)
   assert.equal(tabSource.includes("setInlineToast('Dataset added')"), false)
 })
 

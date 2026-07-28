@@ -13,13 +13,17 @@ test('workspace AI tab is directly editable without a nested edit mode', () => {
   assert.match(source, /v-model="useDefaults"/)
 })
 
-test('workspace AI save action enables only for a changed payload', () => {
+test('workspace AI save action supports changed payloads and first-time setup confirmation', () => {
   assert.match(source, /const initialPayloadSignature = ref\(''\)/)
   assert.match(source, /const isDirty = computed\(/)
   assert.match(source, /payloadSignature\(buildPayload\(\)\) !== initialPayloadSignature\.value/)
-  assert.match(source, /:disabled="isSaving \|\| !isDirty"/)
+  assert.match(source, /const requiresReview = computed\(/)
+  assert.match(source, /props\.setupMode && requiresReview\.value/)
+  assert.match(source, /:disabled="isSaving \|\| !canSave"/)
+  assert.match(source, /setupMode \? 'Finish setup' : 'Save AI settings'/)
   assert.match(source, /initialPayloadSignature\.value = payloadSignature\(buildPayload\(\)\)/)
   assert.match(source, /saveWorkspaceAIConfig\(buildPayload\(\), props\.workspaceId\)/)
+  assert.match(source, /emit\('saved', savedConfig\)/)
 })
 
 test('switching to application defaults remains unsaved until Save is pressed', () => {

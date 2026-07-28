@@ -25,16 +25,21 @@ test('workspace settings uses one active-workspace management surface', () => {
   assert.equal(template.includes('Workspace runtime'), false)
 })
 
-test('new workspace is created from an autofocus inline row and opens inline context editing', () => {
+test('new workspace uses a focused two-step setup and preserves context through creation', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
 
-  assert.equal(workspace.includes('ref="newWorkspaceInputRef"'), true)
-  assert.equal(workspace.includes('@keydown.enter.prevent="createWorkspace"'), true)
-  assert.equal(workspace.includes('async function beginInlineCreate()'), true)
-  assert.equal(workspace.includes('newWorkspaceInputRef.value?.focus?.()'), true)
-  assert.equal(workspace.includes('isEditingContext.value = true'), true)
-  assert.equal(workspace.includes('← Back to workspace summary'), false)
-  assert.equal(workspace.includes('Quick create + Enter'), false)
+  assert.equal(workspace.includes('v-if="isWorkspaceCreationOpen"'), true)
+  assert.equal(workspace.includes("const workspaceCreationStep = ref<'identity' | 'ai'>('identity')"), true)
+  assert.equal(workspace.includes('ref="workspaceNameInputRef"'), true)
+  assert.equal(workspace.includes('@submit.prevent="createWorkspace"'), true)
+  assert.equal(workspace.includes('async function beginWorkspaceCreation()'), true)
+  assert.equal(workspace.includes('workspaceNameInputRef.value?.focus?.()'), true)
+  assert.equal(workspace.includes('const context = normalizedSetupWorkspaceContext.value'), true)
+  assert.equal(workspace.includes("workspaceCreationStep.value = 'ai'"), true)
+  assert.equal(workspace.includes('setup-mode'), true)
+  assert.equal(workspace.includes('@saved="finishWorkspaceSetup"'), true)
+  assert.equal(workspace.includes("emit('workspace-setup-complete', { workspaceId })"), true)
+  assert.equal(workspace.includes('Press Enter to create'), false)
 })
 
 test('active workspace summary saves context and opens the native connection flow', () => {
@@ -75,7 +80,24 @@ test('selected summary puts actions in the header and uses context instead of du
   assert.equal(template.includes('flex min-w-0 items-center justify-between gap-3 border-b'), true)
   assert.equal(template.includes('Add data source'), true)
   assert.equal(template.includes('@click="chooseConnectionFile"'), true)
-  assert.equal(template.match(/@click="beginInlineCreate"/g)?.length, 2)
+  assert.equal(template.match(/@click="beginWorkspaceCreation"/g)?.length, 2)
+})
+
+test('settings stays open after creation and closes only when workspace setup is complete', () => {
+  const settings = read('src/components/modals/SettingsModal.vue')
+  const createdHandler = settings.slice(
+    settings.indexOf('function handleWorkspaceCreated'),
+    settings.indexOf('function handleWorkspaceSetupComplete'),
+  )
+  const completeHandler = settings.slice(
+    settings.indexOf('function handleWorkspaceSetupComplete'),
+    settings.indexOf('function closeModal'),
+  )
+
+  assert.equal(settings.includes('@workspace-setup-complete="handleWorkspaceSetupComplete"'), true)
+  assert.equal(createdHandler.includes("workspaceInitialSection.value = 'ai'"), true)
+  assert.equal(createdHandler.includes("emit('update:modelValue', false)"), false)
+  assert.equal(completeHandler.includes("emit('update:modelValue', false)"), true)
 })
 
 test('settings sidebar keeps workspace ownership ahead of shared connections', () => {

@@ -1,32 +1,122 @@
 <template>
   <section class="scrollbar-hidden h-full overflow-y-auto">
-    <div class="grid h-full min-h-0 grid-cols-[210px_1fr] gap-4">
+    <Transition name="motion-fade" mode="out-in">
+      <div
+        v-if="isWorkspaceCreationOpen"
+        :key="workspaceCreationStep"
+        class="flex min-h-full items-start justify-center px-2 py-3 sm:px-4 sm:py-5"
+      >
+        <div class="w-full max-w-2xl">
+          <header class="mb-4">
+            <div class="flex items-center justify-between gap-4">
+              <button
+                v-if="workspaceCreationStep === 'identity'"
+                type="button"
+                class="text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
+                :disabled="isCreatingWorkspace"
+                @click="cancelWorkspaceCreation"
+              >
+                Back to workspaces
+              </button>
+              <span v-else class="text-xs font-medium text-[var(--color-text-muted)]">Workspace created</span>
+              <span class="text-xs font-semibold text-[var(--color-text-muted)]">
+                Step {{ workspaceCreationStep === 'identity' ? '1' : '2' }} of 2
+              </span>
+            </div>
+            <div
+              class="mt-2 h-1 overflow-hidden rounded-full bg-[var(--color-base-muted)]"
+              role="progressbar"
+              :aria-valuenow="workspaceCreationStep === 'identity' ? 1 : 2"
+              aria-valuemin="1"
+              aria-valuemax="2"
+              aria-label="Workspace setup progress"
+            >
+              <div
+                class="h-full rounded-full bg-[var(--color-accent)] transition-[width] duration-300 motion-reduce:transition-none"
+                :class="workspaceCreationStep === 'identity' ? 'w-1/2' : 'w-full'"
+              ></div>
+            </div>
+          </header>
+
+          <form
+            v-if="workspaceCreationStep === 'identity'"
+            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-base)] p-5 shadow-[var(--shadow-lifted)] sm:p-6"
+            @submit.prevent="createWorkspace"
+          >
+            <p class="text-xs font-semibold uppercase tracking-wide text-[var(--color-accent)]">Workspace setup</p>
+            <h2 class="mt-2 text-xl font-semibold leading-tight tracking-tight text-[var(--color-text-main)]">Create a focused place for your work</h2>
+            <p class="mt-2 max-w-xl text-sm leading-6 text-[var(--color-text-muted)]">
+              Give the workspace a clear name and optional context. You will review its AI and privacy choices next.
+            </p>
+
+            <div class="mt-5 space-y-4">
+              <label class="block">
+                <span class="input-label">Workspace name</span>
+                <input
+                  ref="workspaceNameInputRef"
+                  v-model="setupWorkspaceName"
+                  type="text"
+                  class="input-base input-outlined"
+                  placeholder="FINANCE ANALYSIS"
+                  autocomplete="off"
+                  :disabled="isCreatingWorkspace"
+                />
+                <span class="mt-1.5 block text-xs leading-5 text-[var(--color-text-muted)]">Use a name that will still make sense when you have several workspaces.</span>
+              </label>
+
+              <label class="block">
+                <span class="input-label">Purpose <span class="font-normal text-[var(--color-text-muted)]">(optional)</span></span>
+                <textarea
+                  v-model="setupWorkspaceContext"
+                  rows="3"
+                  class="input-base input-outlined resize-none"
+                  placeholder="What will you analyze here? Add useful business terms, goals, or boundaries."
+                  :disabled="isCreatingWorkspace"
+                ></textarea>
+                <span class="mt-1.5 block text-xs leading-5 text-[var(--color-text-muted)]">This context helps Inquira understand what belongs in this workspace.</span>
+              </label>
+            </div>
+
+            <div class="mt-6 flex items-center justify-end gap-3 border-t border-[var(--color-border)] pt-4">
+              <button type="button" class="btn-secondary px-4 py-2 text-sm" :disabled="isCreatingWorkspace" @click="cancelWorkspaceCreation">Cancel</button>
+              <button type="submit" class="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" :disabled="isCreatingWorkspace || !setupWorkspaceName.trim()">
+                {{ isCreatingWorkspace ? 'Creating…' : 'Create and continue' }}
+              </button>
+            </div>
+          </form>
+
+          <div
+            v-else
+            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-base)] p-5 shadow-[var(--shadow-lifted)] sm:p-6"
+          >
+            <p class="text-xs font-semibold uppercase tracking-wide text-[var(--color-accent)]">Workspace setup</p>
+            <h2 class="mt-2 text-xl font-semibold leading-tight tracking-tight text-[var(--color-text-main)]">Review AI and privacy</h2>
+            <p class="mt-2 max-w-xl text-sm leading-6 text-[var(--color-text-muted)]">
+              Confirm how <span class="font-medium text-[var(--color-text-main)]">{{ setupWorkspaceName }}</span> uses your application models and whether bounded data samples may be sent to them.
+            </p>
+
+            <div class="mt-5 border-t border-[var(--color-border)] pt-4">
+              <WorkspaceAIConfigSection
+                v-if="createdWorkspaceId"
+                :workspace-id="createdWorkspaceId"
+                setup-mode
+                @saved="finishWorkspaceSetup"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="grid h-full min-h-0 grid-cols-[210px_1fr] gap-4">
       <WorkspaceListPanel>
         <header class="mb-3 flex items-center justify-between">
           <h3 class="section-label">Workspaces</h3>
-          <button type="button" class="text-xs font-semibold text-[var(--color-accent)] hover:underline" @click="beginInlineCreate">
+          <button type="button" class="text-xs font-semibold text-[var(--color-accent)] hover:underline" @click="beginWorkspaceCreation">
             + New
           </button>
         </header>
 
         <div class="flex-1 space-y-1.5 overflow-y-auto pr-1 scrollbar-thin">
-          <div
-            v-if="isInlineCreating"
-            class="rounded-lg bg-[var(--color-accent-soft)] px-3 py-2.5 ring-1 ring-[var(--color-accent-border)]"
-          >
-            <input
-              ref="newWorkspaceInputRef"
-              v-model="setupWorkspaceName"
-              type="text"
-              class="w-full bg-transparent text-xs font-medium text-[var(--color-text-main)] outline-none placeholder:text-[var(--color-text-muted)]"
-              placeholder="New workspace name"
-              :disabled="isCreatingWorkspace"
-              @keydown.enter.prevent="createWorkspace"
-              @keydown.escape.prevent="cancelInlineCreate"
-            />
-            <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">Press Enter to create</p>
-          </div>
-
           <div
             v-for="workspace in workspaceCards"
             :key="workspace.id"
@@ -57,7 +147,7 @@
             <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">{{ workspace.conversationCount }} convs · {{ workspace.lastActiveLabel }}</p>
           </div>
 
-          <p v-if="!workspaceCards.length && !isInlineCreating" class="py-4 text-center text-xs text-[var(--color-text-muted)]">No workspaces yet</p>
+          <p v-if="!workspaceCards.length" class="py-4 text-center text-xs text-[var(--color-text-muted)]">No workspaces yet</p>
         </div>
       </WorkspaceListPanel>
 
@@ -386,10 +476,11 @@
 
         <div v-else class="flex flex-1 flex-col items-center justify-center rounded-lg bg-[var(--color-base-soft)] px-5 py-8 text-center">
           <p class="mb-4 text-sm text-[var(--color-text-sub)]">Create a workspace to add context and data sources.</p>
-          <button type="button" class="btn-primary px-4 py-2 text-sm" @click="beginInlineCreate">Create your first workspace</button>
+          <button type="button" class="btn-primary px-4 py-2 text-sm" @click="beginWorkspaceCreation">Create your first workspace</button>
         </div>
       </div>
-    </div>
+      </div>
+    </Transition>
 
     <ConfirmationModal
       :is-open="isWorkspaceDeleteDialogOpen"
@@ -440,7 +531,7 @@ const props = withDefaults(defineProps<{
   initialSection: 'general',
 })
 
-const emit = defineEmits(['select-workspace', 'activate-workspace', 'workspace-created'])
+const emit = defineEmits(['select-workspace', 'activate-workspace', 'workspace-created', 'workspace-setup-complete'])
 
 const uiStore = useUiStore()
 const preferencesStore = usePreferencesStore()
@@ -533,9 +624,11 @@ const setupWorkspaceName = ref('')
 const setupWorkspaceContext = ref('')
 const savedWorkspaceContext = ref('')
 const isSavingWorkspaceIdentity = ref(false)
-const isInlineCreating = ref(false)
+const isWorkspaceCreationOpen = ref(false)
+const workspaceCreationStep = ref<'identity' | 'ai'>('identity')
+const createdWorkspaceId = ref('')
 const isEditingContext = ref(false)
-const newWorkspaceInputRef = ref<any>(null)
+const workspaceNameInputRef = ref<any>(null)
 
 function normalizeWorkspaceName(value: any) {
   return String(value || '').toUpperCase()
@@ -998,22 +1091,28 @@ async function hydrateWorkspaceCards() {
 
 async function selectWorkspaceSummary(workspaceId: any) {
   isEditingContext.value = false
-  isInlineCreating.value = false
+  isWorkspaceCreationOpen.value = false
   await emitSelectedWorkspace(workspaceId)
 }
 
-async function beginInlineCreate() {
+async function beginWorkspaceCreation() {
   isEditingContext.value = false
-  isInlineCreating.value = true
+  isWorkspaceCreationOpen.value = true
+  workspaceCreationStep.value = 'identity'
+  createdWorkspaceId.value = ''
   setupWorkspaceName.value = ''
+  setupWorkspaceContext.value = ''
   await nextTick()
-  newWorkspaceInputRef.value?.focus?.()
+  workspaceNameInputRef.value?.focus?.()
 }
 
-function cancelInlineCreate() {
+function cancelWorkspaceCreation() {
   if (isCreatingWorkspace.value) return
-  isInlineCreating.value = false
+  isWorkspaceCreationOpen.value = false
+  workspaceCreationStep.value = 'identity'
+  createdWorkspaceId.value = ''
   setupWorkspaceName.value = ''
+  setupWorkspaceContext.value = ''
 }
 
 function startContextEdit() {
@@ -1215,7 +1314,7 @@ async function createWorkspace() {
   }
   isCreatingWorkspace.value = true
   try {
-    const context = ''
+    const context = normalizedSetupWorkspaceContext.value
     const workspace = await workspaceActivation.createWorkspace(name, context)
     const workspaceId = String(workspace?.id || workspaceStore.activeWorkspaceId || '').trim()
     if (!workspaceId) {
@@ -1227,13 +1326,26 @@ async function createWorkspace() {
       name,
       context,
     })
-    isInlineCreating.value = false
-    isEditingContext.value = true
+    createdWorkspaceId.value = workspaceId
+    workspaceCreationStep.value = 'ai'
   } catch (error: any) {
     toast.error('Create failed', extractApiErrorMessage(error, 'Failed to create workspace.'))
   } finally {
     isCreatingWorkspace.value = false
   }
+}
+
+function finishWorkspaceSetup() {
+  const workspaceId = String(createdWorkspaceId.value || '').trim()
+  if (!workspaceId) return
+  const workspaceName = String(setupWorkspaceName.value || '').trim()
+  toast.success('Workspace ready', `${workspaceName || 'Your workspace'} is ready for data.`)
+  emit('workspace-setup-complete', { workspaceId })
+  isWorkspaceCreationOpen.value = false
+  workspaceCreationStep.value = 'identity'
+  createdWorkspaceId.value = ''
+  setupWorkspaceName.value = ''
+  setupWorkspaceContext.value = ''
 }
 
 function formatFilename(raw: any) {
