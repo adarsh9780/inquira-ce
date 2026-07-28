@@ -7,11 +7,22 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf
 test('settings modal is viewport bounded and exposes dialog keyboard semantics', () => {
   const source = read('src/components/modals/SettingsModal.vue')
 
-  assert.match(source, /h-\[min\(760px,calc\(100dvh-2rem\)\)\]/)
-  assert.match(source, /max-w-\[1120px\]/)
+  assert.match(source, /h-\[min\(47\.5rem,calc\(100dvh-2rem\)\)\]/)
+  assert.match(source, /max-w-\[70rem\]/)
   assert.match(source, /<DialogShell/)
+  assert.match(source, /:description="activeSectionDescription"/)
   assert.match(source, /headerless/)
   assert.match(source, /@close="closeModal"/)
+})
+
+test('centered dialog animations do not compose competing transform translations', () => {
+  const dialog = read('src/components/ui/dialog/DialogShell.vue')
+  const alertDialog = read('src/components/ui/alert-dialog/AlertDialogShell.vue')
+
+  assert.match(dialog, /translate: -50% calc\(-50% \+ 0\.5rem\)/)
+  assert.doesNotMatch(dialog, /transform: translate\(-50%/)
+  assert.match(alertDialog, /translate: -50% calc\(-50% \+ 0\.5rem\)/)
+  assert.doesNotMatch(alertDialog, /transform: translate\(-50%/)
 })
 
 test('inactive settings panels are removed from keyboard and accessibility navigation', () => {

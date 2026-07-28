@@ -106,13 +106,13 @@ function handleOutside(event: Event) {
 }
 
 @keyframes dialog-content-in {
-  from { opacity: 0; transform: translate(-50%, -48%) scale(0.985); }
-  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  from { opacity: 0; translate: -50% calc(-50% + 0.5rem); }
+  to { opacity: 1; translate: -50% -50%; }
 }
 
 @keyframes dialog-content-out {
-  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  to { opacity: 0; transform: translate(-50%, -49%) scale(0.99); }
+  from { opacity: 1; translate: -50% -50%; }
+  to { opacity: 0; translate: -50% calc(-50% + 0.25rem); }
 }
 
 @media (prefers-reduced-motion: reduce) {
