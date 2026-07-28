@@ -964,10 +964,12 @@ func (a *App) ChooseLocalConnectionFile() (LocalConnectionFileSelection, error) 
 	path, err := runtime.OpenFileDialog(a.appContext(), runtime.OpenDialogOptions{
 		Title: "Choose a local data source",
 		Filters: []runtime.FileFilter{
-			{DisplayName: "CSV, Parquet, or Excel", Pattern: "*.csv;*.CSV;*.parquet;*.PARQUET;*.xlsx;*.XLSX"},
+			{DisplayName: "Supported data sources", Pattern: "*.csv;*.CSV;*.parquet;*.PARQUET;*.xlsx;*.XLSX;*.json;*.JSON;*.jsonl;*.JSONL;*.ndjson;*.NDJSON;*.sqlite;*.SQLITE;*.sqlite3;*.SQLITE3;*.db;*.DB"},
 			{DisplayName: "CSV", Pattern: "*.csv;*.CSV"},
 			{DisplayName: "Parquet", Pattern: "*.parquet;*.PARQUET"},
 			{DisplayName: "Excel workbook", Pattern: "*.xlsx;*.XLSX"},
+			{DisplayName: "JSON", Pattern: "*.json;*.JSON;*.jsonl;*.JSONL;*.ndjson;*.NDJSON"},
+			{DisplayName: "SQLite database", Pattern: "*.sqlite;*.SQLITE;*.sqlite3;*.SQLITE3;*.db;*.DB"},
 		},
 	})
 	if err != nil || path == "" {

@@ -10,7 +10,7 @@ import (
 func AdapterKindForPath(path string) (AdapterKind, error) {
 	base := filepath.Base(strings.TrimSpace(path))
 	if base == "" || strings.HasPrefix(base, ".") {
-		return "", apperror.New("adapter_not_supported", "Select a CSV, Parquet, or XLSX file.")
+		return "", apperror.New("adapter_not_supported", "Select a supported local data file.")
 	}
 	switch strings.ToLower(filepath.Ext(base)) {
 	case ".csv":
@@ -19,24 +19,44 @@ func AdapterKindForPath(path string) (AdapterKind, error) {
 		return AdapterParquet, nil
 	case ".xlsx":
 		return AdapterExcel, nil
+	case ".json", ".jsonl", ".ndjson":
+		return AdapterJSON, nil
+	case ".sqlite", ".sqlite3", ".db":
+		return AdapterSQLite, nil
 	default:
-		return "", apperror.New("adapter_not_supported", "Only CSV, Parquet, and XLSX connections are supported right now.")
+		return "", apperror.New("adapter_not_supported", "Supported formats are CSV, Parquet, XLSX, JSON, JSONL, NDJSON, and SQLite.")
 	}
 }
 
 func supportedAdapter(kind AdapterKind) bool {
-	return kind == AdapterCSV || kind == AdapterParquet || kind == AdapterExcel
+	return kind == AdapterCSV || kind == AdapterParquet || kind == AdapterExcel ||
+		kind == AdapterJSON || kind == AdapterSQLite
 }
 
-func expectedExtension(kind AdapterKind) string {
+func expectedExtensions(kind AdapterKind) []string {
 	if kind == AdapterCSV {
-		return ".csv"
+		return []string{".csv"}
 	}
 	if kind == AdapterParquet {
-		return ".parquet"
+		return []string{".parquet"}
 	}
 	if kind == AdapterExcel {
-		return ".xlsx"
+		return []string{".xlsx"}
 	}
-	return ""
+	if kind == AdapterJSON {
+		return []string{".json", ".jsonl", ".ndjson"}
+	}
+	if kind == AdapterSQLite {
+		return []string{".sqlite", ".sqlite3", ".db"}
+	}
+	return nil
+}
+
+func adapterAcceptsExtension(kind AdapterKind, extension string) bool {
+	for _, expected := range expectedExtensions(kind) {
+		if extension == expected {
+			return true
+		}
+	}
+	return false
 }

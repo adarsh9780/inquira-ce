@@ -244,7 +244,7 @@
               <div class="flex items-start justify-between gap-4">
                 <div>
                   <h4 class="section-label">Data sources</h4>
-                  <p class="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">Create refreshable local snapshots from CSV, Parquet, and Excel files.</p>
+                  <p class="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">Create refreshable local snapshots from CSV, Parquet, Excel, JSON, and SQLite sources.</p>
                 </div>
                 <button type="button" class="btn-primary px-3 py-1.5 text-xs" :disabled="connectionActionLoading || !isWorkspaceActive || !nativeRuntimeStatus.ready" @click="chooseConnectionFile">
                   Add data source
@@ -257,7 +257,7 @@
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
                     <p class="truncate text-xs font-semibold text-[var(--color-text-main)]">{{ pendingConnection.source_path }}</p>
-                    <p class="mt-1 text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">{{ adapterKindLabel(pendingConnection.adapter_kind) }} · {{ pendingConnection.objects.length }} {{ pendingConnection.adapter_kind === 'excel' ? 'sheets' : 'table' }}</p>
+                    <p class="mt-1 text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">{{ adapterKindLabel(pendingConnection.adapter_kind) }} · {{ sourceObjectCountLabel(pendingConnection) }}</p>
                   </div>
                   <button type="button" class="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]" :disabled="connectionActionLoading" @click="cancelPendingConnection">Cancel</button>
                 </div>
@@ -265,14 +265,14 @@
                   <span class="input-label">Connection name</span>
                   <input v-model="pendingConnection.name" class="input-base input-outlined" maxlength="120" :disabled="connectionActionLoading" />
                 </label>
-                <div v-if="pendingConnection.adapter_kind === 'excel'" class="space-y-2">
+                <div v-if="isObjectSelectionAdapter(pendingConnection.adapter_kind)" class="space-y-2">
                   <div class="flex items-center justify-between gap-3">
                     <span class="input-label">
-                      Select sheets · {{ pendingConnection.selected_object_ids.length }} selected
+                      {{ pendingConnection.adapter_kind === 'excel' ? 'Select sheets' : 'Select tables and views' }} · {{ pendingConnection.selected_object_ids.length }} selected
                     </span>
-                    <label class="flex items-center gap-2 text-[10px] text-[var(--color-text-muted)]">
+                    <label v-if="pendingConnection.adapter_kind === 'excel'" class="flex items-center gap-2 text-[10px] text-[var(--color-text-muted)]">
                       Formula values
-                      <select v-model="pendingConnection.formula_mode" class="rounded border border-[var(--color-border)] bg-[var(--color-base)] px-2 py-1" :disabled="connectionActionLoading" @change="previewPendingSheet(pendingConnection.active_object_id)">
+                      <select v-model="pendingConnection.formula_mode" class="rounded border border-[var(--color-border)] bg-[var(--color-base)] px-2 py-1" :disabled="connectionActionLoading" @change="previewPendingObject(pendingConnection.active_object_id)">
                         <option value="cached">Last saved values</option>
                         <option value="formula">Formula text</option>
                       </select>
@@ -280,13 +280,13 @@
                   </div>
                   <div v-if="pendingConnection.objects.length > 6" class="flex items-center gap-2">
                     <input
-                      v-model="sheetSearch"
+                      v-model="objectSearch"
                       type="search"
                       class="input-base input-outlined h-8 min-w-0 flex-1 text-xs"
-                      placeholder="Search sheets"
-                      aria-label="Search Excel sheets"
+                      :placeholder="pendingConnection.adapter_kind === 'excel' ? 'Search sheets' : 'Search tables and views'"
+                      :aria-label="pendingConnection.adapter_kind === 'excel' ? 'Search Excel sheets' : 'Search SQLite tables and views'"
                     />
-                    <button type="button" class="btn-ghost shrink-0 px-2 py-1 text-xs" :disabled="connectionActionLoading" @click="selectAllPendingSheets">
+                    <button type="button" class="btn-ghost shrink-0 px-2 py-1 text-xs" :disabled="connectionActionLoading" @click="selectAllPendingObjects">
                       Select all
                     </button>
                     <button
@@ -294,23 +294,23 @@
                       type="button"
                       class="btn-ghost shrink-0 px-2 py-1 text-xs"
                       :disabled="connectionActionLoading"
-                      @click="clearPendingSheetSelection"
+                      @click="clearPendingObjectSelection"
                     >
                       Clear
                     </button>
                   </div>
                   <div class="grid max-h-56 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
-                    <label v-for="object in filteredPendingSheets" :key="object.id" class="flex items-start gap-2 rounded-lg border p-2" :class="object.id === pendingConnection.active_object_id ? 'border-[var(--color-accent)]' : 'border-[var(--color-border)]'">
+                    <label v-for="object in filteredPendingObjects" :key="object.id" class="flex items-start gap-2 rounded-lg border p-2" :class="object.id === pendingConnection.active_object_id ? 'border-[var(--color-accent)]' : 'border-[var(--color-border)]'">
                       <input v-model="pendingConnection.selected_object_ids" type="checkbox" :value="object.id" :disabled="connectionActionLoading || object.metadata?.selectable === false" />
                       <span class="min-w-0 flex-1">
                         <span class="block truncate text-xs font-medium text-[var(--color-text-main)]">{{ object.name }}</span>
-                        <span class="block text-[10px] text-[var(--color-text-muted)]">{{ object.metadata?.visibility || 'visible' }} · {{ Number(object.metadata?.row_count || 0).toLocaleString() }} rows · {{ Number(object.metadata?.column_count || 0) }} columns</span>
+                        <span class="block text-[10px] text-[var(--color-text-muted)]">{{ sourceObjectSummary(object, pendingConnection.adapter_kind) }}</span>
                       </span>
-                      <button v-if="object.metadata?.selectable !== false" type="button" class="text-[10px] font-medium text-[var(--color-accent)] hover:underline" :disabled="connectionActionLoading" @click.prevent="previewPendingSheet(object.id)">Preview</button>
+                      <button v-if="object.metadata?.selectable !== false" type="button" class="text-[10px] font-medium text-[var(--color-accent)] hover:underline" :disabled="connectionActionLoading" @click.prevent="previewPendingObject(object.id)">Preview</button>
                     </label>
                   </div>
-                  <p v-if="filteredPendingSheets.length === 0" class="py-4 text-center text-xs text-[var(--color-text-muted)]">
-                    No sheets match “{{ sheetSearch }}”.
+                  <p v-if="filteredPendingObjects.length === 0" class="py-4 text-center text-xs text-[var(--color-text-muted)]">
+                    No source objects match “{{ objectSearch }}”.
                   </p>
                 </div>
                 <div class="flex flex-wrap gap-1.5">
@@ -358,7 +358,7 @@
             </section>
             <div v-else-if="!pendingConnection && !connectionActionLoading" class="rounded-lg border border-dashed border-[var(--color-border)] py-8 text-center">
               <p class="text-xs font-medium text-[var(--color-text-main)]">No data sources yet</p>
-              <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">Start with a local CSV, Parquet, or Excel file.</p>
+              <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">Start with CSV, Parquet, Excel, JSON, or a read-only SQLite connection.</p>
             </div>
           </div>
 
@@ -444,7 +444,7 @@ const nativeConnections = ref<any[]>([])
 const pendingConnection = ref<any>(null)
 const connectionActionLoading = ref(false)
 const connectionError = ref('')
-const sheetSearch = ref('')
+const objectSearch = ref('')
 const refreshingConnectionIds = ref(new Set())
 const nativeRuntimeStatus = ref<any>({ ready: false })
 const runtimeProvisioning = ref(false)
@@ -464,13 +464,13 @@ const runtimeConfig = ref({
   httpsProxy: '',
   noProxy: '',
 })
-const pendingSelectableSheets = computed(() => (
+const pendingSelectableObjects = computed(() => (
   Array.isArray(pendingConnection.value?.objects)
     ? pendingConnection.value.objects.filter((object: any) => object?.metadata?.selectable !== false)
     : []
 ))
-const filteredPendingSheets = computed(() => {
-  const query = String(sheetSearch.value || '').trim().toLowerCase()
+const filteredPendingObjects = computed(() => {
+  const query = String(objectSearch.value || '').trim().toLowerCase()
   if (!query) return Array.isArray(pendingConnection.value?.objects) ? pendingConnection.value.objects : []
   return (Array.isArray(pendingConnection.value?.objects) ? pendingConnection.value.objects : [])
     .filter((object: any) => String(object?.name || object?.id || '').toLowerCase().includes(query))
@@ -479,12 +479,12 @@ const visiblePendingColumns = computed(() => (
   Array.isArray(pendingConnection.value?.columns) ? pendingConnection.value.columns.slice(0, 12) : []
 ))
 
-function selectAllPendingSheets() {
+function selectAllPendingObjects() {
   if (!pendingConnection.value) return
-  pendingConnection.value.selected_object_ids = pendingSelectableSheets.value.map((object: any) => String(object.id))
+  pendingConnection.value.selected_object_ids = pendingSelectableObjects.value.map((object: any) => String(object.id))
 }
 
-function clearPendingSheetSelection() {
+function clearPendingObjectSelection() {
   if (!pendingConnection.value) return
   pendingConnection.value.selected_object_ids = []
 }
@@ -714,7 +714,7 @@ async function provisionDataRuntime() {
     await loadNativeRuntimeStatus()
     if (!nativeRuntimeStatus.value?.ready) throw new Error('The data runtime did not become ready.')
     runtimeConfigurationOpen.value = false
-    toast.success('Data runtime ready', 'CSV, Parquet, and Excel connections can now be created.')
+    toast.success('Data runtime ready', 'CSV, Parquet, Excel, JSON, and SQLite connections can now be created.')
   } catch (error: any) {
     runtimeProvisionError.value = extractApiErrorMessage(error, 'Could not set up the data runtime.')
   } finally {
@@ -775,16 +775,16 @@ async function chooseConnectionFile() {
     const objects = Array.isArray(discovery?.objects) ? discovery.objects : []
     const selectableObjects = objects.filter((object: any) => object?.metadata?.selectable !== false)
     const sourceObject = selectableObjects[0] || objects[0] || {}
-    const sourceObjectId = adapterKind === 'excel' ? String(sourceObject?.id || '') : ''
+    const sourceObjectId = isObjectSelectionAdapter(adapterKind) ? String(sourceObject?.id || '') : ''
     const options = adapterKind === 'excel' ? { formula_mode: 'cached' } : {}
-    const preview: any = sourceObjectId || adapterKind !== 'excel'
+    const preview: any = sourceObjectId || !isObjectSelectionAdapter(adapterKind)
       ? await connectionService.preview(adapterKind, sourcePath, sourceObjectId, 25, options)
       : { columns: [], rows: [] }
-    sheetSearch.value = ''
+    objectSearch.value = ''
     pendingConnection.value = {
       source_path: sourcePath,
       adapter_kind: adapterKind,
-      name: String(sourceObject?.name || formatFilename(sourcePath) || 'Local connection').trim(),
+      name: String(adapterKind === 'sqlite' ? formatFilename(sourcePath) : (sourceObject?.name || formatFilename(sourcePath) || 'Local connection')).trim(),
       objects,
       selected_object_ids: sourceObject?.metadata?.selectable === false ? [] : [String(sourceObject?.id || 'file')],
       active_object_id: String(sourceObject?.id || ''),
@@ -799,7 +799,7 @@ async function chooseConnectionFile() {
   }
 }
 
-async function previewPendingSheet(source_object_id: any) {
+async function previewPendingObject(source_object_id: any) {
   const pending = pendingConnection.value
   if (!pending || !source_object_id || connectionActionLoading.value) return
   connectionError.value = ''
@@ -826,7 +826,7 @@ async function previewPendingSheet(source_object_id: any) {
 function cancelPendingConnection() {
   if (connectionActionLoading.value) return
   pendingConnection.value = null
-  sheetSearch.value = ''
+  objectSearch.value = ''
   connectionError.value = ''
 }
 
@@ -846,7 +846,7 @@ async function createPendingConnection() {
       options: pending.adapter_kind === 'excel' ? { formula_mode: pending.formula_mode } : {},
     })
     pendingConnection.value = null
-    sheetSearch.value = ''
+    objectSearch.value = ''
     await refreshNativeConnectionState(workspaceId)
     toast.success('Connection created', 'The local snapshot is ready for analysis.')
   } catch (error: any) {
@@ -900,7 +900,28 @@ function connectionOutputSummary(connection: any) {
 function adapterKindLabel(kind: any) {
   if (kind === 'csv') return 'CSV'
   if (kind === 'excel') return 'Excel'
+  if (kind === 'json') return 'JSON'
+  if (kind === 'sqlite') return 'SQLite'
   return 'Parquet'
+}
+
+function isObjectSelectionAdapter(kind: any) {
+  return kind === 'excel' || kind === 'sqlite'
+}
+
+function sourceObjectCountLabel(connection: any) {
+  const count = Array.isArray(connection?.objects) ? connection.objects.length : 0
+  if (connection?.adapter_kind === 'excel') return `${count} sheet${count === 1 ? '' : 's'}`
+  if (connection?.adapter_kind === 'sqlite') return `${count} table${count === 1 ? '' : 's'}/view${count === 1 ? '' : 's'}`
+  return `${count} table${count === 1 ? '' : 's'}`
+}
+
+function sourceObjectSummary(object: any, adapterKind: any) {
+  const columns = Number(object?.metadata?.column_count ?? object?.columns?.length ?? 0)
+  if (adapterKind === 'sqlite') {
+    return `${object?.kind || 'table'} · ${columns} columns`
+  }
+  return `${object?.metadata?.visibility || 'visible'} · ${Number(object?.metadata?.row_count || 0).toLocaleString()} rows · ${columns} columns`
 }
 
 onUnmounted(() => {

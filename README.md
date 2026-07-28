@@ -39,14 +39,17 @@ privacy choice in SQLite. Both schema generation and agent analysis resolve
 this effective workspace configuration before calling the Python worker.
 
 Local data now starts with refreshable connections rather than uploads. The
-first adapters support CSV, Parquet, and modern Excel (`.xlsx`) files through a shared discover,
-preview, materialize, refresh, and status contract. Go owns connection metadata
-and atomic snapshot publication; the bundled Python worker uses DuckDB to write
-canonical Parquet snapshots without an application row or memory cap. Preview
-limits do not limit materialization. Excel discovery exposes every sheet and
-its visibility, dimensions, and inferred schema. Users explicitly select one
-or more sheets, and each selection becomes its own Parquet output. Cached
-formula values are the default, with formula text available as an option.
+adapters support CSV, Parquet, modern Excel (`.xlsx`), JSON (`.json`, `.jsonl`,
+and `.ndjson`), and read-only SQLite (`.sqlite`, `.sqlite3`, and `.db`) through
+a shared discover, preview, materialize, refresh, and status contract. Go owns
+connection metadata and atomic snapshot publication; the bundled Python worker
+writes canonical Parquet snapshots without an application row or memory cap.
+Preview limits do not limit materialization. Excel discovery exposes every
+sheet and its visibility, dimensions, and inferred schema. SQLite discovery
+exposes user tables and views without modifying or attaching the source
+database. Users explicitly select one or more source objects, and each
+selection becomes its own Parquet output. Cached Excel formula values are the
+default, with formula text available as an option.
 
 A fresh installation asks the user to configure the data runtime before any
 download. Managed Python, a company-provided Python executable, and internal
@@ -55,11 +58,12 @@ certificate settings are passed only to that setup run and are not saved by
 Inquira.
 
 Legacy `.xls` files are not accepted because the streaming reader supports the
-modern Office Open XML format only. The SQLite connector is deferred. Before
-chat or code execution starts, Go can now prepare an atomic workspace DuckDB
-catalog whose read-only views point at the latest connection snapshots. This
-gives analysis processes one stable database contract without copying the
-imported data again.
+modern Office Open XML format only. Before chat or code execution starts, Go
+prepares an atomic workspace DuckDB catalog whose read-only views point at the
+latest connection snapshots. This gives analysis processes one stable database
+contract without copying the imported data again. See
+[`docs/data-sources.md`](docs/data-sources.md) for the format contract and
+current limitations.
 
 Conversation persistence uses SQLite as the authoritative index and the local
 filesystem as an immutable payload heap. Messages, generated code, branching,

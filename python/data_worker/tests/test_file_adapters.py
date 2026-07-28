@@ -35,21 +35,30 @@ def write_parquet(path: Path) -> None:
 
 @pytest.mark.parametrize(
     ("kind", "suffix"),
-    [("csv", ".csv"), ("CSV", ".CSV"), ("parquet", ".parquet"), ("PARQUET", ".PARQUET")],
+    [
+        ("csv", ".csv"),
+        ("CSV", ".CSV"),
+        ("parquet", ".parquet"),
+        ("PARQUET", ".PARQUET"),
+        ("json", ".json"),
+        ("JSON", ".JSONL"),
+    ],
 )
 def test_registry_resolves_supported_adapters_case_insensitively(kind: str, suffix: str, tmp_path: Path) -> None:
     path = tmp_path / f"source{suffix}"
     if kind.lower() == "csv":
         write_csv(path, [["id"], [1]])
-    else:
+    elif kind.lower() == "parquet":
         write_parquet(path)
+    else:
+        path.write_text('[{"id": 1}]' if suffix.lower() == ".json" else '{"id": 1}\n', encoding="utf-8")
     result = get_adapter(kind).discover(AdapterRequest(source_path=str(path)))
     assert result.adapter_kind == kind.lower()
     assert result.source_path == str(path.resolve())
     assert len(result.objects) == 1
 
 
-@pytest.mark.parametrize("kind", ["sqlite", "postgres", "unknown", ""])
+@pytest.mark.parametrize("kind", ["postgres", "unknown", ""])
 def test_registry_rejects_unimplemented_adapters(kind: str) -> None:
     with pytest.raises(AdapterError, match="not supported"):
         get_adapter(kind)

@@ -11,8 +11,8 @@ export interface WorkspaceSummary {
   updated_at?: string
 }
 
-export type LocalConnectionKind = 'csv' | 'parquet' | 'excel'
-export type ConnectionStatus = 'discovering' | 'ready' | 'refreshing' | 'failed'
+export type LocalConnectionKind = 'csv' | 'parquet' | 'excel' | 'json' | 'sqlite'
+export type ConnectionStatus = 'ready' | 'refreshing' | 'needs_attention' | 'error'
 
 export interface ConnectionSummary {
   id: ConnectionId

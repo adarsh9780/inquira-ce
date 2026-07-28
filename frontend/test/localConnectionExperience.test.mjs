@@ -5,7 +5,7 @@ import test from 'node:test'
 
 const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
-test('native workspace data exposes local files and explicit Excel sheet selection', () => {
+test('native workspace data exposes supported files and explicit multi-object selection', () => {
   const workspaceTab = read('src/components/modals/tabs/WorkspaceTab.vue')
   const settingsCoordinator = read('src/composables/useWorkspaceSettings.ts')
   assert.match(workspaceTab, /Data sources/)
@@ -13,7 +13,10 @@ test('native workspace data exposes local files and explicit Excel sheet selecti
   assert.match(workspaceTab, /CSV/)
   assert.match(workspaceTab, /Parquet/)
   assert.match(workspaceTab, /Excel/)
+  assert.match(workspaceTab, /JSON/)
+  assert.match(workspaceTab, /SQLite/)
   assert.match(workspaceTab, /Select sheets/)
+  assert.match(workspaceTab, /Select tables and views/)
   assert.match(workspaceTab, /source_object_id/)
   assert.match(workspaceTab, /formula_mode/)
   assert.match(workspaceTab, /connectionService/)
@@ -36,9 +39,11 @@ test('connection service uses the Wails bridge for every connection operation', 
   assert.match(service, /isNative/)
 })
 
-test('native file picker accepts modern Excel workbooks without claiming legacy xls support', () => {
+test('native file picker accepts the supported data-source matrix without claiming legacy xls support', () => {
   const app = read('../app.go')
   assert.match(app, /\*\.xlsx;\*\.XLSX/)
+  assert.match(app, /\*\.json;\*\.JSON/)
+  assert.match(app, /\*\.sqlite;\*\.SQLITE/)
   assert.doesNotMatch(app, /\*\.xls;/)
 })
 
