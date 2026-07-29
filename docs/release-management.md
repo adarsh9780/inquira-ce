@@ -1,8 +1,9 @@
 # Release management
 
-Inquira Go uses GitHub Releases as the maintainer-facing release record and
-Cloudflare R2 as the public download service. The source repository is private,
-so GitHub Release assets are not suitable as public customer downloads.
+Inquira Community Edition uses GitHub Releases as the public source and release
+record. Cloudflare R2 provides stable, branded customer download URLs and the
+atomic `latest.json` update pointer. The same checksum-verified installers remain
+available as public GitHub Release assets.
 
 ## Cost boundary
 
@@ -38,7 +39,7 @@ The workflow:
 4. builds the Windows application and NSIS installer with the same checks;
 5. creates a DMG and stable, versioned installer filenames;
 6. generates `manifest.json`, `latest.json`, and `SHA256SUMS.txt`;
-7. attaches both installers, the version manifest, and checksums to the private
+7. attaches both installers, the version manifest, and checksums to the public
    GitHub Release;
 8. uploads immutable versioned objects to Cloudflare R2;
 9. uploads `latest.json` only after every other object succeeds;

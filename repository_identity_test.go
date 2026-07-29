@@ -30,11 +30,30 @@ func TestCommunityEditionRepositoryIdentity(t *testing.T) {
 			"# Sustainable Use License",
 			"Version 1.0",
 		},
+		"Makefile": {
+			"REPOSITORY_NAME := inquira-ce",
+			"GITHUB_REPOSITORY ?= $(GITHUB_OWNER)/$(REPOSITORY_NAME)",
+			"VISIBILITY ?= public",
+		},
+		"docs/release-management.md": {
+			"Inquira Community Edition uses GitHub Releases",
+			"public GitHub Release assets",
+		},
 		".gitleaksignore": {
 			"Historical CE Supabase publishable key",
 			"Historical Google API key",
 			"Revoked",
 			"secret-scanning alert #1",
+		},
+	}
+
+	prohibitedContent := map[string][]string{
+		"README.md": {
+			"private GitHub Release",
+		},
+		"docs/release-management.md": {
+			"source repository is private",
+			"private GitHub Release",
 		},
 	}
 
@@ -49,6 +68,22 @@ func TestCommunityEditionRepositoryIdentity(t *testing.T) {
 			for _, fragment := range fragments {
 				if !strings.Contains(string(content), fragment) {
 					t.Errorf("%s does not contain %q", path, fragment)
+				}
+			}
+		})
+	}
+
+	for path, fragments := range prohibitedContent {
+		path := path
+		fragments := fragments
+		t.Run(path+"-prohibited", func(t *testing.T) {
+			content, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read %s: %v", path, err)
+			}
+			for _, fragment := range fragments {
+				if strings.Contains(string(content), fragment) {
+					t.Errorf("%s still contains obsolete identity text %q", path, fragment)
 				}
 			}
 		})

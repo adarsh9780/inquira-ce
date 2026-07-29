@@ -2,6 +2,7 @@ SHELL := /bin/sh
 .DEFAULT_GOAL := help
 
 APP_NAME := inquira-go
+REPOSITORY_NAME := inquira-ce
 FRONTEND_DIR := frontend
 PYTHON_PROJECT := python/data_worker
 WAILS ?= $(shell go env GOPATH)/bin/wails
@@ -17,8 +18,8 @@ GITLEAKS_VERSION := v8.30.1
 ACTIONLINT_VERSION := v1.7.12
 
 GITHUB_OWNER ?= $(shell gh api user --jq .login 2>/dev/null)
-GITHUB_REPOSITORY ?= $(GITHUB_OWNER)/$(APP_NAME)
-VISIBILITY ?= private
+GITHUB_REPOSITORY ?= $(GITHUB_OWNER)/$(REPOSITORY_NAME)
+VISIBILITY ?= public
 RELEASE_VERSION ?=
 MACOS_INSTALLER ?=
 WINDOWS_INSTALLER ?=
@@ -157,7 +158,7 @@ release-check: ci build ## Run every local release gate.
 github-check: ## Verify the repository is clean and ready for GitHub publication.
 	@./scripts/github-check.sh "$(GITHUB_REPOSITORY)"
 
-github-publish: github-check ## Create/connect the private GitHub repository and push the current branch.
+github-publish: github-check ## Create/connect the public GitHub repository and push the current branch.
 	@if [ "$(CONFIRM_PUBLISH)" != "1" ]; then \
 		echo "Refusing to publish without CONFIRM_PUBLISH=1"; \
 		exit 1; \
