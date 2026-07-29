@@ -215,8 +215,8 @@ The helper locates the macOS, Windows, or Unix build output.
 
 Publishing a stable `vMajor.Minor.Patch` GitHub Release triggers native macOS
 ARM64 and Windows x64 builds. The workflow requires successful CI for the exact
-release commit, attaches the installers and checksums to the private GitHub
-Release, then publishes public downloads to Cloudflare R2. The public
+release commit, attaches the installers and checksums to the public GitHub
+release, then publishes the same verified artifacts to Cloudflare R2. The public
 `latest.json` pointer is written only after every versioned object succeeds.
 
 The release workflow does not run on pull requests and does not run Playwright.
