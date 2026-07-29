@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"inquira-go/internal/apperror"
-	"inquira-go/internal/datacatalog"
-	"inquira-go/internal/modelconfig"
+	"github.com/adarsh9780/inquira-ce/internal/apperror"
+	"github.com/adarsh9780/inquira-ce/internal/datacatalog"
+	"github.com/adarsh9780/inquira-ce/internal/modelconfig"
 )
 
 type fakeCatalog struct {

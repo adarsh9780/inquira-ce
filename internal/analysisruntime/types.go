@@ -3,7 +3,7 @@ package analysisruntime
 import (
 	"encoding/json"
 
-	"inquira-go/internal/conversation"
+	"github.com/adarsh9780/inquira-ce/internal/conversation"
 )
 
 type Run struct {

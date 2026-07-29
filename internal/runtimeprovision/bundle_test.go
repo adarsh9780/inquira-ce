@@ -12,7 +12,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"inquira-go/internal/runtimeprovision/contract"
+	"github.com/adarsh9780/inquira-ce/internal/runtimeprovision/contract"
 )
 
 func TestExtractBundleValidatesAndWritesExecutable(t *testing.T) {

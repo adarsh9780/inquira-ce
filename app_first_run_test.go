@@ -11,13 +11,13 @@ import (
 	"sync"
 	"testing"
 
-	"inquira-go/internal/analysisagent"
-	"inquira-go/internal/analysisruntime"
-	"inquira-go/internal/connection"
-	"inquira-go/internal/conversation"
-	"inquira-go/internal/datacatalog"
-	"inquira-go/internal/modelconfig"
-	"inquira-go/internal/workspace"
+	"github.com/adarsh9780/inquira-ce/internal/analysisagent"
+	"github.com/adarsh9780/inquira-ce/internal/analysisruntime"
+	"github.com/adarsh9780/inquira-ce/internal/connection"
+	"github.com/adarsh9780/inquira-ce/internal/conversation"
+	"github.com/adarsh9780/inquira-ce/internal/datacatalog"
+	"github.com/adarsh9780/inquira-ce/internal/modelconfig"
+	"github.com/adarsh9780/inquira-ce/internal/workspace"
 )
 
 func TestNativeFirstRunJourneyReachesFirstAnalysis(t *testing.T) {

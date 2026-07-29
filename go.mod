@@ -1,4 +1,4 @@
-module inquira-go
+module github.com/adarsh9780/inquira-ce
 
 go 1.26.0
 

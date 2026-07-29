@@ -12,9 +12,9 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"inquira-go/internal/appdirs"
-	"inquira-go/internal/desktop"
-	"inquira-go/internal/runtimeprovision"
+	"github.com/adarsh9780/inquira-ce/internal/appdirs"
+	"github.com/adarsh9780/inquira-ce/internal/desktop"
+	"github.com/adarsh9780/inquira-ce/internal/runtimeprovision"
 )
 
 type desktopCommandRecorder struct {

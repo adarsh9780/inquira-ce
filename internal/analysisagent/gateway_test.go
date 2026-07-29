@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"inquira-go/internal/analysisruntime"
-	"inquira-go/internal/worker"
+	"github.com/adarsh9780/inquira-ce/internal/analysisruntime"
+	"github.com/adarsh9780/inquira-ce/internal/worker"
 )
 
 type fakeTransport struct {

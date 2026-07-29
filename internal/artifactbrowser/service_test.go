@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"inquira-go/internal/apperror"
-	"inquira-go/internal/conversation"
+	"github.com/adarsh9780/inquira-ce/internal/apperror"
+	"github.com/adarsh9780/inquira-ce/internal/conversation"
 )
 
 type fakeStore struct {

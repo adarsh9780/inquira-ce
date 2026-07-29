@@ -9,11 +9,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"inquira-go/internal/analysisruntime"
-	"inquira-go/internal/apperror"
-	"inquira-go/internal/conversation"
-	"inquira-go/internal/datacatalog"
-	"inquira-go/internal/modelconfig"
+	"github.com/adarsh9780/inquira-ce/internal/analysisruntime"
+	"github.com/adarsh9780/inquira-ce/internal/apperror"
+	"github.com/adarsh9780/inquira-ce/internal/conversation"
+	"github.com/adarsh9780/inquira-ce/internal/datacatalog"
+	"github.com/adarsh9780/inquira-ce/internal/modelconfig"
 )
 
 const (

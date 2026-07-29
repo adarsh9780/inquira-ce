@@ -50,7 +50,7 @@ is not required.
 
 ## GitHub configuration
 
-The `inquira-go` repository requires this Actions secret:
+The `inquira-ce` repository requires this Actions secret:
 
 - `CLOUDFLARE_API_TOKEN`: a narrowly scoped token allowed to read and write
   objects in the release bucket.
@@ -63,8 +63,8 @@ It also requires these Actions variables:
   `https://downloads.inquiraai.com`)
 
 `PUBLIC_RELEASE_NOTES_URL` is optional. It defaults to the public desktop
-distribution documentation because the source repository and its GitHub
-Release notes are private.
+distribution documentation so the customer-facing release guidance remains
+stable independently of GitHub repository visibility.
 
 ## Versioning
 

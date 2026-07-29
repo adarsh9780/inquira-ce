@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"inquira-go/internal/analysisruntime"
-	"inquira-go/internal/conversation"
-	"inquira-go/internal/datacatalog"
-	"inquira-go/internal/workspace"
+	"github.com/adarsh9780/inquira-ce/internal/analysisruntime"
+	"github.com/adarsh9780/inquira-ce/internal/conversation"
+	"github.com/adarsh9780/inquira-ce/internal/datacatalog"
+	"github.com/adarsh9780/inquira-ce/internal/workspace"
 )
 
 type fakeCatalog struct {

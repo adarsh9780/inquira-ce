@@ -193,7 +193,7 @@ func stageRelease(config releaseConfig) (stagedRelease, error) {
 		MacOSARM64SHA256:    macOSSHA256,
 		WindowsX64SHA256:    windowsSHA256,
 		SHA256SUMSURL:       fmt.Sprintf("%s/%s/SHA256SUMS.txt", baseURL, tag),
-		SourceRepositoryURL: "https://github.com/adarsh9780/inquira-go",
+		SourceRepositoryURL: "https://github.com/adarsh9780/inquira-ce",
 	}
 
 	latestManifestPath := filepath.Join(config.OutputDirectory, "latest.json")

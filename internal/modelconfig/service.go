@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"inquira-go/internal/apperror"
+	"github.com/adarsh9780/inquira-ce/internal/apperror"
 )
 
 type Service struct {

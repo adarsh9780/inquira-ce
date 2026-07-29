@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"strings"
 
-	"inquira-go/internal/runtimeprovision/contract"
+	"github.com/adarsh9780/inquira-ce/internal/runtimeprovision/contract"
 )
 
 // Mode selects who supplies Python and where UV downloads approved artifacts.

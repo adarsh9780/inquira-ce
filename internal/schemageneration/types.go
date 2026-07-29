@@ -1,8 +1,8 @@
 package schemageneration
 
 import (
-	"inquira-go/internal/datacatalog"
-	"inquira-go/internal/modelconfig"
+	"github.com/adarsh9780/inquira-ce/internal/datacatalog"
+	"github.com/adarsh9780/inquira-ce/internal/modelconfig"
 )
 
 type RegenerateRequest struct {

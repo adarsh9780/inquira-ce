@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"inquira-go/internal/appdirs"
-	terminalruntime "inquira-go/internal/terminal"
-	"inquira-go/internal/workspace"
+	"github.com/adarsh9780/inquira-ce/internal/appdirs"
+	terminalruntime "github.com/adarsh9780/inquira-ce/internal/terminal"
+	"github.com/adarsh9780/inquira-ce/internal/workspace"
 )
 
 func TestNativeTerminalSessionIsScopedToItsWorkspace(t *testing.T) {

@@ -1,11 +1,11 @@
 # Release readiness
 
-This repository is private. Its automated binary distribution is an unsigned
-preview channel and is not yet a signed general-availability release.
+This repository is public and source-available under the Sustainable Use
+License 1.0. Its automated binary distribution is an unsigned preview channel
+and is not yet a signed general-availability release.
 
 ## Required before a signed general-availability release
 
-- Choose and review the source-code license.
 - Produce complete third-party notices for Go, frontend, Python, UV, and
   redistributed Python runtime artifacts.
 - Enable GitHub private vulnerability reporting and required branch checks.
@@ -18,8 +18,10 @@ preview channel and is not yet a signed general-availability release.
 - Exercise installation and runtime recovery on every supported OS and
   architecture.
 
-No open-source license is granted by the current repository contents. Keep the
-source repository private until the ownership and license decision is complete.
+The Sustainable Use License permits personal, academic, non-commercial, and
+internal business use subject to its terms. It is not an OSI-approved
+open-source license and restricts commercial exploitation and managed-service
+distribution.
 
 ## Current repository controls
 
@@ -30,5 +32,5 @@ native installers, generate SHA-256 checksums, archive the assets on GitHub,
 and atomically publish public downloads through Cloudflare R2. Dependabot
 alerts and automated security fixes are enabled. The current GitHub account
 tier does not permit branch protection or native secret-scanning push
-protection on a private repository; enable those controls after upgrading the
-account or when an approved public-release plan makes the repository public.
+protection while the repository was private. Re-evaluate required branch
+checks and security controls after the public repository migration.

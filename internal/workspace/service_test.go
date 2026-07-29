@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"inquira-go/internal/apperror"
-	"inquira-go/internal/modelconfig"
+	"github.com/adarsh9780/inquira-ce/internal/apperror"
+	"github.com/adarsh9780/inquira-ce/internal/modelconfig"
 )
 
 type fakeWorkspaceModels struct {

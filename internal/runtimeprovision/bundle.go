@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"slices"
 
-	"inquira-go/internal/runtimeprovision/contract"
+	"github.com/adarsh9780/inquira-ce/internal/runtimeprovision/contract"
 )
 
 // The build preparation command writes the target-specific UV binary and
