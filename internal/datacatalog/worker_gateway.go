@@ -3,7 +3,7 @@ package datacatalog
 import (
 	"context"
 
-	"inquira-go/internal/connection"
+	"github.com/adarsh9780/inquira-ce/internal/connection"
 )
 
 type WorkerGateway struct{ transport connection.RPCTransport }

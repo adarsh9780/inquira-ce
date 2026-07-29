@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"inquira-go/internal/apperror"
+	"github.com/adarsh9780/inquira-ce/internal/apperror"
 )
 
 func AdapterKindForPath(path string) (AdapterKind, error) {

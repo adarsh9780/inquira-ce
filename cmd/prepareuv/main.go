@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"inquira-go/internal/runtimeprovision/contract"
+	"github.com/adarsh9780/inquira-ce/internal/runtimeprovision/contract"
 )
 
 const (

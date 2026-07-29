@@ -3,7 +3,7 @@ package slashcommand
 import (
 	"encoding/json"
 
-	"inquira-go/internal/datacatalog"
+	"github.com/adarsh9780/inquira-ce/internal/datacatalog"
 )
 
 const (

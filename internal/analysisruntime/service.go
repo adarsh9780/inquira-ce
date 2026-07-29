@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"inquira-go/internal/apperror"
-	"inquira-go/internal/conversation"
+	"github.com/adarsh9780/inquira-ce/internal/apperror"
+	"github.com/adarsh9780/inquira-ce/internal/conversation"
 )
 
 const maxTimeoutSeconds = 3600

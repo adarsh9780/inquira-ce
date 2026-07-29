@@ -1,6 +1,6 @@
 package datacatalog
 
-import "inquira-go/internal/connection"
+import "github.com/adarsh9780/inquira-ce/internal/connection"
 
 type TableStatus string
 

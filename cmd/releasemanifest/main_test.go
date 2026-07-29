@@ -52,6 +52,9 @@ func TestStageReleaseBuildsBackwardCompatibleManifest(t *testing.T) {
 	if staged.Manifest.WindowsX64URL != "https://downloads.inquiraai.com/v0.6.0/Inquira-0.6.0-windows-x64-setup.exe" {
 		t.Fatalf("Windows URL = %q", staged.Manifest.WindowsX64URL)
 	}
+	if staged.Manifest.SourceRepositoryURL != "https://github.com/adarsh9780/inquira-ce" {
+		t.Fatalf("source repository URL = %q", staged.Manifest.SourceRepositoryURL)
+	}
 	if len(staged.Manifest.MacOSARM64SHA256) != 64 || len(staged.Manifest.WindowsX64SHA256) != 64 {
 		t.Fatalf("missing checksums: %#v", staged.Manifest)
 	}

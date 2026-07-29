@@ -3,10 +3,10 @@ package analysisagent
 import (
 	"encoding/json"
 
-	"inquira-go/internal/analysisruntime"
-	"inquira-go/internal/conversation"
-	"inquira-go/internal/datacatalog"
-	"inquira-go/internal/modelconfig"
+	"github.com/adarsh9780/inquira-ce/internal/analysisruntime"
+	"github.com/adarsh9780/inquira-ce/internal/conversation"
+	"github.com/adarsh9780/inquira-ce/internal/datacatalog"
+	"github.com/adarsh9780/inquira-ce/internal/modelconfig"
 )
 
 type AnalyzeRequest struct {

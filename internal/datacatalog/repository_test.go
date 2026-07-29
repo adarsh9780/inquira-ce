@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"inquira-go/internal/workspace"
+	"github.com/adarsh9780/inquira-ce/internal/workspace"
 )
 
 func TestSQLiteSchemaRepositoryPersistsReplacementsAndCascadesWithWorkspace(t *testing.T) {

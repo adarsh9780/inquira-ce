@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"inquira-go/internal/apperror"
-	"inquira-go/internal/conversation"
-	"inquira-go/internal/workspace"
+	"github.com/adarsh9780/inquira-ce/internal/apperror"
+	"github.com/adarsh9780/inquira-ce/internal/conversation"
+	"github.com/adarsh9780/inquira-ce/internal/workspace"
 )
 
 type fakeKernelGateway struct {

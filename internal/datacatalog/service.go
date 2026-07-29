@@ -13,9 +13,9 @@ import (
 	"sync"
 	"unicode"
 
-	"inquira-go/internal/apperror"
-	"inquira-go/internal/connection"
-	"inquira-go/internal/workspace"
+	"github.com/adarsh9780/inquira-ce/internal/apperror"
+	"github.com/adarsh9780/inquira-ce/internal/connection"
+	"github.com/adarsh9780/inquira-ce/internal/workspace"
 )
 
 type workspaceSource interface {

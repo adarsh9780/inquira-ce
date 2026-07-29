@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"inquira-go/internal/localstate"
+	"github.com/adarsh9780/inquira-ce/internal/localstate"
 )
 
 type localStateRecorder struct {

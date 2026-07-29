@@ -15,7 +15,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"inquira-go/internal/apperror"
+	"github.com/adarsh9780/inquira-ce/internal/apperror"
 )
 
 const maxTitleLength = 255

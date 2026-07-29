@@ -1,0 +1,5 @@
+# Historical CE Supabase publishable key. This client identifier is public by design.
+edae204c196a323f56046a0e9d6a0621c0b08580:inquira.toml:generic-api-key:27
+
+# Historical Google API key. Revoked and resolved as inquira-ce secret-scanning alert #1 on 2025-09-15.
+efac218c3cf1e59c294a7da2263988d39ddd4de9:src/test_llm.py:gcp-api-key:8

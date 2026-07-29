@@ -1,8 +1,19 @@
-# Inquira Go
+# Inquira Community Edition
 
-This repository is the Go/Wails desktop application for Inquira. It keeps the
-existing Vue UI, uses Go for native application services, and runs ingestion,
-Jupyter, and the LangGraph analysis agent through one bundled Python worker.
+This repository is the canonical Go/Wails desktop application for Inquira
+Community Edition. It keeps the established Vue UI, uses Go for native
+application services, and runs ingestion, Jupyter, and the LangGraph analysis
+agent through one bundled Python worker.
+
+## Product lineage
+
+Inquira CE development began on September 2, 2025. The current Go/Wails
+implementation was developed on a separate branch of history and later joined
+to the original CE repository without rewriting or squashing the earlier work.
+Both complete histories and the original CE release tags remain inspectable.
+
+See [`docs/project-history.md`](docs/project-history.md) for the migration
+record and provenance guarantees.
 
 ## Current architecture
 
@@ -261,6 +272,11 @@ scripts/                       Guarded development and publication helpers
 ## Security and distribution
 
 Report vulnerabilities through GitHub's private vulnerability-reporting flow
-as described in `SECURITY.md`. The repository is intended to remain private
-until the source license, third-party notices, signing, provenance, upgrade,
-and platform installation gates in `docs/release-readiness.md` are complete.
+as described in `SECURITY.md`. Source is available under the Sustainable Use
+License 1.0 in [`LICENSE`](LICENSE). This is a source-available license rather
+than an OSI-approved open-source license; review its commercial and
+redistribution limitations before use.
+
+Current installers are unsigned preview builds. The remaining signing,
+provenance, upgrade, and platform-readiness gates are tracked in
+[`docs/release-readiness.md`](docs/release-readiness.md).
