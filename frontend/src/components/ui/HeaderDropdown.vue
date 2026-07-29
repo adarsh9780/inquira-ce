@@ -93,7 +93,7 @@ const searchQuery = ref('')
 const backendOptions = ref<DropdownOption[]>([])
 const backendLoading = ref(false)
 const isOpen = ref(false)
-const triggerRef = ref<HTMLElement | { $el?: HTMLElement } | null>(null)
+const triggerRef = ref<HTMLElement | null>(null)
 const floatingOptionsStyle = ref<Record<string, string>>({
   left: '0px',
   top: '0px',
@@ -174,9 +174,7 @@ function handleOpenChange(open: boolean) {
 }
 
 function triggerElement(): HTMLElement | null {
-  const candidate = triggerRef.value
-  if (candidate instanceof HTMLElement) return candidate
-  return candidate?.$el instanceof HTMLElement ? candidate.$el : null
+  return triggerRef.value instanceof HTMLElement ? triggerRef.value : null
 }
 
 function updateFloatingPosition() {
@@ -279,8 +277,9 @@ onBeforeUnmount(() => {
     >
       <ComboboxAnchor as-child>
         <div class="relative">
-          <ComboboxTrigger ref="triggerRef" as-child>
+          <ComboboxTrigger as-child>
             <button
+              ref="triggerRef"
               type="button"
               class="group inline-flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1 text-[13px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]"
               :style="triggerStyle"

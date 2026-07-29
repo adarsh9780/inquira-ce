@@ -1262,7 +1262,7 @@ async function handleSubmit() {
       return
     }
 
-    conversationStore.updateLastMessageExplanation(finalExplanation, localMessageId, { conversationId: requestConversationId })
+    conversationStore.finalizeLastMessageExplanation(finalExplanation, localMessageId, { conversationId: requestConversationId })
     const finalStatePatch: Record<string, any> = {}
     if (finalCode.trim()) {
       finalStatePatch.generatedCode = finalCode
