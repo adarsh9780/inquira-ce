@@ -35,7 +35,7 @@ function handleOpenChange(open: boolean) {
     <AlertDialogPortal>
       <AlertDialogOverlay class="ui-alert-overlay modal-overlay layer-modal fixed inset-0" />
       <AlertDialogContent
-        :class="cn('ui-alert-content modal-card fixed left-1/2 top-1/2 z-[91] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-hidden text-left', contentClass)"
+        :class="cn('ui-alert-content modal-card layer-modal fixed left-1/2 top-1/2 w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-hidden text-left', contentClass)"
       >
         <div class="modal-header">
           <div class="flex items-center gap-3">

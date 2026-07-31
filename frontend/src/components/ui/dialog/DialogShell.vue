@@ -42,7 +42,7 @@ function handleOutside(event: Event) {
     <DialogPortal>
       <DialogOverlay class="ui-dialog-overlay modal-overlay layer-modal" />
       <DialogContent
-        :class="cn('ui-dialog-content modal-card fixed left-1/2 top-1/2 z-[91] flex max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden text-left', contentClass)"
+        :class="cn('ui-dialog-content modal-card layer-modal fixed left-1/2 top-1/2 flex max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden text-left', contentClass)"
         @pointer-down-outside="handleOutside"
       >
         <div v-if="!headerless" class="modal-header flex shrink-0 items-center justify-between gap-3">

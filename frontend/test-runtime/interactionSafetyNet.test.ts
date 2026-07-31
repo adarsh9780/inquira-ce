@@ -166,6 +166,44 @@ describe('critical interaction safety net', () => {
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['beta'])
   })
 
+  it('positions the model menu from the rendered trigger element', async () => {
+    const wrapper = mount(HeaderDropdown, {
+      attachTo: document.body,
+      props: {
+        modelValue: 'alpha',
+        searchable: true,
+        dropdownMinWidth: 288,
+        ariaLabel: 'Choose model',
+        options: [
+          { value: 'alpha', label: 'Alpha' },
+          { value: 'beta', label: 'Beta' },
+        ],
+      },
+    })
+    const trigger = wrapper.get('button')
+    trigger.element.getBoundingClientRect = () => ({
+      x: 640,
+      y: 24,
+      top: 24,
+      right: 800,
+      bottom: 56,
+      left: 640,
+      width: 160,
+      height: 32,
+      toJSON: () => ({}),
+    })
+
+    await trigger.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const content = document.body.querySelector('[role="listbox"]')
+    expect(content).toBeTruthy()
+    expect(content.style.width).toBe('var(--reka-combobox-trigger-width)')
+    expect(content.style.minWidth).toBe('288px')
+    expect(content.style.left).toBe('')
+    expect(content.style.top).toBe('')
+  })
+
   it('uses Reka dialog focus management and restores the opening control', async () => {
     const trigger = document.createElement('button')
     trigger.textContent = 'Open settings'

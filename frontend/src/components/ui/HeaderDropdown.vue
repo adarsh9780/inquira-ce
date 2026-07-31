@@ -12,7 +12,7 @@ import {
   ComboboxViewport,
 } from 'reka-ui'
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/vue/20/solid'
-import { computed, nextTick, onBeforeUnmount, ref, watch, type Component } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useId, watch, type Component } from 'vue'
 import {
   mergeModelOptions,
   normalizeModelOptions,
@@ -31,7 +31,6 @@ import {
   dropdownSurfaceClass,
   dropdownSurfaceStyle,
 } from './dropdownShared'
-import { updateFloatingDropdownPosition } from '../../composables/useFloatingDropdown'
 
 type DropdownValue = string | number | null
 
@@ -63,6 +62,7 @@ const props = withDefaults(defineProps<{
   noResultsLabel?: string
   maxOptionsWithoutSearch?: number
   dropdownMinWidth?: number
+  disabled?: boolean
 }>(), {
   modelValue: null,
   options: () => [],
@@ -83,6 +83,7 @@ const props = withDefaults(defineProps<{
   noResultsLabel: 'No results found',
   maxOptionsWithoutSearch: 0,
   dropdownMinWidth: 0,
+  disabled: false,
 })
 
 const emit = defineEmits<{
@@ -93,14 +94,15 @@ const searchQuery = ref('')
 const backendOptions = ref<DropdownOption[]>([])
 const backendLoading = ref(false)
 const isOpen = ref(false)
-const triggerRef = ref<HTMLElement | { $el?: HTMLElement } | null>(null)
-const floatingOptionsStyle = ref<Record<string, string>>({
-  left: '0px',
-  top: '0px',
-  width: '0px',
-  maxHeight: '240px',
+const triggerRef = ref<HTMLElement | null>(null)
+const dropdownInstanceId = `header-dropdown-${useId()}`
+const floatingOptionsStyle = computed<Record<string, string>>(() => ({
+  width: 'var(--reka-combobox-trigger-width)',
+  minWidth: props.dropdownMinWidth > 0 ? `${props.dropdownMinWidth}px` : '0px',
+  maxHeight: 'min(240px, var(--reka-combobox-content-available-height))',
+  visibility: isOpen.value ? 'visible' : 'hidden',
   ...dropdownSurfaceStyle(),
-})
+}))
 let backendSearchTimer: ReturnType<typeof setTimeout> | null = null
 let backendSearchToken = 0
 
@@ -154,7 +156,6 @@ watch(() => props.backendSearch, () => {
   backendOptions.value = []
   scheduleBackendSearch(String(searchQuery.value || '').trim())
 })
-watch([filteredOptions, groupedFilteredOptions], () => void nextTick(updateFloatingPosition))
 
 function handleChange(value: DropdownValue) {
   searchQuery.value = ''
@@ -165,43 +166,61 @@ function handleChange(value: DropdownValue) {
 function handleOpenChange(open: boolean) {
   isOpen.value = open
   if (open) {
-    bindPositionListeners()
-    void nextTick(updateFloatingPosition)
+    bindDismissListeners()
   } else {
-    unbindPositionListeners()
+    unbindDismissListeners()
     searchQuery.value = ''
   }
 }
 
-function triggerElement(): HTMLElement | null {
-  const candidate = triggerRef.value
-  if (candidate instanceof HTMLElement) return candidate
-  return candidate?.$el instanceof HTMLElement ? candidate.$el : null
-}
-
-function updateFloatingPosition() {
-  const nextStyle = updateFloatingDropdownPosition({ value: triggerElement() })
-  if (!nextStyle) return
-  if (props.dropdownMinWidth > 0) {
-    const rect = triggerElement()?.getBoundingClientRect()
-    if (rect) {
-      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || props.dropdownMinWidth + 16
-      const width = Math.min(Math.max(rect.width, props.dropdownMinWidth), Math.max(0, viewportWidth - 16))
-      nextStyle.width = `${Math.round(width)}px`
-      nextStyle.left = `${Math.round(Math.max(8, Math.min(rect.left, viewportWidth - width - 8)))}px`
-    }
+function dismissDropdown(restoreTriggerFocus = false) {
+  if (!isOpen.value) return
+  handleOpenChange(false)
+  if (restoreTriggerFocus) {
+    void nextTick(() => triggerRef.value?.focus())
   }
-  floatingOptionsStyle.value = nextStyle
 }
 
-function bindPositionListeners() {
-  window.addEventListener('resize', updateFloatingPosition)
-  window.addEventListener('scroll', updateFloatingPosition, true)
+function eventPathContains(event: Event, element: Element | null) {
+  return Boolean(element && event.composedPath().includes(element))
 }
 
-function unbindPositionListeners() {
-  window.removeEventListener('resize', updateFloatingPosition)
-  window.removeEventListener('scroll', updateFloatingPosition, true)
+function hasLiveOpenDropdown() {
+  if (!triggerRef.value?.isConnected) {
+    unbindDismissListeners()
+    return false
+  }
+  return isOpen.value
+}
+
+function handleDocumentPointerDown(event: PointerEvent) {
+  if (!hasLiveOpenDropdown()) return
+
+  const content = document.querySelector(`[data-header-dropdown-content="${dropdownInstanceId}"]`)
+  if (eventPathContains(event, triggerRef.value) || eventPathContains(event, content)) return
+
+  dismissDropdown()
+}
+
+function handleDocumentKeydown(event: KeyboardEvent) {
+  if (!hasLiveOpenDropdown() || event.key !== 'Escape') return
+  event.preventDefault()
+  dismissDropdown(true)
+}
+
+function handleEscapeKeyDown(event: Event) {
+  event.preventDefault()
+  dismissDropdown(true)
+}
+
+function bindDismissListeners() {
+  document.addEventListener('pointerdown', handleDocumentPointerDown, true)
+  document.addEventListener('keydown', handleDocumentKeydown, true)
+}
+
+function unbindDismissListeners() {
+  document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
+  document.removeEventListener('keydown', handleDocumentKeydown, true)
 }
 
 function shouldSearchBackend(query: string, localMatches: DropdownOption[]) {
@@ -263,7 +282,7 @@ function normalizeProviderKey(provider: string) {
 
 onBeforeUnmount(() => {
   if (backendSearchTimer) clearTimeout(backendSearchTimer)
-  unbindPositionListeners()
+  unbindDismissListeners()
 })
 </script>
 
@@ -272,6 +291,7 @@ onBeforeUnmount(() => {
     <ComboboxRoot
       :model-value="modelValue"
       :open="isOpen"
+      :disabled="disabled"
       :ignore-filter="true"
       :reset-search-term-on-select="true"
       @update:model-value="handleChange"
@@ -279,12 +299,14 @@ onBeforeUnmount(() => {
     >
       <ComboboxAnchor as-child>
         <div class="relative">
-          <ComboboxTrigger ref="triggerRef" as-child>
+          <ComboboxTrigger as-child>
             <button
+              ref="triggerRef"
               type="button"
-              class="group inline-flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1 text-[13px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]"
+              class="group inline-flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1 text-[13px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] disabled:cursor-not-allowed disabled:opacity-50"
               :style="triggerStyle"
               :aria-label="ariaLabel"
+              :disabled="disabled"
             >
               <span class="flex min-w-0 items-center gap-2">
                 <span v-if="selectedOption?.icon" class="inline-flex h-4 w-4 shrink-0" data-header-dropdown-icon>
@@ -301,6 +323,14 @@ onBeforeUnmount(() => {
               :class="[dropdownSurfaceClass, 'ui-combobox-content']"
               :style="floatingOptionsStyle"
               position="popper"
+              :side-offset="6"
+              align="start"
+              position-strategy="fixed"
+              :collision-padding="8"
+              :data-header-dropdown-content="dropdownInstanceId"
+              @escape-key-down="handleEscapeKeyDown"
+              @pointer-down-outside="dismissDropdown()"
+              @focus-outside="dismissDropdown()"
             >
               <div v-if="searchable" :class="dropdownSearchRowClass" :style="dropdownSearchRowStyle">
                 <ComboboxInput
@@ -380,7 +410,9 @@ onBeforeUnmount(() => {
 }
 
 .ui-combobox-content[data-state='closed'] {
-  animation: combobox-out var(--motion-duration-fast) var(--motion-ease-standard);
+  animation: none;
+  pointer-events: none;
+  visibility: hidden;
 }
 
 @keyframes combobox-in {
@@ -388,8 +420,4 @@ onBeforeUnmount(() => {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-@keyframes combobox-out {
-  from { opacity: 1; transform: translateY(0) scale(1); }
-  to { opacity: 0; transform: translateY(-2px) scale(0.99); }
-}
 </style>

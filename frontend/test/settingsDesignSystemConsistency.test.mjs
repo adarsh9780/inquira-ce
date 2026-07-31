@@ -49,7 +49,8 @@ test('dropdown, toast, and blocking overlays use layer utility classes', () => {
   const appSource = read('src/components/startup/BlockingOperationOverlay.vue')
 
   assert.equal(headerDropdown.includes('dropdownSurfaceClass'), true)
-  assert.equal(sharedDropdown.includes("layer-modal-dropdown fixed"), true)
+  assert.equal(sharedDropdown.includes('layer-modal-dropdown'), true)
+  assert.equal(sharedDropdown.includes('layer-modal-dropdown fixed'), false)
   assert.equal(toastContainer.includes('class="layer-toast fixed'), true)
 
   assert.equal(appSource.includes('class="layer-blocking fixed inset-0'), true)
