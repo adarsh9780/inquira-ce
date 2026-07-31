@@ -1,6 +1,6 @@
 <template>
   <div class="inquira-data-grid" data-inquira-data-grid>
-    <div class="inquira-data-grid__viewport">
+    <DataGridViewport fill label="Scrollable table data" class="inquira-data-grid__viewport">
       <table
         class="inquira-data-grid__table"
         :style="{ width: `max(100%, ${table.getTotalSize()}px)` }"
@@ -103,7 +103,7 @@
           </tr>
         </tbody>
       </table>
-    </div>
+    </DataGridViewport>
 
     <div class="inquira-data-grid__pagination" aria-label="Table pagination">
       <span class="inquira-data-grid__range">{{ visibleRangeLabel }}</span>
@@ -268,6 +268,7 @@ import {
   FunnelIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
+import DataGridViewport from '../../ui/DataGridViewport.vue'
 import {
   fromTanStackSorting,
   getFilterOperators,
@@ -497,13 +498,6 @@ async function copyCellOnShortcut(event: any, value: any) {
   background: var(--color-base);
   color: var(--color-text-main);
   font-family: var(--font-ui);
-}
-
-.inquira-data-grid__viewport {
-  min-height: 0;
-  flex: 1;
-  overflow: auto;
-  background: var(--color-base);
 }
 
 .inquira-data-grid__table {

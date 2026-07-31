@@ -1,6 +1,6 @@
 <template>
   <section class="flex flex-col overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm" :aria-labelledby="`table-${table.id}-title`">
-    <div class="sticky top-0 z-30 flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface)]/95 px-4 py-3 backdrop-blur-sm">
+    <div class="flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
       <div class="min-w-0">
         <h3 :id="`table-${table.id}-title`" class="flex items-center gap-2 truncate font-mono text-[14px] font-semibold text-[var(--color-text-main)]">
           <svg class="h-4 w-4 shrink-0 text-[var(--color-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
@@ -17,16 +17,16 @@
       </div>
     </div>
 
-    <div class="overflow-x-auto">
-      <table class="w-full min-w-[840px] border-collapse text-left">
-        <thead class="sticky top-[61px] z-20 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+    <DataGridViewport :label="`Columns in ${table.tableName}`" class="schema-metadata-viewport">
+      <table class="schema-metadata-grid">
+        <thead class="schema-metadata-grid__head">
           <tr>
-            <th class="w-12 border-b border-[var(--color-border)] px-4 py-2.5 text-center text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">#</th>
-            <th class="w-1/5 border-b border-[var(--color-border)] px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">Column</th>
-            <th class="w-28 border-b border-[var(--color-border)] px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">Type</th>
-            <th class="w-20 border-b border-[var(--color-border)] px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">Nullable</th>
-            <th class="w-[30%] border-b border-[var(--color-border)] px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">Description</th>
-            <th class="w-[25%] border-b border-[var(--color-border)] px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">Aliases</th>
+            <th class="w-12 px-4 text-center">#</th>
+            <th class="w-1/5 px-4">Column</th>
+            <th class="w-28 px-3">Type</th>
+            <th class="w-20 px-3">Nullable</th>
+            <th class="w-[30%] px-4">Description</th>
+            <th class="w-[25%] px-4">Aliases</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-[var(--color-border)]">
@@ -48,7 +48,7 @@
           </tr>
         </tbody>
       </table>
-    </div>
+    </DataGridViewport>
   </section>
 </template>
 
@@ -56,6 +56,7 @@
 import { computed, ref } from 'vue'
 import { normalizeAliasList } from '../../composables/useSchemaHubState'
 import type { SchemaHubColumn, SchemaHubTable } from '../../types/schemaHub'
+import DataGridViewport from '../ui/DataGridViewport.vue'
 
 const props = defineProps<{ table: SchemaHubTable; dirty: boolean; saving: boolean; regenerating: boolean; busy: boolean }>()
 const emit = defineEmits<{ change: [tableId: string, columns: SchemaHubColumn[]]; save: [tableId: string, columns: SchemaHubColumn[]]; regenerate: [tableName: string] }>()
@@ -90,3 +91,44 @@ function saveTable() {
   emit('save', props.table.id, columns)
 }
 </script>
+
+<style scoped>
+.schema-metadata-viewport {
+  max-height: clamp(20rem, calc(100vh - 18rem), 52rem);
+}
+
+.schema-metadata-grid {
+  width: 100%;
+  min-width: 840px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: var(--color-text-main);
+  text-align: left;
+}
+
+.schema-metadata-grid__head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.schema-metadata-grid__head th {
+  height: 36px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-data-grid-header);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.schema-metadata-grid tbody tr:nth-child(even) td {
+  background: var(--color-data-grid-row-alt);
+}
+
+.schema-metadata-grid tbody tr:hover td {
+  background: var(--color-data-grid-row-hover);
+}
+</style>
