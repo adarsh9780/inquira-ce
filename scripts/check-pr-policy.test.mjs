@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 
 import { evaluatePolicy, isReviewablePath, parseNumstat } from './check-pr-policy.mjs'
 
@@ -87,4 +88,18 @@ test('classifies reviewable paths and binary numstat safely', () => {
   assert.deepEqual(parseNumstat('-\t-\tbuild/icon.ico\n'), [
     { path: 'build/icon.ico', added: 0, deleted: 0, binary: true },
   ])
+})
+
+test('uses the same verified action pins as the main CI workflow', () => {
+  const ciWorkflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8')
+  const policyWorkflow = readFileSync(new URL('../.github/workflows/pr-policy.yml', import.meta.url), 'utf8')
+
+  for (const action of ['actions/checkout', 'actions/setup-node']) {
+    const pattern = new RegExp(`${action.replace('/', '\\/')}@([a-f0-9]{40})`)
+    const ciPin = ciWorkflow.match(pattern)?.[1]
+    const policyPin = policyWorkflow.match(pattern)?.[1]
+
+    assert.ok(ciPin, `${action} must have a verified pin in ci.yml`)
+    assert.equal(policyPin, ciPin, `${action} must reuse the verified CI pin`)
+  }
 })
