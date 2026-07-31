@@ -18,7 +18,7 @@
           :disabled="schemaBusy || schemaHub.isEdited.value"
           :title="schemaHub.isEdited.value ? 'Save or discard table changes before adding data' : 'Add data to this workspace'"
           data-action="add-workspace-data"
-          @click="workspaceActivation.openDataConnectionFlow()"
+          @click="requestAddData"
         >
           <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
           Add data
@@ -43,6 +43,7 @@
         :tables="groupedSchema"
         :selection="schemaHub.selection.value"
         :dirty-table-ids="schemaHub.dirtyTableIds.value"
+        :source-count="sourceCount"
         @select="requestSchemaSelection"
       />
 
@@ -61,11 +62,15 @@
           v-model="schemaContext"
           :save-context="saveWorkspaceContext"
         />
-        <div v-if="!schemaHub.isLoading.value && groupedSchema.length === 0" class="flex h-40 flex-col items-center justify-center text-center">
-          <p class="text-[var(--color-text-main)] font-medium text-[15px]">No datasets found.</p>
-          <p class="text-[var(--color-text-muted)] text-[13px] mt-1">Upload data or sync a dataset first.</p>
-        </div>
-        <div v-else-if="!schemaHub.isLoading.value && schemaHub.selectedTable.value" class="space-y-4 p-4 pb-10">
+        <WorkspaceDataSources
+          v-else
+          v-show="schemaHub.selection.value.kind === 'sources'"
+          ref="dataSourcesRef"
+          :workspace-id="workspaceStore.activeWorkspaceId"
+          @changed="handleSourcesChanged"
+          @update:count="sourceCount = $event"
+        />
+        <div v-if="!schemaHub.isLoading.value && schemaHub.selectedTable.value" class="space-y-4 p-4 pb-10">
           <TableContextSurface
             :key="schemaHub.selectedTable.value.id"
             :model-value="schemaHub.selectedTable.value.tableContext || ''"
@@ -99,15 +104,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { workspaceApi } from '../../api/workspaces'
 import { useExecutionStore } from '../../stores/executionStore'
 import { useWorkspaceStore } from '../../stores/workspaceStore'
-import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
 import TableMetadataSurface from '../schema/TableMetadataSurface.vue'
 import TableContextSurface from '../schema/TableContextSurface.vue'
 import SchemaTableNavigator from '../schema/SchemaTableNavigator.vue'
 import WorkspaceContextSurface from '../schema/WorkspaceContextSurface.vue'
+import WorkspaceDataSources from '../schema/WorkspaceDataSources.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import {
   normalizeSchemaColumns,
@@ -120,7 +125,6 @@ import { normalizeSchemaRefreshResult, schemaRefreshFeedback } from '../../utils
 
 const executionStore = useExecutionStore()
 const workspaceStore = useWorkspaceStore()
-const workspaceActivation = useWorkspaceActivation()
 
 const schemaHub = useSchemaHubState()
 const savingTableId = ref('')
@@ -130,6 +134,8 @@ const schemaBusy = computed(() => schemaHub.isLoading.value || isRefreshingSourc
 const regeneratingTableName = ref('')
 const pendingSelection = ref<SchemaHubSelection | null>(null)
 const groupedSchema = schemaHub.tables
+const dataSourcesRef = ref<InstanceType<typeof WorkspaceDataSources> | null>(null)
+const sourceCount = ref(0)
 
 const schemaContext = ref('')
 
@@ -138,7 +144,7 @@ const hasWorkspace = computed(() => !!workspaceStore.activeWorkspaceId)
 function requestSchemaSelection(selection: SchemaHubSelection) {
   const currentSelection = schemaHub.selection.value
   const isCurrent = selection.kind === currentSelection.kind
-    && (selection.kind === 'workspace' || (currentSelection.kind === 'table' && selection.tableId === currentSelection.tableId))
+    && (selection.kind !== 'table' || (currentSelection.kind === 'table' && selection.tableId === currentSelection.tableId))
   if (isCurrent) return
   const currentTable = schemaHub.selectedTable.value
   if (currentTable && schemaHub.dirtyTableIds.value.has(currentTable.id)) {
@@ -150,7 +156,21 @@ function requestSchemaSelection(selection: SchemaHubSelection) {
 
 function applySchemaSelection(selection: SchemaHubSelection) {
   if (selection.kind === 'workspace') schemaHub.selectWorkspace()
+  else if (selection.kind === 'sources') schemaHub.selectSources()
   else schemaHub.selectTable(selection.tableId)
+}
+
+async function requestAddData() {
+  if (!hasWorkspace.value || schemaBusy.value || schemaHub.isEdited.value) return
+  requestSchemaSelection({ kind: 'sources' })
+  await nextTick()
+  await dataSourcesRef.value?.chooseFile()
+}
+
+async function handleSourcesChanged() {
+  await fetchWorkspaceSchema()
+  await workspaceStore.fetchWorkspaceSummary(workspaceStore.activeWorkspaceId)
+  await workspaceStore.fetchColumnCatalog({ force: true })
 }
 
 function discardAndSelect() {

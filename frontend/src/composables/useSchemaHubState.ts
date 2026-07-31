@@ -125,6 +125,10 @@ export function useSchemaHubState() {
     selection.value = { kind: 'workspace' }
   }
 
+  function selectSources() {
+    selection.value = { kind: 'sources' }
+  }
+
   function selectTable(tableId: string) {
     if (!tables.value.some((table) => table.id === tableId)) return false
     selection.value = { kind: 'table', tableId }
@@ -175,6 +179,7 @@ export function useSchemaHubState() {
     rejectLoad,
     clear,
     selectWorkspace,
+    selectSources,
     selectTable,
     markTableDirty,
     clearDirtyTables,

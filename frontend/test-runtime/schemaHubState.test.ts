@@ -69,6 +69,13 @@ describe('schema hub state', () => {
     expect(state.isEdited.value).toBe(false)
   })
 
+  it('selects the data-source surface independently of tables', () => {
+    const state = useSchemaHubState()
+    state.selectSources()
+    expect(state.selection.value).toEqual({ kind: 'sources' })
+    expect(state.selectedTable.value).toBeNull()
+  })
+
   it('restores the last saved columns when table edits are discarded', () => {
     const state = useSchemaHubState()
     const load = state.beginLoad()

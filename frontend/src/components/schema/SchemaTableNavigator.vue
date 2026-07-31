@@ -1,6 +1,6 @@
 <template>
   <aside class="flex w-60 shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-base-muted)] p-3" aria-label="Schema navigation">
-    <div class="mb-6">
+    <div class="mb-6 space-y-1">
       <p class="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">Context</p>
       <button
         type="button"
@@ -11,6 +11,16 @@
       >
         <span>Workspace context</span>
         <span class="text-xs font-normal text-[var(--color-text-muted)]">All tables</span>
+      </button>
+      <button
+        type="button"
+        class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors"
+        :class="selection.kind === 'sources' ? 'bg-[var(--color-surface)] font-semibold text-[var(--color-text-main)] shadow-sm' : 'text-[var(--color-text-sub)] hover:bg-[var(--color-surface)]/70'"
+        :aria-current="selection.kind === 'sources' ? 'page' : undefined"
+        @click="emit('select', { kind: 'sources' })"
+      >
+        <span>Data sources</span>
+        <span class="text-xs font-normal tabular-nums text-[var(--color-text-muted)]">{{ sourceCount }}</span>
       </button>
     </div>
 
@@ -43,7 +53,7 @@
 <script setup lang="ts">
 import type { SchemaHubSelection, SchemaHubTable } from '../../types/schemaHub'
 
-const props = defineProps<{ tables: SchemaHubTable[]; selection: SchemaHubSelection; dirtyTableIds: Set<string> }>()
+const props = withDefaults(defineProps<{ tables: SchemaHubTable[]; selection: SchemaHubSelection; dirtyTableIds: Set<string>; sourceCount?: number }>(), { sourceCount: 0 })
 const emit = defineEmits<{ select: [selection: SchemaHubSelection] }>()
 function isSelected(tableId: string) { return props.selection.kind === 'table' && props.selection.tableId === tableId }
 </script>

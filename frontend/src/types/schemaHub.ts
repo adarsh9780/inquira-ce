@@ -19,4 +19,5 @@ export interface SchemaHubTable {
 
 export type SchemaHubSelection =
   | { kind: 'workspace' }
+  | { kind: 'sources' }
   | { kind: 'table'; tableId: string }

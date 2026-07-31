@@ -12,5 +12,6 @@ test('schema hub uses focused table navigation and protects unsaved metadata', (
   assert.equal(editor.includes('schemaHub.resetTable(currentTable.id)'), true)
   assert.equal(editor.includes(':disabled="schemaBusy || schemaHub.isEdited.value"'), true)
   assert.equal(editor.includes('data-action="add-workspace-data"'), true)
-  assert.equal(editor.includes('workspaceActivation.openDataConnectionFlow()'), true)
+  assert.equal(editor.includes('@click="requestAddData"'), true)
+  assert.equal(editor.includes('<WorkspaceDataSources'), true)
 })
