@@ -16,4 +16,11 @@ describe('shared message rendering', () => {
     expect(rendered).toContain('token')
     expect(rendered).not.toContain('<script>')
   })
+
+  it('registers SQL highlighting without relying on a browser-global Prism variable', () => {
+    const rendered = renderMarkdown('```sql\nSELECT total FROM batting\n```')
+
+    expect(rendered).toContain('language-sql')
+    expect(rendered).toContain('token keyword')
+  })
 })
