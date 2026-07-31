@@ -6,6 +6,14 @@ Describe the user-visible and technical changes.
 
 Explain the problem, decision, or product requirement behind the change.
 
+## Out of scope
+
+Name nearby work intentionally excluded from this PR.
+
+## Reviewer guide
+
+Point reviewers to the highest-risk files and the recommended review order.
+
 ## Validation
 
 - [ ] `make test`
@@ -16,3 +24,5 @@ Explain the problem, decision, or product requirement behind the change.
 ## Risk and recovery
 
 Describe migration, compatibility, security, rollout, and rollback considerations.
+
+<!-- If the size-override label is needed, add a "## Size override" section and explain why the change cannot be split safely. -->
