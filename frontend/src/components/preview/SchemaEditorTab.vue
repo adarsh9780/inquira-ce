@@ -25,38 +25,11 @@
 
     <!-- Content Area -->
     <div v-else class="flex flex-col flex-1 overflow-hidden">
-      <!-- Workspace Context -->
-      <div class="relative z-10 mx-4 mt-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-sm">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-1.5">
-            <label class="text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">Workspace Context</label>
-            <div class="group relative inline-flex items-center">
-              <svg class="w-3.5 h-3.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] transition-colors cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              <!-- Styled Tooltip -->
-              <div class="pointer-events-none absolute top-full left-0 mt-1 w-64 bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text-main)] text-[12px] p-2.5 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-30 leading-normal font-normal normal-case">
-                Shared across every dataset in this workspace for schema generation.
-              </div>
-            </div>
-          </div>
-          <button v-if="!isEditingContext" @click="startEditContext" class="text-[12px] font-medium text-[var(--color-accent)] flex items-center gap-1 hover:brightness-110 transition-colors px-2 py-0.5 rounded hover:bg-[var(--color-accent)]/10">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
-            </svg>
-            Edit
-          </button>
-        </div>
-
-        <div v-if="isEditingContext" class="mt-3">
-          <textarea v-focus v-model="tempContext" class="w-full bg-[var(--color-base)] border border-[var(--color-accent)] rounded-lg p-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 resize-y text-[var(--color-text-main)] placeholder:text-[var(--color-text-muted)]" rows="4" placeholder="Example: Daily transaction-level sales data for retail stores. 'channel' means online vs in-store."></textarea>
-          <div class="flex justify-end gap-2 mt-3">
-            <button @click="cancelEditContext" class="px-4 py-2 text-[13px] font-medium rounded-lg hover:bg-[var(--color-base-muted)] text-[var(--color-text-main)] transition-colors">Cancel</button>
-            <button @click="saveEditContext" class="px-4 py-2 text-[13px] font-semibold rounded-lg bg-[var(--color-accent)] text-[var(--color-on-accent)] shadow-sm hover:brightness-95 transition-all">Save Context</button>
-          </div>
-        </div>
-        <div v-else class="mt-1.5 text-[13px] text-[var(--color-text-main)] prose prose-sm max-w-none leading-relaxed" v-html="renderedContext || '<i class=\'text-[var(--color-text-muted)]\'>Click edit to add shared workspace context...</i>'"></div>
-      </div>
+      <WorkspaceContextSurface
+        :key="workspaceStore.activeWorkspaceId"
+        v-model="schemaContext"
+        :save-context="saveWorkspaceContext"
+      />
 
       <!-- Schema Tables -->
       <div class="flex-1 overflow-auto p-4 schema-scroll-area">
@@ -157,6 +130,7 @@ import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useConversationStore } from '../../stores/conversationStore'
 import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
 import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
+import WorkspaceContextSurface from '../schema/WorkspaceContextSurface.vue'
 import {
   normalizeAliasList,
   normalizeSchemaColumns,
@@ -165,14 +139,12 @@ import {
 } from '../../composables/useSchemaHubState'
 import { toast } from '../../composables/useToast'
 import type { SchemaHubColumn } from '../../types/schemaHub'
-import MarkdownIt from 'markdown-it'
 
 // Custom Directive for autofocusing inline edit inputs
 const vFocus = {
   mounted: (el: any) => el.focus()
 }
 
-const md = new MarkdownIt({ breaks: true, linkify: true })
 const uiStore = useUiStore()
 const preferencesStore = usePreferencesStore()
 const artifactStore = useArtifactStore()
@@ -189,10 +161,7 @@ const regeneratingTableName = ref('')
 const schemaEdited = schemaHub.isEdited
 const groupedSchema = schemaHub.tables
 
-// Workspace context editing state
 const schemaContext = ref('')
-const isEditingContext = ref(false)
-const tempContext = ref('')
 
 // Inline editing state
 const editingCell = ref<{
@@ -202,11 +171,6 @@ const editingCell = ref<{
 } | null>(null)
 
 const hasWorkspace = computed(() => !!workspaceStore.activeWorkspaceId)
-
-const renderedContext = computed(() => {
-  if (!schemaContext.value || schemaContext.value.trim() === '') return ''
-  return md.render(schemaContext.value)
-})
 
 async function loadWorkspaceContext() {
   const workspaceId = workspaceStore.activeWorkspaceId
@@ -252,26 +216,21 @@ async function fetchWorkspaceSchema(forceRefresh = false) {
   }
 }
 
-function startEditContext() {
-  tempContext.value = schemaContext.value
-  isEditingContext.value = true
-}
-
-function cancelEditContext() {
-  isEditingContext.value = false
-  tempContext.value = ''
-}
-
-async function saveEditContext() {
-  if (!workspaceStore.activeWorkspaceId) return
+async function saveWorkspaceContext(context: string) {
+  const workspaceId = workspaceStore.activeWorkspaceId
+  if (!workspaceId) throw new Error('Select a workspace before saving context.')
   try {
-    const workspace = workspaceStore.workspaces.find((w: any) => w.id === workspaceStore.activeWorkspaceId)
-    await workspaceApi.update(workspaceStore.activeWorkspaceId, workspace?.name ?? null, tempContext.value.trim())
-    schemaContext.value = tempContext.value.trim()
-    isEditingContext.value = false
+    const workspace = workspaceStore.workspaces.find((w: any) => w.id === workspaceId)
+    await workspaceApi.update(workspaceId, workspace?.name ?? null, context)
+    if (workspaceStore.activeWorkspaceId !== workspaceId) {
+      throw new DOMException('Workspace changed before the context save completed.', 'AbortError')
+    }
     toast.success('Workspace context saved')
   } catch (error: any) {
-    toast.error('Failed to save context', error?.message)
+    if (workspaceStore.activeWorkspaceId === workspaceId) {
+      toast.error('Failed to save context', error?.message)
+    }
+    throw error
   }
 }
 
@@ -442,24 +401,4 @@ watch(() => uiStore.activeTab, async (nextTab) => {
   height: 0;
 }
 
-/* Base Prose Styles for Markdown Context */
-.prose :deep(p) { margin: 0; }
-.prose :deep(p:last-child) { margin-bottom: 0; }
-.prose :deep(strong) { font-weight: 600; }
-.prose :deep(code) {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.6;
-  padding: 0.125em 0.375em;
-  border-radius: 0.25rem;
-  background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent);
-}
-.prose :deep(ul), .prose :deep(ol) {
-  margin: 0.35em 0;
-  padding-left: 1.5em;
-}
-.prose :deep(a) {
-  color: var(--color-accent);
-  text-decoration: underline;
-}
 </style>
