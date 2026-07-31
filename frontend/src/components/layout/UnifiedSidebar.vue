@@ -37,27 +37,6 @@
 
     <!-- ─── Main Scroll Area ─── -->
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden px-2">
-      <!-- ─── Primary Actions ─── -->
-      <SidebarPrimaryNav>
-        <button
-          type="button"
-          class="sidebar-nav-row sidebar-primary-row justify-start px-2.5"
-          title="New conversation"
-          @click="createConversation()"
-        >
-          <span class="sidebar-row-icon">
-            <PencilSquareIcon class="h-4 w-4" />
-          </span>
-          <span
-            class="sidebar-row-label"
-            :class="uiStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[176px] opacity-100 ml-2.5'"
-          >
-            New analysis
-          </span>
-        </button>
-
-      </SidebarPrimaryNav>
-
       <!-- ─── Workspaces and conversations ─── -->
       <SidebarWorkspaceConversations>
         <div
@@ -123,14 +102,12 @@
                 <div v-if="isWorkspaceConversationsLoading(workspace.id)" class="px-2 py-1 text-[12px] font-medium text-[var(--color-text-muted)]">
                   Loading conversations
                 </div>
-                <button
+                <div
                   v-else-if="visibleConversationsForSidebar(workspace).length === 0"
-                  type="button"
-                  class="w-full rounded-md px-2 py-1 text-left text-[12px] font-medium text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/5 hover:text-[var(--color-text-main)]"
-                  @click="createConversation(workspace.id)"
+                  class="px-2 py-1 text-xs text-[var(--color-text-muted)]"
                 >
-                  New conversation
-                </button>
+                  No conversations yet
+                </div>
                 <template v-else>
                   <SidebarConversationRow
                     v-for="conv in visibleConversationsForSidebar(workspace)"
@@ -350,7 +327,6 @@ import TermsModal from '../modals/TermsModal.vue'
 import SidebarConversationActionsMenu from './sidebar/SidebarConversationActionsMenu.vue'
 import SidebarConversationRow from './sidebar/SidebarConversationRow.vue'
 import SidebarFooter from './sidebar/SidebarFooter.vue'
-import SidebarPrimaryNav from './sidebar/SidebarPrimaryNav.vue'
 import SidebarWorkspaceConversations from './sidebar/SidebarWorkspaceConversations.vue'
 import logo from '../../assets/favicon.svg'
 import { conversationApi } from '../../api/conversations'
@@ -362,7 +338,6 @@ import {
   ShareIcon,
   Cog6ToothIcon,
   ChevronDoubleLeftIcon,
-  PencilSquareIcon,
   TableCellsIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -648,24 +623,6 @@ async function selectWorkspace(workspaceId: any) {
     uiStore.setActiveTab('workspace')
   } catch (error: any) {
     toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to open workspace'))
-  }
-}
-
-async function createConversation(workspaceId = workspaceStore.activeWorkspaceId) {
-  const normalizedWorkspaceId = String(workspaceId || '').trim()
-  try {
-    if (normalizedWorkspaceId && normalizedWorkspaceId !== String(workspaceStore.activeWorkspaceId || '').trim()) {
-      await workspaceActivation.activateWorkspace(normalizedWorkspaceId)
-      await conversationStore.fetchConversations(normalizedWorkspaceId)
-    }
-    const conversation = await conversationStore.createConversation(workspaceStore.activeWorkspaceId)
-    updateSidebarConversationCache(String(workspaceStore.activeWorkspaceId || '').trim(), conversationStore.conversations)
-    if (conversation?.id) {
-      conversationStore.setActiveConversationId(conversation.id)
-      await conversationStore.fetchConversationTurns()
-    }
-  } catch (error: any) {
-    toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to create conversation'))
   }
 }
 

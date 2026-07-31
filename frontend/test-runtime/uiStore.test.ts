@@ -37,6 +37,11 @@ describe('uiStore', () => {
     expect(store.isCommandPaletteOpen).toBe(true)
     store.closeCommandPalette()
     expect(store.isCommandPaletteOpen).toBe(false)
+
+    store.openConversationSwitcher()
+    expect(store.isConversationSwitcherOpen).toBe(true)
+    store.toggleConversationSwitcher()
+    expect(store.isConversationSwitcherOpen).toBe(false)
   })
 
   it('bounds persisted pane sizes', () => {

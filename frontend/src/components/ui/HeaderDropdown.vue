@@ -38,6 +38,7 @@ interface DropdownOption {
   key?: string | number
   value: Exclude<DropdownValue, null>
   label: string
+  description?: string
   icon?: Component
   provider?: string
 }
@@ -63,6 +64,8 @@ const props = withDefaults(defineProps<{
   maxOptionsWithoutSearch?: number
   dropdownMinWidth?: number
   disabled?: boolean
+  open?: boolean | null
+  triggerVariant?: 'field' | 'breadcrumb'
 }>(), {
   modelValue: null,
   options: () => [],
@@ -84,16 +87,20 @@ const props = withDefaults(defineProps<{
   maxOptionsWithoutSearch: 0,
   dropdownMinWidth: 0,
   disabled: false,
+  open: null,
+  triggerVariant: 'field',
 })
 
 const emit = defineEmits<{
   'update:modelValue': [value: DropdownValue]
+  'update:open': [open: boolean]
 }>()
 
 const searchQuery = ref('')
 const backendOptions = ref<DropdownOption[]>([])
 const backendLoading = ref(false)
-const isOpen = ref(false)
+const internalOpen = ref(false)
+const isOpen = computed(() => props.open === null ? internalOpen.value : props.open)
 const triggerRef = ref<HTMLElement | null>(null)
 const dropdownInstanceId = `header-dropdown-${useId()}`
 const floatingOptionsStyle = computed<Record<string, string>>(() => ({
@@ -109,7 +116,7 @@ let backendSearchToken = 0
 const normalizedOptions = computed<DropdownOption[]>(() => normalizeModelOptions(props.options) as DropdownOption[])
 const selectedOption = computed(() => normalizedOptions.value.find((option) => option.value === props.modelValue) ?? null)
 const selectedLabel = computed(() => String(props.triggerLabel || '').trim() || selectedOption.value?.label || props.placeholder)
-const hasSelection = computed(() => Boolean(selectedOption.value))
+const hasSelection = computed(() => Boolean(selectedOption.value || String(props.triggerLabel || '').trim()))
 const normalizedSearchQuery = computed(() => String(searchQuery.value || '').trim().toLowerCase())
 const filteredOptions = computed(() => {
   const options = normalizedOptions.value
@@ -147,8 +154,10 @@ const containerStyle = computed(() => {
 })
 const triggerStyle = computed(() => ({
   color: hasSelection.value ? 'var(--color-text-main)' : 'var(--color-text-muted)',
-  backgroundColor: 'var(--color-surface)',
-  borderColor: 'var(--color-border)',
+  ...(props.triggerVariant === 'field' ? {
+    backgroundColor: 'var(--color-surface)',
+    borderColor: 'var(--color-border)',
+  } : {}),
 }))
 
 watch(searchQuery, (value) => scheduleBackendSearch(String(value || '').trim()))
@@ -164,8 +173,10 @@ function handleChange(value: DropdownValue) {
 }
 
 function handleOpenChange(open: boolean) {
-  isOpen.value = open
+  internalOpen.value = open
+  emit('update:open', open)
   if (open) {
+    searchQuery.value = ''
     bindDismissListeners()
   } else {
     unbindDismissListeners()
@@ -303,7 +314,10 @@ onBeforeUnmount(() => {
             <button
               ref="triggerRef"
               type="button"
-              class="group inline-flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1 text-[13px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] disabled:cursor-not-allowed disabled:opacity-50"
+              class="group inline-flex w-full items-center justify-between gap-1.5 rounded-md border py-1 text-[0.8125rem] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] disabled:cursor-not-allowed disabled:opacity-50"
+              :class="triggerVariant === 'breadcrumb'
+                ? 'border-transparent bg-transparent px-1.5 hover:bg-[var(--color-panel-muted)] data-[state=open]:bg-[var(--color-panel-muted)]'
+                : 'px-2.5'"
               :style="triggerStyle"
               :aria-label="ariaLabel"
               :disabled="disabled"
@@ -335,6 +349,7 @@ onBeforeUnmount(() => {
               <div v-if="searchable" :class="dropdownSearchRowClass" :style="dropdownSearchRowStyle">
                 <ComboboxInput
                   v-model="searchQuery"
+                  :display-value="() => ''"
                   :class="dropdownSearchInputClass"
                   :placeholder="searchPlaceholder"
                   :style="dropdownSearchInputStyle"
@@ -357,11 +372,16 @@ onBeforeUnmount(() => {
                       :class="[dropdownOptionClass, 'relative flex pl-3 pr-9 data-[highlighted]:bg-[var(--color-panel-muted)] data-[state=checked]:font-semibold']"
                       :title="option.label"
                     >
-                      <span class="flex min-w-0 items-center gap-2 pr-2">
+                      <span class="flex min-w-0 flex-1 items-center gap-2 pr-2">
                         <span v-if="option.icon" class="inline-flex h-4 w-4 shrink-0" data-header-dropdown-icon>
                           <component :is="option.icon" class="h-4 w-4 text-[var(--color-text-muted)]" aria-hidden="true" />
                         </span>
-                        <span class="truncate">{{ option.label }}</span>
+                        <span class="min-w-0 flex-1">
+                          <span class="block truncate">{{ option.label }}</span>
+                          <span v-if="option.description" class="mt-0.5 block truncate text-xs font-normal text-[var(--color-text-muted)]">
+                            {{ option.description }}
+                          </span>
+                        </span>
                       </span>
                       <ComboboxItemIndicator class="absolute right-2.5 top-1/2 -translate-y-1/2">
                         <CheckIcon class="h-4 w-4 text-[var(--color-text-muted)]" aria-hidden="true" />
@@ -378,11 +398,16 @@ onBeforeUnmount(() => {
                     :class="[dropdownOptionClass, 'relative flex pl-3 pr-9 data-[highlighted]:bg-[var(--color-panel-muted)] data-[state=checked]:font-semibold']"
                     :title="option.label"
                   >
-                    <span class="flex min-w-0 items-center gap-2 pr-2">
+                    <span class="flex min-w-0 flex-1 items-center gap-2 pr-2">
                       <span v-if="option.icon" class="inline-flex h-4 w-4 shrink-0" data-header-dropdown-icon>
                         <component :is="option.icon" class="h-4 w-4 text-[var(--color-text-muted)]" aria-hidden="true" />
                       </span>
-                      <span class="truncate">{{ option.label }}</span>
+                      <span class="min-w-0 flex-1">
+                        <span class="block truncate">{{ option.label }}</span>
+                        <span v-if="option.description" class="mt-0.5 block truncate text-xs font-normal text-[var(--color-text-muted)]">
+                          {{ option.description }}
+                        </span>
+                      </span>
                     </span>
                     <ComboboxItemIndicator class="absolute right-2.5 top-1/2 -translate-y-1/2">
                       <CheckIcon class="h-4 w-4 text-[var(--color-text-muted)]" aria-hidden="true" />

@@ -5,14 +5,12 @@
   >
     <div class="flex min-w-0 flex-1 items-center gap-2">
       <div class="min-w-0">
-        <div class="flex min-w-0 items-center gap-1.5 text-[13px]">
+        <div class="flex min-w-0 items-center gap-1 text-[0.8125rem]">
           <span class="truncate font-semibold text-[var(--color-text-main)]">
             {{ activeWorkspaceName }}
           </span>
           <ChevronRightIcon class="h-3 w-3 shrink-0 text-[var(--color-text-muted)] opacity-60" aria-hidden="true" />
-          <span class="truncate text-xs text-[var(--color-text-muted)]">
-            {{ activeConversationTitle }}
-          </span>
+          <ConversationSwitcher class="min-w-0" />
         </div>
       </div>
 
@@ -138,6 +136,7 @@ import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation
 import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
 import { preferencesApi } from '../../api/preferences'
 import ModelSelector from '../ui/ModelSelector.vue'
+import ConversationSwitcher from './ConversationSwitcher.vue'
 import type { NativeSearchResponse } from '../../types/native'
 
 const uiStore = useUiStore()
@@ -154,13 +153,6 @@ const activeWorkspaceName = computed(() => {
   if (!workspaceId) return 'No workspace'
   const workspace = workspaceStore.workspaces.find((item) => String(item?.id || '').trim() === workspaceId)
   return String(workspace?.name || '').trim() || 'Untitled workspace'
-})
-
-const activeConversationTitle = computed(() => {
-  const conversationId = String(conversationStore.activeConversationId || '').trim()
-  if (!conversationId) return 'New conversation'
-  const conversation = conversationStore.conversations.find((item) => String(item?.id || '').trim() === conversationId)
-  return String(conversation?.title || '').trim() || 'Untitled conversation'
 })
 
 const runtimeStateLabel = computed(() => {

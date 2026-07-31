@@ -16,7 +16,7 @@ test('collapsed sidebar rows keep a stable fixed-size icon rail', () => {
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
   const styleSource = readFileSync(resolve(process.cwd(), 'src/style.css'), 'utf-8')
 
-  assert.ok(sidebarSource.includes('class="sidebar-nav-row sidebar-primary-row justify-start px-2.5"'))
+  assert.equal(sidebarSource.includes('class="sidebar-nav-row sidebar-primary-row'), false)
   assert.ok(sidebarSource.includes('class="sidebar-workspace-row justify-start px-2.5"'))
   assert.ok(sidebarSource.includes("'sidebar-root-collapsed': uiStore.isSidebarCollapsed"))
   assert.ok(sidebarSource.includes('.sidebar-root-collapsed .sidebar-nav-row'))

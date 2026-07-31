@@ -306,6 +306,12 @@ export const useConversationStore = defineStore('conversations', () => {
     return String(conversation?.id || '')
   }
 
+  function startConversationDraft() {
+    setActiveConversationId('')
+    currentQuestion.value = ''
+    workspaceTurnTree.value = null
+  }
+
   async function fetchConversationTurns(options: RecordValue = {}) {
     const id = normalizeId(options.conversationId)
     if (!id) {
@@ -509,6 +515,7 @@ export const useConversationStore = defineStore('conversations', () => {
     fetchConversations,
     createConversation,
     ensureActiveConversation,
+    startConversationDraft,
     fetchConversationTurns,
     deleteConversationById,
     updateConversationTitle,

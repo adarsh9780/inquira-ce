@@ -23,7 +23,7 @@ test('workspace views live in the sidebar instead of the status bar', () => {
   assert.equal(sidebarSource.includes('Conversation tree'), true)
   assert.equal(sidebarSource.includes('Datasets and column metadata'), false)
   assert.equal(sidebarSource.includes('Turns across this workspace'), false)
-  assert.equal(sidebarSource.includes('New conversation'), true)
+  assert.equal(sidebarSource.includes('New analysis'), false)
   assert.equal(sidebarSource.includes('Search conversations'), false)
   assert.equal(statusBarSource.includes('switchToWorkspace'), false)
   assert.equal(statusBarSource.includes('switchToSchemaEditor'), false)
