@@ -277,11 +277,15 @@ func (s *Service) buildAnalysisSchema(ctx context.Context, summary workspace.Sum
 		if err != nil {
 			return AnalysisSchema{}, apperror.Wrap("schema_read_failed", "Could not load dataset descriptions.", err)
 		}
+		tableContext, err := s.schemas.TableContext(ctx, summary.ID, table.Name)
+		if err != nil {
+			return AnalysisSchema{}, apperror.Wrap("schema_read_failed", "Could not load dataset context.", err)
+		}
 		byName := make(map[string]ColumnOverride, len(overrides))
 		for _, item := range overrides {
 			byName[item.Name] = item
 		}
-		analysisTable := AnalysisTable{Name: table.Name, Columns: make([]SchemaColumn, 0, len(table.Columns))}
+		analysisTable := AnalysisTable{Name: table.Name, Context: tableContext, Columns: make([]SchemaColumn, 0, len(table.Columns))}
 		for _, column := range table.Columns {
 			override := byName[column.Name]
 			analysisTable.Columns = append(analysisTable.Columns, SchemaColumn{

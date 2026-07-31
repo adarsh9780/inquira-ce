@@ -120,7 +120,7 @@ def _graph_input(values: dict[str, Any]) -> dict[str, Any]:
         question_content = blocks
     messages.append(HumanMessage(content=question_content))
 
-    schema = values["schema"]
+    schema = _normalize_schema(values["schema"])
     tables = schema.get("tables", [])
     return {
         "messages": messages,
@@ -130,7 +130,7 @@ def _graph_input(values: dict[str, Any]) -> dict[str, Any]:
         "turn_id": values.get("turn_id"),
         "artifact_dir": values["artifact_dir"],
         "scratchpad_path": values["artifact_dir"],
-        "table_names": [str(table.get("name") or "").strip() for table in tables if str(table.get("name") or "").strip()],
+        "table_names": [str(table.get("table_name") or "").strip() for table in tables],
         "data_path": values["database_path"],
         "context": str(schema.get("context") or ""),
         "workspace_schema": schema,
@@ -142,6 +142,20 @@ def _graph_input(values: dict[str, Any]) -> dict[str, Any]:
         "attachments": attachments,
         "privacy": {"allow_llm_data_samples": bool(values["model"].get("allow_data_samples"))},
     }
+
+
+def _normalize_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(schema)
+    tables: list[dict[str, Any]] = []
+    for item in schema.get("tables", []):
+        if not isinstance(item, dict):
+            continue
+        table_name = str(item.get("table_name") or item.get("name") or "").strip()
+        if not table_name:
+            continue
+        tables.append({**item, "name": table_name, "table_name": table_name})
+    normalized["tables"] = tables
+    return normalized
 
 
 def _model_config(model: dict[str, Any]) -> dict[str, Any]:

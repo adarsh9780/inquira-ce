@@ -307,6 +307,10 @@ func TestNativeDatasetAndSchemaContractsHideSnapshotPointersAndPersistOverrides(
 	if err != nil || preserved.TableContext != "One row per booked sale." || preserved.Columns[1].Description != "Recognized revenue" {
 		t.Fatalf("column-only SaveSchema() = %#v, %v", preserved, err)
 	}
+	catalog, err := service.Prepare(context.Background(), "workspace-1")
+	if err != nil || catalog.AnalysisSchema.Tables[0].Context != "One row per booked sale." {
+		t.Fatalf("analysis schema table context = %#v, %v", catalog.AnalysisSchema, err)
+	}
 	if _, err := service.SaveSchema(context.Background(), SaveSchemaRequest{WorkspaceID: "workspace-1", TableName: "sales", Columns: []SchemaColumn{{Name: "unknown"}}}); errorCode(err) != "schema_columns_invalid" {
 		t.Fatalf("unknown column error = %v", err)
 	}
