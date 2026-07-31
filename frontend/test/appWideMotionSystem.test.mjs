@@ -27,7 +27,8 @@ test('floating overlays animate from their anchor and are positioned before ente
 
   assert.match(headerDropdown, /ui-combobox-content\[data-state='open'\]/)
   assert.match(headerDropdown, /animation: combobox-in/)
-  assert.match(headerDropdown, /void nextTick\(updateFloatingPosition\)/)
+  assert.match(headerDropdown, /position="popper"/)
+  assert.match(headerDropdown, /position-strategy="fixed"/)
   assert.doesNotMatch(headerDropdown, /duration-100 ease-out|duration-75 ease-in/)
 
   assert.match(sharedDropdown, /motion-popover-surface/)

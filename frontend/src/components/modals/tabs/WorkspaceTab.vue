@@ -424,14 +424,16 @@
                   </p>
                 </div>
                 <div class="grid gap-3 sm:grid-cols-2">
-                <label class="block sm:col-span-2">
+                <div class="block sm:col-span-2">
                   <span class="input-label">Runtime source</span>
-                  <select v-model="runtimeConfig.mode" class="input-base input-outlined" :disabled="runtimeProvisioning">
-                    <option value="managed">Managed Python</option>
-                    <option value="external-python">Company Python</option>
-                    <option value="internal-mirror">Internal mirror</option>
-                  </select>
-                </label>
+                  <HeaderDropdown
+                    v-model="runtimeConfig.mode"
+                    :options="runtimeSourceOptions"
+                    aria-label="Runtime source"
+                    max-width-class="w-full"
+                    :disabled="runtimeProvisioning"
+                  />
+                </div>
                 <label v-if="runtimeConfig.mode !== 'external-python'" class="block">
                   <span class="input-label">Approved Python</span>
                   <span class="input-base input-outlined block cursor-default text-xs" aria-readonly="true">{{ approvedPythonVersion }}</span>
@@ -696,6 +698,7 @@ import WorkspaceAIConfigSection from './WorkspaceAIConfigSection.vue'
 import { extractApiErrorMessage } from '../../../utils/apiError'
 import { filenameFromPath } from '../../../utils/pathUtils'
 import ConfirmationModal from '../ConfirmationModal.vue'
+import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 import WorkspaceContextSection from './workspace/WorkspaceContextSection.vue'
 import WorkspaceListPanel from './workspace/WorkspaceListPanel.vue'
 import { useWorkspaceSettings } from '../../../composables/useWorkspaceSettings'
@@ -755,6 +758,11 @@ const runtimeConfig = ref({
   httpsProxy: '',
   noProxy: '',
 })
+const runtimeSourceOptions = [
+  { value: 'managed', label: 'Managed Python' },
+  { value: 'external-python', label: 'Company Python' },
+  { value: 'internal-mirror', label: 'Internal mirror' },
+]
 const pendingSelectableObjects = computed(() => (
   Array.isArray(pendingConnection.value?.objects)
     ? pendingConnection.value.objects.filter((object: any) => object?.metadata?.selectable !== false)
