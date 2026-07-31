@@ -27,6 +27,18 @@ function mountSurface() {
 }
 
 describe('TableMetadataSurface', () => {
+  it('keeps column labels in the shared dataframe viewport', () => {
+    const wrapper = mountSurface()
+    const viewport = wrapper.get('[data-inquira-table-viewport]')
+
+    expect(viewport.attributes('aria-label')).toBe('Columns in orders')
+    expect(viewport.classes()).toContain('schema-metadata-viewport')
+    expect(wrapper.get('thead').classes()).toContain('schema-metadata-grid__head')
+    expect(wrapper.findAll('thead th').map((header) => header.text())).toEqual([
+      '#', 'Column', 'Type', 'Nullable', 'Description', 'Aliases',
+    ])
+  })
+
   it('shows physical metadata and emits normalized alias edits', async () => {
     const wrapper = mountSurface()
 

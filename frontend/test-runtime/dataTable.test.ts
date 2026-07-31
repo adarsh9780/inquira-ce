@@ -104,6 +104,7 @@ describe('DataTable', () => {
       },
     })
 
+    expect(wrapper.get('[data-inquira-table-viewport]').attributes('aria-label')).toBe('Scrollable table data')
     expect(wrapper.get('[role="grid"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('No matching rows')
     expect(wrapper.text()).toContain('0 of 0')
