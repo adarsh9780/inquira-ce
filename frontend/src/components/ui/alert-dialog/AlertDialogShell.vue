@@ -21,6 +21,7 @@ withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
+  action: []
   close: []
 }>()
 
@@ -53,7 +54,7 @@ function handleOpenChange(open: boolean) {
           <AlertDialogCancel as-child>
             <slot name="cancel" />
           </AlertDialogCancel>
-          <AlertDialogAction as-child>
+          <AlertDialogAction as-child @click.capture="emit('action')">
             <slot name="action" />
           </AlertDialogAction>
         </div>
