@@ -2,8 +2,9 @@ import MarkdownIt from 'markdown-it'
 import markdownItKatexModule from '@vscode/markdown-it-katex'
 import DOMPurify from 'dompurify'
 import Prism from 'prismjs'
-import 'prismjs/components/prism-python'
-import 'prismjs/components/prism-sql'
+import { registerPrismLanguages } from './prismLanguages'
+
+registerPrismLanguages(Prism)
 
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   if (node.tagName === 'A' && node.getAttribute('href')) {
@@ -18,7 +19,12 @@ const markdown = new MarkdownIt({
   typographer: true,
   breaks: true,
 })
-markdown.use(markdownItKatexModule)
+const markdownItKatex = typeof markdownItKatexModule === 'function'
+  ? markdownItKatexModule
+  : (markdownItKatexModule as { default?: unknown })?.default
+if (typeof markdownItKatex === 'function') {
+  markdown.use(markdownItKatex)
+}
 const defaultLinkOpen = markdown.renderer.rules.link_open
 markdown.renderer.rules.link_open = (tokens: any[], index: number, options: any, environment: any, self: any) => {
   tokens[index].attrSet('rel', 'noopener noreferrer')

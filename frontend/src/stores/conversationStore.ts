@@ -23,6 +23,7 @@ export const useConversationStore = defineStore('conversations', () => {
   const activeTurnRelations = ref<Record<string, unknown> | null>(null)
   const workspaceTurnTree = ref<Record<string, unknown> | null>(null)
   const finalTurnId = ref('')
+  let conversationListVersion = 0
 
   function normalizeId(value: unknown = activeConversationId.value) {
     return String(value || '').trim()
@@ -277,11 +278,13 @@ export const useConversationStore = defineStore('conversations', () => {
 
   async function fetchConversations(workspaceId: unknown) {
     const target = String(workspaceId || '').trim()
+    const requestVersion = ++conversationListVersion
     if (!target) {
       conversations.value = []
       return []
     }
     const response = await conversationApi.list(target, 50)
+    if (requestVersion !== conversationListVersion) return conversations.value
     conversations.value = (Array.isArray(response?.conversations) ? response.conversations : []) as ConversationSummary[]
     return conversations.value
   }
@@ -334,15 +337,41 @@ export const useConversationStore = defineStore('conversations', () => {
   async function deleteConversationById(conversationId: unknown) {
     const id = normalizeId(conversationId)
     if (!id) return
-    await conversationApi.remove(id)
+    const result = await conversationApi.remove(id)
+    if (result && typeof result === 'object' && result.deleted === false) {
+      throw new Error('The conversation was not deleted.')
+    }
+
+    // Any list request started before the deletion is now stale and must not
+    // restore the deleted row when it finishes.
+    conversationListVersion += 1
     conversations.value = conversations.value.filter((item: any) => String(item?.id || '') !== id)
-    const states = { ...conversationStateById.value }
-    delete states[id]
-    conversationStateById.value = states
+
     if (activeConversationId.value === id) {
+      // Detach first so setActiveConversationId does not write the deleted
+      // conversation's live state back into conversationStateById.
+      activeConversationId.value = ''
+      chatHistory.value = []
+      liveTokenUsage.value = null
+      activeConversationUsage.value = null
+      activeTurnId.value = ''
+      activeTurn.value = null
+      activeTurnCode.value = ''
+      activeTurnRelations.value = null
+      finalTurnId.value = ''
+
       const fallback = conversations.value[0] as RecordValue | undefined
       setActiveConversationId(fallback?.id || '')
     }
+
+    const states = { ...conversationStateById.value }
+    delete states[id]
+    conversationStateById.value = states
+    const usageById = { ...conversationUsageById.value }
+    delete usageById[id]
+    conversationUsageById.value = usageById
+    workspaceTurnTree.value = null
+    return result
   }
 
   async function updateConversationTitle(title: unknown, conversationId: unknown = activeConversationId.value) {
