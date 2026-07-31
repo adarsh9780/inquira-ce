@@ -157,7 +157,14 @@ import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useConversationStore } from '../../stores/conversationStore'
 import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
 import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
+import {
+  normalizeAliasList,
+  normalizeSchemaColumns,
+  normalizeSchemaTables,
+  useSchemaHubState,
+} from '../../composables/useSchemaHubState'
 import { toast } from '../../composables/useToast'
+import type { SchemaHubColumn } from '../../types/schemaHub'
 import MarkdownIt from 'markdown-it'
 
 // Custom Directive for autofocusing inline edit inputs
@@ -175,11 +182,12 @@ const conversationStore = useConversationStore()
 const workspaceActivation = useWorkspaceActivation()
 const artifactPresentation = useArtifactPresentation()
 
-const schemaLoading = ref(false)
+const schemaHub = useSchemaHubState()
+const schemaSaving = ref(false)
+const schemaLoading = computed(() => schemaHub.isLoading.value || schemaSaving.value)
 const regeneratingTableName = ref('')
-const schemaEdited = ref(false)
-const dirtyTables = ref(new Set())
-const workspaceColumns = ref<any[]>([])
+const schemaEdited = schemaHub.isEdited
+const groupedSchema = schemaHub.tables
 
 // Workspace context editing state
 const schemaContext = ref('')
@@ -187,7 +195,11 @@ const isEditingContext = ref(false)
 const tempContext = ref('')
 
 // Inline editing state
-const editingCell = ref<any>(null) // { col: Object, field: 'description' | 'aliases', value: String }
+const editingCell = ref<{
+  col: SchemaHubColumn
+  field: 'description' | 'aliases'
+  value: string
+} | null>(null)
 
 const hasWorkspace = computed(() => !!workspaceStore.activeWorkspaceId)
 
@@ -196,35 +208,26 @@ const renderedContext = computed(() => {
   return md.render(schemaContext.value)
 })
 
-const groupedSchema = computed(() => {
-  const groups: Record<string, any[]> = {}
-  workspaceColumns.value.forEach(col => {
-    const t = col.table_name || 'Unknown Table'
-    if (!groups[t]) groups[t] = []
-    groups[t].push(col)
-  })
-  return Object.entries(groups)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([tableName, columns]) => ({ tableName, columns }))
-})
-
 async function loadWorkspaceContext() {
-  if (!workspaceStore.activeWorkspaceId) {
+  const workspaceId = workspaceStore.activeWorkspaceId
+  if (!workspaceId) {
     schemaContext.value = ''
     return
   }
   try {
-    const summary = await workspaceApi.summary(workspaceStore.activeWorkspaceId)
+    const summary = await workspaceApi.summary(workspaceId)
+    if (workspaceStore.activeWorkspaceId !== workspaceId) return
     schemaContext.value = String(summary?.schema_context || '').trim()
   } catch (error: any) {
+    if (workspaceStore.activeWorkspaceId !== workspaceId) return
     // Silently fail or use store fallback
-    schemaContext.value = String(workspaceStore.workspaces.find((w: any) => w.id === workspaceStore.activeWorkspaceId)?.schema_context || '').trim()
+    schemaContext.value = String(workspaceStore.workspaces.find((w: any) => w.id === workspaceId)?.schema_context || '').trim()
   }
 }
 
 async function fetchWorkspaceSchema(forceRefresh = false) {
   if (!workspaceStore.activeWorkspaceId) return
-  schemaLoading.value = true
+  const loadId = schemaHub.beginLoad()
   try {
     const workspaceId = workspaceStore.activeWorkspaceId
     const datasetResponse: any = await workspaceApi.listDatasets(workspaceId)
@@ -240,27 +243,12 @@ async function fetchWorkspaceSchema(forceRefresh = false) {
       })
     )
 
-    const columns: any[] = []
-    schemas.forEach((schema: any) => {
-      const tableName = schema.table_name
-      const cols = schema.columns || []
-      cols.forEach((c: any) => {
-        columns.push({
-          ...c,
-          table_name: tableName,
-          aliases: normalizeAliasList(c.aliases)
-        })
-      })
-    })
-
-    workspaceColumns.value = columns
-    dirtyTables.value.clear()
-    schemaEdited.value = false
-    if (forceRefresh) toast.success('Schema refreshed', 'Loaded latest workspace schema.')
+    const applied = schemaHub.applyLoad(loadId, normalizeSchemaTables(datasets, schemas))
+    if (applied && forceRefresh) toast.success('Schema refreshed', 'Loaded latest workspace schema.')
   } catch (error: any) {
-    toast.error('Failed to load schema', error?.message || 'Unknown error occurred.')
-  } finally {
-    schemaLoading.value = false
+    if (schemaHub.rejectLoad(loadId, error)) {
+      toast.error('Failed to load schema', error?.message || 'Unknown error occurred.')
+    }
   }
 }
 
@@ -287,15 +275,7 @@ async function saveEditContext() {
   }
 }
 
-function normalizeAliasList(value: any) {
-  if (Array.isArray(value)) return value
-  if (typeof value === 'string') {
-    return value.split(',').map(s => s.trim()).filter(Boolean)
-  }
-  return []
-}
-
-function startInlineEdit(col: any, field: any) {
+function startInlineEdit(col: SchemaHubColumn, field: 'description' | 'aliases') {
   if (editingCell.value && editingCell.value.col === col && editingCell.value.field === field) return
 
   // Save previous edit if exists
@@ -334,8 +314,7 @@ function saveInlineEdit() {
   }
 
   if (changed) {
-    schemaEdited.value = true
-    dirtyTables.value.add(col.table_name)
+    schemaHub.markTableDirty(col.tableId)
   }
 
   editingCell.value = null
@@ -349,32 +328,31 @@ async function saveAllSchema() {
     saveInlineEdit()
   }
 
-  schemaLoading.value = true
+  schemaSaving.value = true
   try {
     const workspaceId = workspaceStore.activeWorkspaceId
 
     // Only save the tables that have been modified
-    const tablesToSave = groupedSchema.value.filter(g => dirtyTables.value.has(g.tableName))
+    const tablesToSave = groupedSchema.value.filter(g => schemaHub.dirtyTableIds.value.has(g.id))
 
     for (const group of tablesToSave) {
       await workspaceApi.saveDatasetSchema(workspaceId, group.tableName, {
         context: schemaContext.value || '',
         columns: group.columns.map((c: any) => ({
           name: c.name,
-          dtype: c.dtype || c.type || 'VARCHAR',
+          dtype: c.dataType || 'VARCHAR',
           description: c.description || '',
           aliases: c.aliases || []
         }))
       })
     }
 
-    schemaEdited.value = false
-    dirtyTables.value.clear()
+    schemaHub.clearDirtyTables()
     toast.success('Schema saved', `Saved changes for ${tablesToSave.length} table(s).`)
   } catch (error: any) {
     toast.error('Failed to save schema', error?.message)
   } finally {
-    schemaLoading.value = false
+    schemaSaving.value = false
   }
 }
 
@@ -396,17 +374,13 @@ async function regenerateTableSchema(tableName: any) {
       context: schemaContext.value || ''
     })
 
-    const restColumns = workspaceColumns.value.filter(c => c.table_name !== tableName)
-    const newColumns = (regenerated.columns || []).map((c: any) => ({
-      ...c,
-      table_name: tableName,
-      aliases: normalizeAliasList(c.aliases)
-    }))
-
-    workspaceColumns.value = [...restColumns, ...newColumns]
-    dirtyTables.value.delete(tableName)
-    if (dirtyTables.value.size === 0) {
-      schemaEdited.value = false
+    const table = groupedSchema.value.find((candidate) => candidate.tableName === tableName)
+    if (table) {
+      schemaHub.replaceTableColumns(
+        table.id,
+        normalizeSchemaColumns(table.id, tableName, regenerated.columns),
+      )
+      schemaHub.clearTableDirty(table.id)
     }
     executionStore.finishBackgroundOperation(operationId, {
       title: 'Schema regenerated',
@@ -440,13 +414,11 @@ onUnmounted(() => {
 })
 
 watch(() => workspaceStore.activeWorkspaceId, async (newId) => {
-  schemaEdited.value = false
-  dirtyTables.value.clear()
+  schemaHub.clear()
   if (newId) {
     await loadWorkspaceContext()
     await fetchWorkspaceSchema()
   } else {
-    workspaceColumns.value = []
     schemaContext.value = ''
   }
 })
