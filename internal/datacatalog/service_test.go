@@ -46,9 +46,21 @@ type fakeCatalogGateway struct {
 	request     BuildRequest
 	result      BuildResult
 	err         error
+	preview     DatasetPreview
+	previewReq  WorkerPreviewRequest
+	previewErr  error
+	previewCall int
 	calls       int
 	started     chan struct{}
 	continueRun chan struct{}
+}
+
+func (f *fakeCatalogGateway) Preview(_ context.Context, request WorkerPreviewRequest) (DatasetPreview, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.previewReq = request
+	f.previewCall++
+	return f.preview, f.previewErr
 }
 
 type fakeSchemaRepository struct {
@@ -332,5 +344,46 @@ func TestNativeDatasetAndSchemaContractsHideSnapshotPointersAndPersistOverrides(
 	}
 	if _, err := service.SaveTableContext(context.Background(), SaveTableContextRequest{WorkspaceID: "workspace-1", TableName: "sales", Context: tooLong}); errorCode(err) != "table_context_invalid" {
 		t.Fatalf("long context-only error = %v", err)
+	}
+}
+
+func TestPreviewDatasetOnlyReadsRegisteredCatalogTablesWithABoundedMode(t *testing.T) {
+	connections := connection.ListResponse{Connections: []connection.Connection{{
+		ID: "connection-1", Name: "Sales", Status: connection.StatusReady,
+		Outputs: []connection.Output{{
+			SourceObjectID: "file", Name: "sales", SnapshotPath: snapshot(t, "sales-preview"),
+			RowCount: 3, Columns: []connection.Column{{Name: "id", DataType: "BIGINT"}},
+		}},
+	}}}
+	gateway := &fakeCatalogGateway{preview: DatasetPreview{
+		TableName: "sales", Columns: []string{"id"}, Rows: []map[string]any{{"id": float64(1)}},
+		RowCount: 3, Mode: DatasetPreviewHead, Limit: DatasetPreviewLimit,
+	}}
+	service := NewService(
+		fakeWorkspaces{summary: workspace.Summary{ID: "workspace-1"}},
+		fakeConnections{response: connections}, gateway, t.TempDir(),
+	)
+
+	result, err := service.PreviewDataset(context.Background(), DatasetPreviewRequest{
+		WorkspaceID: "workspace-1", TableName: "sales",
+	})
+	if err != nil || result.TableName != "sales" || len(result.Rows) != 1 {
+		t.Fatalf("PreviewDataset() = %#v, %v", result, err)
+	}
+	if gateway.previewReq.TableName != "sales" || gateway.previewReq.Mode != DatasetPreviewHead || gateway.previewReq.Limit != 100 || gateway.previewReq.DatabasePath == "" {
+		t.Fatalf("preview request = %#v", gateway.previewReq)
+	}
+	if _, err := service.PreviewDataset(context.Background(), DatasetPreviewRequest{
+		WorkspaceID: "workspace-1", TableName: "inquira_internal.catalog_tables",
+	}); errorCode(err) != "dataset_not_found" {
+		t.Fatalf("internal table error = %v", err)
+	}
+	if _, err := service.PreviewDataset(context.Background(), DatasetPreviewRequest{
+		WorkspaceID: "workspace-1", TableName: "sales", Mode: "middle",
+	}); errorCode(err) != "dataset_preview_mode_invalid" {
+		t.Fatalf("invalid mode error = %v", err)
+	}
+	if gateway.previewCall != 1 {
+		t.Fatalf("preview gateway calls = %d, want 1", gateway.previewCall)
 	}
 }

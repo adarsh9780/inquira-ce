@@ -155,6 +155,11 @@ export interface NativeMethodMap {
   OpenExternalURL: (url: string) => Promise<void>
   OpenStartupLogs: () => Promise<void>
   PreviewLocalConnection: (request: NativeRecord) => Promise<unknown>
+  PreviewWorkspaceDataset: (
+    workspaceId: string,
+    tableName: string,
+    mode: string,
+  ) => Promise<NativeRecord>
   ProvisionRuntime: (configuration: NativeRecord) => Promise<unknown>
   RepairRuntime: () => Promise<unknown>
   RefreshConnection: (connectionId: string) => Promise<unknown>

@@ -29,6 +29,7 @@ type connectionSource interface {
 
 type Gateway interface {
 	Build(context.Context, BuildRequest) (BuildResult, error)
+	Preview(context.Context, WorkerPreviewRequest) (DatasetPreview, error)
 }
 
 type schemaRepository interface {
@@ -163,6 +164,41 @@ func (s *Service) ListDatasets(ctx context.Context, workspaceID string) (Dataset
 			RowCount: table.RowCount, FileType: table.FileType, SchemaStatus: string(table.Status),
 			CreatedAt: table.CreatedAt, UpdatedAt: table.UpdatedAt,
 		})
+	}
+	return result, nil
+}
+
+func (s *Service) PreviewDataset(ctx context.Context, request DatasetPreviewRequest) (DatasetPreview, error) {
+	catalog, err := s.Prepare(ctx, strings.TrimSpace(request.WorkspaceID))
+	if err != nil {
+		return DatasetPreview{}, err
+	}
+	table, ok := findTable(catalog.Tables, strings.TrimSpace(request.TableName))
+	if !ok {
+		return DatasetPreview{}, apperror.New("dataset_not_found", "Dataset not found in this workspace.")
+	}
+	mode := request.Mode
+	if mode == "" {
+		mode = DatasetPreviewHead
+	}
+	if mode != DatasetPreviewHead && mode != DatasetPreviewTail {
+		return DatasetPreview{}, apperror.New("dataset_preview_mode_invalid", "Dataset preview mode must be head or tail.")
+	}
+	result, err := s.gateway.Preview(ctx, WorkerPreviewRequest{
+		DatabasePath: catalog.DatabasePath,
+		TableName:    table.Name,
+		Mode:         mode,
+		Limit:        DatasetPreviewLimit,
+	})
+	if err != nil {
+		return DatasetPreview{}, apperror.Wrap("dataset_preview_failed", "Could not preview this dataset.", err)
+	}
+	expectedOffset := int64(0)
+	if mode == DatasetPreviewTail && table.RowCount > DatasetPreviewLimit {
+		expectedOffset = table.RowCount - DatasetPreviewLimit
+	}
+	if result.TableName != table.Name || result.Mode != mode || result.Limit != DatasetPreviewLimit || result.RowCount != table.RowCount || result.Offset != expectedOffset || len(result.Rows) > DatasetPreviewLimit {
+		return DatasetPreview{}, apperror.New("dataset_preview_invalid", "The data worker returned an invalid dataset preview.")
 	}
 	return result, nil
 }

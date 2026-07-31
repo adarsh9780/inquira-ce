@@ -819,6 +819,18 @@ func (a *App) GetWorkspaceDatasetSchema(workspaceID, tableName string) (datacata
 	return service.GetSchema(a.appContext(), workspaceID, tableName)
 }
 
+func (a *App) PreviewWorkspaceDataset(workspaceID, tableName, mode string) (datacatalog.DatasetPreview, error) {
+	service, err := a.catalogService()
+	if err != nil {
+		return datacatalog.DatasetPreview{}, err
+	}
+	return service.PreviewDataset(a.appContext(), datacatalog.DatasetPreviewRequest{
+		WorkspaceID: workspaceID,
+		TableName:   tableName,
+		Mode:        datacatalog.DatasetPreviewMode(mode),
+	})
+}
+
 func (a *App) SaveWorkspaceDatasetSchema(request datacatalog.SaveSchemaRequest) (datacatalog.DatasetSchema, error) {
 	catalogService, err := a.catalogService()
 	if err != nil {
