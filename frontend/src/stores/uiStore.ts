@@ -26,7 +26,6 @@ export const useUiStore = defineStore('ui', () => {
   const terminalCwd = ref('')
   const isSidebarCollapsed = ref(false)
   const isKeyboardShortcutsOpen = ref(false)
-  const isCommandPaletteOpen = ref(false)
   const isConversationSwitcherOpen = ref(false)
   const connectionFlowRequestId = ref(0)
   const editorLine = ref(1)
@@ -133,18 +132,6 @@ export const useUiStore = defineStore('ui', () => {
     isKeyboardShortcutsOpen.value = false
   }
 
-  function openCommandPalette() {
-    isCommandPaletteOpen.value = true
-  }
-
-  function closeCommandPalette() {
-    isCommandPaletteOpen.value = false
-  }
-
-  function toggleCommandPalette() {
-    isCommandPaletteOpen.value = !isCommandPaletteOpen.value
-  }
-
   function setConversationSwitcherOpen(open: unknown) {
     isConversationSwitcherOpen.value = Boolean(open)
   }
@@ -191,7 +178,6 @@ export const useUiStore = defineStore('ui', () => {
     terminalCwd.value = ''
     isSidebarCollapsed.value = false
     isKeyboardShortcutsOpen.value = false
-    isCommandPaletteOpen.value = false
     isConversationSwitcherOpen.value = false
     connectionFlowRequestId.value = 0
     editorLine.value = 1
@@ -213,7 +199,6 @@ export const useUiStore = defineStore('ui', () => {
     terminalCwd,
     isSidebarCollapsed,
     isKeyboardShortcutsOpen,
-    isCommandPaletteOpen,
     isConversationSwitcherOpen,
     connectionFlowRequestId,
     editorLine,
@@ -235,9 +220,6 @@ export const useUiStore = defineStore('ui', () => {
     setSidebarCollapsed,
     openKeyboardShortcuts,
     closeKeyboardShortcuts,
-    openCommandPalette,
-    closeCommandPalette,
-    toggleCommandPalette,
     setConversationSwitcherOpen,
     openConversationSwitcher,
     closeConversationSwitcher,

@@ -34,10 +34,6 @@
         v-model="uiStore.isSettingsOpen"
         :initial-tab="uiStore.settingsInitialTab"
       />
-      <CommandPaletteModal
-        :is-open="uiStore.isCommandPaletteOpen"
-        @close="uiStore.closeCommandPalette()"
-      />
       <KeyboardShortcutsModal
         :is-open="uiStore.isKeyboardShortcutsOpen"
         @close="uiStore.closeKeyboardShortcuts()"
@@ -80,7 +76,6 @@ import ToastContainer from './components/ui/ToastContainer.vue'
 import StartupScreen from './components/startup/StartupScreen.vue'
 import StartupFailureScreen from './components/startup/StartupFailureScreen.vue'
 import BlockingOperationOverlay from './components/startup/BlockingOperationOverlay.vue'
-import CommandPaletteModal from './components/modals/CommandPaletteModal.vue'
 import KeyboardShortcutsModal from './components/modals/KeyboardShortcutsModal.vue'
 import FirstRunModelOnboarding from './components/onboarding/FirstRunModelOnboarding.vue'
 

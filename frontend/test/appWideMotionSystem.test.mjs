@@ -43,7 +43,6 @@ test('dialogs, compact panels, disclosures, and toasts all have exit motion', ()
     'src/components/modals/SettingsModal.vue',
     'src/components/modals/KeyboardShortcutsModal.vue',
     'src/components/modals/TermsModal.vue',
-    'src/components/modals/CommandPaletteModal.vue',
     'src/components/modals/ConversationTreeRulesModal.vue',
   ]
   for (const path of dialogShellConsumers) {

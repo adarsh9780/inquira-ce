@@ -9,20 +9,20 @@ import {
 
 describe('keyboard shortcuts', () => {
   it('renders platform-specific modifier labels', () => {
-    const commandPalette = SHORTCUTS.find((shortcut) => shortcut.id === 'command-palette')
+    const conversationSwitcher = SHORTCUTS.find((shortcut) => shortcut.id === 'conversation-switcher')
 
-    expect(shortcutLabel(commandPalette, 'MacIntel')).toBe('Cmd+K')
-    expect(shortcutLabel(commandPalette, 'Win32')).toBe('Ctrl+K')
+    expect(shortcutLabel(conversationSwitcher, 'MacIntel')).toBe('Cmd+K')
+    expect(shortcutLabel(conversationSwitcher, 'Win32')).toBe('Ctrl+K')
   })
 
   it('matches the required modifiers and character key', () => {
     expect(matchShortcut(
       { key: 'k', metaKey: true, ctrlKey: false, altKey: false, shiftKey: false },
-      'command-palette',
+      'conversation-switcher',
     )).toBe(true)
     expect(matchShortcut(
       { key: 'k', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false },
-      'command-palette',
+      'conversation-switcher',
     )).toBe(false)
   })
 
