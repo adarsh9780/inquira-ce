@@ -56,37 +56,46 @@
           <p class="text-sm font-medium text-[var(--color-text-muted)]">Loading workspace schema...</p>
         </div>
         <WorkspaceContextSurface
-          v-else
-          v-show="schemaHub.selection.value.kind === 'workspace'"
+          v-show="!schemaHub.isLoading.value && schemaHub.selection.value.kind === 'workspace'"
           :key="workspaceStore.activeWorkspaceId"
           v-model="schemaContext"
           :save-context="saveWorkspaceContext"
         />
         <WorkspaceDataSources
-          v-else
-          v-show="schemaHub.selection.value.kind === 'sources'"
+          v-show="!schemaHub.isLoading.value && schemaHub.selection.value.kind === 'sources'"
           ref="dataSourcesRef"
           :workspace-id="workspaceStore.activeWorkspaceId"
           @changed="handleSourcesChanged"
           @update:count="sourceCount = $event"
         />
-        <div v-if="!schemaHub.isLoading.value && schemaHub.selectedTable.value" class="space-y-4 p-4 pb-10">
-          <TableContextSurface
-            :key="schemaHub.selectedTable.value.id"
-            :model-value="schemaHub.selectedTable.value.tableContext || ''"
-            :table-name="schemaHub.selectedTable.value.tableName"
-            :save-context="(context) => saveTableContext(schemaHub.selectedTable.value!.id, context)"
-            @update:model-value="schemaHub.replaceTableContext(schemaHub.selectedTable.value!.id, $event)"
-          />
-          <TableMetadataSurface
+        <div v-if="!schemaHub.isLoading.value && schemaHub.selectedTable.value" class="flex min-h-full flex-col gap-4 p-4 pb-6">
+          <div class="flex shrink-0 justify-end">
+            <SegmentedControl v-model="tableView" :options="tableViewOptions" aria-label="Table details" />
+          </div>
+          <template v-if="tableView === 'schema'">
+            <TableContextSurface
+              :key="schemaHub.selectedTable.value.id"
+              :model-value="schemaHub.selectedTable.value.tableContext || ''"
+              :table-name="schemaHub.selectedTable.value.tableName"
+              :save-context="(context) => saveTableContext(schemaHub.selectedTable.value!.id, context)"
+              @update:model-value="schemaHub.replaceTableContext(schemaHub.selectedTable.value!.id, $event)"
+            />
+            <TableMetadataSurface
+              :table="schemaHub.selectedTable.value"
+              :dirty="schemaHub.dirtyTableIds.value.has(schemaHub.selectedTable.value.id)"
+              :saving="savingTableId === schemaHub.selectedTable.value.id"
+              :regenerating="regeneratingTableName === schemaHub.selectedTable.value.tableName"
+              :busy="schemaBusy || Boolean(regeneratingTableName)"
+              @change="handleTableColumnsChange"
+              @save="saveTableSchema"
+              @regenerate="regenerateTableSchema"
+            />
+          </template>
+          <TableDataPreview
+            v-else
+            :key="`${schemaHub.selectedTable.value.id}:${previewRevision}`"
+            :workspace-id="workspaceStore.activeWorkspaceId"
             :table="schemaHub.selectedTable.value"
-            :dirty="schemaHub.dirtyTableIds.value.has(schemaHub.selectedTable.value.id)"
-            :saving="savingTableId === schemaHub.selectedTable.value.id"
-            :regenerating="regeneratingTableName === schemaHub.selectedTable.value.tableName"
-            :busy="schemaBusy || Boolean(regeneratingTableName)"
-            @change="handleTableColumnsChange"
-            @save="saveTableSchema"
-            @regenerate="regenerateTableSchema"
           />
         </div>
       </main>
@@ -110,16 +119,19 @@ import { useExecutionStore } from '../../stores/executionStore'
 import { useWorkspaceStore } from '../../stores/workspaceStore'
 import TableMetadataSurface from '../schema/TableMetadataSurface.vue'
 import TableContextSurface from '../schema/TableContextSurface.vue'
+import TableDataPreview from '../schema/TableDataPreview.vue'
 import SchemaTableNavigator from '../schema/SchemaTableNavigator.vue'
 import WorkspaceContextSurface from '../schema/WorkspaceContextSurface.vue'
 import WorkspaceDataSources from '../schema/WorkspaceDataSources.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
+import SegmentedControl from '../ui/SegmentedControl.vue'
 import {
   normalizeSchemaColumns,
   normalizeSchemaTables,
   useSchemaHubState,
 } from '../../composables/useSchemaHubState'
 import { toast } from '../../composables/useToast'
+import { clearDatasetPreviewCache } from '../../composables/useDatasetPreview'
 import type { SchemaHubColumn, SchemaHubSelection } from '../../types/schemaHub'
 import { normalizeSchemaRefreshResult, schemaRefreshFeedback } from '../../utils/schemaRefresh'
 
@@ -136,6 +148,12 @@ const pendingSelection = ref<SchemaHubSelection | null>(null)
 const groupedSchema = schemaHub.tables
 const dataSourcesRef = ref<InstanceType<typeof WorkspaceDataSources> | null>(null)
 const sourceCount = ref(0)
+const tableView = ref('schema')
+const previewRevision = ref(0)
+const tableViewOptions = [
+  { value: 'schema', label: 'Schema' },
+  { value: 'preview', label: 'Preview' },
+]
 
 const schemaContext = ref('')
 
@@ -168,6 +186,8 @@ async function requestAddData() {
 }
 
 async function handleSourcesChanged() {
+  clearDatasetPreviewCache(workspaceStore.activeWorkspaceId)
+  previewRevision.value += 1
   await fetchWorkspaceSchema()
   await workspaceStore.fetchWorkspaceSummary(workspaceStore.activeWorkspaceId)
   await workspaceStore.fetchColumnCatalog({ force: true })
@@ -233,6 +253,8 @@ async function refreshWorkspaceSchema() {
   try {
     const result = normalizeSchemaRefreshResult(await workspaceApi.refreshDatasetSources(workspaceId))
     if (workspaceStore.activeWorkspaceId !== workspaceId) return
+    clearDatasetPreviewCache(workspaceId)
+    previewRevision.value += 1
     if (!await fetchWorkspaceSchema() || workspaceStore.activeWorkspaceId !== workspaceId) return
     const feedback = schemaRefreshFeedback(result)
     toast[feedback.type](feedback.title, feedback.message)
