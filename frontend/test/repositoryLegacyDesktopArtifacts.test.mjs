@@ -144,9 +144,11 @@ test('frontend contains no generated HTTP-client pipeline or old backend E2E con
   )
 })
 
-test('frontend keeps retired workspace and artifact-limit compatibility paths removed', () => {
+test('frontend keeps retired compatibility and UI paths removed', () => {
   const removedFrontendPaths = [
     'frontend/src/components/WorkspaceSwitcher.vue',
+    'frontend/src/components/modals/CommandPaletteModal.vue',
+    'frontend/src/components/layout/sidebar/SidebarPrimaryNav.vue',
     'frontend/src/components/layout/sidebar/SidebarDatasets.vue',
     'frontend/src/components/layout/sidebar/SidebarWorkspaces.vue',
     'frontend/src/utils/chatBootstrap.js',
@@ -159,6 +161,7 @@ test('frontend keeps retired workspace and artifact-limit compatibility paths re
   const guardedSources = [
     'frontend/src/components/modals/SettingsModal.vue',
     'frontend/src/components/layout/StatusBar.vue',
+    'frontend/src/components/layout/UnifiedSidebar.vue',
     'frontend/src/api/native.ts',
   ]
   const retiredMarkers = [
@@ -168,6 +171,7 @@ test('frontend keeps retired workspace and artifact-limit compatibility paths re
     'artifactUsageWarningTitle',
     'subscribeWorkspaceArtifactUsage',
     'GetWorkspaceArtifactUsage',
+    'sidebar-primary-row',
   ]
   const retiredReferences = []
 
