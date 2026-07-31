@@ -60,6 +60,29 @@ describe('critical interaction safety net', () => {
     expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
+  it('submits a destructive confirmation before the dialog clears its target', async () => {
+    const events = []
+    const wrapper = mount(ConfirmationModal, {
+      attachTo: document.body,
+      props: {
+        isOpen: true,
+        title: 'Delete conversation',
+        message: 'This action cannot be undone.',
+        confirmText: 'Delete',
+        onConfirm: () => events.push('confirm'),
+        onClose: () => events.push('close'),
+      },
+    })
+    await wrapper.vm.$nextTick()
+    await wrapper.vm.$nextTick()
+
+    const buttons = [...document.body.querySelectorAll('[role="alertdialog"] button')]
+    buttons.at(-1).click()
+    await wrapper.vm.$nextTick()
+
+    expect(events).toEqual(['confirm', 'close'])
+  })
+
   it('supports menu arrow navigation, Escape, and focus restoration', async () => {
     const trigger = document.createElement('button')
     trigger.textContent = 'Actions'
