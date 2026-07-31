@@ -563,6 +563,7 @@ watch(
       tableError.value = error?.message || 'Failed to load selected table.'
     }
   },
+  { immediate: true },
 )
 
 // ---------------------------------------------------------------------------
