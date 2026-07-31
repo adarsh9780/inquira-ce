@@ -9,7 +9,7 @@ test('schema editor derives dataset options from workspace tables and does not r
 
   assert.equal(source.includes('workspaceApi.listDatasets(workspaceId)'), true)
   assert.equal(source.includes('workspaceApi.getDatasetSchema(workspaceId, ds.table_name)'), true)
-  assert.equal(source.includes('const groupedSchema = computed(() => {'), true)
+  assert.equal(source.includes('const groupedSchema = schemaHub.tables'), true)
 })
 
 test('schema editor refreshes automatically when dataset schema becomes ready', () => {
