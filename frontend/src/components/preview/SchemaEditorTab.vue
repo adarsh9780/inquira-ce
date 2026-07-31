@@ -7,7 +7,11 @@
         <p class="text-[13px] text-[var(--color-text-muted)] mt-1">Manage column metadata across all datasets</p>
       </div>
       <div class="flex items-center gap-2">
-        <button @click="fetchWorkspaceSchema(true)" :disabled="schemaBusy || schemaHub.isEdited.value" :title="schemaHub.isEdited.value ? 'Save or discard table changes before refreshing' : undefined" class="px-3 py-1.5 rounded-md text-[13px] font-medium hover:bg-[var(--color-base-muted)] transition-colors disabled:opacity-50 text-[var(--color-text-main)]">Refresh</button>
+        <button type="button" @click="refreshWorkspaceSchema" :disabled="schemaBusy || schemaHub.isEdited.value" :title="schemaHub.isEdited.value ? 'Save or discard table changes before refreshing' : 'Refresh data sources and reload schema'" class="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium text-[var(--color-text-main)] transition-colors hover:bg-[var(--color-base-muted)] disabled:opacity-50">
+          <span v-if="isRefreshingSources" class="inquira-spinner h-3.5 w-3.5 border-2" aria-hidden="true"></span>
+          <svg v-else class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 11a8.1 8.1 0 00-15.5-2M4 4v5h5m-5 4a8.1 8.1 0 0015.5 2M20 20v-5h-5"></path></svg>
+          {{ isRefreshingSources ? 'Refreshing…' : 'Refresh' }}
+        </button>
       </div>
     </div>
 
@@ -100,6 +104,7 @@ import {
 } from '../../composables/useSchemaHubState'
 import { toast } from '../../composables/useToast'
 import type { SchemaHubColumn, SchemaHubSelection } from '../../types/schemaHub'
+import { normalizeSchemaRefreshResult, schemaRefreshFeedback } from '../../utils/schemaRefresh'
 
 const executionStore = useExecutionStore()
 const workspaceStore = useWorkspaceStore()
@@ -107,7 +112,8 @@ const workspaceStore = useWorkspaceStore()
 const schemaHub = useSchemaHubState()
 const savingTableId = ref('')
 const savingTableContextId = ref('')
-const schemaBusy = computed(() => schemaHub.isLoading.value || Boolean(savingTableId.value) || Boolean(savingTableContextId.value))
+const isRefreshingSources = ref(false)
+const schemaBusy = computed(() => schemaHub.isLoading.value || isRefreshingSources.value || Boolean(savingTableId.value) || Boolean(savingTableContextId.value))
 const regeneratingTableName = ref('')
 const pendingSelection = ref<SchemaHubSelection | null>(null)
 const groupedSchema = schemaHub.tables
@@ -160,8 +166,8 @@ async function loadWorkspaceContext() {
   }
 }
 
-async function fetchWorkspaceSchema(forceRefresh = false) {
-  if (!workspaceStore.activeWorkspaceId) return
+async function fetchWorkspaceSchema() {
+  if (!workspaceStore.activeWorkspaceId) return false
   const loadId = schemaHub.beginLoad()
   try {
     const workspaceId = workspaceStore.activeWorkspaceId
@@ -178,12 +184,31 @@ async function fetchWorkspaceSchema(forceRefresh = false) {
       })
     )
 
-    const applied = schemaHub.applyLoad(loadId, normalizeSchemaTables(datasets, schemas))
-    if (applied && forceRefresh) toast.success('Schema refreshed', 'Loaded latest workspace schema.')
+    return schemaHub.applyLoad(loadId, normalizeSchemaTables(datasets, schemas))
   } catch (error: any) {
     if (schemaHub.rejectLoad(loadId, error)) {
       toast.error('Failed to load schema', error?.message || 'Unknown error occurred.')
     }
+    return false
+  }
+}
+
+async function refreshWorkspaceSchema() {
+  const workspaceId = workspaceStore.activeWorkspaceId
+  if (!workspaceId || schemaBusy.value || schemaHub.isEdited.value) return
+  isRefreshingSources.value = true
+  try {
+    const result = normalizeSchemaRefreshResult(await workspaceApi.refreshDatasetSources(workspaceId))
+    if (workspaceStore.activeWorkspaceId !== workspaceId) return
+    if (!await fetchWorkspaceSchema() || workspaceStore.activeWorkspaceId !== workspaceId) return
+    const feedback = schemaRefreshFeedback(result)
+    toast[feedback.type](feedback.title, feedback.message)
+  } catch (error: any) {
+    if (workspaceStore.activeWorkspaceId === workspaceId) {
+      toast.error('Schema refresh failed', error?.message || 'Unable to refresh workspace data sources.')
+    }
+  } finally {
+    isRefreshingSources.value = false
   }
 }
 
