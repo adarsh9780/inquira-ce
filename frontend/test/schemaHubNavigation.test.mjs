@@ -14,4 +14,6 @@ test('schema hub uses focused table navigation and protects unsaved metadata', (
   assert.equal(editor.includes('data-action="add-workspace-data"'), true)
   assert.equal(editor.includes('@click="requestAddData"'), true)
   assert.equal(editor.includes('<WorkspaceDataSources'), true)
+  assert.equal(editor.includes('handleRequestedAddData'), true)
+  assert.equal(editor.includes('handledWorkspaceDataRequestIds.set(workspaceStore, requestId)'), true)
 })

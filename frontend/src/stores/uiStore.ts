@@ -149,9 +149,10 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function requestConnectionFlow() {
-    settingsInitialTab.value = 'workspace-data'
     connectionFlowRequestId.value += 1
-    isSettingsOpen.value = true
+    activeTab.value = 'schema-editor'
+    isSettingsOpen.value = false
+    persist()
   }
 
   function setEditorPosition(line: number, col: number) {

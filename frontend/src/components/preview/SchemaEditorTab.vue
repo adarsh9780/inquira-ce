@@ -112,10 +112,15 @@
   </div>
 </template>
 
+<script lang="ts">
+const handledWorkspaceDataRequestIds = new WeakMap<object, number>()
+</script>
+
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { workspaceApi } from '../../api/workspaces'
 import { useExecutionStore } from '../../stores/executionStore'
+import { useUiStore } from '../../stores/uiStore'
 import { useWorkspaceStore } from '../../stores/workspaceStore'
 import TableMetadataSurface from '../schema/TableMetadataSurface.vue'
 import TableContextSurface from '../schema/TableContextSurface.vue'
@@ -136,6 +141,7 @@ import type { SchemaHubColumn, SchemaHubSelection } from '../../types/schemaHub'
 import { normalizeSchemaRefreshResult, schemaRefreshFeedback } from '../../utils/schemaRefresh'
 
 const executionStore = useExecutionStore()
+const uiStore = useUiStore()
 const workspaceStore = useWorkspaceStore()
 
 const schemaHub = useSchemaHubState()
@@ -183,6 +189,16 @@ async function requestAddData() {
   requestSchemaSelection({ kind: 'sources' })
   await nextTick()
   await dataSourcesRef.value?.chooseFile()
+}
+
+async function handleRequestedAddData() {
+  const requestId = Math.max(0, Math.floor(Number(uiStore.connectionFlowRequestId || 0)))
+  const lastHandledRequestId = Number(handledWorkspaceDataRequestIds.get(workspaceStore) || 0)
+  if (!requestId || requestId <= lastHandledRequestId) return
+  if (!hasWorkspace.value || schemaBusy.value || schemaHub.isEdited.value || !dataSourcesRef.value) return
+
+  handledWorkspaceDataRequestIds.set(workspaceStore, requestId)
+  await requestAddData()
 }
 
 async function handleSourcesChanged() {
@@ -391,6 +407,7 @@ onMounted(async () => {
   await loadWorkspaceContext()
   await fetchWorkspaceSchema()
   window.addEventListener('dataset-schema-ready', handleDatasetSchemaReady)
+  await handleRequestedAddData()
 })
 
 onUnmounted(() => {
@@ -407,6 +424,18 @@ watch(() => workspaceStore.activeWorkspaceId, async (newId) => {
     schemaContext.value = ''
   }
 })
+
+watch(
+  [
+    () => Number(uiStore.connectionFlowRequestId || 0),
+    () => hasWorkspace.value,
+    () => schemaBusy.value,
+    () => schemaHub.isEdited.value,
+    () => dataSourcesRef.value,
+  ],
+  () => { void handleRequestedAddData() },
+  { flush: 'post' },
+)
 
 </script>
 

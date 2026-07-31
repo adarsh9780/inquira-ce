@@ -179,7 +179,7 @@ const activeSectionTitle = computed(() => {
 const activeSectionDescription = computed(() => {
   if (activeSection.value === 'setup') return 'See what is ready and complete the next required step.'
   if (activeSection.value === 'connections') return 'Manage AI provider credentials shared by every workspace.'
-  if (activeSection.value === 'workspace') return 'Manage each workspace, its data, models, privacy, and advanced controls.'
+  if (activeSection.value === 'workspace') return 'Manage workspace identity, runtime, models, privacy, and advanced controls.'
   if (activeSection.value === 'appearance') return 'Choose the theme and typography used throughout Inquira.'
   if (activeSection.value === 'account') return 'Review local profile and application information.'
   return 'Customize application settings.'
@@ -233,7 +233,7 @@ function normalizeTab(tab: unknown): string {
 function initializePanelState(tab: unknown): void {
   const candidate = String(tab || '').trim().toLowerCase()
   workspaceInitialSection.value = candidate === 'data' || candidate === 'workspace-data'
-    ? 'data'
+    ? 'runtime'
     : candidate === 'models' || candidate === 'workspace-ai'
       ? 'ai'
       : 'general'
