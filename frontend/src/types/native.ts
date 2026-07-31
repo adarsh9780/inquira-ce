@@ -61,6 +61,12 @@ export interface NativeSaveSchemaRequest {
   columns: unknown[]
 }
 
+export interface NativeSaveTableContextRequest {
+  workspace_id: string
+  table_name: string
+  context: string
+}
+
 export interface NativeRegenerateSchemaRequest {
   workspace_id: string
   table_name: string
@@ -167,6 +173,9 @@ export interface NativeMethodMap {
   SaveLocalState: (scope: string, state: NativeRecord) => Promise<boolean>
   SaveProviderConfiguration: (request: NativeRecord) => Promise<NativeRecord>
   SaveWorkspaceDatasetSchema: (request: NativeSaveSchemaRequest) => Promise<NativeRecord>
+  SaveWorkspaceDatasetContext: (
+    request: NativeSaveTableContextRequest,
+  ) => Promise<NativeRecord>
   SearchProviderModels: (
     provider: string,
     query: string,

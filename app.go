@@ -847,6 +847,14 @@ func (a *App) SaveWorkspaceDatasetSchema(request datacatalog.SaveSchemaRequest) 
 	return catalogService.GetSchema(a.appContext(), request.WorkspaceID, request.TableName)
 }
 
+func (a *App) SaveWorkspaceDatasetContext(request datacatalog.SaveTableContextRequest) (datacatalog.DatasetSchema, error) {
+	service, err := a.catalogService()
+	if err != nil {
+		return datacatalog.DatasetSchema{}, err
+	}
+	return service.SaveTableContext(a.appContext(), request)
+}
+
 func (a *App) RegenerateWorkspaceDatasetSchema(request schemageneration.RegenerateRequest) (schemageneration.RegenerateResult, error) {
 	service, err := a.schemaGenerationService()
 	if err != nil {

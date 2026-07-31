@@ -11,6 +11,7 @@ export interface SchemaHubColumn {
 export interface SchemaHubTable {
   id: string
   tableName: string
+  tableContext?: string
   rowCount: number
   status: string
   columns: SchemaHubColumn[]

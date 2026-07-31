@@ -59,6 +59,13 @@ export const workspaceApi = {
       columns: Array.isArray(payload.columns) ? payload.columns : [],
     })
   },
+  saveDatasetContext(workspaceId: unknown, tableName: unknown, context: unknown) {
+    return invokeNative('SaveWorkspaceDatasetContext', {
+      workspace_id: String(workspaceId || ''),
+      table_name: String(tableName || ''),
+      context: String(context || ''),
+    })
+  },
   regenerateDatasetSchema(workspaceId: unknown, tableName: unknown, payload: RecordValue = {}) {
     return invokeNative('RegenerateWorkspaceDatasetSchema', {
       workspace_id: String(workspaceId || ''),

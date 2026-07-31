@@ -46,7 +46,10 @@ describe('workspaceApi Wails bridge', () => {
   })
 
   it('forwards table context through the native schema save contract', async () => {
-    const app = { SaveWorkspaceDatasetSchema: vi.fn().mockResolvedValue({ table_name: 'sales' }) }
+    const app = {
+      SaveWorkspaceDatasetSchema: vi.fn().mockResolvedValue({ table_name: 'sales' }),
+      SaveWorkspaceDatasetContext: vi.fn().mockResolvedValue({ table_name: 'sales' }),
+    }
     window.go = { main: { App: app } }
 
     await workspaceApi.saveDatasetSchema('workspace-1', 'sales', {
@@ -59,6 +62,13 @@ describe('workspaceApi Wails bridge', () => {
       table_name: 'sales',
       table_context: 'One row per booked sale',
       columns: [{ name: 'amount' }],
+    })
+
+    await workspaceApi.saveDatasetContext('workspace-1', 'sales', 'Net sales after returns')
+    expect(app.SaveWorkspaceDatasetContext).toHaveBeenCalledWith({
+      workspace_id: 'workspace-1',
+      table_name: 'sales',
+      context: 'Net sales after returns',
     })
   })
 })

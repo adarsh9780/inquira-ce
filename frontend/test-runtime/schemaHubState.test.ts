@@ -16,6 +16,7 @@ describe('schema hub state', () => {
       [
         {
           table_name: 'orders',
+          table_context: 'One row per completed order.',
           columns: [
             { name: 'order_id', dtype: 'BIGINT', nullable: false, aliases: 'id, order number' },
           ],
@@ -25,6 +26,7 @@ describe('schema hub state', () => {
     )
 
     expect(tables.map((table) => table.id)).toEqual(['table-customers', 'table-orders'])
+    expect(tables[1]?.tableContext).toBe('One row per completed order.')
     expect(tables[1]?.columns[0]).toMatchObject({
       name: 'order_id',
       dataType: 'BIGINT',
@@ -90,5 +92,19 @@ describe('schema hub state', () => {
     state.markTableDirty('table-orders')
     state.resetTable('table-orders')
     expect(state.tables.value[0]?.columns[0]?.description).toBe('Saved')
+  })
+
+  it('replaces table context without marking column metadata dirty', () => {
+    const state = useSchemaHubState()
+    const load = state.beginLoad()
+    state.applyLoad(load, normalizeSchemaTables(
+      [{ id: 'table-orders', table_name: 'orders' }],
+      [{ table_name: 'orders', table_context: 'Original context', columns: [] }],
+    ))
+
+    state.replaceTableContext('table-orders', 'Updated context')
+
+    expect(state.tables.value[0]?.tableContext).toBe('Updated context')
+    expect(state.isEdited.value).toBe(false)
   })
 })
