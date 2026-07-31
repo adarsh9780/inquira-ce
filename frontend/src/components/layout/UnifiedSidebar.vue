@@ -826,10 +826,12 @@ function closeDeleteDialog() {
 }
 
 async function confirmDelete() {
-  if (!pendingDeleteId.value) return
+  const conversationId = String(pendingDeleteId.value || '').trim()
+  if (!conversationId) return
   try {
-    await conversationStore.deleteConversationById(pendingDeleteId.value)
-    removeConversationFromSidebarCache(pendingDeleteId.value)
+    await conversationStore.deleteConversationById(conversationId)
+    removeConversationFromSidebarCache(conversationId)
+    updateSidebarConversationCache(workspaceStore.activeWorkspaceId, conversationStore.conversations)
     toast.success('Conversation Deleted', 'Conversation has been removed.')
     closeDeleteDialog()
   } catch (error: any) {

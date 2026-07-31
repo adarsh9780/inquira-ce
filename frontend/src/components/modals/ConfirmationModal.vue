@@ -29,6 +29,7 @@ const emit = defineEmits<{
     :open="isOpen"
     :title="title"
     :description="message"
+    @action="emit('confirm')"
     @close="emit('close')"
   >
     <template #icon>
@@ -38,7 +39,7 @@ const emit = defineEmits<{
       <Button variant="secondary">{{ cancelText }}</Button>
     </template>
     <template #action>
-      <Button variant="danger" @click="emit('confirm')">{{ confirmText }}</Button>
+      <Button variant="danger">{{ confirmText }}</Button>
     </template>
   </AlertDialogShell>
 </template>
