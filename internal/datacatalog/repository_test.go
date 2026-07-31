@@ -32,6 +32,10 @@ func TestSQLiteSchemaRepositoryPersistsReplacementsAndCascadesWithWorkspace(t *t
 	if err != nil || loadedContext != tableContext {
 		t.Fatalf("TableContext() = %q, %v", loadedContext, err)
 	}
+	if err := repository.SaveTableContext(context.Background(), created.ID, "sales", "Updated table context"); err != nil {
+		t.Fatal(err)
+	}
+	tableContext = "Updated table context"
 	loaded, err := repository.List(context.Background(), created.ID, "sales")
 	if err != nil || len(loaded) != 1 || loaded[0].Aliases[1] != "bookings" {
 		t.Fatalf("List() = %#v, %v", loaded, err)

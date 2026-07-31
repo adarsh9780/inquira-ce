@@ -64,6 +64,14 @@ func (f *fakeSchemaRepository) TableContext(_ context.Context, workspaceID, tabl
 	return f.contexts[workspaceID+"/"+tableName], nil
 }
 
+func (f *fakeSchemaRepository) SaveTableContext(_ context.Context, workspaceID, tableName, value string) error {
+	if f.contexts == nil {
+		f.contexts = map[string]string{}
+	}
+	f.contexts[workspaceID+"/"+tableName] = value
+	return nil
+}
+
 func (f *fakeSchemaRepository) Replace(_ context.Context, workspaceID, tableName string, tableContext *string, items []ColumnOverride) error {
 	if f.items == nil {
 		f.items = map[string][]ColumnOverride{}
@@ -311,11 +319,18 @@ func TestNativeDatasetAndSchemaContractsHideSnapshotPointersAndPersistOverrides(
 	if err != nil || catalog.AnalysisSchema.Tables[0].Context != "One row per booked sale." {
 		t.Fatalf("analysis schema table context = %#v, %v", catalog.AnalysisSchema, err)
 	}
+	contextOnly, err := service.SaveTableContext(context.Background(), SaveTableContextRequest{WorkspaceID: "workspace-1", TableName: "sales", Context: "  Net sales after returns.  "})
+	if err != nil || contextOnly.TableContext != "Net sales after returns." || contextOnly.Columns[1].Description != "Recognized revenue" {
+		t.Fatalf("SaveTableContext() = %#v, %v", contextOnly, err)
+	}
 	if _, err := service.SaveSchema(context.Background(), SaveSchemaRequest{WorkspaceID: "workspace-1", TableName: "sales", Columns: []SchemaColumn{{Name: "unknown"}}}); errorCode(err) != "schema_columns_invalid" {
 		t.Fatalf("unknown column error = %v", err)
 	}
 	tooLong := strings.Repeat("x", 8001)
 	if _, err := service.SaveSchema(context.Background(), SaveSchemaRequest{WorkspaceID: "workspace-1", TableName: "sales", TableContext: &tooLong, Columns: preserved.Columns}); errorCode(err) != "table_context_invalid" {
 		t.Fatalf("long table context error = %v", err)
+	}
+	if _, err := service.SaveTableContext(context.Background(), SaveTableContextRequest{WorkspaceID: "workspace-1", TableName: "sales", Context: tooLong}); errorCode(err) != "table_context_invalid" {
+		t.Fatalf("long context-only error = %v", err)
 	}
 }

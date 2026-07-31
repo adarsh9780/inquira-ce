@@ -53,6 +53,7 @@ export function normalizeSchemaTables(datasets: unknown, schemas: unknown): Sche
     return {
       id: tableId,
       tableName,
+      tableContext: String(schema.table_context || ''),
       rowCount: Number(dataset.row_count || 0),
       status: String(dataset.schema_status || ''),
       columns: normalizeSchemaColumns(tableId, tableName, schema.columns),
@@ -147,6 +148,10 @@ export function useSchemaHubState() {
     tables.value = tables.value.map((table) => table.id === tableId ? { ...table, columns } : table)
   }
 
+  function replaceTableContext(tableId: string, tableContext: string) {
+    tables.value = tables.value.map((table) => table.id === tableId ? { ...table, tableContext } : table)
+  }
+
   function resetTable(tableId: string) {
     const columns = savedColumns.get(tableId)
     if (!columns) return false
@@ -175,6 +180,7 @@ export function useSchemaHubState() {
     clearDirtyTables,
     clearTableDirty,
     replaceTableColumns,
+    replaceTableContext,
     resetTable,
   }
 }

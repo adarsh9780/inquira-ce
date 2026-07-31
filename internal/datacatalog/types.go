@@ -107,6 +107,12 @@ type SaveSchemaRequest struct {
 	Columns      []SchemaColumn `json:"columns"`
 }
 
+type SaveTableContextRequest struct {
+	WorkspaceID string `json:"workspace_id"`
+	TableName   string `json:"table_name"`
+	Context     string `json:"context"`
+}
+
 type ColumnOverride struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description"`

@@ -50,7 +50,14 @@
           <p class="text-[var(--color-text-main)] font-medium text-[15px]">No datasets found.</p>
           <p class="text-[var(--color-text-muted)] text-[13px] mt-1">Upload data or sync a dataset first.</p>
         </div>
-        <div v-else-if="!schemaHub.isLoading.value && schemaHub.selectedTable.value" class="p-4 pb-10">
+        <div v-else-if="!schemaHub.isLoading.value && schemaHub.selectedTable.value" class="space-y-4 p-4 pb-10">
+          <TableContextSurface
+            :key="schemaHub.selectedTable.value.id"
+            :model-value="schemaHub.selectedTable.value.tableContext || ''"
+            :table-name="schemaHub.selectedTable.value.tableName"
+            :save-context="(context) => saveTableContext(schemaHub.selectedTable.value!.id, context)"
+            @update:model-value="schemaHub.replaceTableContext(schemaHub.selectedTable.value!.id, $event)"
+          />
           <TableMetadataSurface
             :table="schemaHub.selectedTable.value"
             :dirty="schemaHub.dirtyTableIds.value.has(schemaHub.selectedTable.value.id)"
@@ -82,6 +89,7 @@ import { workspaceApi } from '../../api/workspaces'
 import { useExecutionStore } from '../../stores/executionStore'
 import { useWorkspaceStore } from '../../stores/workspaceStore'
 import TableMetadataSurface from '../schema/TableMetadataSurface.vue'
+import TableContextSurface from '../schema/TableContextSurface.vue'
 import SchemaTableNavigator from '../schema/SchemaTableNavigator.vue'
 import WorkspaceContextSurface from '../schema/WorkspaceContextSurface.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
@@ -98,7 +106,8 @@ const workspaceStore = useWorkspaceStore()
 
 const schemaHub = useSchemaHubState()
 const savingTableId = ref('')
-const schemaBusy = computed(() => schemaHub.isLoading.value || Boolean(savingTableId.value))
+const savingTableContextId = ref('')
+const schemaBusy = computed(() => schemaHub.isLoading.value || Boolean(savingTableId.value) || Boolean(savingTableContextId.value))
 const regeneratingTableName = ref('')
 const pendingSelection = ref<SchemaHubSelection | null>(null)
 const groupedSchema = schemaHub.tables
@@ -199,6 +208,27 @@ async function saveWorkspaceContext(context: string) {
 function handleTableColumnsChange(tableId: string, columns: SchemaHubColumn[]) {
   schemaHub.replaceTableColumns(tableId, columns)
   schemaHub.markTableDirty(tableId)
+}
+
+async function saveTableContext(tableId: string, context: string) {
+  const workspaceId = workspaceStore.activeWorkspaceId
+  const table = groupedSchema.value.find((candidate) => candidate.id === tableId)
+  if (!workspaceId || !table || savingTableContextId.value) return
+  savingTableContextId.value = tableId
+  try {
+    await workspaceApi.saveDatasetContext(workspaceId, table.tableName, context)
+    if (workspaceStore.activeWorkspaceId !== workspaceId) {
+      throw new DOMException('Workspace changed before the table context save completed.', 'AbortError')
+    }
+    toast.success('Table context saved', `Saved context for ${table.tableName}.`)
+  } catch (error: any) {
+    if (workspaceStore.activeWorkspaceId === workspaceId) {
+      toast.error('Failed to save table context', error?.message)
+    }
+    throw error
+  } finally {
+    savingTableContextId.value = ''
+  }
 }
 
 async function saveTableSchema(tableId: string, columns: SchemaHubColumn[]) {

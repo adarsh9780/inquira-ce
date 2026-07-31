@@ -34,6 +34,7 @@ type Gateway interface {
 type schemaRepository interface {
 	List(context.Context, string, string) ([]ColumnOverride, error)
 	TableContext(context.Context, string, string) (string, error)
+	SaveTableContext(context.Context, string, string, string) error
 	Replace(context.Context, string, string, *string, []ColumnOverride) error
 	Close() error
 }
@@ -45,6 +46,9 @@ func (emptySchemaRepository) List(context.Context, string, string) ([]ColumnOver
 }
 func (emptySchemaRepository) TableContext(context.Context, string, string) (string, error) {
 	return "", nil
+}
+func (emptySchemaRepository) SaveTableContext(context.Context, string, string, string) error {
+	return nil
 }
 func (emptySchemaRepository) Replace(context.Context, string, string, *string, []ColumnOverride) error {
 	return nil
@@ -237,9 +241,9 @@ func (s *Service) SaveSchema(ctx context.Context, request SaveSchemaRequest) (Da
 	overrides := make([]ColumnOverride, 0, len(request.Columns))
 	var tableContext *string
 	if request.TableContext != nil {
-		value := strings.TrimSpace(*request.TableContext)
-		if utf8.RuneCountInString(value) > 8000 {
-			return DatasetSchema{}, apperror.New("table_context_invalid", "Table context must be at most 8000 characters.")
+		value, err := normalizeTableContext(*request.TableContext)
+		if err != nil {
+			return DatasetSchema{}, err
 		}
 		tableContext = &value
 	}
@@ -263,6 +267,31 @@ func (s *Service) SaveSchema(ctx context.Context, request SaveSchemaRequest) (Da
 		return DatasetSchema{}, apperror.Wrap("schema_save_failed", "Could not save dataset metadata.", err)
 	}
 	return s.GetSchema(ctx, request.WorkspaceID, current.TableName)
+}
+
+func (s *Service) SaveTableContext(ctx context.Context, request SaveTableContextRequest) (DatasetSchema, error) {
+	workspaceID := strings.TrimSpace(request.WorkspaceID)
+	current, err := s.GetSchema(ctx, workspaceID, strings.TrimSpace(request.TableName))
+	if err != nil {
+		return DatasetSchema{}, err
+	}
+	value, err := normalizeTableContext(request.Context)
+	if err != nil {
+		return DatasetSchema{}, err
+	}
+	if err := s.schemas.SaveTableContext(ctx, workspaceID, current.TableName, value); err != nil {
+		return DatasetSchema{}, apperror.Wrap("schema_save_failed", "Could not save table context.", err)
+	}
+	current.TableContext = value
+	return current, nil
+}
+
+func normalizeTableContext(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if utf8.RuneCountInString(value) > 8000 {
+		return "", apperror.New("table_context_invalid", "Table context must be at most 8000 characters.")
+	}
+	return value, nil
 }
 
 func (s *Service) workspaceLock(id string) *sync.Mutex {

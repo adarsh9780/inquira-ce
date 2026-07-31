@@ -113,6 +113,15 @@ func (r *SQLiteRepository) TableContext(ctx context.Context, workspaceID, tableN
 	return value, nil
 }
 
+func (r *SQLiteRepository) SaveTableContext(ctx context.Context, workspaceID, tableName, value string) error {
+	_, err := r.db.ExecContext(ctx, `INSERT INTO dataset_schema_tables(workspace_id, table_name, context)
+		VALUES (?, ?, ?) ON CONFLICT(workspace_id, table_name) DO UPDATE SET context = excluded.context, updated_at = CURRENT_TIMESTAMP`, workspaceID, tableName, value)
+	if err != nil {
+		return fmt.Errorf("save table context: %w", err)
+	}
+	return nil
+}
+
 func (r *SQLiteRepository) Replace(ctx context.Context, workspaceID, tableName string, tableContext *string, items []ColumnOverride) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
