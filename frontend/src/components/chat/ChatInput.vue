@@ -1386,6 +1386,12 @@ async function handleSubmit() {
         applyConversationResultState(requestConversationId, finalStatePatch)
       }
     }
+    if (
+      responseTurnId
+      && requestConversationId === String(conversationStore.activeConversationId || '').trim()
+    ) {
+      artifactStore.requestActiveTurnArtifactRefresh()
+    }
 
     setTimeout(() => {
       const scrollableContainer = document.querySelector('[data-chat-scroll-container]')

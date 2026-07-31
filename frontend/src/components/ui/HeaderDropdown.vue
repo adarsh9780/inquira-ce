@@ -12,7 +12,7 @@ import {
   ComboboxViewport,
 } from 'reka-ui'
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/vue/20/solid'
-import { computed, nextTick, onBeforeUnmount, ref, watch, type Component } from 'vue'
+import { computed, onBeforeUnmount, ref, watch, type Component } from 'vue'
 import {
   mergeModelOptions,
   normalizeModelOptions,
@@ -31,7 +31,6 @@ import {
   dropdownSurfaceClass,
   dropdownSurfaceStyle,
 } from './dropdownShared'
-import { updateFloatingDropdownPosition } from '../../composables/useFloatingDropdown'
 
 type DropdownValue = string | number | null
 
@@ -63,6 +62,7 @@ const props = withDefaults(defineProps<{
   noResultsLabel?: string
   maxOptionsWithoutSearch?: number
   dropdownMinWidth?: number
+  disabled?: boolean
 }>(), {
   modelValue: null,
   options: () => [],
@@ -83,6 +83,7 @@ const props = withDefaults(defineProps<{
   noResultsLabel: 'No results found',
   maxOptionsWithoutSearch: 0,
   dropdownMinWidth: 0,
+  disabled: false,
 })
 
 const emit = defineEmits<{
@@ -93,14 +94,12 @@ const searchQuery = ref('')
 const backendOptions = ref<DropdownOption[]>([])
 const backendLoading = ref(false)
 const isOpen = ref(false)
-const triggerRef = ref<HTMLElement | null>(null)
-const floatingOptionsStyle = ref<Record<string, string>>({
-  left: '0px',
-  top: '0px',
-  width: '0px',
-  maxHeight: '240px',
+const floatingOptionsStyle = computed<Record<string, string>>(() => ({
+  width: 'var(--reka-combobox-trigger-width)',
+  minWidth: props.dropdownMinWidth > 0 ? `${props.dropdownMinWidth}px` : '0px',
+  maxHeight: 'min(240px, var(--reka-combobox-content-available-height))',
   ...dropdownSurfaceStyle(),
-})
+}))
 let backendSearchTimer: ReturnType<typeof setTimeout> | null = null
 let backendSearchToken = 0
 
@@ -154,7 +153,6 @@ watch(() => props.backendSearch, () => {
   backendOptions.value = []
   scheduleBackendSearch(String(searchQuery.value || '').trim())
 })
-watch([filteredOptions, groupedFilteredOptions], () => void nextTick(updateFloatingPosition))
 
 function handleChange(value: DropdownValue) {
   searchQuery.value = ''
@@ -164,42 +162,9 @@ function handleChange(value: DropdownValue) {
 
 function handleOpenChange(open: boolean) {
   isOpen.value = open
-  if (open) {
-    bindPositionListeners()
-    void nextTick(updateFloatingPosition)
-  } else {
-    unbindPositionListeners()
+  if (!open) {
     searchQuery.value = ''
   }
-}
-
-function triggerElement(): HTMLElement | null {
-  return triggerRef.value instanceof HTMLElement ? triggerRef.value : null
-}
-
-function updateFloatingPosition() {
-  const nextStyle = updateFloatingDropdownPosition({ value: triggerElement() })
-  if (!nextStyle) return
-  if (props.dropdownMinWidth > 0) {
-    const rect = triggerElement()?.getBoundingClientRect()
-    if (rect) {
-      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || props.dropdownMinWidth + 16
-      const width = Math.min(Math.max(rect.width, props.dropdownMinWidth), Math.max(0, viewportWidth - 16))
-      nextStyle.width = `${Math.round(width)}px`
-      nextStyle.left = `${Math.round(Math.max(8, Math.min(rect.left, viewportWidth - width - 8)))}px`
-    }
-  }
-  floatingOptionsStyle.value = nextStyle
-}
-
-function bindPositionListeners() {
-  window.addEventListener('resize', updateFloatingPosition)
-  window.addEventListener('scroll', updateFloatingPosition, true)
-}
-
-function unbindPositionListeners() {
-  window.removeEventListener('resize', updateFloatingPosition)
-  window.removeEventListener('scroll', updateFloatingPosition, true)
 }
 
 function shouldSearchBackend(query: string, localMatches: DropdownOption[]) {
@@ -261,7 +226,6 @@ function normalizeProviderKey(provider: string) {
 
 onBeforeUnmount(() => {
   if (backendSearchTimer) clearTimeout(backendSearchTimer)
-  unbindPositionListeners()
 })
 </script>
 
@@ -270,6 +234,7 @@ onBeforeUnmount(() => {
     <ComboboxRoot
       :model-value="modelValue"
       :open="isOpen"
+      :disabled="disabled"
       :ignore-filter="true"
       :reset-search-term-on-select="true"
       @update:model-value="handleChange"
@@ -279,11 +244,11 @@ onBeforeUnmount(() => {
         <div class="relative">
           <ComboboxTrigger as-child>
             <button
-              ref="triggerRef"
               type="button"
-              class="group inline-flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1 text-[13px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]"
+              class="group inline-flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1 text-[13px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] disabled:cursor-not-allowed disabled:opacity-50"
               :style="triggerStyle"
               :aria-label="ariaLabel"
+              :disabled="disabled"
             >
               <span class="flex min-w-0 items-center gap-2">
                 <span v-if="selectedOption?.icon" class="inline-flex h-4 w-4 shrink-0" data-header-dropdown-icon>
@@ -300,6 +265,10 @@ onBeforeUnmount(() => {
               :class="[dropdownSurfaceClass, 'ui-combobox-content']"
               :style="floatingOptionsStyle"
               position="popper"
+              :side-offset="6"
+              align="start"
+              position-strategy="fixed"
+              :collision-padding="8"
             >
               <div v-if="searchable" :class="dropdownSearchRowClass" :style="dropdownSearchRowStyle">
                 <ComboboxInput

@@ -198,9 +198,10 @@ describe('critical interaction safety net', () => {
 
     const content = document.body.querySelector('[role="listbox"]')
     expect(content).toBeTruthy()
-    expect(content.style.width).toBe('288px')
-    expect(content.style.left).toBe('640px')
-    expect(content.style.top).toBe('62px')
+    expect(content.style.width).toBe('var(--reka-combobox-trigger-width)')
+    expect(content.style.minWidth).toBe('288px')
+    expect(content.style.left).toBe('')
+    expect(content.style.top).toBe('')
   })
 
   it('uses Reka dialog focus management and restores the opening control', async () => {

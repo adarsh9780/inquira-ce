@@ -100,6 +100,10 @@ export const useArtifactStore = defineStore('artifacts', () => {
     dataPaneError.value = ''
   }
 
+  function requestActiveTurnArtifactRefresh() {
+    activeTurnArtifactRefreshKey.value += 1
+  }
+
   function setTableViewport(start: unknown, end: unknown, total: unknown) {
     const nextStart = Math.max(0, Number(start || 0))
     const nextEnd = Math.max(0, Number(end || 0))
@@ -222,6 +226,7 @@ export const useArtifactStore = defineStore('artifacts', () => {
     setFigureCount,
     setDataPaneError,
     clearDataPaneError,
+    requestActiveTurnArtifactRefresh,
     setTableViewport,
     clearTableViewport,
     setTablePageOffset,

@@ -49,4 +49,12 @@ describe('artifactStore', () => {
     store.setTablePageOffset('workspace-1', 'table-1', 0, 'turn-1')
     expect(persist).not.toHaveBeenCalled()
   })
+
+  it('invalidates active-turn artifact readers after a completed response', () => {
+    const store = useArtifactStore()
+
+    expect(store.activeTurnArtifactRefreshKey).toBe(0)
+    store.requestActiveTurnArtifactRefresh()
+    expect(store.activeTurnArtifactRefreshKey).toBe(1)
+  })
 })
