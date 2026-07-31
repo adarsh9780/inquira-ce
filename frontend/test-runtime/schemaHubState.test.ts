@@ -66,4 +66,29 @@ describe('schema hub state', () => {
     state.clearDirtyTables()
     expect(state.isEdited.value).toBe(false)
   })
+
+  it('restores the last saved columns when table edits are discarded', () => {
+    const state = useSchemaHubState()
+    const load = state.beginLoad()
+    const tables = normalizeSchemaTables(
+      [{ id: 'table-orders', table_name: 'orders' }],
+      [{ table_name: 'orders', columns: [{ name: 'order_id', description: 'Original' }] }],
+    )
+    state.applyLoad(load, tables)
+
+    state.replaceTableColumns('table-orders', [{ ...tables[0]!.columns[0]!, description: 'Draft' }])
+    state.markTableDirty('table-orders')
+    expect(state.resetTable('table-orders')).toBe(true)
+    expect(state.tables.value[0]?.columns[0]?.description).toBe('Original')
+    expect(state.dirtyTableIds.value.has('table-orders')).toBe(false)
+
+    const savedColumns = [{ ...state.tables.value[0]!.columns[0]!, description: 'Saved' }]
+    state.replaceTableColumns('table-orders', savedColumns)
+    state.markTableDirty('table-orders')
+    state.clearTableDirty('table-orders')
+    state.replaceTableColumns('table-orders', [{ ...savedColumns[0]!, description: 'Another draft' }])
+    state.markTableDirty('table-orders')
+    state.resetTable('table-orders')
+    expect(state.tables.value[0]?.columns[0]?.description).toBe('Saved')
+  })
 })

@@ -62,6 +62,7 @@ export function normalizeSchemaTables(datasets: unknown, schemas: unknown): Sche
 
 export function useSchemaHubState() {
   const tables = ref<SchemaHubTable[]>([])
+  const savedColumns = new Map<string, SchemaHubColumn[]>()
   const selection = ref<SchemaHubSelection>({ kind: 'workspace' })
   const dirtyTableIds = ref(new Set<string>())
   const isLoading = ref(false)
@@ -85,6 +86,8 @@ export function useSchemaHubState() {
   function applyLoad(loadId: number, nextTables: SchemaHubTable[]) {
     if (loadId !== activeLoad) return false
     tables.value = nextTables
+    savedColumns.clear()
+    nextTables.forEach((table) => savedColumns.set(table.id, cloneColumns(table.columns)))
     if (selection.value.kind === 'table') {
       const tableId = selection.value.tableId
       if (!nextTables.some((table) => table.id === tableId)) {
@@ -106,6 +109,7 @@ export function useSchemaHubState() {
   function clear() {
     activeLoad += 1
     tables.value = []
+    savedColumns.clear()
     selection.value = { kind: 'workspace' }
     dirtyTableIds.value = new Set()
     isLoading.value = false
@@ -127,10 +131,13 @@ export function useSchemaHubState() {
   }
 
   function clearDirtyTables() {
+    tables.value.forEach((table) => savedColumns.set(table.id, cloneColumns(table.columns)))
     dirtyTableIds.value = new Set()
   }
 
   function clearTableDirty(tableId: string) {
+    const table = tables.value.find((candidate) => candidate.id === tableId)
+    if (table) savedColumns.set(tableId, cloneColumns(table.columns))
     const next = new Set(dirtyTableIds.value)
     next.delete(tableId)
     dirtyTableIds.value = next
@@ -138,6 +145,16 @@ export function useSchemaHubState() {
 
   function replaceTableColumns(tableId: string, columns: SchemaHubColumn[]) {
     tables.value = tables.value.map((table) => table.id === tableId ? { ...table, columns } : table)
+  }
+
+  function resetTable(tableId: string) {
+    const columns = savedColumns.get(tableId)
+    if (!columns) return false
+    replaceTableColumns(tableId, cloneColumns(columns))
+    const next = new Set(dirtyTableIds.value)
+    next.delete(tableId)
+    dirtyTableIds.value = next
+    return true
   }
 
   return {
@@ -158,5 +175,10 @@ export function useSchemaHubState() {
     clearDirtyTables,
     clearTableDirty,
     replaceTableColumns,
+    resetTable,
   }
+}
+
+function cloneColumns(columns: SchemaHubColumn[]) {
+  return columns.map((column) => ({ ...column, aliases: [...column.aliases] }))
 }
