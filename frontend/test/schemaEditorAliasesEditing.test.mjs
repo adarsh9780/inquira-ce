@@ -7,14 +7,15 @@ const schemaPath = resolve(process.cwd(), 'src/components/preview/SchemaEditorTa
 const source = readFileSync(schemaPath, 'utf-8')
 const statePath = resolve(process.cwd(), 'src/composables/useSchemaHubState.ts')
 const stateSource = readFileSync(statePath, 'utf-8')
+const tablePath = resolve(process.cwd(), 'src/components/schema/TableMetadataSurface.vue')
+const tableSource = readFileSync(tablePath, 'utf-8')
 
 test('schema editor supports inline alias editing and persists normalized aliases', () => {
-  assert.equal(source.includes('normalizeAliasList,'), true)
+  assert.equal(tableSource.includes("import { normalizeAliasList } from '../../composables/useSchemaHubState'"), true)
   assert.equal(stateSource.includes('export function normalizeAliasList(value: unknown): string[] {'), true)
-  assert.equal(source.includes("startInlineEdit(col, 'aliases')"), true)
-  assert.equal(source.includes("editingCell?.field === 'aliases'"), true)
-  assert.equal(source.includes('const newAliases = normalizeAliasList(value)'), true)
-  assert.equal(source.includes('aliases: c.aliases || []'), true)
+  assert.equal(tableSource.includes("startEdit(column, 'aliases')"), true)
+  assert.equal(tableSource.includes('normalizeAliasList(active.value)'), true)
+  assert.equal(source.includes('aliases: column.aliases || []'), true)
 })
 
 test('schema editor loads all workspace dataset schemas without auto-regenerating them', () => {
@@ -22,5 +23,5 @@ test('schema editor loads all workspace dataset schemas without auto-regeneratin
   assert.equal(source.includes('return await workspaceApi.getDatasetSchema(workspaceId, ds.table_name)'), true)
   assert.equal(source.includes('await fetchWorkspaceSchema()'), true)
   assert.equal(source.includes('normalizeSchemaTables(datasets, schemas)'), true)
-  assert.equal(source.includes('regenerateTableSchema(group.tableName)'), true)
+  assert.equal(source.includes('@regenerate="regenerateTableSchema"'), true)
 })

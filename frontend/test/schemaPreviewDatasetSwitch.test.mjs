@@ -23,7 +23,7 @@ test('schema editor refreshes automatically when dataset schema becomes ready', 
 })
 
 test('schema editor does not label blank descriptions as active generation', () => {
-  const schemaEditorPath = resolve(process.cwd(), 'src/components/preview/SchemaEditorTab.vue')
+  const schemaEditorPath = resolve(process.cwd(), 'src/components/schema/TableMetadataSurface.vue')
   const source = readFileSync(schemaEditorPath, 'utf-8')
 
   assert.equal(source.includes('Click to add description...'), true)
