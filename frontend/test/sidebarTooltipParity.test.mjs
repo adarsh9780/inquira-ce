@@ -7,7 +7,7 @@ test('sidebar uses native title tooltips for current navigation actions', () => 
   const source = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
   const rowSource = readFileSync(resolve(process.cwd(), 'src/components/layout/sidebar/SidebarConversationRow.vue'), 'utf-8')
 
-  assert.equal(source.includes('title="New conversation"'), true)
+  assert.equal(source.includes('title="New conversation"'), false)
   assert.equal(source.includes('Search conversations'), false)
   assert.equal(rowSource.includes('title="Conversation actions"'), true)
   assert.equal(source.includes('title="Data sources"'), true)

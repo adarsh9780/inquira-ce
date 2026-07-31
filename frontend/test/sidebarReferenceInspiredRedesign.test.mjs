@@ -3,10 +3,12 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('sidebar redesign keeps quick actions and compact hierarchy without sidebar search', () => {
+test('sidebar keeps compact workspace hierarchy while creation lives in the context bar', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
-  assert.equal(source.includes('PencilSquareIcon'), true)
+  assert.equal(source.includes('PencilSquareIcon'), false)
+  assert.equal(source.includes('class="sidebar-nav-row sidebar-primary-row'), false)
+  assert.equal(source.includes('No conversations yet'), true)
   assert.equal(source.includes('MagnifyingGlassIcon'), false)
   assert.equal(source.includes('Search conversations'), false)
   assert.equal(source.includes('filteredSidebarWorkspaces'), true)

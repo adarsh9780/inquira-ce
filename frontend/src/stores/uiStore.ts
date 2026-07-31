@@ -27,6 +27,7 @@ export const useUiStore = defineStore('ui', () => {
   const isSidebarCollapsed = ref(false)
   const isKeyboardShortcutsOpen = ref(false)
   const isCommandPaletteOpen = ref(false)
+  const isConversationSwitcherOpen = ref(false)
   const connectionFlowRequestId = ref(0)
   const editorLine = ref(1)
   const editorCol = ref(1)
@@ -144,6 +145,22 @@ export const useUiStore = defineStore('ui', () => {
     isCommandPaletteOpen.value = !isCommandPaletteOpen.value
   }
 
+  function setConversationSwitcherOpen(open: unknown) {
+    isConversationSwitcherOpen.value = Boolean(open)
+  }
+
+  function openConversationSwitcher() {
+    setConversationSwitcherOpen(true)
+  }
+
+  function closeConversationSwitcher() {
+    setConversationSwitcherOpen(false)
+  }
+
+  function toggleConversationSwitcher() {
+    setConversationSwitcherOpen(!isConversationSwitcherOpen.value)
+  }
+
   function requestConnectionFlow() {
     settingsInitialTab.value = 'workspace-data'
     connectionFlowRequestId.value += 1
@@ -175,6 +192,7 @@ export const useUiStore = defineStore('ui', () => {
     isSidebarCollapsed.value = false
     isKeyboardShortcutsOpen.value = false
     isCommandPaletteOpen.value = false
+    isConversationSwitcherOpen.value = false
     connectionFlowRequestId.value = 0
     editorLine.value = 1
     editorCol.value = 1
@@ -196,6 +214,7 @@ export const useUiStore = defineStore('ui', () => {
     isSidebarCollapsed,
     isKeyboardShortcutsOpen,
     isCommandPaletteOpen,
+    isConversationSwitcherOpen,
     connectionFlowRequestId,
     editorLine,
     editorCol,
@@ -219,6 +238,10 @@ export const useUiStore = defineStore('ui', () => {
     openCommandPalette,
     closeCommandPalette,
     toggleCommandPalette,
+    setConversationSwitcherOpen,
+    openConversationSwitcher,
+    closeConversationSwitcher,
+    toggleConversationSwitcher,
     requestConnectionFlow,
     setEditorPosition,
     setEditorFocused,

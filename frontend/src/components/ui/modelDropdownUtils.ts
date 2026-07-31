@@ -75,6 +75,7 @@ export function optionMatchesSearch(option: unknown, query: unknown): boolean {
     record.label,
     record.value,
     record.provider,
+    record.description,
     providerLabel(record.provider),
     Array.isArray(record.tags) ? record.tags.join(' ') : '',
   ]
