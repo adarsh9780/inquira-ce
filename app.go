@@ -954,6 +954,14 @@ func (a *App) RefreshConnection(connectionID string) (connection.Connection, err
 	return service.Refresh(a.appContext(), connectionID)
 }
 
+func (a *App) RefreshWorkspaceDatasetSources(workspaceID string) (connection.WorkspaceRefreshResult, error) {
+	service, err := a.connectionService()
+	if err != nil {
+		return connection.WorkspaceRefreshResult{}, err
+	}
+	return service.RefreshWorkspace(a.appContext(), workspaceID)
+}
+
 func (a *App) DeleteConnection(connectionID string) (connection.DeleteResult, error) {
 	service, err := a.connectionService()
 	if err != nil {

@@ -158,6 +158,7 @@ export interface NativeMethodMap {
   ProvisionRuntime: (configuration: NativeRecord) => Promise<unknown>
   RepairRuntime: () => Promise<unknown>
   RefreshConnection: (connectionId: string) => Promise<unknown>
+  RefreshWorkspaceDatasetSources: (workspaceId: string) => Promise<NativeRecord>
   RefreshProviderModels: (request: NativeRecord) => Promise<NativeRecord>
   RegenerateWorkspaceDatasetSchema: (
     request: NativeRegenerateSchemaRequest,

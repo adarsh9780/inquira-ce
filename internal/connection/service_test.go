@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ type fakeGateway struct {
 	preview             Preview
 	materialization     Materialization
 	discoverErr         error
+	discoverCalls       int
 	previewErr          error
 	previewRequest      AdapterRequest
 	materializeErr      error
@@ -30,6 +32,7 @@ type fakeGateway struct {
 func (f *fakeGateway) Discover(_ context.Context, request AdapterRequest) (Discovery, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.discoverCalls++
 	result := f.discovery
 	if result.Objects == nil && (request.AdapterKind == AdapterCSV || request.AdapterKind == AdapterParquet || request.AdapterKind == AdapterJSON) {
 		result.Objects = []SourceObject{{ID: "file", Name: "file", Kind: "table"}}
@@ -344,6 +347,34 @@ func TestRefreshSkipsMaterializationWhenTheSourceFingerprintIsUnchanged(t *testi
 	}
 	if refreshed.Outputs[0].SnapshotPath != created.Outputs[0].SnapshotPath || gateway.materializeCalls != 1 {
 		t.Fatalf("unchanged refresh materialized again: calls=%d", gateway.materializeCalls)
+	}
+}
+
+func TestRefreshWorkspaceReportsSuccessesAndSafeFailures(t *testing.T) {
+	gateway := &fakeGateway{materialization: defaultMaterialization("first"), discovery: Discovery{Fingerprint: "changed"}}
+	service, workspaceID, _ := newTestService(t, gateway)
+	for _, name := range []string{"Sales", "Customers"} {
+		if _, err := service.Create(context.Background(), CreateRequest{
+			WorkspaceID: workspaceID, Name: name, AdapterKind: AdapterCSV,
+			SourcePath: createSource(t, ".csv"), SelectedObjectIDs: []string{"file"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	gateway.materialization = defaultMaterialization("changed")
+
+	refreshed, err := service.RefreshWorkspace(context.Background(), workspaceID)
+	if err != nil || refreshed.Attempted != 2 || refreshed.Succeeded != 2 || refreshed.Changed != 2 || len(refreshed.Failures) != 0 {
+		t.Fatalf("RefreshWorkspace() = %#v, %v", refreshed, err)
+	}
+
+	gateway.discoverErr = errors.New("private source path and credential detail")
+	failed, err := service.RefreshWorkspace(context.Background(), workspaceID)
+	if err != nil || failed.Attempted != 2 || failed.Succeeded != 0 || failed.Changed != 0 || len(failed.Failures) != 2 {
+		t.Fatalf("failed RefreshWorkspace() = %#v, %v", failed, err)
+	}
+	if gateway.discoverCalls != 4 || strings.Contains(failed.Failures[0].Message, "credential") {
+		t.Fatalf("workspace refresh did not continue safely: calls=%d failures=%#v", gateway.discoverCalls, failed.Failures)
 	}
 }
 

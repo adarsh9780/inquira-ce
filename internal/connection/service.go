@@ -209,6 +209,43 @@ func (s *Service) Refresh(ctx context.Context, connectionID string) (Connection,
 	return connection, nil
 }
 
+func (s *Service) RefreshWorkspace(ctx context.Context, workspaceID string) (WorkspaceRefreshResult, error) {
+	listed, err := s.List(ctx, workspaceID)
+	if err != nil {
+		return WorkspaceRefreshResult{}, err
+	}
+	result := WorkspaceRefreshResult{
+		WorkspaceID: strings.TrimSpace(workspaceID),
+		Attempted:   len(listed.Connections),
+		Failures:    []RefreshFailure{},
+	}
+	for _, item := range listed.Connections {
+		refreshed, refreshErr := s.Refresh(ctx, item.ID)
+		if refreshErr != nil {
+			result.Failures = append(result.Failures, safeRefreshFailure(item, refreshErr))
+			continue
+		}
+		result.Succeeded++
+		if refreshed.SourceFingerprint != item.SourceFingerprint {
+			result.Changed++
+		}
+	}
+	return result, nil
+}
+
+func safeRefreshFailure(connection Connection, err error) RefreshFailure {
+	failure := RefreshFailure{
+		ConnectionID: connection.ID, ConnectionName: connection.Name,
+		Code: "connection_refresh_failed", Message: "Could not refresh this data source.",
+	}
+	var publicError *apperror.Error
+	if errors.As(err, &publicError) {
+		failure.Code = publicError.Code
+		failure.Message = publicError.Message
+	}
+	return failure
+}
+
 func (s *Service) Get(ctx context.Context, connectionID string) (Connection, error) {
 	connection, err := s.repository.Get(ctx, strings.TrimSpace(connectionID))
 	if errors.Is(err, errNotFound) {

@@ -39,6 +39,9 @@ export const workspaceApi = {
   listDatasets(workspaceId: unknown) {
     return invokeNative('ListWorkspaceDatasets', String(workspaceId || ''))
   },
+  refreshDatasetSources(workspaceId: unknown) {
+    return invokeNative('RefreshWorkspaceDatasetSources', String(workspaceId || ''))
+  },
   getDatasetSchema(workspaceId: unknown, tableName: unknown) {
     return invokeNative(
       'GetWorkspaceDatasetSchema',

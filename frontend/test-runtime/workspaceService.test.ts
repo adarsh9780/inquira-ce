@@ -15,6 +15,7 @@ describe('workspaceApi Wails bridge', () => {
       UpdateWorkspace: vi.fn().mockResolvedValue({ id: 'workspace-1', name: 'Finance' }),
       GetWorkspaceSummary: vi.fn().mockResolvedValue({ id: 'workspace-1', table_count: 0 }),
       DeleteWorkspace: vi.fn().mockResolvedValue({ job_id: 'job-1', status: 'completed' }),
+      RefreshWorkspaceDatasetSources: vi.fn().mockResolvedValue({ attempted: 1, succeeded: 1 }),
     }
     window.go = { main: { App: app } }
 
@@ -25,6 +26,7 @@ describe('workspaceApi Wails bridge', () => {
     await workspaceApi.update('workspace-1', 'Finance', 'Updated context')
     await workspaceApi.summary('workspace-1')
     await workspaceApi.remove('workspace-1')
+    await workspaceApi.refreshDatasetSources('workspace-1')
 
     expect(app.ListWorkspaces).toHaveBeenCalledOnce()
     expect(app.CreateWorkspace).toHaveBeenCalledWith({
@@ -43,6 +45,7 @@ describe('workspaceApi Wails bridge', () => {
     })
     expect(app.GetWorkspaceSummary).toHaveBeenCalledWith('workspace-1')
     expect(app.DeleteWorkspace).toHaveBeenCalledWith('workspace-1')
+    expect(app.RefreshWorkspaceDatasetSources).toHaveBeenCalledWith('workspace-1')
   })
 
   it('forwards table context through the native schema save contract', async () => {
