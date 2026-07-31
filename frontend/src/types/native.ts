@@ -57,6 +57,7 @@ export interface NativeSaveSchemaRequest {
   workspace_id: string
   table_name: string
   context?: string
+  table_context?: string
   columns: unknown[]
 }
 

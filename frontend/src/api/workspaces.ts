@@ -53,6 +53,9 @@ export const workspaceApi = {
       ...(Object.prototype.hasOwnProperty.call(payload, 'context')
         ? { context: String(payload.context || '') }
         : {}),
+      ...(Object.prototype.hasOwnProperty.call(payload, 'table_context')
+        ? { table_context: String(payload.table_context || '') }
+        : {}),
       columns: Array.isArray(payload.columns) ? payload.columns : [],
     })
   },

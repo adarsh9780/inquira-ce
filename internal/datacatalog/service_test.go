@@ -52,18 +52,30 @@ type fakeCatalogGateway struct {
 }
 
 type fakeSchemaRepository struct {
-	items map[string][]ColumnOverride
+	items    map[string][]ColumnOverride
+	contexts map[string]string
 }
 
 func (f *fakeSchemaRepository) List(_ context.Context, workspaceID, tableName string) ([]ColumnOverride, error) {
 	return append([]ColumnOverride(nil), f.items[workspaceID+"/"+tableName]...), nil
 }
 
-func (f *fakeSchemaRepository) Replace(_ context.Context, workspaceID, tableName string, items []ColumnOverride) error {
+func (f *fakeSchemaRepository) TableContext(_ context.Context, workspaceID, tableName string) (string, error) {
+	return f.contexts[workspaceID+"/"+tableName], nil
+}
+
+func (f *fakeSchemaRepository) Replace(_ context.Context, workspaceID, tableName string, tableContext *string, items []ColumnOverride) error {
 	if f.items == nil {
 		f.items = map[string][]ColumnOverride{}
 	}
-	f.items[workspaceID+"/"+tableName] = append([]ColumnOverride(nil), items...)
+	key := workspaceID + "/" + tableName
+	f.items[key] = append([]ColumnOverride(nil), items...)
+	if tableContext != nil {
+		if f.contexts == nil {
+			f.contexts = map[string]string{}
+		}
+		f.contexts[key] = *tableContext
+	}
 	return nil
 }
 
@@ -281,15 +293,25 @@ func TestNativeDatasetAndSchemaContractsHideSnapshotPointersAndPersistOverrides(
 		t.Fatalf("SummarizeWorkspace() = %#v, %v", summary, err)
 	}
 
-	saved, err := service.SaveSchema(context.Background(), SaveSchemaRequest{WorkspaceID: "workspace-1", TableName: "sales", Columns: []SchemaColumn{{Name: "region", Description: "Sales territory", Aliases: []string{"area"}}, {Name: "amount", Description: "Booked revenue"}}})
-	if err != nil || saved.Context != "Business context" || saved.Columns[0].DataType != "VARCHAR" || saved.Columns[0].Description != "Sales territory" || len(saved.Columns[0].Aliases) != 1 {
+	tableContext := "  One row per booked sale.  "
+	saved, err := service.SaveSchema(context.Background(), SaveSchemaRequest{WorkspaceID: "workspace-1", TableName: "sales", TableContext: &tableContext, Columns: []SchemaColumn{{Name: "region", Description: "Sales territory", Aliases: []string{"area"}}, {Name: "amount", Description: "Booked revenue"}}})
+	if err != nil || saved.Context != "Business context" || saved.TableContext != "One row per booked sale." || saved.Columns[0].DataType != "VARCHAR" || saved.Columns[0].Description != "Sales territory" || len(saved.Columns[0].Aliases) != 1 {
 		t.Fatalf("SaveSchema() = %#v, %v", saved, err)
 	}
 	loaded, err := service.GetSchema(context.Background(), "workspace-1", "sales")
 	if err != nil || loaded.Columns[1].Description != "Booked revenue" {
 		t.Fatalf("GetSchema() = %#v, %v", loaded, err)
 	}
+	loaded.Columns[1].Description = "Recognized revenue"
+	preserved, err := service.SaveSchema(context.Background(), SaveSchemaRequest{WorkspaceID: "workspace-1", TableName: "sales", Columns: loaded.Columns})
+	if err != nil || preserved.TableContext != "One row per booked sale." || preserved.Columns[1].Description != "Recognized revenue" {
+		t.Fatalf("column-only SaveSchema() = %#v, %v", preserved, err)
+	}
 	if _, err := service.SaveSchema(context.Background(), SaveSchemaRequest{WorkspaceID: "workspace-1", TableName: "sales", Columns: []SchemaColumn{{Name: "unknown"}}}); errorCode(err) != "schema_columns_invalid" {
 		t.Fatalf("unknown column error = %v", err)
+	}
+	tooLong := strings.Repeat("x", 8001)
+	if _, err := service.SaveSchema(context.Background(), SaveSchemaRequest{WorkspaceID: "workspace-1", TableName: "sales", TableContext: &tooLong, Columns: preserved.Columns}); errorCode(err) != "table_context_invalid" {
+		t.Fatalf("long table context error = %v", err)
 	}
 }

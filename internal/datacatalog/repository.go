@@ -56,7 +56,15 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 			PRIMARY KEY(workspace_id, table_name, column_name)
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_dataset_schema_workspace_table ON dataset_schema_columns(workspace_id, table_name)`,
+		`CREATE TABLE IF NOT EXISTS dataset_schema_tables (
+			workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+			table_name TEXT NOT NULL,
+			context TEXT NOT NULL DEFAULT '',
+			updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY(workspace_id, table_name)
+		)`,
 		`INSERT OR IGNORE INTO schema_migrations(version) VALUES (7)`,
+		`INSERT OR IGNORE INTO schema_migrations(version) VALUES (10)`,
 	} {
 		if _, err := tx.ExecContext(ctx, statement); err != nil {
 			return fmt.Errorf("apply schema migration: %w", err)
@@ -93,12 +101,30 @@ func (r *SQLiteRepository) List(ctx context.Context, workspaceID, tableName stri
 	return result, nil
 }
 
-func (r *SQLiteRepository) Replace(ctx context.Context, workspaceID, tableName string, items []ColumnOverride) error {
+func (r *SQLiteRepository) TableContext(ctx context.Context, workspaceID, tableName string) (string, error) {
+	var value string
+	err := r.db.QueryRowContext(ctx, `SELECT context FROM dataset_schema_tables WHERE workspace_id = ? AND table_name = ?`, workspaceID, tableName).Scan(&value)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("read table context: %w", err)
+	}
+	return value, nil
+}
+
+func (r *SQLiteRepository) Replace(ctx context.Context, workspaceID, tableName string, tableContext *string, items []ColumnOverride) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin schema replacement: %w", err)
 	}
 	defer tx.Rollback()
+	if tableContext != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO dataset_schema_tables(workspace_id, table_name, context)
+			VALUES (?, ?, ?) ON CONFLICT(workspace_id, table_name) DO UPDATE SET context = excluded.context, updated_at = CURRENT_TIMESTAMP`, workspaceID, tableName, *tableContext); err != nil {
+			return fmt.Errorf("save table context: %w", err)
+		}
+	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM dataset_schema_columns WHERE workspace_id = ? AND table_name = ?`, workspaceID, tableName); err != nil {
 		return fmt.Errorf("clear schema overrides: %w", err)
 	}

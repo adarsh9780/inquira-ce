@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/adarsh9780/inquira-ce/internal/apperror"
 	"github.com/adarsh9780/inquira-ce/internal/connection"
@@ -32,7 +33,8 @@ type Gateway interface {
 
 type schemaRepository interface {
 	List(context.Context, string, string) ([]ColumnOverride, error)
-	Replace(context.Context, string, string, []ColumnOverride) error
+	TableContext(context.Context, string, string) (string, error)
+	Replace(context.Context, string, string, *string, []ColumnOverride) error
 	Close() error
 }
 
@@ -41,7 +43,10 @@ type emptySchemaRepository struct{}
 func (emptySchemaRepository) List(context.Context, string, string) ([]ColumnOverride, error) {
 	return nil, nil
 }
-func (emptySchemaRepository) Replace(context.Context, string, string, []ColumnOverride) error {
+func (emptySchemaRepository) TableContext(context.Context, string, string) (string, error) {
+	return "", nil
+}
+func (emptySchemaRepository) Replace(context.Context, string, string, *string, []ColumnOverride) error {
 	return nil
 }
 func (emptySchemaRepository) Close() error { return nil }
@@ -193,6 +198,10 @@ func (s *Service) GetSchema(ctx context.Context, workspaceID, tableName string) 
 	if err != nil {
 		return DatasetSchema{}, apperror.Wrap("schema_read_failed", "Could not load dataset descriptions.", err)
 	}
+	tableContext, err := s.schemas.TableContext(ctx, catalog.WorkspaceID, table.Name)
+	if err != nil {
+		return DatasetSchema{}, apperror.Wrap("schema_read_failed", "Could not load dataset context.", err)
+	}
 	byName := make(map[string]ColumnOverride, len(overrides))
 	for _, item := range overrides {
 		byName[item.Name] = item
@@ -201,7 +210,7 @@ func (s *Service) GetSchema(ctx context.Context, workspaceID, tableName string) 
 	if err != nil {
 		return DatasetSchema{}, apperror.Wrap("schema_workspace_failed", "Could not load the workspace schema context.", err)
 	}
-	result := DatasetSchema{TableName: table.Name, Context: summary.SchemaContext, Columns: make([]SchemaColumn, 0, len(table.Columns))}
+	result := DatasetSchema{TableName: table.Name, Context: summary.SchemaContext, TableContext: tableContext, Columns: make([]SchemaColumn, 0, len(table.Columns))}
 	for _, column := range table.Columns {
 		override := byName[column.Name]
 		result.Columns = append(result.Columns, SchemaColumn{
@@ -226,6 +235,14 @@ func (s *Service) SaveSchema(ctx context.Context, request SaveSchemaRequest) (Da
 	}
 	seen := make(map[string]bool, len(request.Columns))
 	overrides := make([]ColumnOverride, 0, len(request.Columns))
+	var tableContext *string
+	if request.TableContext != nil {
+		value := strings.TrimSpace(*request.TableContext)
+		if utf8.RuneCountInString(value) > 8000 {
+			return DatasetSchema{}, apperror.New("table_context_invalid", "Table context must be at most 8000 characters.")
+		}
+		tableContext = &value
+	}
 	for _, column := range request.Columns {
 		name := strings.TrimSpace(column.Name)
 		if name == "" || !physical[name] || seen[name] {
@@ -242,8 +259,8 @@ func (s *Service) SaveSchema(ctx context.Context, request SaveSchemaRequest) (Da
 		}
 		overrides = append(overrides, ColumnOverride{Name: name, Description: description, Aliases: aliases})
 	}
-	if err := s.schemas.Replace(ctx, strings.TrimSpace(request.WorkspaceID), current.TableName, overrides); err != nil {
-		return DatasetSchema{}, apperror.Wrap("schema_save_failed", "Could not save dataset descriptions.", err)
+	if err := s.schemas.Replace(ctx, strings.TrimSpace(request.WorkspaceID), current.TableName, tableContext, overrides); err != nil {
+		return DatasetSchema{}, apperror.Wrap("schema_save_failed", "Could not save dataset metadata.", err)
 	}
 	return s.GetSchema(ctx, request.WorkspaceID, current.TableName)
 }

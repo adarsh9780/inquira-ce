@@ -82,9 +82,10 @@ type SchemaColumn struct {
 }
 
 type DatasetSchema struct {
-	TableName string         `json:"table_name"`
-	Context   string         `json:"context"`
-	Columns   []SchemaColumn `json:"columns"`
+	TableName    string         `json:"table_name"`
+	Context      string         `json:"context"`
+	TableContext string         `json:"table_context"`
+	Columns      []SchemaColumn `json:"columns"`
 }
 
 type AnalysisTable struct {
@@ -98,10 +99,11 @@ type AnalysisSchema struct {
 }
 
 type SaveSchemaRequest struct {
-	WorkspaceID string         `json:"workspace_id"`
-	TableName   string         `json:"table_name"`
-	Context     *string        `json:"context,omitempty"`
-	Columns     []SchemaColumn `json:"columns"`
+	WorkspaceID  string         `json:"workspace_id"`
+	TableName    string         `json:"table_name"`
+	Context      *string        `json:"context,omitempty"`
+	TableContext *string        `json:"table_context,omitempty"`
+	Columns      []SchemaColumn `json:"columns"`
 }
 
 type ColumnOverride struct {
