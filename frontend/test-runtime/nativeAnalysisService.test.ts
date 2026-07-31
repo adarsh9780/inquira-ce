@@ -93,4 +93,59 @@ describe('native analysis bridge', () => {
     expect(app.InterruptWorkspaceKernel).not.toHaveBeenCalled()
   })
 
+  it('keeps the persisted assistant answer when the top-level answer is empty', async () => {
+    window.go = {
+      main: {
+        App: {
+          AnalyzeQuestion: vi.fn().mockResolvedValue({
+            conversation: { id: 'conversation-1', workspace_id: 'workspace-1' },
+            turn: {
+              id: 'turn-1',
+              conversation_id: 'conversation-1',
+              assistant_text: 'The persisted answer is visible.',
+            },
+            answer: '',
+            execution: { success: true, artifacts: [] },
+            metadata: {},
+          }),
+        },
+      },
+    }
+
+    const result = await executionApi.analyze({
+      workspace_id: 'workspace-1',
+      conversation_id: 'conversation-1',
+      question: 'Show the result',
+    })
+
+    expect(result.explanation).toBe('The persisted answer is visible.')
+    expect(result.result_explanation).toBe('The persisted answer is visible.')
+  })
+
+  it('uses final response metadata when the other assistant answer fields are empty', async () => {
+    window.go = {
+      main: {
+        App: {
+          AnalyzeQuestion: vi.fn().mockResolvedValue({
+            conversation: { id: 'conversation-1', workspace_id: 'workspace-1' },
+            turn: { id: 'turn-1', conversation_id: 'conversation-1' },
+            answer: '   ',
+            execution: { success: true, artifacts: [] },
+            metadata: {
+              final_response: { answer: 'The metadata answer is visible.' },
+            },
+          }),
+        },
+      },
+    }
+
+    const result = await executionApi.analyze({
+      workspace_id: 'workspace-1',
+      conversation_id: 'conversation-1',
+      question: 'Show the result',
+    })
+
+    expect(result.explanation).toBe('The metadata answer is visible.')
+  })
+
 })

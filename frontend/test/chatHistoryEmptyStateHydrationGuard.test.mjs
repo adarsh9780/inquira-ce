@@ -8,5 +8,6 @@ test('chat history leaves empty guidance to ChatTab while preserving hydration a
 
   assert.equal(source.includes('displayedChatHistory.length === 0 && !executionStore.isConversationRunning(conversationStore.activeConversationId)'), false)
   assert.equal(source.includes('executionStore.isConversationRunning(conversationStore.activeConversationId) && displayedChatHistory.length === 0'), true)
-  assert.equal(source.includes('const syntheticMessage = mapTurnToMessage(conversationStore.activeTurn)'), true)
+  assert.equal(source.includes('selectDisplayedChatHistory({'), true)
+  assert.equal(source.includes('activeTurn: conversationStore.activeTurn'), true)
 })

@@ -24,4 +24,17 @@ describe('conversationStore', () => {
     expect(store.questionHistory).toHaveLength(30)
     expect(store.questionHistory[0]).toBe('question-30')
   })
+
+  it('does not erase a streamed assistant answer when completion text is empty', () => {
+    const store = useConversationStore()
+    store.setActiveConversationId('conversation-a')
+    const messageId = store.addChatMessage('Question', '', { conversationId: 'conversation-a' })
+    store.appendLastMessageExplanationChunk('Streamed answer', messageId, { conversationId: 'conversation-a' })
+
+    expect(store.finalizeLastMessageExplanation('', messageId, { conversationId: 'conversation-a' })).toBe(false)
+    expect(store.chatHistory[0]?.explanation).toBe('Streamed answer')
+
+    expect(store.finalizeLastMessageExplanation('Final answer', messageId, { conversationId: 'conversation-a' })).toBe(true)
+    expect(store.chatHistory[0]?.explanation).toBe('Final answer')
+  })
 })

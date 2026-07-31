@@ -20,6 +20,14 @@ function statusMessage(stage: unknown) {
   } as Record<string, string>)[String(stage || '')] || 'Working on the analysis…'
 }
 
+function firstNonEmptyText(...values: unknown[]) {
+  for (const value of values) {
+    const text = String(value || '').trim()
+    if (text) return text
+  }
+  return ''
+}
+
 function normalizeAnalysis(rawValue: unknown) {
   const raw = (rawValue || {}) as RecordValue
   const execution = (raw.execution && typeof raw.execution === 'object'
@@ -41,14 +49,21 @@ function normalizeAnalysis(rawValue: unknown) {
   }
   const conversation = (raw.conversation || {}) as RecordValue
   const turn = (raw.turn || {}) as RecordValue
+  const metadata = raw.metadata && typeof raw.metadata === 'object'
+    ? { ...(raw.metadata as RecordValue) }
+    : {}
+  const finalResponse = metadata.final_response && typeof metadata.final_response === 'object'
+    ? metadata.final_response as RecordValue
+    : {}
+  const answer = firstNonEmptyText(raw.answer, turn.assistant_text, finalResponse.answer)
   return {
     conversation_id: String(conversation.id || ''),
     turn_id: String(turn.id || ''),
     is_safe: execution.success !== false,
     is_relevant: true,
     code: String(raw.code || ''),
-    explanation: String(raw.answer || ''),
-    result_explanation: String(raw.answer || ''),
+    explanation: answer,
+    result_explanation: answer,
     code_explanation: '',
     run_id: String(raw.run_id || ''),
     execution: { ...execution, run_id: String(raw.run_id || ''), artifacts },
@@ -56,7 +71,7 @@ function normalizeAnalysis(rawValue: unknown) {
     result_kind: execution.result_kind || '',
     artifacts,
     route: String(raw.route || ''),
-    metadata: raw.metadata && typeof raw.metadata === 'object' ? { ...(raw.metadata as RecordValue) } : {},
+    metadata,
   }
 }
 

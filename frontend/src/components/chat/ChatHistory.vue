@@ -212,11 +212,11 @@ import ChatAssistantMessage from './ChatAssistantMessage.vue'
 import ChatUserMessage from './ChatUserMessage.vue'
 import { toolOutputHasRenderableContent } from '../../utils/toolOutputPreview'
 import { formatTimestamp } from '../../utils/dateUtils'
+import { selectDisplayedChatHistory } from '../../utils/chatHistoryView'
 import { toast } from '../../composables/useToast'
 import { useChatScrollFollow } from '../../composables/useChatScrollFollow'
+
 const MarkdownContent = defineAsyncComponent(() => import('./MarkdownContent.vue'))
-
-
 const uiStore = useUiStore()
 const preferencesStore = usePreferencesStore()
 const artifactStore = useArtifactStore()
@@ -247,44 +247,12 @@ function toggleAnalysisDetails(messageId: any) {
   expandedAnalysisMessageIds.value = next
 }
 
-function mapTurnToMessage(turn: any) {
-  if (!turn || typeof turn !== 'object') return null
-  return {
-    id: turn.id,
-    question: String(turn.user_text || ''),
-    explanation: String(turn.assistant_text || ''),
-    resultExplanation: String(turn?.metadata?.result_explanation || turn.assistant_text || ''),
-    codeExplanation: String(turn?.metadata?.code_explanation || ''),
-    analysisMetadata: turn?.metadata && typeof turn.metadata === 'object' ? { ...turn.metadata } : {},
-    attachments: Array.isArray(turn?.metadata?.user_attachments) ? turn.metadata.user_attachments.map((item: any) => ({ ...item })) : [],
-    toolEvents: Array.isArray(turn?.tool_events) ? turn.tool_events.map((event: any) => ({ ...event })) : null,
-    streamTrace: null,
-    codeSnapshot: String(turn.code_snapshot || ''),
-    codeUpdated: Boolean(String(turn.code_snapshot || '').trim()),
-    timestamp: turn.created_at || new Date().toISOString(),
-  }
-}
-
-const displayedChatHistory = computed(() => {
-  const localHistory = Array.isArray(conversationStore.chatHistory) ? conversationStore.chatHistory : []
-  if (executionStore.isConversationRunning(conversationStore.activeConversationId) && localHistory.length > 0) {
-    const pendingMessage = localHistory[localHistory.length - 1]
-    const pendingId = String(pendingMessage?.id || '').trim()
-    const activeId = String(conversationStore.activeTurnId || '').trim()
-    if (!activeId || pendingId !== activeId) {
-      return [pendingMessage]
-    }
-  }
-
-  const activeTurnId = String(conversationStore.activeTurnId || '').trim()
-  if (activeTurnId) {
-    const existing = localHistory.find((message: any) => String(message?.id || '').trim() === activeTurnId)
-    if (existing) return [existing]
-  }
-
-  const syntheticMessage = mapTurnToMessage(conversationStore.activeTurn)
-  return syntheticMessage ? [syntheticMessage] : []
-})
+const displayedChatHistory = computed(() => selectDisplayedChatHistory({
+  localHistory: conversationStore.chatHistory,
+  activeTurnId: conversationStore.activeTurnId,
+  activeTurn: conversationStore.activeTurn,
+  isRunning: executionStore.isConversationRunning(conversationStore.activeConversationId),
+}))
 
 const lastMessageId = computed(() => displayedChatHistory.value.at(-1)?.id)
 
