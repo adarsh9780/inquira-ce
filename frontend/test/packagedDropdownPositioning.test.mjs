@@ -30,3 +30,15 @@ test('runtime source uses the shared styled dropdown instead of a native select'
   assert.equal(workspaceSettings.includes(':options="runtimeSourceOptions"'), true)
   assert.equal(workspaceSettings.includes('<select v-model="runtimeConfig.mode"'), false)
 })
+
+test('shared dropdown dismisses immediately on outside interaction and Escape', () => {
+  const dropdown = read('src/components/ui/HeaderDropdown.vue')
+
+  assert.equal(dropdown.includes("document.addEventListener('pointerdown', handleDocumentPointerDown, true)"), true)
+  assert.equal(dropdown.includes("document.addEventListener('keydown', handleDocumentKeydown, true)"), true)
+  assert.equal(dropdown.includes('@escape-key-down="handleEscapeKeyDown"'), true)
+  assert.equal(dropdown.includes('@pointer-down-outside="dismissDropdown()"'), true)
+  assert.equal(dropdown.includes("visibility: isOpen.value ? 'visible' : 'hidden'"), true)
+  assert.equal(dropdown.includes("event.key !== 'Escape'"), true)
+  assert.equal(dropdown.includes('unbindDismissListeners()'), true)
+})

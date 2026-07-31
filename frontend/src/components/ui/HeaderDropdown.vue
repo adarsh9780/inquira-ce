@@ -12,7 +12,7 @@ import {
   ComboboxViewport,
 } from 'reka-ui'
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/vue/20/solid'
-import { computed, onBeforeUnmount, ref, watch, type Component } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useId, watch, type Component } from 'vue'
 import {
   mergeModelOptions,
   normalizeModelOptions,
@@ -94,10 +94,13 @@ const searchQuery = ref('')
 const backendOptions = ref<DropdownOption[]>([])
 const backendLoading = ref(false)
 const isOpen = ref(false)
+const triggerRef = ref<HTMLElement | null>(null)
+const dropdownInstanceId = `header-dropdown-${useId()}`
 const floatingOptionsStyle = computed<Record<string, string>>(() => ({
   width: 'var(--reka-combobox-trigger-width)',
   minWidth: props.dropdownMinWidth > 0 ? `${props.dropdownMinWidth}px` : '0px',
   maxHeight: 'min(240px, var(--reka-combobox-content-available-height))',
+  visibility: isOpen.value ? 'visible' : 'hidden',
   ...dropdownSurfaceStyle(),
 }))
 let backendSearchTimer: ReturnType<typeof setTimeout> | null = null
@@ -162,9 +165,62 @@ function handleChange(value: DropdownValue) {
 
 function handleOpenChange(open: boolean) {
   isOpen.value = open
-  if (!open) {
+  if (open) {
+    bindDismissListeners()
+  } else {
+    unbindDismissListeners()
     searchQuery.value = ''
   }
+}
+
+function dismissDropdown(restoreTriggerFocus = false) {
+  if (!isOpen.value) return
+  handleOpenChange(false)
+  if (restoreTriggerFocus) {
+    void nextTick(() => triggerRef.value?.focus())
+  }
+}
+
+function eventPathContains(event: Event, element: Element | null) {
+  return Boolean(element && event.composedPath().includes(element))
+}
+
+function hasLiveOpenDropdown() {
+  if (!triggerRef.value?.isConnected) {
+    unbindDismissListeners()
+    return false
+  }
+  return isOpen.value
+}
+
+function handleDocumentPointerDown(event: PointerEvent) {
+  if (!hasLiveOpenDropdown()) return
+
+  const content = document.querySelector(`[data-header-dropdown-content="${dropdownInstanceId}"]`)
+  if (eventPathContains(event, triggerRef.value) || eventPathContains(event, content)) return
+
+  dismissDropdown()
+}
+
+function handleDocumentKeydown(event: KeyboardEvent) {
+  if (!hasLiveOpenDropdown() || event.key !== 'Escape') return
+  event.preventDefault()
+  dismissDropdown(true)
+}
+
+function handleEscapeKeyDown(event: Event) {
+  event.preventDefault()
+  dismissDropdown(true)
+}
+
+function bindDismissListeners() {
+  document.addEventListener('pointerdown', handleDocumentPointerDown, true)
+  document.addEventListener('keydown', handleDocumentKeydown, true)
+}
+
+function unbindDismissListeners() {
+  document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
+  document.removeEventListener('keydown', handleDocumentKeydown, true)
 }
 
 function shouldSearchBackend(query: string, localMatches: DropdownOption[]) {
@@ -226,6 +282,7 @@ function normalizeProviderKey(provider: string) {
 
 onBeforeUnmount(() => {
   if (backendSearchTimer) clearTimeout(backendSearchTimer)
+  unbindDismissListeners()
 })
 </script>
 
@@ -244,6 +301,7 @@ onBeforeUnmount(() => {
         <div class="relative">
           <ComboboxTrigger as-child>
             <button
+              ref="triggerRef"
               type="button"
               class="group inline-flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1 text-[13px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] disabled:cursor-not-allowed disabled:opacity-50"
               :style="triggerStyle"
@@ -269,6 +327,10 @@ onBeforeUnmount(() => {
               align="start"
               position-strategy="fixed"
               :collision-padding="8"
+              :data-header-dropdown-content="dropdownInstanceId"
+              @escape-key-down="handleEscapeKeyDown"
+              @pointer-down-outside="dismissDropdown()"
+              @focus-outside="dismissDropdown()"
             >
               <div v-if="searchable" :class="dropdownSearchRowClass" :style="dropdownSearchRowStyle">
                 <ComboboxInput
@@ -348,7 +410,9 @@ onBeforeUnmount(() => {
 }
 
 .ui-combobox-content[data-state='closed'] {
-  animation: combobox-out var(--motion-duration-fast) var(--motion-ease-standard);
+  animation: none;
+  pointer-events: none;
+  visibility: hidden;
 }
 
 @keyframes combobox-in {
@@ -356,8 +420,4 @@ onBeforeUnmount(() => {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-@keyframes combobox-out {
-  from { opacity: 1; transform: translateY(0) scale(1); }
-  to { opacity: 0; transform: translateY(-2px) scale(0.99); }
-}
 </style>
