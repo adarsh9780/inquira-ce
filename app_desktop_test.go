@@ -22,6 +22,19 @@ type desktopCommandRecorder struct {
 	args []string
 }
 
+func TestDesktopWindowKeepsNativeResizeAndZoomControls(t *testing.T) {
+	config := desktopApplicationOptions(&App{})
+	if config.DisableResize {
+		t.Fatal("desktop window must remain resizable")
+	}
+	if config.Mac == nil {
+		t.Fatal("macOS options must be explicit so Wails enables the native zoom control")
+	}
+	if config.Mac.DisableZoom {
+		t.Fatal("macOS zoom control must remain enabled")
+	}
+}
+
 func TestSaveExportFileUsesNativeDialogAndPersistsTheChosenFile(t *testing.T) {
 	target := filepath.Join(t.TempDir(), "analysis.csv")
 	dialogCalls := 0

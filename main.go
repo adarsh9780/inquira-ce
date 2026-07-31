@@ -9,6 +9,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
 )
 
 //go:embed all:frontend/dist
@@ -28,12 +29,26 @@ func main() {
 	}
 
 	// Create application with options
-	err := wails.Run(&options.App{
+	err := wails.Run(desktopApplicationOptions(app))
+
+	if err != nil {
+		println("Error:", err.Error())
+	}
+}
+
+func desktopApplicationOptions(app *App) *options.App {
+	return &options.App{
 		Title:     "Inquira",
 		Width:     1400,
 		Height:    900,
 		MinWidth:  800,
 		MinHeight: 600,
+		// Wails leaves the macOS zoom control disabled when Mac options are nil.
+		// Keep native resize, zoom, and fullscreen window affordances available.
+		DisableResize: false,
+		Mac: &mac.Options{
+			DisableZoom: false,
+		},
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
@@ -44,9 +59,5 @@ func main() {
 		Bind: []interface{}{
 			app,
 		},
-	})
-
-	if err != nil {
-		println("Error:", err.Error())
 	}
 }
