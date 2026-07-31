@@ -917,10 +917,6 @@ watch(() => uiStore.isSidebarCollapsed, (collapsed) => {
     transform var(--motion-duration-standard) var(--motion-ease-spring);
 }
 
-.sidebar-primary-row {
-  color: color-mix(in srgb, var(--color-text-main) 86%, var(--color-text-muted) 14%);
-}
-
 .sidebar-nav-row:hover,
 .sidebar-workspace-row:hover {
   background: color-mix(in srgb, var(--color-text-main) 5%, transparent);
