@@ -97,15 +97,6 @@
       <button
         type="button"
         class="context-icon-button"
-        title="Open command palette"
-        aria-label="Open command palette"
-        @click="uiStore.openCommandPalette()"
-      >
-        <MagnifyingGlassIcon class="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        class="context-icon-button"
         title="Workspace settings"
         aria-label="Open workspace settings"
         @click="uiStore.openSettings('workspace')"
@@ -123,7 +114,6 @@ import {
   ChevronRightIcon,
   CircleStackIcon,
   Cog6ToothIcon,
-  MagnifyingGlassIcon,
   PlusIcon,
 } from '@heroicons/vue/24/outline'
 import { useUiStore } from '../../stores/uiStore'

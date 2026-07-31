@@ -13,7 +13,7 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'schema', category: 'Navigation', label: 'Open Schema', keys: ['mod', 's'], title: 'Schema' },
   { id: 'settings', category: 'Navigation', label: 'Open Settings', keys: ['mod', ','], title: 'Settings' },
   { id: 'dataset-import', category: 'Data', label: 'Import Dataset', keys: ['mod', 'o'], title: 'Import Dataset' },
-  { id: 'command-palette', category: 'Workspace', label: 'Open Command Palette', keys: ['mod', 'k'], title: 'Command Palette' },
+  { id: 'conversation-switcher', category: 'Workspace', label: 'Search Conversations', keys: ['mod', 'k'], title: 'Conversations' },
   { id: 'sidebar', category: 'Workspace', label: 'Toggle Sidebar', keys: ['mod', 'b'], title: 'Sidebar' },
   { id: 'terminal', category: 'Workspace', label: 'Toggle Terminal', keys: ['mod', 'j'], title: 'Terminal' },
 ]

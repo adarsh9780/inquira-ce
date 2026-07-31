@@ -1,9 +1,11 @@
 import { onMounted, onUnmounted, type Ref } from 'vue'
 import { matchShortcut } from '../utils/keyboardShortcuts'
 import { useUiStore } from '../stores/uiStore'
+import { useWorkspaceStore } from '../stores/workspaceStore'
 
 export function useGlobalShortcuts(isAuthenticated: Ref<boolean>, openDatasetPicker: () => void) {
   const ui = useUiStore()
+  const workspace = useWorkspaceStore()
 
   function handleGlobalShortcuts(event: KeyboardEvent) {
     if (!isAuthenticated.value || event.defaultPrevented || event.repeat) return
@@ -11,7 +13,9 @@ export function useGlobalShortcuts(isAuthenticated: Ref<boolean>, openDatasetPic
 
     const actions: Array<[string, () => void]> = [
       ['conversation-tree', () => ui.setActiveTab('conversation-tree')],
-      ['command-palette', () => ui.toggleCommandPalette()],
+      ['conversation-switcher', () => {
+        if (workspace.hasWorkspace) ui.toggleConversationSwitcher()
+      }],
       ['settings', () => ui.openSettings('setup')],
       ['sidebar', () => ui.setSidebarCollapsed(!ui.isSidebarCollapsed)],
       ['schema', () => ui.setActiveTab('schema-editor')],

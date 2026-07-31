@@ -33,11 +33,6 @@ describe('uiStore', () => {
     expect(store.settingsInitialTab).toBe('workspace-data')
     expect(store.connectionFlowRequestId).toBe(1)
 
-    store.openCommandPalette()
-    expect(store.isCommandPaletteOpen).toBe(true)
-    store.closeCommandPalette()
-    expect(store.isCommandPaletteOpen).toBe(false)
-
     store.openConversationSwitcher()
     expect(store.isConversationSwitcherOpen).toBe(true)
     store.toggleConversationSwitcher()
