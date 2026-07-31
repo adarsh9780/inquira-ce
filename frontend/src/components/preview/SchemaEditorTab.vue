@@ -3,14 +3,25 @@
     <!-- Header -->
     <div class="schema-top-bar relative z-10 border-b border-[var(--color-border)] p-4 flex flex-wrap items-center justify-between gap-3 bg-[var(--color-surface)]">
       <div>
-        <h2 class="text-[15px] font-bold leading-tight">Workspace Schema</h2>
-        <p class="text-[13px] text-[var(--color-text-muted)] mt-1">Manage column metadata across all datasets</p>
+        <h2 class="text-[15px] font-semibold leading-tight">Workspace data</h2>
+        <p class="mt-1 text-[13px] text-[var(--color-text-muted)]">Manage context, sources, schemas, and table previews.</p>
       </div>
       <div class="flex items-center gap-2">
         <button type="button" @click="refreshWorkspaceSchema" :disabled="schemaBusy || schemaHub.isEdited.value" :title="schemaHub.isEdited.value ? 'Save or discard table changes before refreshing' : 'Refresh data sources and reload schema'" class="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium text-[var(--color-text-main)] transition-colors hover:bg-[var(--color-base-muted)] disabled:opacity-50">
           <span v-if="isRefreshingSources" class="inquira-spinner h-3.5 w-3.5 border-2" aria-hidden="true"></span>
           <svg v-else class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 11a8.1 8.1 0 00-15.5-2M4 4v5h5m-5 4a8.1 8.1 0 0015.5 2M20 20v-5h-5"></path></svg>
           {{ isRefreshingSources ? 'Refreshing…' : 'Refresh' }}
+        </button>
+        <button
+          type="button"
+          class="btn-primary flex items-center gap-1.5 px-3 py-1.5 text-[13px]"
+          :disabled="schemaBusy || schemaHub.isEdited.value"
+          :title="schemaHub.isEdited.value ? 'Save or discard table changes before adding data' : 'Add data to this workspace'"
+          data-action="add-workspace-data"
+          @click="workspaceActivation.openDataConnectionFlow()"
+        >
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          Add data
         </button>
       </div>
     </div>
@@ -92,6 +103,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { workspaceApi } from '../../api/workspaces'
 import { useExecutionStore } from '../../stores/executionStore'
 import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
 import TableMetadataSurface from '../schema/TableMetadataSurface.vue'
 import TableContextSurface from '../schema/TableContextSurface.vue'
 import SchemaTableNavigator from '../schema/SchemaTableNavigator.vue'
@@ -108,6 +120,7 @@ import { normalizeSchemaRefreshResult, schemaRefreshFeedback } from '../../utils
 
 const executionStore = useExecutionStore()
 const workspaceStore = useWorkspaceStore()
+const workspaceActivation = useWorkspaceActivation()
 
 const schemaHub = useSchemaHubState()
 const savingTableId = ref('')
