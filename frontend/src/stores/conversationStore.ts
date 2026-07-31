@@ -138,6 +138,13 @@ export const useConversationStore = defineStore('conversations', () => {
     mutateMessage(messageId, options, (message) => ({ ...message, explanation: String(explanation || '') }))
   }
 
+  function finalizeLastMessageExplanation(explanation: unknown, messageId: unknown = null, options: RecordValue = {}) {
+    const text = String(explanation || '')
+    if (!text.trim()) return false
+    updateLastMessageExplanation(text, messageId, options)
+    return true
+  }
+
   function appendLastMessageExplanationChunk(text: unknown, messageId: unknown = null, options: RecordValue = {}) {
     mutateMessage(messageId, options, (message) => ({
       ...message,
@@ -482,6 +489,7 @@ export const useConversationStore = defineStore('conversations', () => {
     addChatMessage,
     addQuestionHistoryEntry,
     updateLastMessageExplanation,
+    finalizeLastMessageExplanation,
     appendLastMessageExplanationChunk,
     setLastMessageCodeExplanation,
     setLastMessageAnalysisMetadata,
