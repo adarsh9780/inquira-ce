@@ -100,7 +100,7 @@ def test_langgraph_agent_maps_branch_context_model_roles_events_and_result(tmp_p
                 },
                 "schema": {
                     "context": "Finance reporting",
-                    "tables": [{"name": "sales", "columns": [{"name": "amount", "dtype": "INTEGER"}]}],
+                    "tables": [{"name": "sales", "context": "One row per booked sale", "columns": [{"name": "amount", "dtype": "INTEGER"}]}],
                 },
                 "context": {
                     "turns": [{
@@ -125,6 +125,8 @@ def test_langgraph_agent_maps_branch_context_model_roles_events_and_result(tmp_p
         assert graph_input["conversation_id"] == "conversation-1"
         assert graph_input["turn_id"] == "turn-2"
         assert graph_input["table_names"] == ["sales"]
+        assert graph_input["workspace_schema"]["tables"][0]["table_name"] == "sales"
+        assert graph_input["workspace_schema"]["tables"][0]["context"] == "One row per booked sale"
         assert graph_input["privacy"] == {"allow_llm_data_samples": True}
         assert [message.type for message in graph_input["messages"]] == ["human", "ai", "human"]
         assert [message.content for message in graph_input["messages"]] == [

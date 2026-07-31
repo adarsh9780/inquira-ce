@@ -90,6 +90,7 @@ type DatasetSchema struct {
 
 type AnalysisTable struct {
 	Name    string         `json:"name"`
+	Context string         `json:"context"`
 	Columns []SchemaColumn `json:"columns"`
 }
 

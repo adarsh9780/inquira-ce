@@ -116,7 +116,7 @@ func newAgentService(t *testing.T, gateway *fakeAgentGateway) (*Service, *conver
 		&fakeCatalogSource{catalog: datacatalog.Catalog{
 			WorkspaceID: createdWorkspace.ID, DatabasePath: catalogPath,
 			AnalysisSchema: datacatalog.AnalysisSchema{Context: "Revenue reporting", Tables: []datacatalog.AnalysisTable{{
-				Name: "sales", Columns: []datacatalog.SchemaColumn{{Name: "amount", DataType: "DOUBLE", Description: "Booked revenue", Aliases: []string{"sales"}}},
+				Name: "sales", Context: "One row per booked sale", Columns: []datacatalog.SchemaColumn{{Name: "amount", DataType: "DOUBLE", Description: "Booked revenue", Aliases: []string{"sales"}}},
 			}}},
 		}},
 		&fakeModelSource{config: modelconfig.RuntimeConfiguration{Provider: "openai", Model: "gpt-4o", APIKey: "runtime-secret"}},
@@ -169,7 +169,7 @@ func TestAnalyzeCreatesConversationExecutesAndPersistsTurn(t *testing.T) {
 		gateway.request.CurrentCode != "result = previous" || len(gateway.request.Attachments) != 1 || gateway.request.Attachments[0].AttachmentID != "image-1" {
 		t.Fatalf("worker identity/attachments = %#v", gateway.request)
 	}
-	if gateway.request.Schema.Context != "Revenue reporting" || gateway.request.Schema.Tables[0].Columns[0].Description != "Booked revenue" {
+	if gateway.request.Schema.Context != "Revenue reporting" || gateway.request.Schema.Tables[0].Context != "One row per booked sale" || gateway.request.Schema.Tables[0].Columns[0].Description != "Booked revenue" {
 		t.Fatalf("semantic schema = %#v", gateway.request.Schema)
 	}
 	if !runs.cleaned || len(runs.candidates) != 1 || len(result.Artifacts) != 1 {
