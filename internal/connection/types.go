@@ -118,6 +118,21 @@ type ListResponse struct {
 	Connections []Connection `json:"connections"`
 }
 
+type RefreshFailure struct {
+	ConnectionID   string `json:"connection_id"`
+	ConnectionName string `json:"connection_name"`
+	Code           string `json:"code"`
+	Message        string `json:"message"`
+}
+
+type WorkspaceRefreshResult struct {
+	WorkspaceID string           `json:"workspace_id"`
+	Attempted   int              `json:"attempted"`
+	Succeeded   int              `json:"succeeded"`
+	Changed     int              `json:"changed"`
+	Failures    []RefreshFailure `json:"failures"`
+}
+
 type CreateRequest struct {
 	WorkspaceID       string         `json:"workspace_id"`
 	Name              string         `json:"name"`
