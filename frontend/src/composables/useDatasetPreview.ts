@@ -46,15 +46,15 @@ export function normalizeDatasetPreview(
 }
 
 export function clearDatasetPreviewCache(workspaceId: string, tableName = '') {
-	const prefix = tableName
-	  ? `${workspaceId}\u0000${tableName}\u0000`
-	  : `${workspaceId}\u0000`
-	for (const key of previewCache.keys()) {
-	  if (key.startsWith(prefix)) previewCache.delete(key)
-	}
-	for (const key of previewRequests.keys()) {
-	  if (key.startsWith(prefix)) previewRequests.delete(key)
-	}
+  const prefix = tableName
+    ? `${workspaceId}\u0000${tableName}\u0000`
+    : `${workspaceId}\u0000`
+  for (const key of previewCache.keys()) {
+    if (key.startsWith(prefix)) previewCache.delete(key)
+  }
+  for (const key of previewRequests.keys()) {
+    if (key.startsWith(prefix)) previewRequests.delete(key)
+  }
   workspaceRevisions.set(workspaceId, (workspaceRevisions.get(workspaceId) || 0) + 1)
 }
 
