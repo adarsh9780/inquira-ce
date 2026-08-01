@@ -39,10 +39,11 @@ describe('TableMetadataSurface', () => {
     ])
   })
 
-  it('shows physical metadata and emits normalized alias edits', async () => {
+  it('shows physical column metadata without repeating dataset identity', async () => {
     const wrapper = mountSurface()
 
-    expect(wrapper.text()).toContain('1,200 rows')
+    expect(wrapper.text()).not.toContain('orders')
+    expect(wrapper.text()).not.toContain('1,200 rows')
     expect(wrapper.text()).toContain('BIGINT')
     expect(wrapper.text()).toContain('No')
 

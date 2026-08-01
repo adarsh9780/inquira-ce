@@ -1,11 +1,9 @@
 <template>
-  <section class="flex shrink-0 items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-base-soft)] px-4 py-2.5" aria-labelledby="table-context-title">
-    <div class="min-w-0 flex-1">
-      <h3 id="table-context-title" class="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--color-text-muted)]">Table context</h3>
-      <p v-if="modelValue.trim()" class="mt-0.5 truncate text-[12px] leading-5 text-[var(--color-text-sub)]">{{ modelValue }}</p>
-      <p v-else class="mt-0.5 truncate text-[12px] leading-5 text-[var(--color-text-muted)]">Add business meaning, rules, and edge cases for this dataset.</p>
-    </div>
-    <button type="button" class="shrink-0 rounded-md px-2.5 py-1.5 text-[12px] font-medium text-[var(--color-accent)] transition-colors hover:bg-[var(--color-accent)]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]" @click="startEditing">
+  <section class="flex min-w-0 shrink-0 items-center gap-2 px-4 pb-2.5" aria-labelledby="table-context-title">
+    <h3 id="table-context-title" class="shrink-0 text-[11px] font-semibold text-[var(--color-text-muted)]">Context</h3>
+    <p v-if="modelValue.trim()" class="min-w-0 flex-1 truncate text-[12px] leading-5 text-[var(--color-text-sub)]">{{ modelValue }}</p>
+    <p v-else class="min-w-0 flex-1 truncate text-[12px] leading-5 text-[var(--color-text-muted)]">Add business meaning, rules, and edge cases.</p>
+    <button type="button" class="shrink-0 rounded px-1.5 py-1 text-[12px] font-medium text-[var(--color-accent)] transition-colors hover:bg-[var(--color-accent)]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]" @click="startEditing">
       {{ modelValue.trim() ? 'Edit context' : 'Add context' }}
     </button>
 
