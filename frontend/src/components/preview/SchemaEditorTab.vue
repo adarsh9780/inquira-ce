@@ -99,39 +99,41 @@
         </div>
 
         <template v-else-if="schemaHub.selectedTable.value">
-          <div class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
-            <div class="min-w-0">
-              <h3 class="truncate font-mono text-[14px] font-semibold text-[var(--color-text-main)]">{{ schemaHub.selectedTable.value.tableName }}</h3>
-              <p class="mt-1 text-[11px] tabular-nums text-[var(--color-text-muted)]">
-                {{ schemaHub.selectedTable.value.columns.length }} columns
-                <span v-if="schemaHub.selectedTable.value.rowCount"> · {{ schemaHub.selectedTable.value.rowCount.toLocaleString() }} rows</span>
-                <span v-if="schemaHub.selectedTable.value.status"> · {{ schemaHub.selectedTable.value.status }}</span>
-              </p>
+          <div class="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+            <div class="flex flex-wrap items-center justify-between gap-3 px-4 pb-2 pt-3">
+              <div class="min-w-0">
+                <h3 class="truncate font-mono text-[14px] font-semibold text-[var(--color-text-main)]">{{ schemaHub.selectedTable.value.tableName }}</h3>
+                <p class="mt-0.5 text-[11px] tabular-nums text-[var(--color-text-muted)]">
+                  {{ schemaHub.selectedTable.value.columns.length }} columns
+                  <span v-if="schemaHub.selectedTable.value.rowCount"> · {{ schemaHub.selectedTable.value.rowCount.toLocaleString() }} rows</span>
+                  <span v-if="schemaHub.selectedTable.value.status"> · {{ schemaHub.selectedTable.value.status }}</span>
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <SegmentedControl v-model="tableView" :options="tableViewOptions" aria-label="Dataset details" />
+                <button
+                  type="button"
+                  class="flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-base-muted)] hover:text-[var(--color-text-main)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+                  aria-label="Dataset actions"
+                  :aria-expanded="datasetMenuOpen"
+                  data-action="dataset-actions"
+                  @click="toggleDatasetActions"
+                >
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+                </button>
+              </div>
             </div>
-            <div class="flex items-center gap-2">
-              <SegmentedControl v-model="tableView" :options="tableViewOptions" aria-label="Dataset details" />
-              <button
-                type="button"
-                class="flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-base-muted)] hover:text-[var(--color-text-main)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
-                aria-label="Dataset actions"
-                :aria-expanded="datasetMenuOpen"
-                data-action="dataset-actions"
-                @click="toggleDatasetActions"
-              >
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
-              </button>
-            </div>
+
+            <TableContextSurface
+              :key="schemaHub.selectedTable.value.id"
+              :model-value="schemaHub.selectedTable.value.tableContext || ''"
+              :table-name="schemaHub.selectedTable.value.tableName"
+              :save-context="(context) => saveTableContext(schemaHub.selectedTable.value!.id, context)"
+              @update:model-value="schemaHub.replaceTableContext(schemaHub.selectedTable.value!.id, $event)"
+            />
           </div>
 
-          <TableContextSurface
-            :key="schemaHub.selectedTable.value.id"
-            :model-value="schemaHub.selectedTable.value.tableContext || ''"
-            :table-name="schemaHub.selectedTable.value.tableName"
-            :save-context="(context) => saveTableContext(schemaHub.selectedTable.value!.id, context)"
-            @update:model-value="schemaHub.replaceTableContext(schemaHub.selectedTable.value!.id, $event)"
-          />
-
-          <div v-if="tableView === 'schema'" class="schema-scroll-area min-h-0 flex-1 overflow-auto p-4 pb-8">
+          <div v-if="tableView === 'schema'" class="min-h-0 flex-1 overflow-hidden">
             <TableMetadataSurface
               :table="schemaHub.selectedTable.value"
               :dirty="schemaHub.dirtyTableIds.value.has(schemaHub.selectedTable.value.id)"
@@ -157,10 +159,9 @@
       :is-open="datasetMenuOpen"
       :position="datasetMenuPosition"
       :items="datasetMenuItems"
-      :header="schemaHub.selectedTable.value?.tableName || ''"
       width-class="w-48"
       :width="192"
-      :height="92"
+      :height="48"
       marker-attr="data-dataset-actions-menu"
       @close="datasetMenuOpen = false"
       @select="handleDatasetAction"

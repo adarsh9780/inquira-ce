@@ -1,13 +1,6 @@
 <template>
-  <section class="flex flex-col overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm" :aria-labelledby="`table-${table.id}-title`">
-    <div class="flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
-      <div class="min-w-0">
-        <h3 :id="`table-${table.id}-title`" class="flex items-center gap-2 truncate font-mono text-[14px] font-semibold text-[var(--color-text-main)]">
-          <svg class="h-4 w-4 shrink-0 text-[var(--color-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
-          {{ table.tableName }}
-        </h3>
-        <p class="mt-1 text-[11px] text-[var(--color-text-muted)]">{{ table.columns.length }} columns<span v-if="table.rowCount"> · {{ table.rowCount.toLocaleString() }} rows</span><span v-if="table.status"> · {{ table.status }}</span></p>
-      </div>
+  <section class="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--color-surface)]" aria-label="Schema metadata">
+    <div class="flex shrink-0 items-center justify-end border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2">
       <div class="flex items-center gap-2">
         <button type="button" :disabled="busy" class="flex items-center gap-1 rounded px-2 py-1 text-[12px] font-medium text-[var(--color-accent)] transition-colors hover:bg-[var(--color-accent)]/10 disabled:cursor-not-allowed disabled:opacity-50" @click="$emit('regenerate', table.tableName)">
           <span v-if="regenerating" class="inquira-spinner h-3.5 w-3.5 border-2"></span>
@@ -17,7 +10,7 @@
       </div>
     </div>
 
-    <DataGridViewport :label="`Columns in ${table.tableName}`" class="schema-metadata-viewport">
+    <DataGridViewport :label="`Columns in ${table.tableName}`" :fill="true" class="schema-metadata-viewport">
       <table class="schema-metadata-grid">
         <thead class="schema-metadata-grid__head">
           <tr>
@@ -93,10 +86,6 @@ function saveTable() {
 </script>
 
 <style scoped>
-.schema-metadata-viewport {
-  max-height: clamp(20rem, calc(100vh - 18rem), 52rem);
-}
-
 .schema-metadata-grid {
   width: 100%;
   min-width: 840px;
