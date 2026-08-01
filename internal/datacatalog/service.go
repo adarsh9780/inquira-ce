@@ -25,10 +25,12 @@ type workspaceSource interface {
 
 type connectionSource interface {
 	List(context.Context, string) (connection.ListResponse, error)
+	DeleteOutput(context.Context, string, string) (connection.DeleteOutputResult, error)
 }
 
 type Gateway interface {
 	Build(context.Context, BuildRequest) (BuildResult, error)
+	Preview(context.Context, WorkerPreviewRequest) (DatasetPreview, error)
 }
 
 type schemaRepository interface {
@@ -36,6 +38,7 @@ type schemaRepository interface {
 	TableContext(context.Context, string, string) (string, error)
 	SaveTableContext(context.Context, string, string, string) error
 	Replace(context.Context, string, string, *string, []ColumnOverride) error
+	DeleteTable(context.Context, string, string) error
 	Close() error
 }
 
@@ -53,7 +56,8 @@ func (emptySchemaRepository) SaveTableContext(context.Context, string, string, s
 func (emptySchemaRepository) Replace(context.Context, string, string, *string, []ColumnOverride) error {
 	return nil
 }
-func (emptySchemaRepository) Close() error { return nil }
+func (emptySchemaRepository) DeleteTable(context.Context, string, string) error { return nil }
+func (emptySchemaRepository) Close() error                                      { return nil }
 
 type Service struct {
 	workspaces  workspaceSource
@@ -163,6 +167,64 @@ func (s *Service) ListDatasets(ctx context.Context, workspaceID string) (Dataset
 			RowCount: table.RowCount, FileType: table.FileType, SchemaStatus: string(table.Status),
 			CreatedAt: table.CreatedAt, UpdatedAt: table.UpdatedAt,
 		})
+	}
+	return result, nil
+}
+
+func (s *Service) DeleteDataset(ctx context.Context, workspaceID, tableName string) (DatasetDeleteResult, error) {
+	id := strings.TrimSpace(workspaceID)
+	catalog, err := s.Prepare(ctx, id)
+	if err != nil {
+		return DatasetDeleteResult{}, err
+	}
+	table, ok := findTable(catalog.Tables, strings.TrimSpace(tableName))
+	if !ok {
+		return DatasetDeleteResult{}, apperror.New("dataset_not_found", "Dataset not found in this workspace.")
+	}
+	deleted, err := s.connections.DeleteOutput(ctx, table.ConnectionID, table.SourceObjectID)
+	if err != nil {
+		return DatasetDeleteResult{}, err
+	}
+	if err := s.schemas.DeleteTable(ctx, id, table.Name); err != nil {
+		return DatasetDeleteResult{}, apperror.Wrap("dataset_metadata_delete_failed", "The dataset was removed, but its saved descriptions could not be cleared.", err)
+	}
+	if err := s.Remove(id); err != nil {
+		return DatasetDeleteResult{}, err
+	}
+	return DatasetDeleteResult{Deleted: deleted.Deleted, ConnectionDeleted: deleted.ConnectionDeleted}, nil
+}
+
+func (s *Service) PreviewDataset(ctx context.Context, request DatasetPreviewRequest) (DatasetPreview, error) {
+	catalog, err := s.Prepare(ctx, strings.TrimSpace(request.WorkspaceID))
+	if err != nil {
+		return DatasetPreview{}, err
+	}
+	table, ok := findTable(catalog.Tables, strings.TrimSpace(request.TableName))
+	if !ok {
+		return DatasetPreview{}, apperror.New("dataset_not_found", "Dataset not found in this workspace.")
+	}
+	mode := request.Mode
+	if mode == "" {
+		mode = DatasetPreviewHead
+	}
+	if mode != DatasetPreviewHead && mode != DatasetPreviewTail {
+		return DatasetPreview{}, apperror.New("dataset_preview_mode_invalid", "Dataset preview mode must be head or tail.")
+	}
+	result, err := s.gateway.Preview(ctx, WorkerPreviewRequest{
+		DatabasePath: catalog.DatabasePath,
+		TableName:    table.Name,
+		Mode:         mode,
+		Limit:        DatasetPreviewLimit,
+	})
+	if err != nil {
+		return DatasetPreview{}, apperror.Wrap("dataset_preview_failed", "Could not preview this dataset.", err)
+	}
+	expectedOffset := int64(0)
+	if mode == DatasetPreviewTail && table.RowCount > DatasetPreviewLimit {
+		expectedOffset = table.RowCount - DatasetPreviewLimit
+	}
+	if result.TableName != table.Name || result.Mode != mode || result.Limit != DatasetPreviewLimit || result.RowCount != table.RowCount || result.Offset != expectedOffset || len(result.Rows) > DatasetPreviewLimit {
+		return DatasetPreview{}, apperror.New("dataset_preview_invalid", "The data worker returned an invalid dataset preview.")
 	}
 	return result, nil
 }
@@ -337,7 +399,7 @@ func buildTables(connections []connection.Connection) ([]Table, error) {
 		sort.Slice(item.Outputs, func(i, j int) bool {
 			return item.Outputs[i].SourceObjectID < item.Outputs[j].SourceObjectID
 		})
-		multiple := len(item.Outputs) > 1
+		multiple := len(item.Outputs) > 1 || item.Options[connection.QualifiedOutputNamesOption] == true
 		for _, output := range item.Outputs {
 			info, err := os.Stat(output.SnapshotPath)
 			if err != nil || !info.Mode().IsRegular() || info.Size() == 0 || strings.ToLower(filepath.Ext(output.SnapshotPath)) != ".parquet" {

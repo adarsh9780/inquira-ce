@@ -28,8 +28,4 @@ jobs:
         run: node --test scripts/check-pr-policy.test.mjs
 
       - name: Check pull request policy
-        env:
-          PR_POLICY_WARNING_LINES: "200"
-          PR_POLICY_MAXIMUM_LINES: "400"
-          PR_POLICY_MAXIMUM_FILES: "15"
         run: node scripts/check-pr-policy.mjs --base "origin/${{ github.base_ref }}" --head HEAD

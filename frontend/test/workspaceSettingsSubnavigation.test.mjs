@@ -5,7 +5,7 @@ import test from 'node:test'
 
 const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
-test('workspace settings separate General, Data sources, and AI without losing workspace context', () => {
+test('workspace settings separate General, Runtime, and AI without duplicating data-source management', () => {
   const workspace = [
     read('src/components/modals/tabs/WorkspaceTab.vue'),
     read('src/composables/useWorkspaceSettings.ts'),
@@ -14,17 +14,17 @@ test('workspace settings separate General, Data sources, and AI without losing w
   assert.match(workspace, /aria-label="Workspace settings sections"/)
   assert.match(workspace, /role="tablist"/)
   assert.match(workspace, /\{ id: 'general', label: 'General' \}/)
-  assert.match(workspace, /\{ id: 'connections', label: 'Data sources' \}/)
+  assert.match(workspace, /\{ id: 'runtime', label: 'Runtime' \}/)
   assert.match(workspace, /\{ id: 'ai', label: 'AI' \}/)
   assert.match(workspace, /v-show="activeWorkspaceSection === 'general'"/)
-  assert.match(workspace, /v-show="activeWorkspaceSection === 'connections'"/)
+  assert.match(workspace, /v-show="activeWorkspaceSection === 'runtime'"/)
   assert.match(workspace, /v-show="activeWorkspaceSection === 'ai'"/)
   assert.match(workspace, /props\.initialSection/)
   assert.match(workspace, /moveWorkspaceSection\(-1, \$event\)/)
   assert.match(workspace, /moveWorkspaceSection\(1, \$event\)/)
 })
 
-test('workspace entry points deep-link to the relevant scoped tab', () => {
+test('data entry points route to Workspace Data while AI opens scoped settings', () => {
   const settings = read('src/components/modals/SettingsModal.vue')
   const store = read('src/stores/uiStore.ts')
   const setup = read('src/components/modals/tabs/SetupTab.vue')
@@ -32,7 +32,8 @@ test('workspace entry points deep-link to the relevant scoped tab', () => {
 
   assert.match(settings, /:initial-section="workspaceInitialSection"/)
   assert.match(store, /settingsInitialTab\.value = 'workspace-ai'/)
-  assert.match(store, /settingsInitialTab\.value = 'workspace-data'/)
+  assert.match(store, /function requestConnectionFlow\(\)[\s\S]*activeTab\.value = 'schema-editor'/)
+  assert.match(store, /function requestConnectionFlow\(\)[\s\S]*isSettingsOpen\.value = false/)
   assert.match(setup, /openDataConnectionFlow\(\)/)
   assert.match(setup, /openSettings\('workspace-ai'\)/)
   assert.doesNotMatch(composer, /<ModelSelector/)

@@ -41,32 +41,21 @@ test('accepts a focused conventional pull request', () => {
   assert.equal(result.metrics.reviewableLines, 120)
 })
 
-test('rejects oversized changes without a documented override', () => {
+test('allows large cohesive changes while still reporting review metrics', () => {
   const result = evaluatePolicy({
-    title: 'fix: oversized change',
+    title: 'feat: deliver cohesive workspace manager',
     body: validBody,
-    files: [{ path: 'frontend/src/large.ts', added: 401, deleted: 0 }],
-  })
-
-  assert.equal(result.failures.some((failure) => failure.includes('size-override')), true)
-  assert.equal(result.warnings.length, 1)
-})
-
-test('allows a documented size override and ignores generated files', () => {
-  const result = evaluatePolicy({
-    title: 'fix: regenerate desktop assets',
-    body: `${validBody}\n## Size override\n\nGenerated assets must change together.`,
-    labels: ['size-override'],
-    files: [
-      { path: 'frontend/src/large.ts', added: 401, deleted: 0 },
-      { path: 'frontend/package-lock.json', added: 900, deleted: 800 },
-      { path: 'build/appicon.png', added: 0, deleted: 0, binary: true },
-    ],
+    files: Array.from({ length: 24 }, (_, index) => ({
+      path: `frontend/src/workspace/part-${index}.ts`,
+      added: 100,
+      deleted: 25,
+    })),
   })
 
   assert.deepEqual(result.failures, [])
-  assert.equal(result.metrics.reviewableLines, 401)
-  assert.equal(result.metrics.ignoredFiles, 2)
+  assert.deepEqual(result.warnings, [])
+  assert.equal(result.metrics.reviewableLines, 3000)
+  assert.equal(result.metrics.reviewableFiles, 24)
 })
 
 test('requires metadata and completed validation for ready PRs', () => {

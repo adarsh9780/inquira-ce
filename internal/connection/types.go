@@ -12,6 +12,8 @@ const (
 	AdapterSQLite  AdapterKind = "sqlite"
 )
 
+const QualifiedOutputNamesOption = "_inquira_qualified_output_names"
+
 type Status string
 
 const (
@@ -158,4 +160,9 @@ type PreviewRequest struct {
 
 type DeleteResult struct {
 	Deleted bool `json:"deleted"`
+}
+
+type DeleteOutputResult struct {
+	Deleted           bool `json:"deleted"`
+	ConnectionDeleted bool `json:"connection_deleted"`
 }

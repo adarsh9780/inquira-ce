@@ -366,7 +366,7 @@
           </WorkspaceContextSection>
           </div>
 
-          <div v-show="activeWorkspaceSection === 'connections'" class="space-y-3" role="tabpanel" aria-label="Workspace data sources">
+          <div v-show="activeWorkspaceSection === 'runtime'" class="space-y-3" role="tabpanel" aria-label="Workspace runtime">
             <section class="rounded-lg border p-4" :class="nativeRuntimeStatus.ready ? 'border-[var(--color-border)] bg-[var(--color-base-soft)]' : 'border-[var(--color-warning-border)] bg-[var(--color-warning-bg)]'">
               <div class="flex items-start justify-between gap-3">
                 <div>
@@ -517,126 +517,6 @@
               </div>
             </section>
 
-            <section class="rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)] p-4">
-              <div class="flex items-start justify-between gap-4">
-                <div>
-                  <h4 class="section-label">Data sources</h4>
-                  <p class="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">Create refreshable local snapshots from CSV, Parquet, Excel, JSON, and SQLite sources.</p>
-                </div>
-                <button type="button" class="btn-primary px-3 py-1.5 text-xs" :disabled="connectionActionLoading || !isWorkspaceActive || !nativeRuntimeStatus.ready" @click="chooseConnectionFile">
-                  Add data source
-                </button>
-              </div>
-
-              <p v-if="connectionError" class="mt-3 rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-xs text-[var(--color-danger-text)]" role="alert">{{ connectionError }}</p>
-
-              <div v-if="pendingConnection" class="mt-4 space-y-3 rounded-lg border border-[var(--color-accent-border)] bg-[var(--color-base)] p-3">
-                <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <p class="truncate text-xs font-semibold text-[var(--color-text-main)]">{{ pendingConnection.source_path }}</p>
-                    <p class="mt-1 text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">{{ adapterKindLabel(pendingConnection.adapter_kind) }} · {{ sourceObjectCountLabel(pendingConnection) }}</p>
-                  </div>
-                  <button type="button" class="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]" :disabled="connectionActionLoading" @click="cancelPendingConnection">Cancel</button>
-                </div>
-                <label class="block">
-                  <span class="input-label">Connection name</span>
-                  <input v-model="pendingConnection.name" class="input-base input-outlined" maxlength="120" :disabled="connectionActionLoading" />
-                </label>
-                <div v-if="isObjectSelectionAdapter(pendingConnection.adapter_kind)" class="space-y-2">
-                  <div class="flex items-center justify-between gap-3">
-                    <span class="input-label">
-                      {{ pendingConnection.adapter_kind === 'excel' ? 'Select sheets' : 'Select tables and views' }} · {{ pendingConnection.selected_object_ids.length }} selected
-                    </span>
-                    <label v-if="pendingConnection.adapter_kind === 'excel'" class="flex items-center gap-2 text-[10px] text-[var(--color-text-muted)]">
-                      Formula values
-                      <select v-model="pendingConnection.formula_mode" class="rounded border border-[var(--color-border)] bg-[var(--color-base)] px-2 py-1" :disabled="connectionActionLoading" @change="previewPendingObject(pendingConnection.active_object_id)">
-                        <option value="cached">Last saved values</option>
-                        <option value="formula">Formula text</option>
-                      </select>
-                    </label>
-                  </div>
-                  <div v-if="pendingConnection.objects.length > 6" class="flex items-center gap-2">
-                    <input
-                      v-model="objectSearch"
-                      type="search"
-                      class="input-base input-outlined h-8 min-w-0 flex-1 text-xs"
-                      :placeholder="pendingConnection.adapter_kind === 'excel' ? 'Search sheets' : 'Search tables and views'"
-                      :aria-label="pendingConnection.adapter_kind === 'excel' ? 'Search Excel sheets' : 'Search SQLite tables and views'"
-                    />
-                    <button type="button" class="btn-ghost shrink-0 px-2 py-1 text-xs" :disabled="connectionActionLoading" @click="selectAllPendingObjects">
-                      Select all
-                    </button>
-                    <button
-                      v-if="pendingConnection.selected_object_ids.length"
-                      type="button"
-                      class="btn-ghost shrink-0 px-2 py-1 text-xs"
-                      :disabled="connectionActionLoading"
-                      @click="clearPendingObjectSelection"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div class="grid max-h-56 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
-                    <label v-for="object in filteredPendingObjects" :key="object.id" class="flex items-start gap-2 rounded-lg border p-2" :class="object.id === pendingConnection.active_object_id ? 'border-[var(--color-accent)]' : 'border-[var(--color-border)]'">
-                      <input v-model="pendingConnection.selected_object_ids" type="checkbox" :value="object.id" :disabled="connectionActionLoading || object.metadata?.selectable === false" />
-                      <span class="min-w-0 flex-1">
-                        <span class="block truncate text-xs font-medium text-[var(--color-text-main)]">{{ object.name }}</span>
-                        <span class="block text-[10px] text-[var(--color-text-muted)]">{{ sourceObjectSummary(object, pendingConnection.adapter_kind) }}</span>
-                      </span>
-                      <button v-if="object.metadata?.selectable !== false" type="button" class="text-[10px] font-medium text-[var(--color-accent)] hover:underline" :disabled="connectionActionLoading" @click.prevent="previewPendingObject(object.id)">Preview</button>
-                    </label>
-                  </div>
-                  <p v-if="filteredPendingObjects.length === 0" class="py-4 text-center text-xs text-[var(--color-text-muted)]">
-                    No source objects match “{{ objectSearch }}”.
-                  </p>
-                </div>
-                <div class="flex flex-wrap gap-1.5">
-                  <span v-for="column in visiblePendingColumns" :key="column.name" class="rounded-full bg-[var(--color-base-soft)] px-2 py-1 text-[10px] text-[var(--color-text-muted)]">
-                    {{ column.name }} · {{ column.data_type }}
-                  </span>
-                  <span v-if="pendingConnection.columns.length > visiblePendingColumns.length" class="rounded-full bg-[var(--color-base-soft)] px-2 py-1 text-[10px] font-medium text-[var(--color-text-main)]">
-                    +{{ pendingConnection.columns.length - visiblePendingColumns.length }} more
-                  </span>
-                </div>
-                <div v-if="pendingConnection.preview_rows.length" class="overflow-hidden rounded-lg border border-[var(--color-border)]">
-                  <div class="overflow-x-auto">
-                    <table class="min-w-full text-left text-[10px]">
-                      <thead class="bg-[var(--color-base-soft)] text-[var(--color-text-muted)]"><tr><th v-for="column in pendingConnection.columns" :key="column.name" class="px-2 py-1.5 font-medium">{{ column.name }}</th></tr></thead>
-                      <tbody><tr v-for="(row, index) in pendingConnection.preview_rows.slice(0, 5)" :key="index" class="border-t border-[var(--color-border)]"><td v-for="column in pendingConnection.columns" :key="column.name" class="max-w-48 truncate px-2 py-1.5 text-[var(--color-text-main)]">{{ row[column.name] ?? '—' }}</td></tr></tbody>
-                    </table>
-                  </div>
-                </div>
-                <div class="flex justify-end">
-                  <button type="button" class="btn-primary px-4 py-1.5 text-xs" :disabled="connectionActionLoading || !pendingConnection.name.trim() || !pendingConnection.selected_object_ids.length" @click="createPendingConnection">
-                    {{ connectionActionLoading ? 'Creating snapshot…' : 'Create connection' }}
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            <section v-if="nativeConnections.length" class="space-y-2">
-              <article v-for="item in nativeConnections" :key="item.id" class="rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)] px-3 py-3">
-                <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                      <p class="truncate text-xs font-semibold text-[var(--color-text-main)]">{{ item.name }}</p>
-                      <span class="rounded-full px-2 py-0.5 text-[9px]" :class="['error', 'needs_attention'].includes(item.status) ? 'bg-[var(--color-danger-bg)] text-[var(--color-danger-text)]' : 'bg-[var(--color-success-bg)] text-[var(--color-success)]'">{{ item.status === 'needs_attention' ? 'needs attention' : item.status }}</span>
-                    </div>
-                    <p class="mt-1 truncate text-[10px] text-[var(--color-text-muted)]">{{ item.source_path }}</p>
-                    <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">{{ connectionOutputSummary(item) }}</p>
-                    <p v-if="item.error_message" class="mt-1 text-[10px] text-[var(--color-danger-text)]">{{ item.error_message }}</p>
-                  </div>
-                  <div class="flex shrink-0 items-center gap-2">
-                    <button type="button" class="text-xs font-medium text-[var(--color-accent)] hover:underline" :disabled="refreshingConnectionIds.has(item.id)" @click="refreshNativeConnection(item.id)">{{ refreshingConnectionIds.has(item.id) ? 'Refreshing…' : 'Refresh' }}</button>
-                    <button type="button" class="text-xs font-medium text-[var(--color-danger)] hover:underline" :disabled="connectionActionLoading" @click="deleteNativeConnection(item.id)">Delete</button>
-                  </div>
-                </div>
-              </article>
-            </section>
-            <div v-else-if="!pendingConnection && !connectionActionLoading" class="rounded-lg border border-dashed border-[var(--color-border)] py-8 text-center">
-              <p class="text-xs font-medium text-[var(--color-text-main)]">No data sources yet</p>
-              <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">Start with CSV, Parquet, Excel, JSON, or a read-only SQLite connection.</p>
-            </div>
           </div>
 
           <div v-show="activeWorkspaceSection === 'ai'" role="tabpanel" aria-label="Workspace AI settings">
@@ -676,16 +556,11 @@
   </section>
 </template>
 
-<script lang="ts">
-const handledConnectionFlowRequestIds = new WeakMap()
-</script>
-
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { workspaceApi } from '../../../api/workspaces'
 import { connectionService } from '../../../services/connectionService'
 import { runtimeProvisionService, type RuntimeProgress } from '../../../services/runtimeProvisionService'
-import { useUiStore } from '../../../stores/uiStore'
 import { usePreferencesStore } from '../../../stores/preferencesStore'
 import { useArtifactStore } from '../../../stores/artifactStore'
 import { useExecutionStore } from '../../../stores/executionStore'
@@ -715,7 +590,6 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits(['select-workspace', 'activate-workspace', 'workspace-created', 'workspace-setup-complete'])
 
-const uiStore = useUiStore()
 const preferencesStore = usePreferencesStore()
 const artifactStore = useArtifactStore()
 const executionStore = useExecutionStore()
@@ -729,12 +603,10 @@ const {
   activeWorkspaceSection,
   moveWorkspaceSection,
 } = useWorkspaceSettings(computed(() => props.initialSection))
-const nativeConnections = ref<any[]>([])
 const pendingConnection = ref<any>(null)
 const connectionActionLoading = ref(false)
 const connectionError = ref('')
 const objectSearch = ref('')
-const refreshingConnectionIds = ref(new Set())
 const nativeRuntimeStatus = ref<any>({ ready: false })
 const runtimeProvisioning = ref(false)
 const runtimeRecoveryLoading = ref(false)
@@ -745,7 +617,6 @@ const isRuntimeResetDialogOpen = ref(false)
 const runtimeProvisionError = ref('')
 const runtimeConfigurationOpen = ref(false)
 const runtimePlanSummary = ref('')
-const isWorkspaceTabMounted = ref(false)
 const runtimeConfig = ref({
   mode: 'managed',
   pythonVersion: '3.12.13',
@@ -915,34 +786,15 @@ watch(
   async () => {
     await loadWorkspaceDetail()
     syncSetupIdentity()
-    await loadNativeConnections()
   },
   { immediate: true },
 )
 
-watch(
-  [
-    () => Number(uiStore.connectionFlowRequestId || 0),
-    () => isWorkspaceActive.value,
-    () => Boolean(nativeRuntimeStatus.value?.ready),
-    () => runtimeProvisioning.value,
-    () => connectionActionLoading.value,
-    () => isWorkspaceTabMounted.value,
-  ],
-  () => {
-    void handlePendingConnectionFlowRequest()
-  },
-  { flush: 'post' },
-)
-
 onMounted(async () => {
-  isWorkspaceTabMounted.value = true
   document.addEventListener('pointerdown', handleWorkspaceActionsPointerDown)
   await hydrateWorkspaceCards()
-  await loadNativeConnections()
   await loadNativeRuntimeStatus()
   syncSetupIdentity()
-  await handlePendingConnectionFlowRequest()
 })
 
 async function loadNativeRuntimeStatus() {
@@ -1184,44 +1036,13 @@ async function exportRuntimeDiagnostics() {
   }
 }
 
-async function loadNativeConnections() {
-  if (!isNativeWorkspaceMetadata) return
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
-  if (!workspaceId) {
-    nativeConnections.value = []
-    return
-  }
-  try {
-    const response: any = await connectionService.list(workspaceId)
-    nativeConnections.value = Array.isArray(response?.connections) ? response.connections : []
-  } catch (error: any) {
-    connectionError.value = extractApiErrorMessage(error, 'Could not load connections.')
-  }
-}
-
-async function refreshNativeConnectionState(workspaceId: any) {
+async function refreshWorkspaceDataState(workspaceId: any) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
-  const refreshes: Promise<unknown>[] = [loadNativeConnections()]
-  if (normalizedWorkspaceId && normalizedWorkspaceId === String(workspaceStore.activeWorkspaceId || '').trim()) {
-    refreshes.push(
-      workspaceStore.fetchWorkspaceSummary(normalizedWorkspaceId),
-      workspaceStore.fetchColumnCatalog({ force: true }),
-    )
-  }
-  await Promise.all(refreshes)
-}
-
-async function handlePendingConnectionFlowRequest() {
-  const requestId = Math.max(0, Math.floor(Number(uiStore.connectionFlowRequestId || 0)))
-  const lastHandledRequestId = Number(handledConnectionFlowRequestIds.get(workspaceStore) || 0)
-  if (!requestId || requestId <= lastHandledRequestId) return
-  if (!isWorkspaceTabMounted.value || !isNativeWorkspaceMetadata || !isWorkspaceActive.value) return
-
-  activeWorkspaceSection.value = 'connections'
-  if (!nativeRuntimeStatus.value?.ready || runtimeProvisioning.value || connectionActionLoading.value) return
-
-  handledConnectionFlowRequestIds.set(workspaceStore, requestId)
-  await chooseConnectionFile()
+  if (!normalizedWorkspaceId || normalizedWorkspaceId !== String(workspaceStore.activeWorkspaceId || '').trim()) return
+  await Promise.all([
+    workspaceStore.fetchWorkspaceSummary(normalizedWorkspaceId),
+    workspaceStore.fetchColumnCatalog({ force: true }),
+  ])
 }
 
 async function chooseConnectionFile() {
@@ -1309,7 +1130,7 @@ async function createPendingConnection() {
     })
     pendingConnection.value = null
     objectSearch.value = ''
-    await refreshNativeConnectionState(workspaceId)
+    await refreshWorkspaceDataState(workspaceId)
     if (completesWorkspaceSetup) {
       finishWorkspaceSetup('connected')
     } else {
@@ -1320,47 +1141,6 @@ async function createPendingConnection() {
   } finally {
     connectionActionLoading.value = false
   }
-}
-
-async function refreshNativeConnection(connectionId: any) {
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
-  const next = new Set(refreshingConnectionIds.value)
-  next.add(connectionId)
-  refreshingConnectionIds.value = next
-  connectionError.value = ''
-  try {
-    await connectionService.refresh(connectionId)
-    await refreshNativeConnectionState(workspaceId)
-    toast.success('Connection refreshed', 'The local snapshot is up to date.')
-  } catch (error: any) {
-    connectionError.value = extractApiErrorMessage(error, 'Could not refresh the connection.')
-    await refreshNativeConnectionState(workspaceId)
-  } finally {
-    const remaining = new Set(refreshingConnectionIds.value)
-    remaining.delete(connectionId)
-    refreshingConnectionIds.value = remaining
-  }
-}
-
-async function deleteNativeConnection(connectionId: any) {
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
-  connectionError.value = ''
-  connectionActionLoading.value = true
-  try {
-    await connectionService.remove(connectionId)
-    await refreshNativeConnectionState(workspaceId)
-    toast.success('Connection deleted', 'The connection and its local snapshots were removed.')
-  } catch (error: any) {
-    connectionError.value = extractApiErrorMessage(error, 'Could not delete the connection.')
-  } finally {
-    connectionActionLoading.value = false
-  }
-}
-
-function connectionOutputSummary(connection: any) {
-  const outputs = Array.isArray(connection?.outputs) ? connection.outputs : []
-  const rows = outputs.reduce((total: any, output: any) => total + Number(output?.row_count || 0), 0)
-  return `${adapterKindLabel(connection?.adapter_kind)} · ${outputs.length} table${outputs.length === 1 ? '' : 's'} · ${rows.toLocaleString()} rows`
 }
 
 function adapterKindLabel(kind: any) {
@@ -1391,7 +1171,6 @@ function sourceObjectSummary(object: any, adapterKind: any) {
 }
 
 onUnmounted(() => {
-  isWorkspaceTabMounted.value = false
   document.removeEventListener('pointerdown', handleWorkspaceActionsPointerDown)
 })
 
@@ -1674,7 +1453,7 @@ function advanceToDataSetup() {
 
 function openAdvancedDataSettings() {
   isWorkspaceCreationOpen.value = false
-  activeWorkspaceSection.value = 'connections'
+  activeWorkspaceSection.value = 'runtime'
   workspaceCreationStep.value = 'identity'
   createdWorkspaceId.value = ''
 }

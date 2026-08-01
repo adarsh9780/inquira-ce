@@ -105,6 +105,7 @@ export interface NativeMethodMap {
     artifactId: string,
   ) => Promise<NativeRecord>
   DeleteWorkspace: (workspaceId: string) => Promise<NativeRecord>
+  DeleteWorkspaceDataset: (workspaceId: string, tableName: string) => Promise<NativeRecord>
   DiscoverLocalConnection: (request: NativeRecord) => Promise<unknown>
   ExecuteWorkspaceCommand: (request: NativeCommandRequest) => Promise<NativeRecord>
   ExportRuntimeDiagnostics: () => Promise<boolean>
@@ -155,6 +156,11 @@ export interface NativeMethodMap {
   OpenExternalURL: (url: string) => Promise<void>
   OpenStartupLogs: () => Promise<void>
   PreviewLocalConnection: (request: NativeRecord) => Promise<unknown>
+  PreviewWorkspaceDataset: (
+    workspaceId: string,
+    tableName: string,
+    mode: string,
+  ) => Promise<NativeRecord>
   ProvisionRuntime: (configuration: NativeRecord) => Promise<unknown>
   RepairRuntime: () => Promise<unknown>
   RefreshConnection: (connectionId: string) => Promise<unknown>

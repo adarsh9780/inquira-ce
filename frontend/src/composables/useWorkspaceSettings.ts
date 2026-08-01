@@ -2,7 +2,7 @@ import { nextTick, ref, watch, type Ref } from 'vue'
 
 export const WORKSPACE_SETTINGS_SECTIONS = [
   { id: 'general', label: 'General' },
-  { id: 'connections', label: 'Data sources' },
+  { id: 'runtime', label: 'Runtime' },
   { id: 'ai', label: 'AI' },
 ] as const
 
@@ -11,7 +11,7 @@ export function useWorkspaceSettings(initialSection: Ref<unknown>) {
 
   function selectWorkspaceSection(section: unknown) {
     const normalized = String(section || '').trim().toLowerCase()
-    const requested = normalized === 'data' ? 'connections' : normalized
+    const requested = ['data', 'connections'].includes(normalized) ? 'runtime' : normalized
     activeWorkspaceSection.value = WORKSPACE_SETTINGS_SECTIONS.some((item) => item.id === requested)
       ? requested
       : 'general'

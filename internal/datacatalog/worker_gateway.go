@@ -17,3 +17,9 @@ func (g *WorkerGateway) Build(ctx context.Context, request BuildRequest) (BuildR
 	err := g.transport.Call(ctx, "build_catalog", request, &result)
 	return result, err
 }
+
+func (g *WorkerGateway) Preview(ctx context.Context, request WorkerPreviewRequest) (DatasetPreview, error) {
+	var result DatasetPreview
+	err := g.transport.Call(ctx, "preview_catalog", request, &result)
+	return result, err
+}

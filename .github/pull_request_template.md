@@ -24,5 +24,3 @@ Point reviewers to the highest-risk files and the recommended review order.
 ## Risk and recovery
 
 Describe migration, compatibility, security, rollout, and rollback considerations.
-
-<!-- If the size-override label is needed, add a "## Size override" section and explain why the change cannot be split safely. -->

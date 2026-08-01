@@ -819,6 +819,33 @@ func (a *App) GetWorkspaceDatasetSchema(workspaceID, tableName string) (datacata
 	return service.GetSchema(a.appContext(), workspaceID, tableName)
 }
 
+func (a *App) PreviewWorkspaceDataset(workspaceID, tableName, mode string) (datacatalog.DatasetPreview, error) {
+	service, err := a.catalogService()
+	if err != nil {
+		return datacatalog.DatasetPreview{}, err
+	}
+	return service.PreviewDataset(a.appContext(), datacatalog.DatasetPreviewRequest{
+		WorkspaceID: workspaceID,
+		TableName:   tableName,
+		Mode:        datacatalog.DatasetPreviewMode(mode),
+	})
+}
+
+func (a *App) DeleteWorkspaceDataset(workspaceID, tableName string) (datacatalog.DatasetDeleteResult, error) {
+	service, err := a.catalogService()
+	if err != nil {
+		return datacatalog.DatasetDeleteResult{}, err
+	}
+	if a.worker != nil && a.worker.Running() && a.analysis != nil {
+		_, _ = a.analysis.Reset(a.appContext(), strings.TrimSpace(workspaceID))
+	}
+	result, err := service.DeleteDataset(a.appContext(), workspaceID, tableName)
+	if err != nil {
+		return datacatalog.DatasetDeleteResult{}, err
+	}
+	return result, nil
+}
+
 func (a *App) SaveWorkspaceDatasetSchema(request datacatalog.SaveSchemaRequest) (datacatalog.DatasetSchema, error) {
 	catalogService, err := a.catalogService()
 	if err != nil {

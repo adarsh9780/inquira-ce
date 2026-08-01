@@ -154,4 +154,22 @@ func (r *SQLiteRepository) Replace(ctx context.Context, workspaceID, tableName s
 	return nil
 }
 
+func (r *SQLiteRepository) DeleteTable(ctx context.Context, workspaceID, tableName string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin schema deletion: %w", err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM dataset_schema_columns WHERE workspace_id = ? AND table_name = ?`, workspaceID, tableName); err != nil {
+		return fmt.Errorf("delete schema overrides: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM dataset_schema_tables WHERE workspace_id = ? AND table_name = ?`, workspaceID, tableName); err != nil {
+		return fmt.Errorf("delete table context: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit schema deletion: %w", err)
+	}
+	return nil
+}
+
 func (r *SQLiteRepository) Close() error { return r.db.Close() }

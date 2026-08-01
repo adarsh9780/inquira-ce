@@ -13,7 +13,8 @@ test('workspace manager separates workspace sections from dataset selection', ()
   assert.equal(editor.includes("activeWorkspaceSection === 'context'"), true)
   assert.equal(editor.includes("activeWorkspaceSection.value = selection.kind === 'workspace' ? 'context' : 'data'"), true)
   assert.equal(editor.includes('data-action="add-workspace-data"'), true)
-  assert.equal(editor.includes('uiStore.requestConnectionFlow()'), true)
+  assert.equal(editor.includes('await dataSourcesRef.value?.chooseFile()'), true)
+  assert.equal(editor.includes('sourceDrawerOpen.value = true'), true)
 })
 
 test('dataset browser makes interactive rows explicit and searchable', () => {

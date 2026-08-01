@@ -6,7 +6,7 @@ describe('workspace settings coordinator', () => {
   it('normalizes deep links and wraps keyboard section navigation', async () => {
     const initial = ref('data')
     const settings = useWorkspaceSettings(initial)
-    expect(settings.activeWorkspaceSection.value).toBe('connections')
+    expect(settings.activeWorkspaceSection.value).toBe('runtime')
 
     settings.moveWorkspaceSection(1)
     expect(settings.activeWorkspaceSection.value).toBe('ai')
