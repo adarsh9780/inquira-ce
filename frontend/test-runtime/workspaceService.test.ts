@@ -90,4 +90,15 @@ describe('workspaceApi Wails bridge', () => {
 
     expect(app.PreviewWorkspaceDataset).toHaveBeenCalledWith('workspace-1', 'sales', 'tail')
   })
+
+  it('removes one saved dataset through its workspace-scoped table identity', async () => {
+    const app = {
+      DeleteWorkspaceDataset: vi.fn().mockResolvedValue({ deleted: true }),
+    }
+    window.go = { main: { App: app } }
+
+    await workspaceApi.removeDataset('workspace-1', 'sales')
+
+    expect(app.DeleteWorkspaceDataset).toHaveBeenCalledWith('workspace-1', 'sales')
+  })
 })

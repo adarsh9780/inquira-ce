@@ -57,6 +57,13 @@ export const workspaceApi = {
       String(mode || 'head'),
     )
   },
+  removeDataset(workspaceId: unknown, tableName: unknown) {
+    return invokeNative(
+      'DeleteWorkspaceDataset',
+      String(workspaceId || ''),
+      String(tableName || ''),
+    )
+  },
   saveDatasetSchema(workspaceId: unknown, tableName: unknown, payload: RecordValue = {}) {
     return invokeNative('SaveWorkspaceDatasetSchema', {
       workspace_id: String(workspaceId || ''),

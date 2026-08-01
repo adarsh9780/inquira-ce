@@ -69,7 +69,16 @@
           @update:count="sourceCount = $event"
         />
         <div v-if="!schemaHub.isLoading.value && schemaHub.selectedTable.value" class="flex min-h-full flex-col gap-4 p-4 pb-6">
-          <div class="flex shrink-0 justify-end">
+          <div class="flex shrink-0 items-center justify-between gap-3">
+            <button
+              type="button"
+              class="rounded-md px-2.5 py-1.5 text-[12px] font-medium text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger-bg)] disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="schemaBusy || schemaHub.isEdited.value"
+              :title="schemaHub.isEdited.value ? 'Save or discard table changes before removing this dataset' : `Remove ${schemaHub.selectedTable.value.tableName}`"
+              @click="pendingDatasetRemoval = schemaHub.selectedTable.value"
+            >
+              Remove dataset
+            </button>
             <SegmentedControl v-model="tableView" :options="tableViewOptions" aria-label="Table details" />
           </div>
           <template v-if="tableView === 'schema'">
@@ -109,6 +118,14 @@
       @close="pendingSelection = null"
       @confirm="discardAndSelect"
     />
+    <ConfirmationModal
+      :is-open="Boolean(pendingDatasetRemoval)"
+      title="Remove dataset?"
+      :message="`This removes ${pendingDatasetRemoval?.tableName || 'this dataset'} and its local snapshot from this workspace. Other datasets from the same source will stay connected. This cannot be undone.`"
+      confirm-text="Remove"
+      @close="pendingDatasetRemoval = null"
+      @confirm="removeSelectedDataset"
+    />
   </div>
 </template>
 
@@ -137,7 +154,7 @@ import {
 } from '../../composables/useSchemaHubState'
 import { toast } from '../../composables/useToast'
 import { clearDatasetPreviewCache } from '../../composables/useDatasetPreview'
-import type { SchemaHubColumn, SchemaHubSelection } from '../../types/schemaHub'
+import type { SchemaHubColumn, SchemaHubSelection, SchemaHubTable } from '../../types/schemaHub'
 import { normalizeSchemaRefreshResult, schemaRefreshFeedback } from '../../utils/schemaRefresh'
 
 const executionStore = useExecutionStore()
@@ -148,9 +165,11 @@ const schemaHub = useSchemaHubState()
 const savingTableId = ref('')
 const savingTableContextId = ref('')
 const isRefreshingSources = ref(false)
-const schemaBusy = computed(() => schemaHub.isLoading.value || isRefreshingSources.value || Boolean(savingTableId.value) || Boolean(savingTableContextId.value))
+const removingDataset = ref(false)
+const schemaBusy = computed(() => schemaHub.isLoading.value || isRefreshingSources.value || removingDataset.value || Boolean(savingTableId.value) || Boolean(savingTableContextId.value))
 const regeneratingTableName = ref('')
 const pendingSelection = ref<SchemaHubSelection | null>(null)
+const pendingDatasetRemoval = ref<SchemaHubTable | null>(null)
 const groupedSchema = schemaHub.tables
 const dataSourcesRef = ref<InstanceType<typeof WorkspaceDataSources> | null>(null)
 const sourceCount = ref(0)
@@ -207,6 +226,34 @@ async function handleSourcesChanged() {
   await fetchWorkspaceSchema()
   await workspaceStore.fetchWorkspaceSummary(workspaceStore.activeWorkspaceId)
   await workspaceStore.fetchColumnCatalog({ force: true })
+}
+
+async function removeSelectedDataset() {
+  const workspaceId = workspaceStore.activeWorkspaceId
+  const table = pendingDatasetRemoval.value
+  pendingDatasetRemoval.value = null
+  if (!workspaceId || !table || removingDataset.value || schemaHub.isEdited.value) return
+  removingDataset.value = true
+  try {
+    await workspaceApi.removeDataset(workspaceId, table.tableName)
+    if (workspaceStore.activeWorkspaceId !== workspaceId) return
+    clearDatasetPreviewCache(workspaceId)
+    previewRevision.value += 1
+    schemaHub.selectSources()
+    await Promise.all([
+      fetchWorkspaceSchema(),
+      dataSourcesRef.value?.reload(),
+      workspaceStore.fetchWorkspaceSummary(workspaceId),
+      workspaceStore.fetchColumnCatalog({ force: true }),
+    ])
+    toast.success('Dataset removed', `${table.tableName} was removed from this workspace.`)
+  } catch (error: any) {
+    if (workspaceStore.activeWorkspaceId === workspaceId) {
+      toast.error('Could not remove dataset', error?.message || 'The dataset could not be removed.')
+    }
+  } finally {
+    removingDataset.value = false
+  }
 }
 
 function discardAndSelect() {

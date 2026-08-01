@@ -105,6 +105,7 @@ export interface NativeMethodMap {
     artifactId: string,
   ) => Promise<NativeRecord>
   DeleteWorkspace: (workspaceId: string) => Promise<NativeRecord>
+  DeleteWorkspaceDataset: (workspaceId: string, tableName: string) => Promise<NativeRecord>
   DiscoverLocalConnection: (request: NativeRecord) => Promise<unknown>
   ExecuteWorkspaceCommand: (request: NativeCommandRequest) => Promise<NativeRecord>
   ExportRuntimeDiagnostics: () => Promise<boolean>

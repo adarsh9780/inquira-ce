@@ -16,4 +16,8 @@ test('schema hub uses focused table navigation and protects unsaved metadata', (
   assert.equal(editor.includes('<WorkspaceDataSources'), true)
   assert.equal(editor.includes('handleRequestedAddData'), true)
   assert.equal(editor.includes('handledWorkspaceDataRequestIds.set(workspaceStore, requestId)'), true)
+  assert.equal(editor.includes('Remove dataset'), true)
+  assert.equal(editor.includes('title="Remove dataset?"'), true)
+  assert.equal(editor.includes('workspaceApi.removeDataset(workspaceId, table.tableName)'), true)
+  assert.equal(editor.includes('dataSourcesRef.value?.reload()'), true)
 })

@@ -119,7 +119,7 @@ async function confirmRemoval() {
   await state.removeConnection(id)
 }
 
-defineExpose({ chooseFile: state.chooseFile })
+defineExpose({ chooseFile: state.chooseFile, reload: state.load })
 </script>
 
 <style scoped>
