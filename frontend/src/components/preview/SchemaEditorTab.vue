@@ -1,19 +1,45 @@
 <template>
   <div class="schema-editor h-full flex flex-col relative overflow-hidden bg-[var(--color-base)] text-[var(--color-text-main)] font-sans">
-    <!-- Header -->
-    <div class="schema-top-bar relative z-10 border-b border-[var(--color-border)] p-4 flex flex-wrap items-center justify-between gap-3 bg-[var(--color-surface)]">
-      <div>
-        <h2 class="text-[15px] font-bold leading-tight">Workspace Schema</h2>
-        <p class="text-[13px] text-[var(--color-text-muted)] mt-1">Manage column metadata across all datasets</p>
+    <header class="schema-top-bar relative z-10 shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 pt-4">
+      <div class="flex flex-wrap items-center justify-between gap-4 pb-3">
+        <div class="min-w-0">
+          <p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">Workspace</p>
+          <h2 class="mt-1 truncate text-[15px] font-semibold leading-tight tracking-tight">{{ activeWorkspaceName }}</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <button v-if="activeWorkspaceSection === 'data'" type="button" @click="refreshWorkspaceSchema" :disabled="!hasWorkspace || schemaBusy || schemaHub.isEdited.value" :title="schemaHub.isEdited.value ? 'Save or discard table changes before refreshing' : 'Refresh data sources and reload schema'" class="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium text-[var(--color-text-main)] transition-colors hover:bg-[var(--color-base-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] disabled:opacity-50">
+            <span v-if="isRefreshingSources" class="inquira-spinner h-3.5 w-3.5 border-2" aria-hidden="true"></span>
+            <svg v-else class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 11a8.1 8.1 0 00-15.5-2M4 4v5h5m-5 4a8.1 8.1 0 0015.5 2M20 20v-5h-5"></path></svg>
+            {{ isRefreshingSources ? 'Refreshing…' : 'Refresh' }}
+          </button>
+          <button
+            type="button"
+            class="btn-primary flex items-center gap-1.5 px-3 py-1.5 text-[13px]"
+            :disabled="!hasWorkspace || schemaBusy || schemaHub.isEdited.value"
+            data-action="add-workspace-data"
+            @click="requestAddData"
+          >
+            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+            Add data
+          </button>
+        </div>
       </div>
-      <div class="flex items-center gap-2">
-        <button type="button" @click="refreshWorkspaceSchema" :disabled="schemaBusy || schemaHub.isEdited.value" :title="schemaHub.isEdited.value ? 'Save or discard table changes before refreshing' : 'Refresh data sources and reload schema'" class="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium text-[var(--color-text-main)] transition-colors hover:bg-[var(--color-base-muted)] disabled:opacity-50">
-          <span v-if="isRefreshingSources" class="inquira-spinner h-3.5 w-3.5 border-2" aria-hidden="true"></span>
-          <svg v-else class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 11a8.1 8.1 0 00-15.5-2M4 4v5h5m-5 4a8.1 8.1 0 0015.5 2M20 20v-5h-5"></path></svg>
-          {{ isRefreshingSources ? 'Refreshing…' : 'Refresh' }}
+
+      <nav class="flex gap-5" aria-label="Workspace manager sections" role="tablist">
+        <button
+          v-for="section in workspaceSections"
+          :key="section.value"
+          type="button"
+          role="tab"
+          class="relative -mb-px border-b-2 px-0.5 pb-2.5 pt-1 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+          :class="activeWorkspaceSection === section.value ? 'border-[var(--color-accent)] text-[var(--color-text-main)]' : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
+          :aria-selected="activeWorkspaceSection === section.value"
+          @click="openWorkspaceSection(section.value)"
+        >
+          {{ section.label }}
         </button>
-      </div>
-    </div>
+      </nav>
+    </header>
 
     <!-- Empty State for No Workspace -->
     <div v-if="!hasWorkspace" class="flex flex-1 flex-col items-center justify-center py-16">
@@ -26,8 +52,15 @@
       <p class="text-sm text-[var(--color-text-muted)]">Select or create a workspace to view and edit schema.</p>
     </div>
 
-    <!-- Content Area -->
-    <div v-else class="flex flex-1 overflow-hidden">
+    <div v-else-if="activeWorkspaceSection === 'context'" class="min-h-0 flex-1 overflow-auto schema-scroll-area">
+      <WorkspaceContextSurface
+        :key="workspaceStore.activeWorkspaceId"
+        v-model="schemaContext"
+        :save-context="saveWorkspaceContext"
+      />
+    </div>
+
+    <div v-else class="flex min-h-0 flex-1 overflow-hidden">
       <SchemaTableNavigator
         :tables="groupedSchema"
         :selection="schemaHub.selection.value"
@@ -43,16 +76,10 @@
           </div>
           <p class="text-sm font-medium text-[var(--color-text-muted)]">Loading workspace schema...</p>
         </div>
-        <WorkspaceContextSurface
-          v-else
-          v-show="schemaHub.selection.value.kind === 'workspace'"
-          :key="workspaceStore.activeWorkspaceId"
-          v-model="schemaContext"
-          :save-context="saveWorkspaceContext"
-        />
         <div v-if="!schemaHub.isLoading.value && groupedSchema.length === 0" class="flex h-40 flex-col items-center justify-center text-center">
           <p class="text-[var(--color-text-main)] font-medium text-[15px]">No datasets found.</p>
-          <p class="text-[var(--color-text-muted)] text-[13px] mt-1">Upload data or sync a dataset first.</p>
+          <p class="mt-1 text-[13px] text-[var(--color-text-muted)]">Add a data source to begin exploring this workspace.</p>
+          <button type="button" class="btn-primary mt-4 px-3 py-1.5 text-[13px]" @click="requestAddData">Add data</button>
         </div>
         <div v-else-if="!schemaHub.isLoading.value && schemaHub.selectedTable.value" class="space-y-4 p-4 pb-10">
           <TableContextSurface
@@ -91,6 +118,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { workspaceApi } from '../../api/workspaces'
 import { useExecutionStore } from '../../stores/executionStore'
+import { useUiStore } from '../../stores/uiStore'
 import { useWorkspaceStore } from '../../stores/workspaceStore'
 import TableMetadataSurface from '../schema/TableMetadataSurface.vue'
 import TableContextSurface from '../schema/TableContextSurface.vue'
@@ -107,6 +135,7 @@ import type { SchemaHubColumn, SchemaHubSelection } from '../../types/schemaHub'
 import { normalizeSchemaRefreshResult, schemaRefreshFeedback } from '../../utils/schemaRefresh'
 
 const executionStore = useExecutionStore()
+const uiStore = useUiStore()
 const workspaceStore = useWorkspaceStore()
 
 const schemaHub = useSchemaHubState()
@@ -117,10 +146,38 @@ const schemaBusy = computed(() => schemaHub.isLoading.value || isRefreshingSourc
 const regeneratingTableName = ref('')
 const pendingSelection = ref<SchemaHubSelection | null>(null)
 const groupedSchema = schemaHub.tables
+const activeWorkspaceSection = ref<'data' | 'context'>('data')
+const lastSelectedTableId = ref('')
+const workspaceSections = [
+  { value: 'data' as const, label: 'Data' },
+  { value: 'context' as const, label: 'Context' },
+]
 
 const schemaContext = ref('')
 
 const hasWorkspace = computed(() => !!workspaceStore.activeWorkspaceId)
+const activeWorkspaceName = computed(() => {
+  const activeId = String(workspaceStore.activeWorkspaceId || '')
+  return String(workspaceStore.workspaces.find((workspace) => String(workspace.id) === activeId)?.name || 'Workspace')
+})
+
+function requestAddData() {
+  if (!hasWorkspace.value || schemaBusy.value || schemaHub.isEdited.value) return
+  uiStore.requestConnectionFlow()
+}
+
+function openWorkspaceSection(section: 'data' | 'context') {
+  if (section === activeWorkspaceSection.value) return
+  if (section === 'context') {
+    requestSchemaSelection({ kind: 'workspace' })
+    return
+  }
+  const tableId = groupedSchema.value.some((table) => table.id === lastSelectedTableId.value)
+    ? lastSelectedTableId.value
+    : groupedSchema.value[0]?.id
+  if (tableId) requestSchemaSelection({ kind: 'table', tableId })
+  else activeWorkspaceSection.value = 'data'
+}
 
 function requestSchemaSelection(selection: SchemaHubSelection) {
   const currentSelection = schemaHub.selection.value
@@ -136,8 +193,14 @@ function requestSchemaSelection(selection: SchemaHubSelection) {
 }
 
 function applySchemaSelection(selection: SchemaHubSelection) {
-  if (selection.kind === 'workspace') schemaHub.selectWorkspace()
-  else schemaHub.selectTable(selection.tableId)
+  if (selection.kind === 'workspace') {
+    schemaHub.selectWorkspace()
+    activeWorkspaceSection.value = 'context'
+  } else {
+    schemaHub.selectTable(selection.tableId)
+    lastSelectedTableId.value = selection.tableId
+    activeWorkspaceSection.value = 'data'
+  }
 }
 
 function discardAndSelect() {
@@ -184,7 +247,11 @@ async function fetchWorkspaceSchema() {
       })
     )
 
-    return schemaHub.applyLoad(loadId, normalizeSchemaTables(datasets, schemas))
+    const applied = schemaHub.applyLoad(loadId, normalizeSchemaTables(datasets, schemas))
+    if (applied && activeWorkspaceSection.value === 'data' && !schemaHub.selectedTable.value && groupedSchema.value[0]) {
+      applySchemaSelection({ kind: 'table', tableId: groupedSchema.value[0].id })
+    }
+    return applied
   } catch (error: any) {
     if (schemaHub.rejectLoad(loadId, error)) {
       toast.error('Failed to load schema', error?.message || 'Unknown error occurred.')
@@ -344,6 +411,8 @@ onUnmounted(() => {
 
 watch(() => workspaceStore.activeWorkspaceId, async (newId) => {
   pendingSelection.value = null
+  activeWorkspaceSection.value = 'data'
+  lastSelectedTableId.value = ''
   schemaHub.clear()
   if (newId) {
     await loadWorkspaceContext()

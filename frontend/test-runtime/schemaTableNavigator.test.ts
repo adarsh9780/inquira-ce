@@ -13,7 +13,7 @@ const tables: SchemaHubTable[] = [{
 }]
 
 describe('SchemaTableNavigator', () => {
-  it('shows workspace and table destinations with dirty state', async () => {
+  it('shows searchable dataset destinations with selection and dirty state', async () => {
     const wrapper = mount(SchemaTableNavigator, {
       props: {
         tables,
@@ -22,12 +22,16 @@ describe('SchemaTableNavigator', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('Workspace context')
+    expect(wrapper.attributes('aria-label')).toBe('Dataset browser')
+    expect(wrapper.text()).not.toContain('Workspace context')
     expect(wrapper.text()).toContain('1,200 rows')
     expect(wrapper.get('[aria-label="Unsaved changes"]').exists()).toBe(true)
     expect(wrapper.get('button[aria-current="page"]').text()).toContain('orders')
 
     await wrapper.findAll('button')[0]!.trigger('click')
-    expect(wrapper.emitted('select')).toEqual([[{ kind: 'workspace' }]])
+    expect(wrapper.emitted('select')).toEqual([[{ kind: 'table', tableId: 'orders' }]])
+
+    await wrapper.get('input[type="search"]').setValue('missing')
+    expect(wrapper.text()).toContain('No datasets match “missing”.')
   })
 })

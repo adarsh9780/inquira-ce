@@ -10,5 +10,5 @@ test('schema hub uses focused table navigation and protects unsaved metadata', (
   assert.equal(editor.includes('@select="requestSchemaSelection"'), true)
   assert.equal(editor.includes("title=\"Discard unsaved changes?\""), true)
   assert.equal(editor.includes('schemaHub.resetTable(currentTable.id)'), true)
-  assert.equal(editor.includes(':disabled="schemaBusy || schemaHub.isEdited.value"'), true)
+  assert.equal(editor.includes(':disabled="!hasWorkspace || schemaBusy || schemaHub.isEdited.value"'), true)
 })

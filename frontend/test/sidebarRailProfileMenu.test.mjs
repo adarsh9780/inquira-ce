@@ -19,7 +19,7 @@ test('sidebar keeps the bottom action stack and expanded-only labels', () => {
   assert.equal(source.includes('Workspace settings'), true)
   assert.equal(source.includes('visibleConversationsForSidebar(workspace)'), true)
   assert.equal(source.includes('Workspace tools'), false)
-  assert.equal(source.includes('Data sources'), true)
+  assert.equal(source.includes('Workspace data'), true)
   assert.equal(source.includes('Conversation tree'), true)
 })
 

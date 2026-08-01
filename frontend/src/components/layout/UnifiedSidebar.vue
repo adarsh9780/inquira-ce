@@ -143,30 +143,16 @@
         <button
           type="button"
           class="sidebar-nav-row justify-start px-2.5"
-          title="Data sources"
-          @click="workspaceActivation.openDataConnectionFlow()"
-        >
-          <span class="sidebar-row-icon"><CircleStackIcon class="h-4 w-4" /></span>
-          <span
-            class="sidebar-row-label"
-            :class="uiStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'ml-2.5 max-w-[176px] opacity-100'"
-          >
-            Data sources
-          </span>
-        </button>
-        <button
-          type="button"
-          class="sidebar-nav-row justify-start px-2.5"
           :class="uiStore.activeTab === 'schema-editor' ? 'sidebar-nav-row-active' : ''"
-          :title="shortcutTooltip('schema', 'Schema editor')"
-          @click="openSchemaEditor"
+          :title="shortcutTooltip('schema', 'Workspace data')"
+          @click="openWorkspaceData"
         >
           <span class="sidebar-row-icon"><TableCellsIcon class="h-4 w-4" /></span>
           <span
             class="sidebar-row-label"
             :class="uiStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'ml-2.5 max-w-[176px] opacity-100'"
           >
-            Schema
+            Data
           </span>
         </button>
         <button
@@ -334,7 +320,6 @@ import { sidebarConversationPageSize, useSidebarConversations } from '../../comp
 import { workspaceInitials } from '../../utils/workspaceDisplay'
 
 import {
-  CircleStackIcon,
   ShareIcon,
   Cog6ToothIcon,
   ChevronDoubleLeftIcon,
@@ -523,7 +508,7 @@ function handleBrandClick() {
   uiStore.setSidebarCollapsed(!uiStore.isSidebarCollapsed)
 }
 
-function openSchemaEditor() {
+function openWorkspaceData() {
   uiStore.setActiveTab('schema-editor')
 }
 
