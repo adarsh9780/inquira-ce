@@ -8,7 +8,7 @@ test('schema editor derives dataset options from workspace tables and does not r
   const source = readFileSync(schemaEditorPath, 'utf-8')
 
   assert.equal(source.includes('workspaceApi.listDatasets(workspaceId)'), true)
-  assert.equal(source.includes('workspaceApi.getDatasetSchema(workspaceId, ds.table_name)'), true)
+  assert.equal(source.includes('workspaceApi.getDatasetSchema(workspaceId, dataset.table_name)'), true)
   assert.equal(source.includes('const groupedSchema = schemaHub.tables'), true)
 })
 
@@ -16,7 +16,7 @@ test('schema editor refreshes automatically when dataset schema becomes ready', 
   const schemaEditorPath = resolve(process.cwd(), 'src/components/preview/SchemaEditorTab.vue')
   const source = readFileSync(schemaEditorPath, 'utf-8')
 
-  assert.equal(source.includes('async function handleDatasetSchemaReady(event) {'), true)
+  assert.equal(source.includes('async function handleDatasetSchemaReady() {'), true)
   assert.equal(source.includes("window.addEventListener('dataset-schema-ready', handleDatasetSchemaReady)"), true)
   assert.equal(source.includes("window.removeEventListener('dataset-schema-ready', handleDatasetSchemaReady)"), true)
   assert.equal(source.includes('await fetchWorkspaceSchema()'), true)

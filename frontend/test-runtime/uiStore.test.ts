@@ -22,7 +22,7 @@ describe('uiStore', () => {
     expect(store.dataPane).toBe('table')
   })
 
-  it('keeps modal state and connection requests in one UI domain', () => {
+  it('routes connection requests to Workspace Data without leaving Settings open', () => {
     const store = useUiStore()
 
     store.openSettings('workspace-ai')
@@ -30,7 +30,9 @@ describe('uiStore', () => {
     expect(store.settingsInitialTab).toBe('workspace-ai')
 
     store.requestConnectionFlow()
-    expect(store.settingsInitialTab).toBe('workspace-data')
+    expect(store.activeTab).toBe('schema-editor')
+    expect(store.isSettingsOpen).toBe(false)
+    expect(store.settingsInitialTab).toBe('workspace-ai')
     expect(store.connectionFlowRequestId).toBe(1)
 
     store.openConversationSwitcher()

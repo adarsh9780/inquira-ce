@@ -33,12 +33,29 @@ func (f fakeWorkspaces) Summary(context.Context, string) (workspace.Summary, err
 }
 
 type fakeConnections struct {
-	response connection.ListResponse
-	err      error
+	response            connection.ListResponse
+	err                 error
+	deleteResult        connection.DeleteOutputResult
+	deleteErr           error
+	deletedConnection   *string
+	deletedSourceObject *string
 }
 
 func (f fakeConnections) List(context.Context, string) (connection.ListResponse, error) {
 	return f.response, f.err
+}
+
+func (f fakeConnections) DeleteOutput(_ context.Context, connectionID, sourceObjectID string) (connection.DeleteOutputResult, error) {
+	if f.deletedConnection != nil {
+		*f.deletedConnection = connectionID
+	}
+	if f.deletedSourceObject != nil {
+		*f.deletedSourceObject = sourceObjectID
+	}
+	if !f.deleteResult.Deleted && f.deleteErr == nil {
+		f.deleteResult.Deleted = true
+	}
+	return f.deleteResult, f.deleteErr
 }
 
 type fakeCatalogGateway struct {
@@ -46,9 +63,21 @@ type fakeCatalogGateway struct {
 	request     BuildRequest
 	result      BuildResult
 	err         error
+	preview     DatasetPreview
+	previewReq  WorkerPreviewRequest
+	previewErr  error
+	previewCall int
 	calls       int
 	started     chan struct{}
 	continueRun chan struct{}
+}
+
+func (f *fakeCatalogGateway) Preview(_ context.Context, request WorkerPreviewRequest) (DatasetPreview, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.previewReq = request
+	f.previewCall++
+	return f.preview, f.previewErr
 }
 
 type fakeSchemaRepository struct {
@@ -84,6 +113,12 @@ func (f *fakeSchemaRepository) Replace(_ context.Context, workspaceID, tableName
 		}
 		f.contexts[key] = *tableContext
 	}
+	return nil
+}
+
+func (f *fakeSchemaRepository) DeleteTable(_ context.Context, workspaceID, tableName string) error {
+	delete(f.items, workspaceID+"/"+tableName)
+	delete(f.contexts, workspaceID+"/"+tableName)
 	return nil
 }
 
@@ -160,6 +195,41 @@ func TestPrepareBuildsStableAnalysisTablesFromEveryConnectionOutput(t *testing.T
 	}
 }
 
+func TestDeleteDatasetResolvesTheCatalogTableAndClearsSavedMetadata(t *testing.T) {
+	deletedConnection := ""
+	deletedObject := ""
+	connections := connection.ListResponse{Connections: []connection.Connection{{
+		ID: "connection-1", Name: "Workbook", Status: connection.StatusReady,
+		Outputs: []connection.Output{
+			{SourceObjectID: "sheet:orders", Name: "orders", SnapshotPath: snapshot(t, "orders")},
+			{SourceObjectID: "sheet:customers", Name: "customers", SnapshotPath: snapshot(t, "customers")},
+		},
+	}}}
+	repository := &fakeSchemaRepository{
+		items:    map[string][]ColumnOverride{"workspace-1/workbook_orders": {{Name: "id", Description: "Order id"}}},
+		contexts: map[string]string{"workspace-1/workbook_orders": "One row per order"},
+	}
+	service := NewService(
+		fakeWorkspaces{summary: workspace.Summary{ID: "workspace-1"}},
+		fakeConnections{
+			response: connections, deleteResult: connection.DeleteOutputResult{Deleted: true},
+			deletedConnection: &deletedConnection, deletedSourceObject: &deletedObject,
+		},
+		&fakeCatalogGateway{}, t.TempDir(),
+	).WithSchemaRepository(repository)
+
+	result, err := service.DeleteDataset(context.Background(), "workspace-1", "workbook_orders")
+	if err != nil || !result.Deleted {
+		t.Fatalf("DeleteDataset() = %#v, %v", result, err)
+	}
+	if deletedConnection != "connection-1" || deletedObject != "sheet:orders" {
+		t.Fatalf("deleted output = %q / %q", deletedConnection, deletedObject)
+	}
+	if len(repository.items) != 0 || len(repository.contexts) != 0 {
+		t.Fatalf("schema metadata was retained: %#v / %#v", repository.items, repository.contexts)
+	}
+}
+
 func TestPrepareDisambiguatesNormalizedTableNameCollisionsDeterministically(t *testing.T) {
 	connections := connection.ListResponse{Connections: []connection.Connection{
 		{ID: "a", Name: "Sales-data", SourceFingerprint: "one", Outputs: []connection.Output{{SourceObjectID: "file", Name: "a", SnapshotPath: snapshot(t, "a")}}},
@@ -177,6 +247,25 @@ func TestPrepareDisambiguatesNormalizedTableNameCollisionsDeterministically(t *t
 	}
 	if first.Tables[0].Name != "sales_data" || first.Tables[1].Name == "sales_data" || first.Tables[1].Name != second.Tables[1].Name {
 		t.Fatalf("collision names = %#v / %#v", first.Tables, second.Tables)
+	}
+}
+
+func TestPrepareKeepsQualifiedTableNameAfterSiblingDatasetRemoval(t *testing.T) {
+	connections := connection.ListResponse{Connections: []connection.Connection{{
+		ID: "connection-1", Name: "Workbook", Status: connection.StatusReady,
+		Options: map[string]any{connection.QualifiedOutputNamesOption: true},
+		Outputs: []connection.Output{{SourceObjectID: "sheet:customers", Name: "customers", SnapshotPath: snapshot(t, "customers")}},
+	}}}
+	service := NewService(
+		fakeWorkspaces{summary: workspace.Summary{ID: "workspace-1"}},
+		fakeConnections{response: connections}, &fakeCatalogGateway{}, t.TempDir(),
+	)
+	result, err := service.Prepare(context.Background(), "workspace-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Tables) != 1 || result.Tables[0].Name != "workbook_customers" {
+		t.Fatalf("tables = %#v", result.Tables)
 	}
 }
 
@@ -332,5 +421,46 @@ func TestNativeDatasetAndSchemaContractsHideSnapshotPointersAndPersistOverrides(
 	}
 	if _, err := service.SaveTableContext(context.Background(), SaveTableContextRequest{WorkspaceID: "workspace-1", TableName: "sales", Context: tooLong}); errorCode(err) != "table_context_invalid" {
 		t.Fatalf("long context-only error = %v", err)
+	}
+}
+
+func TestPreviewDatasetOnlyReadsRegisteredCatalogTablesWithABoundedMode(t *testing.T) {
+	connections := connection.ListResponse{Connections: []connection.Connection{{
+		ID: "connection-1", Name: "Sales", Status: connection.StatusReady,
+		Outputs: []connection.Output{{
+			SourceObjectID: "file", Name: "sales", SnapshotPath: snapshot(t, "sales-preview"),
+			RowCount: 3, Columns: []connection.Column{{Name: "id", DataType: "BIGINT"}},
+		}},
+	}}}
+	gateway := &fakeCatalogGateway{preview: DatasetPreview{
+		TableName: "sales", Columns: []string{"id"}, Rows: []map[string]any{{"id": float64(1)}},
+		RowCount: 3, Mode: DatasetPreviewHead, Limit: DatasetPreviewLimit,
+	}}
+	service := NewService(
+		fakeWorkspaces{summary: workspace.Summary{ID: "workspace-1"}},
+		fakeConnections{response: connections}, gateway, t.TempDir(),
+	)
+
+	result, err := service.PreviewDataset(context.Background(), DatasetPreviewRequest{
+		WorkspaceID: "workspace-1", TableName: "sales",
+	})
+	if err != nil || result.TableName != "sales" || len(result.Rows) != 1 {
+		t.Fatalf("PreviewDataset() = %#v, %v", result, err)
+	}
+	if gateway.previewReq.TableName != "sales" || gateway.previewReq.Mode != DatasetPreviewHead || gateway.previewReq.Limit != 100 || gateway.previewReq.DatabasePath == "" {
+		t.Fatalf("preview request = %#v", gateway.previewReq)
+	}
+	if _, err := service.PreviewDataset(context.Background(), DatasetPreviewRequest{
+		WorkspaceID: "workspace-1", TableName: "inquira_internal.catalog_tables",
+	}); errorCode(err) != "dataset_not_found" {
+		t.Fatalf("internal table error = %v", err)
+	}
+	if _, err := service.PreviewDataset(context.Background(), DatasetPreviewRequest{
+		WorkspaceID: "workspace-1", TableName: "sales", Mode: "middle",
+	}); errorCode(err) != "dataset_preview_mode_invalid" {
+		t.Fatalf("invalid mode error = %v", err)
+	}
+	if gateway.previewCall != 1 {
+		t.Fatalf("preview gateway calls = %d, want 1", gateway.previewCall)
 	}
 }

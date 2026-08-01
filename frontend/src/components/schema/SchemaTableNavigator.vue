@@ -17,7 +17,7 @@
     </label>
 
     <div class="min-h-0 flex-1 overflow-y-auto pr-0.5">
-      <ul class="space-y-1" aria-label="Workspace tables">
+      <ul class="space-y-1" aria-label="Workspace datasets">
         <li v-for="table in filteredTables" :key="table.id">
           <button
             type="button"

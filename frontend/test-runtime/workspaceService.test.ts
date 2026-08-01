@@ -74,4 +74,31 @@ describe('workspaceApi Wails bridge', () => {
       context: 'Net sales after returns',
     })
   })
+
+  it('requests a bounded saved-dataset preview by edge', async () => {
+    const app = {
+      PreviewWorkspaceDataset: vi.fn().mockResolvedValue({
+        table_name: 'sales',
+        columns: ['id'],
+        rows: [{ id: 101 }],
+        mode: 'tail',
+      }),
+    }
+    window.go = { main: { App: app } }
+
+    await workspaceApi.previewDataset('workspace-1', 'sales', 'tail')
+
+    expect(app.PreviewWorkspaceDataset).toHaveBeenCalledWith('workspace-1', 'sales', 'tail')
+  })
+
+  it('removes one saved dataset through its workspace-scoped table identity', async () => {
+    const app = {
+      DeleteWorkspaceDataset: vi.fn().mockResolvedValue({ deleted: true }),
+    }
+    window.go = { main: { App: app } }
+
+    await workspaceApi.removeDataset('workspace-1', 'sales')
+
+    expect(app.DeleteWorkspaceDataset).toHaveBeenCalledWith('workspace-1', 'sales')
+  })
 })

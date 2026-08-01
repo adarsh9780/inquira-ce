@@ -5,8 +5,12 @@ from __future__ import annotations
 import os
 import uuid
 from dataclasses import dataclass
+from datetime import date, datetime, time
+from decimal import Decimal
+import math
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import duckdb
 
@@ -21,6 +25,17 @@ class CatalogBuild:
     changed: bool
     table_count: int
     byte_size: int
+
+
+@dataclass(frozen=True)
+class CatalogPreview:
+    table_name: str
+    columns: list[str]
+    rows: list[dict[str, Any]]
+    row_count: int
+    mode: str
+    offset: int
+    limit: int
 
 
 def _identifier(value: str) -> str:
@@ -39,6 +54,69 @@ def _existing_fingerprint(path: Path) -> str:
             connection.close()
     except Exception:
         return ""
+
+
+def _preview_value(value: Any) -> Any:
+    if value is None or isinstance(value, (str, bool, int)):
+        return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, (date, datetime, time, UUID)):
+        return value.isoformat() if hasattr(value, "isoformat") else str(value)
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return bytes(value).hex()
+    return str(value)
+
+
+def preview_catalog(params: dict[str, Any]) -> CatalogPreview:
+    database_value = params.get("database_path")
+    table_name = str(params.get("table_name") or "").strip()
+    mode = str(params.get("mode") or "head").strip().lower()
+    limit = params.get("limit", 100)
+    if (
+        not isinstance(database_value, str)
+        or not database_value.strip()
+        or not table_name
+        or mode not in {"head", "tail"}
+        or not isinstance(limit, int)
+        or isinstance(limit, bool)
+        or limit < 1
+        or limit > 100
+    ):
+        raise AdapterError(
+            "invalid_params",
+            "database_path, table_name, head or tail mode, and a limit from 1 to 100 are required.",
+        )
+    database = Path(database_value).expanduser()
+    if not database.is_absolute() or database.suffix.lower() != ".duckdb" or not database.is_file():
+        raise AdapterError("catalog_path_invalid", "Workspace catalog does not exist.")
+    connection = duckdb.connect(str(database.resolve(strict=True)), read_only=True)
+    try:
+        registered = connection.execute(
+            "SELECT 1 FROM inquira_internal.catalog_tables WHERE name = ? LIMIT 1",
+            [table_name],
+        ).fetchone()
+        if registered is None:
+            raise AdapterError("dataset_not_found", "Dataset was not found in this workspace catalog.")
+        row_count = int(connection.execute(f"SELECT COUNT(*) FROM {_identifier(table_name)}").fetchone()[0])
+        offset = max(row_count - limit, 0) if mode == "tail" else 0
+        cursor = connection.execute(
+            f"SELECT * FROM {_identifier(table_name)} LIMIT ? OFFSET ?", [limit, offset]
+        )
+        columns = [str(item[0]) for item in cursor.description]
+        rows = [
+            {column: _preview_value(value) for column, value in zip(columns, values, strict=True)}
+            for values in cursor.fetchall()
+        ]
+        return CatalogPreview(table_name, columns, rows, row_count, mode, offset, limit)
+    except AdapterError:
+        raise
+    except Exception as exc:
+        raise AdapterError("catalog_preview_failed", f"Could not preview workspace dataset: {exc}") from exc
+    finally:
+        connection.close()
 
 
 def build_catalog(params: dict[str, Any]) -> CatalogBuild:

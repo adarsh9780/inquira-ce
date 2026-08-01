@@ -72,6 +72,42 @@ type DatasetListResponse struct {
 	Datasets []Dataset `json:"datasets"`
 }
 
+type DatasetDeleteResult struct {
+	Deleted           bool `json:"deleted"`
+	ConnectionDeleted bool `json:"connection_deleted"`
+}
+
+type DatasetPreviewMode string
+
+const (
+	DatasetPreviewHead  DatasetPreviewMode = "head"
+	DatasetPreviewTail  DatasetPreviewMode = "tail"
+	DatasetPreviewLimit                    = 100
+)
+
+type DatasetPreviewRequest struct {
+	WorkspaceID string             `json:"workspace_id"`
+	TableName   string             `json:"table_name"`
+	Mode        DatasetPreviewMode `json:"mode"`
+}
+
+type WorkerPreviewRequest struct {
+	DatabasePath string             `json:"database_path"`
+	TableName    string             `json:"table_name"`
+	Mode         DatasetPreviewMode `json:"mode"`
+	Limit        int                `json:"limit"`
+}
+
+type DatasetPreview struct {
+	TableName string             `json:"table_name"`
+	Columns   []string           `json:"columns"`
+	Rows      []map[string]any   `json:"rows"`
+	RowCount  int64              `json:"row_count"`
+	Mode      DatasetPreviewMode `json:"mode"`
+	Offset    int64              `json:"offset"`
+	Limit     int                `json:"limit"`
+}
+
 type SchemaColumn struct {
 	Name        string   `json:"name"`
 	DataType    string   `json:"dtype"`

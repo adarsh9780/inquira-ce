@@ -304,6 +304,51 @@ func TestConnectionContractPersistsMultipleSelectedOutputs(t *testing.T) {
 	}
 }
 
+func TestDeleteOutputRemovesOnlyTheSelectedDatasetAndDeletesAnEmptyConnection(t *testing.T) {
+	gateway := &fakeGateway{materialization: Materialization{
+		Fingerprint: "multi",
+		Outputs: []MaterializedOutput{
+			{SourceObjectID: "sheet:orders", Name: "orders", RelativePath: "orders.parquet", Format: "parquet", RowCount: 4},
+			{SourceObjectID: "sheet:customers", Name: "customers", RelativePath: "customers.parquet", Format: "parquet", RowCount: 3},
+		},
+	}}
+	service, workspaceID, _ := newTestService(t, gateway)
+	created, err := service.Create(context.Background(), CreateRequest{
+		WorkspaceID: workspaceID, Name: "Workbook", AdapterKind: AdapterExcel,
+		SourcePath: createSource(t, ".xlsx"), SelectedObjectIDs: []string{"sheet:orders", "sheet:customers"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	removedPath := created.Outputs[0].SnapshotPath
+	result, err := service.DeleteOutput(context.Background(), created.ID, "sheet:orders")
+	if err != nil || !result.Deleted || result.ConnectionDeleted {
+		t.Fatalf("DeleteOutput() = %#v, %v", result, err)
+	}
+	persisted, err := service.Get(context.Background(), created.ID)
+	if err != nil || len(persisted.Outputs) != 1 || persisted.Outputs[0].SourceObjectID != "sheet:customers" {
+		t.Fatalf("persisted = %#v, %v", persisted, err)
+	}
+	if len(persisted.SelectedObjectIDs) != 1 || persisted.SelectedObjectIDs[0] != "sheet:customers" {
+		t.Fatalf("selected objects = %#v", persisted.SelectedObjectIDs)
+	}
+	if persisted.Options[QualifiedOutputNamesOption] != true {
+		t.Fatalf("qualified table naming was not preserved: %#v", persisted.Options)
+	}
+	if _, err := os.Stat(removedPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("removed snapshot still exists: %v", err)
+	}
+
+	result, err = service.DeleteOutput(context.Background(), created.ID, "sheet:customers")
+	if err != nil || !result.ConnectionDeleted {
+		t.Fatalf("DeleteOutput(last) = %#v, %v", result, err)
+	}
+	listed, err := service.List(context.Background(), workspaceID)
+	if err != nil || len(listed.Connections) != 0 {
+		t.Fatalf("connections = %#v, %v", listed.Connections, err)
+	}
+}
+
 func TestRefreshAtomicallyReplacesChangedSnapshotAndRemovesTheOldOne(t *testing.T) {
 	gateway := &fakeGateway{materialization: defaultMaterialization("first"), discovery: Discovery{Fingerprint: "second"}}
 	service, workspaceID, _ := newTestService(t, gateway)

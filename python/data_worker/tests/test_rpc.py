@@ -98,3 +98,48 @@ def test_rpc_builds_a_workspace_catalog(tmp_path: Path) -> None:
     })
     assert response["error"] is None
     assert response["result"]["table_count"] == 1
+
+
+def test_rpc_previews_only_registered_catalog_tables_from_either_edge(tmp_path: Path) -> None:
+    source = tmp_path / "source.parquet"
+    database = tmp_path / "workspace.duckdb"
+    import duckdb
+    duckdb.sql(f"COPY (SELECT range AS id FROM range(1, 106)) TO '{source}' (FORMAT PARQUET)")
+    built = handle_request({
+        "id": "build",
+        "method": "build_catalog",
+        "params": {
+            "database_path": str(database),
+            "fingerprint": "preview",
+            "tables": [{"id": "table-1", "name": "sales", "snapshot_path": str(source)}],
+        },
+    })
+    assert built["error"] is None
+
+    first = handle_request({
+        "id": "head",
+        "method": "preview_catalog",
+        "params": {"database_path": str(database), "table_name": "sales", "mode": "head", "limit": 100},
+    })
+    last = handle_request({
+        "id": "tail",
+        "method": "preview_catalog",
+        "params": {"database_path": str(database), "table_name": "sales", "mode": "tail", "limit": 100},
+    })
+    assert first["error"] is None
+    assert first["result"]["row_count"] == 105
+    assert first["result"]["rows"][0] == {"id": 1}
+    assert last["result"]["offset"] == 5
+    assert last["result"]["rows"][0] == {"id": 6}
+
+    internal = handle_request({
+        "id": "internal",
+        "method": "preview_catalog",
+        "params": {
+            "database_path": str(database),
+            "table_name": "inquira_internal.catalog_tables",
+            "mode": "head",
+            "limit": 100,
+        },
+    })
+    assert internal["error"]["code"] == "dataset_not_found"

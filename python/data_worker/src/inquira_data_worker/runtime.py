@@ -49,7 +49,7 @@ class WorkerRuntime:
                     "invalid_params", "RPC params must be an object."
                 )
             method = request["method"]
-            if method in {"discover", "preview", "materialize", "build_catalog"}:
+            if method in {"discover", "preview", "materialize", "build_catalog", "preview_catalog"}:
                 return await asyncio.to_thread(handle_data_request, request)
             if method == "ping":
                 response["result"] = {"status": "ready"}

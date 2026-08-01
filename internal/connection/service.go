@@ -27,6 +27,7 @@ type repository interface {
 	MarkReady(context.Context, string, string) error
 	MarkNeedsAttention(context.Context, string, string, string) error
 	MarkError(context.Context, string, string, string) error
+	RemoveOutput(context.Context, string, string, []string, map[string]any, string) error
 	Delete(context.Context, string) error
 	Close() error
 }
@@ -120,11 +121,15 @@ func (s *Service) Create(ctx context.Context, request CreateRequest) (Connection
 		return Connection{}, err
 	}
 	now := formatTime(s.now())
+	options := cloneOptions(request.Options)
+	if len(outputs) > 1 {
+		options[QualifiedOutputNamesOption] = true
+	}
 	connection := Connection{
 		ID: connectionID, WorkspaceID: workspaceID, Name: name,
 		AdapterKind: request.AdapterKind, SourcePath: sourcePath,
 		SourceFingerprint: materialization.Fingerprint, Status: StatusReady,
-		SelectedObjectIDs: selected, Options: cloneOptions(request.Options), Outputs: outputs,
+		SelectedObjectIDs: selected, Options: options, Outputs: outputs,
 		CreatedAt: now, UpdatedAt: now, LastRefreshAttemptAt: now, LastRefreshSuccessAt: now,
 	}
 	if err := s.repository.Create(ctx, connection, normalizedName); err != nil {
@@ -152,7 +157,7 @@ func (s *Service) Refresh(ctx context.Context, connectionID string) (Connection,
 		return Connection{}, apperror.Wrap("connection_refresh_failed", "Could not start the refresh.", err)
 	}
 	discovery, err := s.gateway.Discover(ctx, AdapterRequest{
-		AdapterKind: connection.AdapterKind, SourcePath: connection.SourcePath, Options: connection.Options,
+		AdapterKind: connection.AdapterKind, SourcePath: connection.SourcePath, Options: adapterOptions(connection.Options),
 	})
 	if err != nil {
 		s.recordRefreshError(ctx, id, attemptedAt, err)
@@ -177,7 +182,7 @@ func (s *Service) Refresh(ctx context.Context, connectionID string) (Connection,
 	}
 	materialization, err := s.gateway.Materialize(ctx, MaterializeRequest{
 		AdapterKind: connection.AdapterKind, SourcePath: connection.SourcePath,
-		TargetDir: staging, SelectedObjectIDs: connection.SelectedObjectIDs, Options: connection.Options,
+		TargetDir: staging, SelectedObjectIDs: connection.SelectedObjectIDs, Options: adapterOptions(connection.Options),
 	})
 	if err != nil {
 		_ = os.RemoveAll(staging)
@@ -286,6 +291,57 @@ func (s *Service) Delete(ctx context.Context, connectionID string) error {
 	}
 	_ = os.RemoveAll(filepath.Join(s.snapshotRoot, connection.WorkspaceID, connection.ID))
 	return nil
+}
+
+func (s *Service) DeleteOutput(ctx context.Context, connectionID, sourceObjectID string) (DeleteOutputResult, error) {
+	id := strings.TrimSpace(connectionID)
+	objectID := strings.TrimSpace(sourceObjectID)
+	if id == "" || objectID == "" {
+		return DeleteOutputResult{}, apperror.New("dataset_required", "Choose a dataset to remove.")
+	}
+	lock := s.connectionLock(id)
+	lock.Lock()
+	defer lock.Unlock()
+
+	item, err := s.Get(ctx, id)
+	if err != nil {
+		return DeleteOutputResult{}, err
+	}
+	outputIndex := -1
+	for index, output := range item.Outputs {
+		if output.SourceObjectID == objectID {
+			outputIndex = index
+			break
+		}
+	}
+	if outputIndex < 0 {
+		return DeleteOutputResult{}, apperror.New("dataset_not_found", "Dataset not found in this data source.")
+	}
+	if len(item.Outputs) == 1 {
+		if err := s.repository.Delete(ctx, id); err != nil {
+			return DeleteOutputResult{}, apperror.Wrap("dataset_delete_failed", "Could not remove the dataset.", err)
+		}
+		_ = os.RemoveAll(filepath.Join(s.snapshotRoot, item.WorkspaceID, item.ID))
+		return DeleteOutputResult{Deleted: true, ConnectionDeleted: true}, nil
+	}
+
+	selected := make([]string, 0, len(item.SelectedObjectIDs)-1)
+	for _, selectedID := range item.SelectedObjectIDs {
+		if selectedID != objectID {
+			selected = append(selected, selectedID)
+		}
+	}
+	options := cloneOptions(item.Options)
+	options[QualifiedOutputNamesOption] = true
+	output := item.Outputs[outputIndex]
+	if err := s.repository.RemoveOutput(ctx, id, output.ID, selected, options, formatTime(s.now())); errors.Is(err, errNotFound) {
+		return DeleteOutputResult{}, apperror.New("dataset_not_found", "Dataset not found in this data source.")
+	} else if err != nil {
+		return DeleteOutputResult{}, apperror.Wrap("dataset_delete_failed", "Could not remove the dataset.", err)
+	}
+	_ = os.Remove(output.SnapshotPath)
+	_ = os.Remove(filepath.Dir(output.SnapshotPath))
+	return DeleteOutputResult{Deleted: true}, nil
 }
 
 func (s *Service) DeleteWorkspaceConnections(ctx context.Context, workspaceID string) error {
@@ -454,6 +510,12 @@ func cloneOptions(options map[string]any) map[string]any {
 	for key, value := range options {
 		result[key] = value
 	}
+	return result
+}
+
+func adapterOptions(options map[string]any) map[string]any {
+	result := cloneOptions(options)
+	delete(result, QualifiedOutputNamesOption)
 	return result
 }
 

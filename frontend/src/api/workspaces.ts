@@ -49,6 +49,21 @@ export const workspaceApi = {
       String(tableName || ''),
     )
   },
+  previewDataset(workspaceId: unknown, tableName: unknown, mode: unknown = 'head') {
+    return invokeNative(
+      'PreviewWorkspaceDataset',
+      String(workspaceId || ''),
+      String(tableName || ''),
+      String(mode || 'head'),
+    )
+  },
+  removeDataset(workspaceId: unknown, tableName: unknown) {
+    return invokeNative(
+      'DeleteWorkspaceDataset',
+      String(workspaceId || ''),
+      String(tableName || ''),
+    )
+  },
   saveDatasetSchema(workspaceId: unknown, tableName: unknown, payload: RecordValue = {}) {
     return invokeNative('SaveWorkspaceDatasetSchema', {
       workspace_id: String(workspaceId || ''),

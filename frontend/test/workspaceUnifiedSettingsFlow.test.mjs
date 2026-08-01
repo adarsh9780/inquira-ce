@@ -22,7 +22,7 @@ test('workspace settings uses one active-workspace management surface', () => {
   assert.equal(workspace.includes('Selected Workspace Summary'), false)
   assert.equal(template.includes('workspace-stepper'), false)
   assert.equal(template.includes('System Pipeline Graph'), false)
-  assert.equal(template.includes('Workspace runtime'), false)
+  assert.equal(template.includes('Workspace runtime'), true)
 })
 
 test('new workspace uses a focused three-step setup through its first data source', () => {
@@ -47,7 +47,7 @@ test('new workspace uses a focused three-step setup through its first data sourc
   assert.equal(workspace.includes('Press Enter to create'), false)
 })
 
-test('active workspace summary saves context and opens the native connection flow', () => {
+test('active workspace settings save context while first-source setup remains native', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
 
   assert.equal(workspace.includes('@click="saveWorkspaceContext"'), true)
@@ -83,7 +83,7 @@ test('selected summary puts actions in the header and uses context instead of du
   assert.equal(template.includes('<span class="section-label mb-1 block">Conversations</span>'), false)
   assert.equal(template.includes('<span class="section-label mb-1 block">Last Active</span>'), false)
   assert.equal(template.includes('flex min-w-0 items-center justify-between gap-3 border-b'), true)
-  assert.equal(template.includes('Add data source'), true)
+  assert.equal(template.includes('Add your first data source'), true)
   assert.equal(template.includes('@click="chooseConnectionFile"'), true)
   assert.equal(template.match(/@click="beginWorkspaceCreation"/g)?.length, 2)
 })
@@ -119,7 +119,7 @@ test('settings sidebar keeps workspace ownership ahead of shared connections', (
   assert.equal(template.indexOf('<span>Appearance</span>') < template.indexOf('<span>Account</span>'), true)
 })
 
-test('active workspace summary separates selection, saved context, and connection actions', () => {
+test('active workspace summary separates selection and saved context from ongoing data management', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
   const template = workspace.slice(0, workspace.indexOf('<script setup>'))
 
@@ -133,10 +133,10 @@ test('active workspace summary separates selection, saved context, and connectio
   assert.equal(template.includes("isWorkspaceContextDirty ? 'Unsaved changes' : 'Saved'"), true)
   assert.equal(template.includes('data-testid="workspace-import-datasets-dropzone"'), false)
   assert.equal(template.includes('v-if="isWorkspaceActive"'), true)
-  assert.equal(template.includes('Add data source'), true)
-  assert.equal(template.includes('No data sources yet'), true)
-  assert.equal(template.includes('CSV, Parquet, Excel, JSON, and SQLite'), true)
+  const managementSurface = template.slice(template.indexOf('v-if="activeWorkspace"'))
+  assert.equal(managementSurface.includes('Add data source'), false)
+  assert.equal(managementSurface.includes('No data sources yet'), false)
   assert.equal(workspace.includes('pendingConnection'), true)
-  assert.equal(workspace.includes('nativeConnections'), true)
+  assert.equal(workspace.includes('nativeConnections'), false)
   assert.equal(workspace.includes('isDatasetIngesting'), false)
 })
