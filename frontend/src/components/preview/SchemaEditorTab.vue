@@ -183,7 +183,10 @@ function requestSchemaSelection(selection: SchemaHubSelection) {
   const currentSelection = schemaHub.selection.value
   const isCurrent = selection.kind === currentSelection.kind
     && (selection.kind === 'workspace' || (currentSelection.kind === 'table' && selection.tableId === currentSelection.tableId))
-  if (isCurrent) return
+  if (isCurrent) {
+    activeWorkspaceSection.value = selection.kind === 'workspace' ? 'context' : 'data'
+    return
+  }
   const currentTable = schemaHub.selectedTable.value
   if (currentTable && schemaHub.dirtyTableIds.value.has(currentTable.id)) {
     pendingSelection.value = selection
