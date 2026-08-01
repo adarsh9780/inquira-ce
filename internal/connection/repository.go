@@ -247,6 +247,37 @@ func (r *SQLiteRepository) MarkError(ctx context.Context, id, message, timestamp
 	return err
 }
 
+func (r *SQLiteRepository) RemoveOutput(ctx context.Context, connectionID, outputID string, selectedObjectIDs []string, options map[string]any, timestamp string) error {
+	selected, err := json.Marshal(selectedObjectIDs)
+	if err != nil {
+		return err
+	}
+	encodedOptions, err := json.Marshal(options)
+	if err != nil {
+		return err
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, `DELETE FROM connection_outputs WHERE id = ? AND connection_id = ?`, outputID, connectionID)
+	if err != nil {
+		return err
+	}
+	if affected, _ := result.RowsAffected(); affected == 0 {
+		return errNotFound
+	}
+	result, err = tx.ExecContext(ctx, `UPDATE connections SET selected_object_ids_json = ?, options_json = ?, updated_at = ? WHERE id = ?`, string(selected), string(encodedOptions), timestamp, connectionID)
+	if err != nil {
+		return err
+	}
+	if affected, _ := result.RowsAffected(); affected == 0 {
+		return errNotFound
+	}
+	return tx.Commit()
+}
+
 func (r *SQLiteRepository) Delete(ctx context.Context, id string) error {
 	result, err := r.db.ExecContext(ctx, `DELETE FROM connections WHERE id = ?`, id)
 	if err != nil {

@@ -86,3 +86,38 @@ func TestSQLiteSchemaRepositoryPersistsReplacementsAndCascadesWithWorkspace(t *t
 		t.Fatalf("workspace delete did not cascade table context: %q, %v", loadedContext, err)
 	}
 }
+
+func TestSQLiteSchemaRepositoryDeletesOneTableWithoutTouchingSiblings(t *testing.T) {
+	database := filepath.Join(t.TempDir(), "inquira.db")
+	workspaceRepository, err := workspace.OpenSQLite(database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspaces := workspace.NewService(workspaceRepository)
+	created, err := workspaces.Create(context.Background(), workspace.CreateRequest{Name: "Analysis"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = workspaces.Close() })
+	repository, err := OpenSQLite(database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer repository.Close()
+	for _, table := range []string{"orders", "customers"} {
+		contextValue := "Context for " + table
+		if err := repository.Replace(context.Background(), created.ID, table, &contextValue, []ColumnOverride{{Name: "id", Description: table + " id"}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := repository.DeleteTable(context.Background(), created.ID, "orders"); err != nil {
+		t.Fatal(err)
+	}
+	deleted, _ := repository.List(context.Background(), created.ID, "orders")
+	deletedContext, _ := repository.TableContext(context.Background(), created.ID, "orders")
+	kept, _ := repository.List(context.Background(), created.ID, "customers")
+	keptContext, _ := repository.TableContext(context.Background(), created.ID, "customers")
+	if len(deleted) != 0 || deletedContext != "" || len(kept) != 1 || keptContext != "Context for customers" {
+		t.Fatalf("deleted=%#v context=%q kept=%#v kept context=%q", deleted, deletedContext, kept, keptContext)
+	}
+}

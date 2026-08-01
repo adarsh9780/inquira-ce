@@ -72,6 +72,11 @@ type DatasetListResponse struct {
 	Datasets []Dataset `json:"datasets"`
 }
 
+type DatasetDeleteResult struct {
+	Deleted           bool `json:"deleted"`
+	ConnectionDeleted bool `json:"connection_deleted"`
+}
+
 type DatasetPreviewMode string
 
 const (
