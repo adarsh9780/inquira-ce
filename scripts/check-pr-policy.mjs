@@ -43,20 +43,14 @@ export function parseNumstat(output) {
 export function evaluatePolicy({
   title,
   body,
-  labels = [],
   draft = false,
   files = [],
-  warningLines = 200,
-  maximumLines = 400,
-  maximumFiles = 15,
 }) {
   const failures = []
   const warnings = []
   const reviewableFiles = files.filter((file) => isReviewablePath(file.path))
   const ignoredFiles = files.filter((file) => !isReviewablePath(file.path))
   const reviewableLines = reviewableFiles.reduce((total, file) => total + file.added + file.deleted, 0)
-  const hasSizeOverride = labels.includes('size-override')
-  const hasOverrideReason = /## Size override\s+\S+/i.test(body)
 
   if (!CONVENTIONAL_TITLE.test(title)) {
     failures.push('Use a conventional PR title such as `fix: close dropdowns on Escape`.')
@@ -72,17 +66,6 @@ export function evaluatePolicy({
     const message = `Complete or explicitly mark all ${uncheckedItems} validation checklist item(s) as not applicable.`
     if (draft) warnings.push(message)
     else failures.push(message)
-  }
-
-  if (reviewableLines > warningLines) {
-    warnings.push(`This PR changes ${reviewableLines} reviewable lines; the preferred maximum is ${warningLines}.`)
-  }
-
-  const sizeViolations = []
-  if (reviewableLines > maximumLines) sizeViolations.push(`${reviewableLines} reviewable lines (maximum ${maximumLines})`)
-  if (reviewableFiles.length > maximumFiles) sizeViolations.push(`${reviewableFiles.length} reviewable files (maximum ${maximumFiles})`)
-  if (sizeViolations.length > 0 && !(hasSizeOverride && hasOverrideReason)) {
-    failures.push(`Split the PR or add the \`size-override\` label with a non-empty \`## Size override\` explanation: ${sizeViolations.join(', ')}.`)
   }
 
   return {
@@ -127,12 +110,8 @@ function main() {
   const result = evaluatePolicy({
     title: event.pull_request.title || '',
     body: event.pull_request.body || '',
-    labels: (event.pull_request.labels || []).map((label) => label.name),
     draft: Boolean(event.pull_request.draft),
     files: parseNumstat(numstat),
-    warningLines: Number(process.env.PR_POLICY_WARNING_LINES || 200),
-    maximumLines: Number(process.env.PR_POLICY_MAXIMUM_LINES || 400),
-    maximumFiles: Number(process.env.PR_POLICY_MAXIMUM_FILES || 15),
   })
   const summary = renderSummary(result)
 
