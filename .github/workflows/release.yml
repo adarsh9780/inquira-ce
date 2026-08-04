@@ -46,6 +46,12 @@ jobs:
             exit 1
           fi
 
+          version="$(tr -d '[:space:]' < VERSION)"
+          if [ "$tag" != "v$version" ]; then
+            echo "Release tag $tag does not match canonical VERSION $version."
+            exit 1
+          fi
+
           release_sha="$(git rev-list -n 1 "$tag")"
           git fetch origin main
           if ! git merge-base --is-ancestor "$release_sha" origin/main; then
@@ -56,7 +62,7 @@ jobs:
           {
             echo "release_sha=$release_sha"
             echo "tag=$tag"
-            echo "version=${tag#v}"
+            echo "version=$version"
           } >> "$GITHUB_OUTPUT"
 
       - name: Require successful CI for the release commit
@@ -86,8 +92,6 @@ jobs:
     name: Build release frontend
     needs: guard
     runs-on: ubuntu-latest
-    env:
-      INQUIRA_BUILD_VERSION: ${{ needs.guard.outputs.version }}
     steps:
       - name: Check out verified release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -150,7 +154,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          go run ./cmd/releaseprep -version "$INQUIRA_BUILD_VERSION"
+          go run ./cmd/prepareversion
           go run ./cmd/prepareuv -version "$UV_VERSION"
 
       - name: Test macOS Go packages
@@ -258,7 +262,7 @@ jobs:
       - name: Prepare release metadata and bundled UV
         shell: pwsh
         run: |
-          go run ./cmd/releaseprep -version "$env:INQUIRA_BUILD_VERSION"
+          go run ./cmd/prepareversion
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go run ./cmd/prepareuv -version "$env:UV_VERSION"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

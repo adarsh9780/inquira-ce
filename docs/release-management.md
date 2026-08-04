@@ -23,13 +23,14 @@ once on Ubuntu and reused by both native packaging jobs.
 
 ## Release flow
 
-1. Merge the release changes into `main`.
-2. Wait for the `CI` workflow on that `main` commit to pass.
-3. In GitHub, open **Releases** and choose **Draft a new release**.
-4. Create a stable `vMajor.Minor.Patch` tag, such as `v0.6.0`, targeting the
+1. Update the root `VERSION` file in a focused release-preparation pull request.
+2. Merge the release changes into `main`.
+3. Wait for the `CI` workflow on that `main` commit to pass.
+4. In GitHub, open **Releases** and choose **Draft a new release**.
+5. Create a stable tag matching `v$(cat VERSION)`, such as `v0.6.0`, targeting the
    green `main` commit.
-5. Add the public release title and notes, then publish the release.
-6. Watch the `Release desktop` workflow.
+6. Add the public release title and notes, then publish the release.
+7. Watch the `Release desktop` workflow.
 
 The workflow:
 
@@ -69,9 +70,10 @@ stable independently of GitHub repository visibility.
 
 ## Versioning
 
-Stable releases currently use `vMajor.Minor.Patch`. The release workflow rejects
-prerelease version strings because Windows installer metadata requires a
-numeric product version.
+The root `VERSION` file is the single source of truth for application versions.
+Stable releases use `Major.Minor.Patch`; the release workflow rejects prerelease
+strings because Windows installer metadata requires a numeric product version.
+It also rejects a tag that does not exactly match `v$(cat VERSION)`.
 
 The release version is injected into:
 
@@ -81,7 +83,14 @@ The release version is injected into:
 - the frontend build constant;
 - installer filenames and download manifests.
 
-The tracked development version remains available for local builds.
+Go embeds `VERSION` directly, Vite reads it directly, and `make build` or
+`make dev` generates the ignored `wails.json` desktop configuration from the
+tracked `wails.template.json`. Wails' generated `frontend/package.json.md5` is
+also ignored. A normal build must therefore leave the tracked repository clean.
+
+Feature branches do not bump `VERSION`. The next version is chosen in a focused
+release-preparation pull request so concurrent feature work does not create
+version conflicts or claim an unpublished release independently.
 
 ## Signing
 

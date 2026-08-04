@@ -5,6 +5,8 @@ APP_NAME := inquira-go
 REPOSITORY_NAME := inquira-ce
 FRONTEND_DIR := frontend
 PYTHON_PROJECT := python/data_worker
+VERSION_FILE := VERSION
+WAILS_TEMPLATE := wails.template.json
 WAILS ?= $(shell go env GOPATH)/bin/wails
 UV ?= uv
 NPM ?= npm
@@ -27,7 +29,7 @@ RELEASE_STAGE_DIR ?= release-stage
 PUBLIC_DOWNLOADS_BASE_URL ?= https://downloads.inquiraai.com
 PUBLIC_RELEASE_NOTES_URL ?= https://inquiraai.com/docs/getting-started/distribution
 
-.PHONY: help doctor versions bootstrap dev frontend-dev frontend-embed prepare-uv runtime-info \
+.PHONY: help doctor versions app-version bootstrap dev frontend-dev frontend-embed prepare-version prepare-uv runtime-info \
 	fmt fmt-check lint lint-go lint-actions typecheck test test-go test-python test-frontend \
 	test-frontend-source test-runtime test-runtime-e2e test-live-provider test-full \
 	frontend-build bundle-check audit audit-go audit-python audit-frontend audit-secrets \
@@ -45,16 +47,23 @@ versions: ## Print the toolchain versions pinned by this repository.
 	@printf 'Python:  %s\n' "$(PYTHON_VERSION)"
 	@printf 'UV:      %s\n' "$(UV_VERSION)"
 
+app-version: ## Print the canonical application version.
+	@tr -d '[:space:]' < $(VERSION_FILE)
+	@printf '\n'
+
 bootstrap: ## Install locked Go, frontend, and Python development dependencies.
 	go mod download
 	cd $(FRONTEND_DIR) && $(NPM) ci
 	$(UV) sync --project $(PYTHON_PROJECT) --locked --group dev
 
-dev: prepare-uv ## Start the Wails desktop development server.
+dev: prepare-version prepare-uv ## Start the Wails desktop development server.
 	$(WAILS) dev
 
 frontend-dev: ## Start only the frontend development server.
 	cd $(FRONTEND_DIR) && $(NPM) run dev
+
+prepare-version: ## Generate ignored desktop metadata from the canonical VERSION file.
+	go run ./cmd/prepareversion -version-file "$(VERSION_FILE)" -template "$(WAILS_TEMPLATE)" -output wails.json
 
 prepare-uv: ## Download and checksum-verify the pinned UV binary for this platform.
 	go run ./cmd/prepareuv -version "$(UV_VERSION)"
@@ -136,7 +145,7 @@ audit-secrets: ## Scan the current tree and Git history for committed secrets.
 
 ci: fmt-check lint test frontend-build audit ## Reproduce the required continuous-integration checks.
 
-build: prepare-uv ## Build the production Wails desktop application.
+build: prepare-version prepare-uv ## Build the production Wails desktop application.
 	$(WAILS) build -clean
 
 package: build ## Build the platform package for the current host.
@@ -167,5 +176,6 @@ github-publish: github-check ## Create/connect the public GitHub repository and 
 
 clean: ## Remove generated build and bundled-runtime outputs.
 	rm -rf build/bin frontend/dist
+	rm -f wails.json frontend/package.json.md5
 	rm -f internal/runtimeprovision/assets/uv internal/runtimeprovision/assets/uv.exe
 	rm -f internal/runtimeprovision/assets/manifest.json

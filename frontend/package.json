@@ -1,7 +1,6 @@
 {
   "name": "inquira",
   "private": true,
-  "version": "0.5.35",
   "type": "module",
   "engines": {
     "node": ">=24.15.0 <25"
