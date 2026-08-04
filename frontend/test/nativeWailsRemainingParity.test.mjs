@@ -23,11 +23,13 @@ test('Terms are bundled and loaded through the native Go bridge', () => {
   assert.match(goApp, /func \(a \*App\) GetTermsAndConditions/)
 })
 
-test('desktop identity and window constraints match release 0.5.35', () => {
-  const config = JSON.parse(read('../wails.json'))
+test('desktop identity and window constraints come from the versionless Wails template', () => {
+  const config = JSON.parse(read('../wails.template.json'))
+  const version = read('../VERSION').trim()
   const main = read('../main.go')
 
-  assert.equal(config.info.productVersion, '0.5.35')
+  assert.match(version, /^\d+\.\d+\.\d+$/)
+  assert.equal(Object.hasOwn(config.info, 'productVersion'), false)
   assert.equal(config.info.productName, 'Inquira')
   assert.equal(config.info.companyName, 'Inquira')
   assert.match(main, /Width:\s+1400/)

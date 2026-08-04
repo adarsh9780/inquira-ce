@@ -6,12 +6,11 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const frontendRoot = fileURLToPath(new URL('.', import.meta.url))
-const frontendPackage = JSON.parse(
-  readFileSync(resolve(frontendRoot, 'package.json'), 'utf-8')
-)
-const frontendVersion = String(
-  process.env.INQUIRA_BUILD_VERSION || frontendPackage.version || '0.0.0'
-).trim() || '0.0.0'
+const versionFile = resolve(frontendRoot, '..', 'VERSION')
+const frontendVersion = readFileSync(versionFile, 'utf-8').trim()
+if (!/^\d+\.\d+\.\d+$/.test(frontendVersion)) {
+  throw new Error(`Invalid application version in ${versionFile}: ${frontendVersion}`)
+}
 
 const manualChunkGroups = {
   'vue-vendor': ['node_modules/vue/', 'node_modules/@vue/devtools-api/'],

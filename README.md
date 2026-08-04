@@ -195,9 +195,11 @@ all deterministic Go, frontend, and Python tests; `make audit` runs dependency,
 reachable-vulnerability, and Git-history secret checks; and `make ci`
 reproduces the required GitHub checks.
 
-The build command downloads the pinned, target-specific UV release, validates
-the archive against Astral's published SHA-256 value, and embeds it into the
-native executable.
+The root `VERSION` file is the application-version source for Go, the frontend,
+desktop bundle metadata, installers, and releases. The build command generates
+ignored Wails metadata from that file, downloads the pinned target-specific UV
+release, validates the archive against Astral's published SHA-256 value, and
+embeds it into the native executable without changing tracked files.
 
 ```sh
 make build
