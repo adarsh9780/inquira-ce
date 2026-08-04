@@ -31,6 +31,6 @@ test('desktop identity and window constraints match release 0.5.35', () => {
   assert.equal(config.info.productName, 'Inquira')
   assert.equal(config.info.companyName, 'Inquira')
   assert.match(main, /Width:\s+1400/)
-  assert.match(main, /MinWidth:\s+800/)
+  assert.match(main, /MinWidth:\s+768/)
   assert.match(main, /MinHeight:\s+600/)
 })

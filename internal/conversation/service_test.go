@@ -495,6 +495,55 @@ func TestArtifactPayloadsAreImmutableHeapObjectsReferencedBySQLite(t *testing.T)
 	}
 }
 
+func TestPublishedArtifactSurvivesRestartReconciliation(t *testing.T) {
+	service, workspaceID, databasePath, workspaceRoot := newTestService(t)
+	ctx := context.Background()
+	created, err := service.CreateConversation(ctx, CreateConversationRequest{WorkspaceID: workspaceID, Title: "Persistent results"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	turn, err := service.CreateTurn(ctx, CreateTurnRequest{ConversationID: created.ID, UserText: "Save a table"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := "PAR1-persistent-result"
+	artifact, err := service.PublishArtifact(ctx, PublishArtifactRequest{
+		ConversationID: created.ID,
+		TurnID:         turn.ID,
+		Kind:           "dataframe",
+		LogicalName:    "persistent_table",
+		PayloadFormat:  "parquet",
+	}, strings.NewReader(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	repository, err := OpenSQLite(databasePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restarted := NewService(repository, NewFileHeap(workspaceRoot))
+	t.Cleanup(func() { _ = restarted.Close() })
+	reconciled, err := restarted.ReconcileWorkspace(ctx, workspaceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reconciled.MissingArtifacts != 0 || reconciled.OrphansRemoved != 0 {
+		t.Fatalf("restart reconciliation = %#v", reconciled)
+	}
+	path, err := restarted.ArtifactPath(ctx, artifact.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil || string(contents) != payload {
+		t.Fatalf("restarted artifact contents = %q, %v", contents, err)
+	}
+}
+
 func TestArtifactPointersCannotResolveOutsideTheirConversationHeap(t *testing.T) {
 	service, workspaceID, databasePath, workspaceRoot := newTestService(t)
 	ctx := context.Background()

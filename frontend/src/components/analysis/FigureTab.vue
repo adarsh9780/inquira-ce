@@ -1,7 +1,11 @@
 <template>
   <div class="flex flex-col h-full">
     <Teleport to="#workspace-right-pane-toolbar-center" v-if="isMounted && uiStore.dataPane === 'figure'">
-      <div v-if="figureDropdownOptions.length > 0" class="flex min-w-[11rem] max-w-full items-center" style="width: clamp(11rem, 28vw, 19rem);">
+      <div
+        v-if="figureDropdownOptions.length > 0"
+        class="flex min-w-0 max-w-full items-center"
+        :class="toolbarMode === 'wide' ? 'w-[19rem]' : toolbarMode === 'compact' ? 'w-48' : 'w-36'"
+      >
         <HeaderDropdown
           id="figure-select"
           v-model="selectedArtifactId"
@@ -15,7 +19,7 @@
 
     <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && uiStore.dataPane === 'figure'">
       <div class="flex min-w-0 items-center justify-end w-full gap-3">
-        <div class="flex min-w-0 items-center space-x-3 text-sm">
+        <div v-if="toolbarMode === 'wide'" class="flex min-w-0 items-center space-x-3 text-sm">
           <span
             v-if="isLoadingArtifacts || isLoadingFigure || isDeletingArtifact"
             class="rounded px-2 py-1 text-xs"
@@ -60,8 +64,8 @@
       <!-- Empty State -->
       <div v-else class="absolute inset-0" style="background-color: var(--color-base);">
         <AppEmptyState
-          :title="artifactListError ? 'Charts unavailable' : 'No saved charts'"
-          :description="artifactListError || 'Ask AI for a chart, or promote one from Runs.'"
+          :title="artifactListError ? 'Charts unavailable' : unavailableArtifactCount > 0 ? 'Saved charts unavailable' : 'No saved charts'"
+          :description="artifactListError || (unavailableArtifactCount > 0 ? artifactUnavailableDescription('chart', unavailableArtifactCount) : 'Ask AI for a chart, or promote one from Runs.')"
         ><template #icon><ChartBarIcon class="h-7 w-7" /></template></AppEmptyState>
       </div>
     </div>
@@ -107,6 +111,11 @@ import { artifactApi } from '../../api/artifacts'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import { loadPlotly } from '../../utils/loadPlotly'
 import { persistExportFile } from '../../utils/exportFile'
+import {
+  artifactUnavailableDescription,
+  isArtifactAvailable,
+  isArtifactPayloadMissingError,
+} from '../../utils/artifactAvailability'
 import { applyPlotlyTheme, applyPlotlyConfigTheme, PLOTLY_THEME_MODE } from '../../utils/plotlyTheme'
 import { toast } from '../../composables/useToast'
 import {
@@ -114,6 +123,12 @@ import {
   ChartBarIcon,
 } from '@heroicons/vue/24/outline'
 
+const props = withDefaults(defineProps<{
+  toolbarMode?: 'wide' | 'compact' | 'minimal'
+}>(), {
+  toolbarMode: 'wide',
+})
+const toolbarMode = computed(() => props.toolbarMode)
 const uiStore = useUiStore()
 const preferencesStore = usePreferencesStore()
 const artifactStore = useArtifactStore()
@@ -148,13 +163,17 @@ const exportMenuItems = computed(() => [
   { id: 'delete', label: 'Delete chart', dividerBefore: true, destructive: true, disabled: !canDeleteSelectedFigure.value || isDeletingArtifact.value },
 ])
 
-const persistedFigureArtifacts = computed(() => (
+const allPersistedFigureArtifacts = computed(() => (
   Array.isArray(workspaceFigureArtifacts.value) ? workspaceFigureArtifacts.value : []
+))
+const persistedFigureArtifacts = computed(() => allPersistedFigureArtifacts.value.filter(isArtifactAvailable))
+const unavailableArtifactCount = computed(() => (
+  allPersistedFigureArtifacts.value.filter((artifact) => !isArtifactAvailable(artifact)).length
 ))
 
 const liveFigureArtifacts = computed(() => {
   const persistedIds = new Set(
-    persistedFigureArtifacts.value
+    allPersistedFigureArtifacts.value
       .map((fig) => String(fig?.artifact_id || '').trim())
       .filter(Boolean),
   )
@@ -404,7 +423,7 @@ async function loadActiveTurnFigureArtifacts() {
   } catch (error: any) {
     if (error?.name === 'AbortError') return
     console.warn('Failed to load active turn figure artifacts:', error)
-    artifactListError.value = error?.message || 'Failed to load charts.'
+    artifactListError.value = 'Saved charts could not be loaded. Try refreshing the workspace.'
     workspaceFigureArtifacts.value = []
     selectedArtifactId.value = null
     selectedFigurePayload.value = null
@@ -457,9 +476,22 @@ async function loadSelectedFigurePayload(artifactId: any) {
   } catch (error: any) {
     if (error?.name === 'AbortError') return
     console.warn('Failed to load selected figure payload:', error)
+    if (isArtifactPayloadMissingError(error)) {
+      workspaceFigureArtifacts.value = workspaceFigureArtifacts.value.map((artifact) => (
+        String(artifact?.artifact_id || '').trim() === normalizedArtifactId
+          ? { ...artifact, status: 'missing' }
+          : artifact
+      ))
+      artifactStore.removeResultArtifact(normalizedArtifactId)
+      selectedArtifactId.value = null
+      selectedFigurePayload.value = null
+      artifactStore.setPlotlyFigure(null)
+      artifactListError.value = ''
+      return
+    }
     selectedFigurePayload.value = null
     artifactStore.setPlotlyFigure(null)
-    artifactListError.value = error?.message || 'Failed to load selected chart.'
+    artifactListError.value = 'We could not read this saved chart. Try again, or run the question again to recreate it.'
   } finally {
     isLoadingFigure.value = false
   }

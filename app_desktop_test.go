@@ -24,6 +24,9 @@ type desktopCommandRecorder struct {
 
 func TestDesktopWindowKeepsNativeResizeAndZoomControls(t *testing.T) {
 	config := desktopApplicationOptions(&App{})
+	if config.MinWidth != 768 {
+		t.Fatalf("minimum desktop width = %d, want 768-point iPad target", config.MinWidth)
+	}
 	if config.DisableResize {
 		t.Fatal("desktop window must remain resizable")
 	}

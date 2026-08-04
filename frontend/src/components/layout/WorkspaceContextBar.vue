@@ -15,9 +15,9 @@
       </div>
 
       <div
-        v-if="workspaceStore.hasWorkspace"
+        v-if="workspaceStore.hasWorkspace && !compact"
         data-workspace-status
-        class="hidden shrink-0 items-center gap-1.5 lg:flex"
+        class="flex shrink-0 items-center gap-1.5"
       >
         <span
           class="context-state-chip"
@@ -47,12 +47,12 @@
         @click="workspaceActivation.openDataConnectionFlow()"
       >
         <PlusIcon class="h-3.5 w-3.5" aria-hidden="true" />
-        <span class="hidden sm:inline">{{ workspaceStore.hasWorkspace ? 'Add data' : 'New workspace' }}</span>
+        <span v-if="!compact">{{ workspaceStore.hasWorkspace ? 'Add data' : 'New workspace' }}</span>
       </button>
 
       <div
-        v-if="conversationStore.activeTurnId"
-        class="context-turn-controls hidden items-center sm:flex"
+        v-if="conversationStore.activeTurnId && !compact"
+        class="context-turn-controls flex items-center"
         role="group"
         aria-label="Turn navigation"
       >
@@ -80,7 +80,7 @@
         </button>
       </div>
 
-      <div v-if="workspaceStore.hasWorkspace" class="workspace-context-model hidden w-36 min-w-0 md:block xl:w-44">
+      <div v-if="workspaceStore.hasWorkspace && !compact" class="workspace-context-model w-36 min-w-0 xl:w-44">
         <ModelSelector
           :selected-model="effectiveWorkspaceModel"
           :model-options="workspaceModelOptions"
@@ -128,6 +128,12 @@ import { preferencesApi } from '../../api/preferences'
 import ModelSelector from '../ui/ModelSelector.vue'
 import ConversationSwitcher from './ConversationSwitcher.vue'
 import type { NativeSearchResponse } from '../../types/native'
+
+withDefaults(defineProps<{
+  compact?: boolean
+}>(), {
+  compact: false,
+})
 
 const uiStore = useUiStore()
 const preferencesStore = usePreferencesStore()

@@ -7,7 +7,7 @@ test('TableTab uses active turn artifact catalog as canonical source', () => {
   const path = resolve(process.cwd(), 'src/components/analysis/TableTab.vue')
   const source = readFileSync(path, 'utf-8')
 
-  assert.equal(source.includes('const allArtifacts = computed(() => (Array.isArray(workspaceArtifacts.value) ? workspaceArtifacts.value : []))'), true)
+  assert.equal(source.includes('const allArtifacts = computed(() => persistedArtifacts.value.filter(isArtifactAvailable))'), true)
   assert.equal(source.includes('async function loadActiveTurnArtifacts()'), true)
   assert.equal(source.includes('artifactApi.listTurn('), true)
   assert.equal(source.includes('artifactApi.turnRows('), true)
@@ -19,5 +19,6 @@ test('TableTab uses active turn artifact catalog as canonical source', () => {
   assert.equal(source.includes('await prepareArtifact(nextSelection)'), true)
   assert.equal(source.includes('const liveDataframeArtifacts = computed(() => {'), true)
   assert.equal(source.includes('return [...liveDataframeArtifacts.value, ...persistedArtifacts]'), true)
+  assert.equal(source.includes('persistedArtifacts.value.filter((artifact) => !isArtifactAvailable(artifact)).length'), true)
   assert.equal(source.includes('if (selectedArtifactId.value && !list.some((item) => item.artifact_id === selectedArtifactId.value))'), true)
 })

@@ -20,7 +20,13 @@ describe('RightPanel resizers', () => {
     store.setLeftPaneWidth.mockClear()
     store.setTerminalHeight.mockClear()
     vi.stubGlobal('ResizeObserver', class {
-      observe() {}
+      callback: ResizeObserverCallback
+      constructor(callback: ResizeObserverCallback) {
+        this.callback = callback
+      }
+      observe(target: Element) {
+        this.callback([{ target, contentRect: { width: 1200 } } as ResizeObserverEntry], this as unknown as ResizeObserver)
+      }
       disconnect() {}
     })
   })
@@ -40,6 +46,7 @@ describe('RightPanel resizers', () => {
         },
       },
     })
+    await wrapper.vm.$nextTick()
 
     const horizontal = wrapper.get('[aria-label="Resize work and data panes"]')
     expect(horizontal.attributes('role')).toBe('separator')

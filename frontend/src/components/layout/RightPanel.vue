@@ -7,7 +7,7 @@
       class="relative flex w-full flex-col transition-[height] motion-slow"
       :style="{ height: workspaceVisualHeight + '%' }"
     >
-      <WorkspaceContextBar />
+      <WorkspaceContextBar :compact="isCompactLayout" />
 
       <div
         class="relative flex min-h-0 w-full flex-1 overflow-hidden"
@@ -155,7 +155,9 @@ const workspaceVisualHeight = computed(() => 100 - terminalVisualHeight.value)
 const panelRef = ref<HTMLElement | null>(null)
 const isResizingX = ref(false)
 const isResizingY = ref(false)
-const isCompactLayout = ref(false)
+// Start in the safe compact state so the first frame cannot overlap before
+// ResizeObserver reports the real workspace width.
+const isCompactLayout = ref(true)
 const compactPane = ref('work')
 let panelResizeObserver: ResizeObserver | null = null
 
