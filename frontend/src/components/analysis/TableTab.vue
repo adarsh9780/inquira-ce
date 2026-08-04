@@ -1,7 +1,31 @@
 <template>
   <div class="flex flex-col h-full" style="background-color: var(--color-base);">
     <Teleport to="#workspace-right-pane-toolbar-center" v-if="isMounted && uiStore.dataPane === 'table'">
-      <div v-if="tableDropdownOptions.length > 0" class="flex min-w-[11rem] max-w-full items-center" style="width: clamp(11rem, 28vw, 19rem);">
+      <div
+        v-if="compactSearchOpen"
+        ref="compactSearchContainerRef"
+        class="relative flex h-8 min-w-0 max-w-full items-center"
+        :class="toolbarMode === 'compact' ? 'w-48' : 'w-36'"
+        @focusout="handleCompactSearchFocusout"
+      >
+        <FunnelIcon class="pointer-events-none absolute left-2 h-4 w-4 text-[var(--color-text-sub)]" aria-hidden="true" />
+        <input
+          ref="compactSearchInputRef"
+          v-model="tableSearch"
+          type="text"
+          placeholder="Search rows"
+          class="input-base h-8 min-w-0 pl-8 pr-7"
+          aria-label="Search rows"
+        />
+        <button type="button" class="absolute right-1 flex h-6 w-6 items-center justify-center rounded text-[var(--color-text-muted)] hover:bg-[var(--color-panel-muted)] hover:text-[var(--color-text-main)]" title="Close search" aria-label="Close search" @click="closeCompactSearch">
+          <XMarkIcon class="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div
+        v-else-if="tableDropdownOptions.length > 0"
+        class="flex min-w-0 max-w-full items-center"
+        :class="toolbarMode === 'wide' ? 'w-[19rem]' : toolbarMode === 'compact' ? 'w-48' : 'w-36'"
+      >
         <HeaderDropdown
           id="dataframe-select"
           v-model="selectedArtifactId"
@@ -15,7 +39,7 @@
 
     <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && uiStore.dataPane === 'table'">
       <TableToolbar>
-        <div v-if="tableStatusMessage" class="flex items-center gap-2 text-[12px] leading-[1.3] mr-1" :class="tableStatusClass">
+        <div v-if="tableStatusMessage && toolbarMode === 'wide'" class="mr-1 flex items-center gap-2 text-[0.75rem] leading-[1.3] text-[var(--color-text-main)]">
           <div
             v-if="isPageLoading"
             class="h-3.5 w-3.5 animate-spin rounded-full border border-[var(--color-border)] border-t-[var(--color-text-main)]"
@@ -24,10 +48,7 @@
           <span>{{ tableStatusMessage }}</span>
         </div>
 
-        <div
-          class="relative min-w-[10rem] flex-1"
-          style="max-width: clamp(9rem, 24vw, 13.5rem);"
-        >
+        <div v-if="toolbarMode === 'wide'" class="relative w-[13.5rem] min-w-0 shrink-0">
           <FunnelIcon
             class="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2"
             style="color: var(--color-text-sub);"
@@ -46,8 +67,22 @@
           />
         </div>
 
+        <button
+          v-if="toolbarMode === 'compact'"
+          type="button"
+          class="btn-icon relative h-8 w-8 shrink-0 border"
+          style="border-color: var(--color-border); color: var(--color-text-muted);"
+          :title="tableSearch ? `Edit row search: ${tableSearch}` : 'Search rows'"
+          aria-label="Search rows"
+          @click="openCompactSearch"
+        >
+          <FunnelIcon class="h-4 w-4" />
+          <span v-if="tableSearch" class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" aria-hidden="true"></span>
+        </button>
+
         <!-- CSV download -->
         <button
+          v-if="toolbarMode !== 'minimal'"
           @click="downloadCsv"
           :disabled="!downloadRows.length || isDownloading"
           class="btn-icon h-8 w-8 shrink-0 border"
@@ -112,8 +147,8 @@
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-10 w-10 mx-auto mb-3 text-[var(--color-error)]">
             <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clip-rule="evenodd" />
           </svg>
-          <p class="text-base font-semibold text-[var(--color-danger-text)]">Failed to load selected table</p>
-          <p class="text-sm mt-2 text-[var(--color-danger-text)] break-words">{{ tableError }}</p>
+          <p class="text-[0.875rem] font-semibold text-[var(--color-text-main)]">Table unavailable</p>
+          <p class="mt-2 break-words text-[0.8125rem] leading-5 text-[var(--color-text-sub)]">{{ tableError }}</p>
           <p class="text-xs mt-3" style="color: var(--color-text-muted);">
             Table:
             <span class="font-medium">{{ selectedArtifactMeta?.display_name || selectedArtifactMeta?.logical_name || selectedArtifactId }}</span>
@@ -154,6 +189,16 @@
         </div>
       </div>
 
+      <TableEmptyState
+        v-else-if="unavailableArtifactCount > 0"
+        title="Saved tables unavailable"
+        :subtitle="artifactUnavailableDescription('table', unavailableArtifactCount)"
+      >
+        <template #icon>
+          <ArchiveBoxXMarkIcon class="mx-auto mb-3 h-10 w-10 text-[var(--color-text-muted)]" />
+        </template>
+      </TableEmptyState>
+
       <!-- Empty state: no artifacts at all -->
       <TableEmptyState
         v-else
@@ -182,14 +227,14 @@
     :items="tableActionItems"
     width-class="w-44"
     :width="176"
-    :height="56"
+    :height="toolbarMode === 'minimal' ? 120 : 56"
     @select="handleTableAction"
     @close="tableActionsOpen = false"
   />
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
+import { ref, watch, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useUiStore } from '../../stores/uiStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
 import { useArtifactStore } from '../../stores/artifactStore'
@@ -208,6 +253,11 @@ import TableToolbar from './table/TableToolbar.vue'
 import FloatingActionMenu from '../ui/FloatingActionMenu.vue'
 import { toast } from '../../composables/useToast'
 import { persistExportFile } from '../../utils/exportFile'
+import {
+  artifactUnavailableDescription,
+  isArtifactAvailable,
+  isArtifactPayloadMissingError,
+} from '../../utils/artifactAvailability'
 import { useTableArtifacts } from '../../composables/useTableArtifacts'
 import {
   createTableQuery,
@@ -217,11 +267,19 @@ import {
 } from './table/tableQuery'
 import {
   ArrowDownTrayIcon,
+  ArchiveBoxXMarkIcon,
   EllipsisHorizontalIcon,
   FunnelIcon,
-  TableCellsIcon
+  TableCellsIcon,
+  XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
+const props = withDefaults(defineProps<{
+  toolbarMode?: 'wide' | 'compact' | 'minimal'
+}>(), {
+  toolbarMode: 'wide',
+})
+const toolbarMode = computed(() => props.toolbarMode)
 const uiStore = useUiStore()
 const preferencesStore = usePreferencesStore()
 const artifactStore = useArtifactStore()
@@ -257,6 +315,9 @@ const windowStart = ref(0)
 const windowEnd = ref(0)
 const useClientFallback = ref(false)
 const tableSearch = ref('')
+const compactSearchOpen = ref(false)
+const compactSearchContainerRef = ref<HTMLElement | null>(null)
+const compactSearchInputRef = ref<HTMLInputElement | null>(null)
 const tableQuery = ref(createTableQuery({ pageSize }))
 const tableError = ref('')
 const artifactListError = ref('')
@@ -268,7 +329,19 @@ let currentPageRequestToken = 0
 let tableSearchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 const pendingRestorePageByArtifact = new Map()
 const tableActionItems = computed(() => [
-  { id: 'delete', label: 'Delete table', destructive: true, disabled: !canDeleteSelectedArtifact.value || isDeletingArtifact.value },
+  ...(toolbarMode.value === 'minimal'
+    ? [
+        { id: 'search', label: tableSearch.value ? 'Edit row search' : 'Search rows' },
+        { id: 'export', label: 'Export CSV', disabled: !downloadRows.value.length || isDownloading.value },
+      ]
+    : []),
+  {
+    id: 'delete',
+    label: 'Delete table',
+    dividerBefore: toolbarMode.value === 'minimal',
+    destructive: true,
+    disabled: !canDeleteSelectedArtifact.value || isDeletingArtifact.value,
+  },
 ])
 
 function toggleTableActions() {
@@ -278,7 +351,27 @@ function toggleTableActions() {
 }
 
 function handleTableAction(action: any) {
+  if (action === 'search') void openCompactSearch()
+  if (action === 'export') void downloadCsv()
   if (action === 'delete') openDeleteDialog()
+}
+
+async function openCompactSearch() {
+  compactSearchOpen.value = true
+  tableActionsOpen.value = false
+  await nextTick()
+  compactSearchInputRef.value?.focus()
+  compactSearchInputRef.value?.select()
+}
+
+function closeCompactSearch() {
+  compactSearchOpen.value = false
+}
+
+function handleCompactSearchFocusout() {
+  requestAnimationFrame(() => {
+    if (!compactSearchContainerRef.value?.contains(document.activeElement)) closeCompactSearch()
+  })
 }
 
 onMounted(() => {
@@ -294,7 +387,18 @@ onUnmounted(() => {
   }
 })
 
-const allArtifacts = computed(() => (Array.isArray(workspaceArtifacts.value) ? workspaceArtifacts.value : []))
+watch(toolbarMode, (mode) => {
+  if (mode === 'wide') compactSearchOpen.value = false
+  if (mode !== 'minimal') tableActionsOpen.value = false
+})
+
+const persistedArtifacts = computed(() => (
+  Array.isArray(workspaceArtifacts.value) ? workspaceArtifacts.value : []
+))
+const allArtifacts = computed(() => persistedArtifacts.value.filter(isArtifactAvailable))
+const unavailableArtifactCount = computed(() => (
+  persistedArtifacts.value.filter((artifact) => !isArtifactAvailable(artifact)).length
+))
 
 function normalizeClientRowsFromDataframeValue(value: any) {
   if (Array.isArray(value)) {
@@ -346,7 +450,7 @@ function normalizeLiveDataframeArtifact(item: any, index: any) {
 
 const liveDataframeArtifacts = computed(() => {
   const persistedIds = new Set(
-    allArtifacts.value
+    persistedArtifacts.value
       .map((artifact) => String(artifact?.artifact_id || '').trim())
       .filter(Boolean),
   )
@@ -440,10 +544,11 @@ function isAbortError(error: any) {
 }
 
 function isArtifactMissingError(error: any) {
-  const status = Number(error?.response?.status ?? error?.status ?? 0)
-  if (status === 404) return true
-  const detail = String(error?.response?.data?.detail || error?.message || '').toLowerCase()
-  return detail.includes('artifact not found')
+  return isArtifactPayloadMissingError(error)
+}
+
+function tableLoadFailureMessage() {
+  return 'We could not read this saved table. Try again, or run the question again to recreate it.'
 }
 
 function clearMissingSelectedArtifact(artifactId: any) {
@@ -456,9 +561,11 @@ function clearMissingSelectedArtifact(artifactId: any) {
   if (String(selectedArtifactId.value || '').trim() === normalizedArtifactId) {
     selectedArtifactId.value = null
   }
-  workspaceArtifacts.value = workspaceArtifacts.value.filter(
-    (artifact) => String(artifact?.artifact_id || '').trim() !== normalizedArtifactId,
-  )
+  workspaceArtifacts.value = workspaceArtifacts.value.map((artifact) => (
+    String(artifact?.artifact_id || '').trim() === normalizedArtifactId
+      ? { ...artifact, status: 'missing' }
+      : artifact
+  ))
   artifactStore.removeResultArtifact(normalizedArtifactId)
   resetTableState()
 }
@@ -513,7 +620,7 @@ async function loadActiveTurnArtifacts() {
   } catch (error: any) {
     if (isAbortError(error)) return
     console.warn('Failed to load active turn artifacts:', error)
-    const brief = error?.response?.data?.detail || error?.message || 'Failed to load tables'
+    const brief = 'Saved tables could not be loaded. Try refreshing the workspace.'
     artifactListError.value = brief
     artifactStore.setDataPaneError(brief)
     workspaceArtifacts.value = []
@@ -560,7 +667,7 @@ watch(
       await prepareArtifact(nextSelection)
     } catch (error: any) {
       if (isAbortError(error)) return
-      tableError.value = error?.message || 'Failed to load selected table.'
+      tableError.value = tableLoadFailureMessage()
     }
   },
   { immediate: true },
@@ -600,7 +707,7 @@ watch(selectedArtifactId, async (newId) => {
         await prepareArtifact(newId)
       } catch (error: any) {
         if (isAbortError(error)) return
-        tableError.value = error?.message || 'Failed to load selected table.'
+        tableError.value = tableLoadFailureMessage()
       }
       return
     }
@@ -632,7 +739,7 @@ watch(selectedArtifactId, async (newId) => {
     await prepareArtifact(newId)
   } catch (error: any) {
     if (isAbortError(error)) return
-    tableError.value = error?.message || 'Failed to load selected table.'
+    tableError.value = tableLoadFailureMessage()
   }
 })
 
@@ -704,13 +811,7 @@ const visibleTableRows = computed(() => (
 const tableStatusMessage = computed(() => {
   if (isDeletingArtifact.value) return 'Deleting table...'
   if (isPageLoading.value) return 'Loading table data...'
-  if (tableError.value) return tableError.value
   return ''
-})
-
-const tableStatusClass = computed(() => {
-  if (tableError.value) return 'text-[var(--color-danger-text)]'
-  return 'text-[var(--color-text-main)]'
 })
 
 const tableColumns = computed(() => {
@@ -895,7 +996,7 @@ async function loadServerPage(artifactId: any, query = tableQuery.value) {
     }
     if (requestToken !== currentPageRequestToken) return
     console.error('Failed to load dataframe page:', error)
-    tableError.value = error?.message || 'Failed to load table data.'
+    tableError.value = tableLoadFailureMessage()
     serverRows.value = []
     serverColumns.value = []
     clientRows.value = []
@@ -964,7 +1065,7 @@ async function retrySelectedArtifact() {
     await prepareArtifact(selectedArtifactId.value)
   } catch (error: any) {
     if (isAbortError(error)) return
-    tableError.value = error?.message || 'Failed to load selected table.'
+    tableError.value = tableLoadFailureMessage()
   }
 }
 
@@ -999,7 +1100,7 @@ async function deleteSelectedArtifact() {
     }
   } catch (error: any) {
     if (isAbortError(error)) return
-    tableError.value = error?.message || 'Failed to delete table artifact.'
+    tableError.value = 'The table could not be deleted. Try again.'
   } finally {
     isDeletingArtifact.value = false
   }

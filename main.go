@@ -38,10 +38,11 @@ func main() {
 
 func desktopApplicationOptions(app *App) *options.App {
 	return &options.App{
-		Title:     "Inquira",
-		Width:     1400,
-		Height:    900,
-		MinWidth:  800,
+		Title:  "Inquira",
+		Width:  1400,
+		Height: 900,
+		// Keep the full workspace usable at the 768-point width of a 9-inch iPad.
+		MinWidth:  768,
 		MinHeight: 600,
 		// Wails leaves the macOS zoom control disabled when Mac options are nil.
 		// Keep native resize, zoom, and fullscreen window affordances available.

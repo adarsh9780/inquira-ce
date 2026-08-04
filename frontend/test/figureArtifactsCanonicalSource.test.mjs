@@ -20,12 +20,14 @@ test('FigureTab uses active turn artifact catalog as canonical source and resolv
   assert.equal(source.includes(':key="selectedArtifactId"'), true)
 })
 
-test('FigureTab renders artifact load errors inside the centered empty state instead of the toolbar', () => {
+test('FigureTab keeps unavailable artifacts out of selectors and explains recovery in the empty state', () => {
   const figureTabPath = resolve(process.cwd(), 'src/components/analysis/FigureTab.vue')
   const source = readFileSync(figureTabPath, 'utf-8')
 
   assert.equal(source.includes('<AppEmptyState'), true)
-  assert.equal(source.includes(":title=\"artifactListError ? 'Charts unavailable' : 'No saved charts'\""), true)
-  assert.equal(source.includes(":description=\"artifactListError || 'Ask AI for a chart, or promote one from Runs.'\""), true)
+  assert.equal(source.includes("unavailableArtifactCount > 0 ? 'Saved charts unavailable'"), true)
+  assert.equal(source.includes("artifactUnavailableDescription('chart', unavailableArtifactCount)"), true)
+  assert.equal(source.includes('allPersistedFigureArtifacts.value.filter(isArtifactAvailable)'), true)
+  assert.equal(source.includes('isArtifactPayloadMissingError(error)'), true)
   assert.equal(source.includes("v-else-if=\"artifactListError\""), false)
 })

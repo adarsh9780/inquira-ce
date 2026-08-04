@@ -1,10 +1,11 @@
 <template>
-  <div class="flex h-full w-full min-h-0 min-w-0 flex-col" style="background-color: var(--color-workspace-surface);">
+  <div ref="paneRef" class="flex h-full w-full min-h-0 min-w-0 flex-col" :data-toolbar-mode="toolbarMode" style="background-color: var(--color-workspace-surface);">
     <AppToolbar aria-label="Results toolbar">
       <template #start>
         <SegmentedControl
           v-model="selectedCategory"
           :options="resultCategoryOptions"
+          :icon-only="toolbarMode !== 'wide'"
           aria-label="Result views"
         />
       </template>
@@ -19,15 +20,15 @@
     <p class="sr-only" aria-live="polite">{{ resultAnnouncement }}</p>
 
     <div class="min-h-0 flex-1 p-2.5 pb-0 sm:p-3 sm:pb-0" style="background-color: var(--color-workspace-surface);">
-      <TableTab v-if="selectedCategory === 'table'" />
-      <FigureTab v-else-if="selectedCategory === 'chart'" />
-      <OutputTab v-else />
+      <TableTab v-if="selectedCategory === 'table'" :toolbar-mode="toolbarMode" />
+      <FigureTab v-else-if="selectedCategory === 'chart'" :toolbar-mode="toolbarMode" />
+      <OutputTab v-else :toolbar-mode="toolbarMode" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useArtifactStore } from '../../stores/artifactStore'
 import { useConversationStore } from '../../stores/conversationStore'
 import { useExecutionStore } from '../../stores/executionStore'
@@ -45,10 +46,18 @@ const artifactStore = useArtifactStore()
 const conversationStore = useConversationStore()
 const executionStore = useExecutionStore()
 const uiStore = useUiStore()
+const paneRef = ref<HTMLElement | null>(null)
+const paneWidth = ref(0)
 const resultAnnouncement = ref('')
+let paneResizeObserver: ResizeObserver | null = null
 const TableTab = defineAsyncComponent(() => import('../analysis/TableTab.vue'))
 const FigureTab = defineAsyncComponent(() => import('../analysis/FigureTab.vue'))
 const OutputTab = defineAsyncComponent(() => import('../analysis/OutputTab.vue'))
+const toolbarMode = computed<'wide' | 'compact' | 'minimal'>(() => {
+  if (paneWidth.value >= 900) return 'wide'
+  if (paneWidth.value >= 520) return 'compact'
+  return 'minimal'
+})
 
 const tableResultCount = computed(() => Math.max(
   Number(artifactStore.dataframeCount || 0),
@@ -96,4 +105,14 @@ watch(() => uiStore.dataPane, (pane, previousPane) => {
   const selected = resultCategoryOptions.value.find((option) => option.value === category)
   resultAnnouncement.value = selected ? `${selected.label} available` : ''
 })
+
+onMounted(() => {
+  if (!('ResizeObserver' in window) || !paneRef.value) return
+  paneResizeObserver = new ResizeObserver(([entry]) => {
+    paneWidth.value = Number(entry?.contentRect?.width || paneRef.value?.clientWidth || 0)
+  })
+  paneResizeObserver.observe(paneRef.value)
+})
+
+onBeforeUnmount(() => paneResizeObserver?.disconnect())
 </script>

@@ -6,6 +6,7 @@
     >
       <nav class="flex items-center gap-1" aria-label="Run history navigation" data-run-navigator>
         <button
+          v-if="toolbarMode !== 'minimal'"
           type="button"
           class="btn-icon h-7 w-7 shrink-0"
           :disabled="!canGoPrevious"
@@ -23,9 +24,10 @@
           :dropdown-min-width="248"
           placeholder="Select run"
           aria-label="Select run from history"
-          max-width-class="w-[8.5rem]"
+          :max-width-class="toolbarMode === 'minimal' ? 'w-28' : 'w-[8.5rem]'"
         />
         <button
+          v-if="toolbarMode !== 'minimal'"
           type="button"
           class="btn-icon h-7 w-7 shrink-0"
           :disabled="!canGoNext"
@@ -257,6 +259,12 @@ import {
   TrashIcon,
 } from '@heroicons/vue/24/outline'
 
+const props = withDefaults(defineProps<{
+  toolbarMode?: 'wide' | 'compact' | 'minimal'
+}>(), {
+  toolbarMode: 'wide',
+})
+const toolbarMode = computed(() => props.toolbarMode)
 const INLINE_TEXT_LIMIT = 4_000
 const RunChartOutput = defineAsyncComponent(() => import('./runs/RunChartOutput.vue'))
 const uiStore = useUiStore()
