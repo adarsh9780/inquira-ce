@@ -47,11 +47,11 @@ describe('conversationStore', () => {
     expect(store.chatHistory[0]?.explanation).toBe('Final answer')
   })
 
-  it('starts a local draft and creates it only when submission needs an id', async () => {
+  it('starts a local draft and creates it with the first-question title only when submission needs an id', async () => {
     const create = vi.spyOn(conversationApi, 'create').mockResolvedValue({
       id: 'conversation-new',
       workspace_id: 'workspace-1',
-      title: 'New chat',
+      title: 'Give me the top 10 bowlers',
     } as any)
     const store = useConversationStore()
     store.setActiveConversationId('conversation-old')
@@ -65,7 +65,11 @@ describe('conversationStore', () => {
     expect(store.currentQuestion).toBe('')
     expect(create).not.toHaveBeenCalled()
 
-    await expect(store.ensureActiveConversation('workspace-1', 'New chat')).resolves.toBe('conversation-new')
+    await expect(store.ensureActiveConversation('workspace-1', 'Give me the top 10 bowlers')).resolves.toBe('conversation-new')
+    expect(create).toHaveBeenCalledOnce()
+    expect(create).toHaveBeenCalledWith('workspace-1', 'Give me the top 10 bowlers')
+
+    await expect(store.ensureActiveConversation('workspace-1', 'Do not replace the title')).resolves.toBe('conversation-new')
     expect(create).toHaveBeenCalledOnce()
   })
 
