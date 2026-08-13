@@ -178,6 +178,7 @@ import executionService from '../../services/executionService'
 import { executeCommand, getRegisteredCommands, isCommand } from '../../services/commandRegistry'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
+import { deriveConversationTitle } from '../../utils/conversationTitle'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import { modelSupportsImages, SUPPORTED_CHAT_IMAGE_TYPES } from '../../utils/modelCapabilities'
 import ColumnSuggest from './ColumnSuggest.vue'
@@ -1014,7 +1015,10 @@ async function handleSlashCommand(questionText: any) {
       throw new Error('Create/select a workspace before analysis.')
     }
 
-    requestConversationId = String(await conversationStore.ensureActiveConversation(workspaceStore.activeWorkspaceId, 'New chat') || '').trim()
+    requestConversationId = String(await conversationStore.ensureActiveConversation(
+      workspaceStore.activeWorkspaceId,
+      deriveConversationTitle(questionText),
+    ) || '').trim()
     if (!requestConversationId) {
       throw new Error('Could not create a chat for this command.')
     }
@@ -1143,7 +1147,10 @@ async function handleSubmit() {
 
   let requestConversationId = ''
   try {
-    requestConversationId = String(await conversationStore.ensureActiveConversation(workspaceStore.activeWorkspaceId, 'New chat') || '').trim()
+    requestConversationId = String(await conversationStore.ensureActiveConversation(
+      workspaceStore.activeWorkspaceId,
+      deriveConversationTitle(questionText),
+    ) || '').trim()
   } catch (error: any) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Could not create a chat.'))
     question.value = rawQuestionText
