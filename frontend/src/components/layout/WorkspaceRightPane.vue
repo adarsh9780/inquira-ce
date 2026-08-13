@@ -72,8 +72,8 @@ const runResultCount = computed(() => buildUserRunItems({
   conversationId: conversationStore.activeConversationId,
 }).length)
 const resultCategoryOptions = computed(() => [
-  { value: 'table', label: 'Tables', icon: TableCellsIcon, count: tableResultCount.value },
   { value: 'chart', label: 'Charts', icon: ChartBarIcon, count: chartResultCount.value },
+  { value: 'table', label: 'Tables', icon: TableCellsIcon, count: tableResultCount.value },
   { value: 'runs', label: 'Runs', icon: PlayCircleIcon, count: runResultCount.value },
 ])
 
@@ -104,6 +104,10 @@ watch(() => uiStore.dataPane, (pane, previousPane) => {
   const category = categoryForPane(pane)
   const selected = resultCategoryOptions.value.find((option) => option.value === category)
   resultAnnouncement.value = selected ? `${selected.label} available` : ''
+})
+
+watch(chartResultCount, (count, previousCount) => {
+  if (count > 0 && count > previousCount) uiStore.setDataPane('figure')
 })
 
 onMounted(() => {

@@ -59,7 +59,7 @@ test('charts and terminal refresh their embedded themes when appearance changes'
   const terminalSource = read('src/components/analysis/NativeTerminalPane.vue')
 
   assert.equal(figureSource.includes('() => preferencesStore.uiTheme'), true)
-  assert.equal(figureSource.includes('const themeMode = PLOTLY_THEME_MODE.SOFT'), true)
+  assert.equal(figureSource.includes('const themeMode = PLOTLY_THEME_MODE.HARD'), true)
   assert.equal(figureSource.includes('await renderPlot()'), true)
   assert.equal(terminalSource.includes('function syncTerminalTheme()'), true)
   assert.equal(terminalSource.includes('terminal.options.theme = getTerminalVisualTheme()'), true)

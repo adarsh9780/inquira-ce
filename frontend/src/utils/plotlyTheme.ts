@@ -602,7 +602,7 @@ export function applyPlotlyConfigTheme(
   const baseButtonsToRemove = ['pan2d', 'lasso2d', 'select2d']
 
   const themedConfig: RecordValue = {
-    displayModeBar: true,
+    displayModeBar: mode === PLOTLY_THEME_MODE.HARD ? 'hover' : true,
     displaylogo: false,
     responsive: true,
     ...input,
