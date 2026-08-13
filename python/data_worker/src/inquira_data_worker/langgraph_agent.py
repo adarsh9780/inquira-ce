@@ -48,6 +48,11 @@ class LangGraphAnalysisAgent:
                 artifact_dir=values["artifact_dir"],
                 timeout_seconds=timeout,
                 output_contract=request.get("output_contract") if "output_contract" in request else None,
+                chart_spec=(
+                    request.get("chart_spec")
+                    if isinstance(request.get("chart_spec"), dict)
+                    else None
+                ),
                 emit=emit,
             )
 

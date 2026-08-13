@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from pathlib import Path
 
@@ -141,6 +142,56 @@ def test_kernel_displays_and_captures_a_plotly_last_expression(tmp_path: Path) -
             assert result["result"]["data"][0]["type"] == "bar"
             assert len(result["artifacts"]) == 1
             assert result["artifacts"][0]["kind"] == "figure"
+        finally:
+            await manager.shutdown()
+
+    asyncio.run(scenario())
+
+
+def test_kernel_compiles_agent_chart_spec_and_persists_source_spec(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        catalog = tmp_path / "workspace.duckdb"
+        create_catalog(catalog)
+        manager = WorkspaceKernelManager()
+        try:
+            result = await manager.execute(
+                workspace_id="workspace-chart-spec",
+                database_path=str(catalog),
+                code=(
+                    "sales_summary = conn.sql(\"SELECT id, amount FROM sales ORDER BY amount DESC\").df()\n"
+                    "sales_summary"
+                ),
+                run_id="run-chart-spec",
+                artifact_dir=str(tmp_path / "chart-spec-artifacts"),
+                timeout_seconds=10,
+                output_contract=[{"name": "sales_summary", "kind": "dataframe"}],
+                chart_spec={
+                    "schema": "inquira.chart/v1",
+                    "data": {"logical_name": "sales_summary"},
+                    "mark": "bar",
+                    "encoding": {
+                        "x": {"field": "id", "type": "ordinal"},
+                        "y": {"field": "amount", "type": "quantitative"},
+                    },
+                    "title": "Sales by ID",
+                },
+            )
+            assert result["success"] is True, result
+            artifacts = {(item["kind"], item["logical_name"]): item for item in result["artifacts"]}
+            assert set(artifacts) == {
+                ("dataframe", "sales_summary"),
+                ("chart_spec", "sales_summary_chart_spec"),
+                ("figure", "sales_summary_chart"),
+            }
+            saved_spec = json.loads(
+                Path(artifacts[("chart_spec", "sales_summary_chart_spec")]["source_path"]).read_text()
+            )
+            saved_figure = json.loads(
+                Path(artifacts[("figure", "sales_summary_chart")]["source_path"]).read_text()
+            )
+            assert saved_spec["schema"] == "inquira.chart/v1"
+            assert saved_figure["data"][0]["type"] == "bar"
+            assert saved_figure["data"][0]["y"] == [20, 10]
         finally:
             await manager.shutdown()
 

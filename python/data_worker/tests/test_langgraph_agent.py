@@ -298,7 +298,9 @@ def test_migrated_execution_node_passes_the_structured_output_contract_to_jupyte
     state = {
         "candidate_code": "summary = conn.sql('SELECT 1').df()",
         "output_contract": [{"name": "summary", "kind": "dataframe"}],
+        "analysis_output": {"chart_spec": {"schema": "inquira.chart/v1"}},
         "attempt_counters": {"execution": 0},
     }
     result = asyncio.run(analysis_request_execute_tool_node(state, {}))
     assert result["pending_tools"][0]["args"]["output_contract"] == state["output_contract"]
+    assert result["pending_tools"][0]["args"]["chart_spec"] == state["analysis_output"]["chart_spec"]

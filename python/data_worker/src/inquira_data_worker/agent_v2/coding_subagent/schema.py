@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ...chart_spec import ChartSpec
 from ..structured_schema import openai_strict_json_schema
 
 
@@ -22,6 +23,7 @@ class AnalysisOutput(BaseModel):
     explanation: str | None = None
     progress_message: str | None = None
     output_contract: list[OutputContractItem] = Field(default_factory=list)
+    chart_spec: ChartSpec | None = None
     search_schema_queries: list[str] = Field(default_factory=list)
     selected_tables: list[str] = Field(default_factory=list)
     join_keys: list[str] = Field(default_factory=list)

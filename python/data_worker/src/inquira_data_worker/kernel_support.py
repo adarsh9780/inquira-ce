@@ -7,6 +7,13 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from .chart_spec import (
+    CHART_SPEC_MEDIA_TYPE,
+    ChartSpec,
+    ChartSpecError,
+    compile_chart_spec,
+)
+
 
 def install(namespace: dict[str, Any], *, workspace_id: str, database_path: str) -> None:
     import duckdb
@@ -115,6 +122,53 @@ def install(namespace: dict[str, Any], *, workspace_id: str, database_path: str)
         }
         return record(descriptor, run_id)
 
+    def export_chart_spec(value: Any, run_id: str | None = None) -> list[dict[str, Any]]:
+        spec = ChartSpec.model_validate(value)
+        frame_value = namespace.get(spec.data.logical_name)
+        frame = dataframe_value(frame_value)
+        if frame is None:
+            raise ChartSpecError(
+                "chart_dataframe_missing",
+                f"Chart dataframe '{spec.data.logical_name}' was not produced by the analysis code.",
+            )
+        if len(frame.index) > 5000:
+            raise ChartSpecError(
+                "chart_data_too_large",
+                "Chart data must contain 5,000 rows or fewer.",
+            )
+        records = json.loads(frame.to_json(orient="records", date_format="iso"))
+        serialized_spec = spec.model_dump(mode="json", by_alias=True)
+        figure = compile_chart_spec(spec, records)
+
+        spec_path = target_path("chart_spec", "json", run_id)
+        spec_path.write_text(json.dumps(serialized_spec), encoding="utf-8")
+        spec_descriptor = record(
+            {
+                "kind": "chart_spec",
+                "logical_name": f"{spec.data.logical_name}_chart_spec",
+                "display_name": spec.title,
+                "payload_format": "json",
+                "media_type": CHART_SPEC_MEDIA_TYPE,
+                "source_path": str(spec_path),
+            },
+            run_id,
+        )
+
+        figure_path = target_path("figure", "json", run_id)
+        figure_path.write_text(json.dumps(figure, default=str), encoding="utf-8")
+        figure_descriptor = record(
+            {
+                "kind": "figure",
+                "logical_name": f"{spec.data.logical_name}_chart",
+                "display_name": spec.title,
+                "payload_format": "json",
+                "media_type": "application/vnd.plotly.v1+json",
+                "source_path": str(figure_path),
+            },
+            run_id,
+        )
+        return [spec_descriptor, figure_descriptor]
+
     def emit_capture(value: Any, logical_name: str = "result") -> None:
         frame = dataframe_value(value)
         if frame is not None:
@@ -158,6 +212,7 @@ def install(namespace: dict[str, Any], *, workspace_id: str, database_path: str)
     namespace["export_dataframe"] = export_dataframe
     namespace["export_figure"] = export_figure
     namespace["export_scalar"] = export_scalar
+    namespace["_inquira_export_chart_spec"] = export_chart_spec
     namespace["_inquira_emit_capture"] = emit_capture
     namespace["_inquira_emit_preview"] = emit_preview
     namespace["_inquira_emit_exports"] = emit_exports
