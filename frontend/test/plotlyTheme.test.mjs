@@ -81,7 +81,7 @@ test('plotly config theme merges modebar removals and image defaults', () => {
   )
 
   assert.deepEqual(config.modeBarButtonsToRemove, ['pan2d', 'lasso2d', 'select2d', 'zoomIn2d'])
-  assert.equal(config.displayModeBar, true)
+  assert.equal(config.displayModeBar, 'hover')
   assert.equal(config.displaylogo, false)
   assert.equal(config.responsive, true)
   assert.equal(config.toImageButtonOptions.format, 'png')
