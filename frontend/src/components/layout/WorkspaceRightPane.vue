@@ -33,6 +33,9 @@ import { useArtifactStore } from '../../stores/artifactStore'
 import { useConversationStore } from '../../stores/conversationStore'
 import { useExecutionStore } from '../../stores/executionStore'
 import { useUiStore } from '../../stores/uiStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { artifactApi } from '../../api/artifacts'
+import { isArtifactAvailable } from '../../utils/artifactAvailability'
 import AppToolbar from '../ui/AppToolbar.vue'
 import SegmentedControl from '../ui/SegmentedControl.vue'
 import { buildUserRunItems } from '../../utils/unifiedResults'
@@ -46,10 +49,14 @@ const artifactStore = useArtifactStore()
 const conversationStore = useConversationStore()
 const executionStore = useExecutionStore()
 const uiStore = useUiStore()
+const workspaceStore = useWorkspaceStore()
 const paneRef = ref<HTMLElement | null>(null)
 const paneWidth = ref(0)
 const resultAnnouncement = ref('')
+const catalogTableCount = ref(0)
+const catalogChartCount = ref(0)
 let paneResizeObserver: ResizeObserver | null = null
+let artifactCatalogAbortController: AbortController | null = null
 const TableTab = defineAsyncComponent(() => import('../analysis/TableTab.vue'))
 const FigureTab = defineAsyncComponent(() => import('../analysis/FigureTab.vue'))
 const OutputTab = defineAsyncComponent(() => import('../analysis/OutputTab.vue'))
@@ -60,10 +67,12 @@ const toolbarMode = computed<'wide' | 'compact' | 'minimal'>(() => {
 })
 
 const tableResultCount = computed(() => Math.max(
+  catalogTableCount.value,
   Number(artifactStore.dataframeCount || 0),
   Array.isArray(artifactStore.dataframes) ? artifactStore.dataframes.length : 0,
 ))
 const chartResultCount = computed(() => Math.max(
+  catalogChartCount.value,
   Number(artifactStore.figureCount || 0),
   Array.isArray(artifactStore.figures) ? artifactStore.figures.length : 0,
 ))
@@ -110,6 +119,59 @@ watch(chartResultCount, (count, previousCount) => {
   if (count > 0 && count > previousCount) uiStore.setDataPane('figure')
 })
 
+function availableArtifactCount(response: any) {
+  const artifacts = Array.isArray(response?.artifacts) ? response.artifacts : []
+  return artifacts.filter(isArtifactAvailable).length
+}
+
+async function refreshResultArtifactCounts() {
+  const conversationId = String(conversationStore.activeConversationId || '').trim()
+  const turnId = String(conversationStore.activeTurnId || '').trim()
+  const workspaceId = String(workspaceStore.activeWorkspaceId || '').trim()
+  artifactCatalogAbortController?.abort()
+  catalogTableCount.value = 0
+  catalogChartCount.value = 0
+  if (!workspaceId || !conversationId || !turnId) return
+
+  const controller = new AbortController()
+  artifactCatalogAbortController = controller
+  try {
+    const [tableResponse, chartResponse] = await Promise.all([
+      artifactApi.listTurn(conversationId, turnId, 'dataframe', { signal: controller.signal }),
+      artifactApi.listTurn(conversationId, turnId, 'figure', { signal: controller.signal }),
+    ])
+    if (controller.signal.aborted) return
+    const tableCount = availableArtifactCount(tableResponse)
+    const chartCount = availableArtifactCount(chartResponse)
+    catalogTableCount.value = tableCount
+    catalogChartCount.value = chartCount
+    artifactStore.setDataframeCount(tableCount)
+    artifactStore.setFigureCount(chartCount)
+
+    if (chartCount > 0) {
+      uiStore.setDataPane('figure')
+      resultAnnouncement.value = `${chartCount} chart${chartCount === 1 ? '' : 's'} available`
+    } else if (tableCount > 0) {
+      uiStore.setDataPane('table')
+      resultAnnouncement.value = `${tableCount} table${tableCount === 1 ? '' : 's'} available`
+    }
+  } catch (error: any) {
+    if (error?.name === 'AbortError') return
+    console.warn('Failed to discover active turn artifacts:', error)
+  }
+}
+
+watch(
+  () => [
+    String(workspaceStore.activeWorkspaceId || '').trim(),
+    String(conversationStore.activeConversationId || '').trim(),
+    String(conversationStore.activeTurnId || '').trim(),
+    String(artifactStore.activeTurnArtifactRefreshKey || 0),
+  ].join('||'),
+  () => void refreshResultArtifactCounts(),
+  { immediate: true },
+)
+
 onMounted(() => {
   if (!('ResizeObserver' in window) || !paneRef.value) return
   paneResizeObserver = new ResizeObserver(([entry]) => {
@@ -118,5 +180,8 @@ onMounted(() => {
   paneResizeObserver.observe(paneRef.value)
 })
 
-onBeforeUnmount(() => paneResizeObserver?.disconnect())
+onBeforeUnmount(() => {
+  artifactCatalogAbortController?.abort()
+  paneResizeObserver?.disconnect()
+})
 </script>
