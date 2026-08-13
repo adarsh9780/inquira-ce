@@ -686,6 +686,50 @@ def _sanitize_output_contract(contract: Any) -> list[dict[str, str]]:
     return accepted
 
 
+def _chart_policy_error(output: Any) -> str:
+    """Enforce chart-by-default without trusting agent-authored Plotly code."""
+
+    code = str(getattr(output, "code", None) or "").strip()
+    schema_queries = getattr(output, "search_schema_queries", None)
+    if not code or (isinstance(schema_queries, list) and schema_queries):
+        return ""
+
+    contract = _sanitize_output_contract(
+        [
+            item.model_dump() if hasattr(item, "model_dump") else item
+            for item in (getattr(output, "output_contract", None) or [])
+        ]
+    )
+    dataframe_names = {
+        item["name"] for item in contract if item.get("kind") == "dataframe"
+    }
+    figure_names = {item["name"] for item in contract if item.get("kind") == "figure"}
+    chart_spec = getattr(output, "chart_spec", None)
+
+    if figure_names:
+        return (
+            "Do not generate Plotly figure variables or declare figure outputs. "
+            "Return bounded dataframe data and describe the chart with chart_spec."
+        )
+    if dataframe_names:
+        if chart_spec is None:
+            return (
+                "Analytical dataframe results require chart_spec. Only a genuinely scalar "
+                "answer may omit a chart."
+            )
+        logical_name = str(chart_spec.data.logical_name or "").strip()
+        if logical_name not in dataframe_names:
+            available = ", ".join(sorted(dataframe_names))
+            return (
+                "chart_spec.data.logical_name must reference a dataframe in output_contract. "
+                f"Available dataframe outputs: {available}."
+            )
+        return ""
+    if chart_spec is not None:
+        return "chart_spec requires a dataframe output in output_contract."
+    return ""
+
+
 def _normalize_search_queries(raw: Any) -> list[str]:
     if not isinstance(raw, list):
         return []
@@ -1432,6 +1476,7 @@ async def execute_python_runtime_tool(
     code: str,
     timeout: int = 90,
     output_contract: list[dict[str, str]] | None = None,
+    chart_spec: dict[str, Any] | None = None,
     explanation: str = "",
     analysis_context: Annotated[dict[str, Any], InjectedState("analysis_context")] = None,
     workspace_id: Annotated[str, InjectedState("workspace_id")] = "",
@@ -1444,6 +1489,7 @@ async def execute_python_runtime_tool(
         code=str(code or ""),
         timeout=max(5, int(timeout or 90)),
         output_contract=output_contract or [],
+        chart_spec=chart_spec,
         explanation=str(explanation or "").strip(),
         emit_tool_events=True,
     )
@@ -2313,6 +2359,14 @@ async def _run_execute_python_runtime(
         data_path=str(analysis_context.get("data_path") or "") or None,
         code=str(args.get("code") or ""),
         timeout=max(5, int(args.get("timeout") or 90)),
+        output_contract=(
+            args.get("output_contract")
+            if isinstance(args.get("output_contract"), list)
+            else []
+        ),
+        chart_spec=(
+            args.get("chart_spec") if isinstance(args.get("chart_spec"), dict) else None
+        ),
         explanation=explanation,
         emit_tool_events=False,
         run_id=str(state.get("run_id") or "").strip() or None,
@@ -3232,6 +3286,11 @@ async def analysis_request_execute_tool_node(state: dict[str, Any], config: Runn
             "code": code,
             "timeout": timeout,
             "output_contract": _sanitize_output_contract(state.get("output_contract") or []),
+            "chart_spec": (
+                state.get("analysis_output", {}).get("chart_spec")
+                if isinstance(state.get("analysis_output"), dict)
+                else None
+            ),
         },
         "explanation": "I have executable code, so I’m running it now and will inspect the result next.",
     }
@@ -3419,7 +3478,7 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
         max_generation_attempts = max(1, int(attempt_counters.get("max_code_executions") or 3))
         if next_generation_attempt >= max_generation_attempts:
             return {
-                "analysis_output": output.model_dump(),
+                "analysis_output": output.model_dump(mode="json", by_alias=True),
                 "candidate_code": "",
                 "tool_plan": [],
                 "enrichment_hints": requested_queries,
@@ -3434,7 +3493,7 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
                 },
             }
         return {
-            "analysis_output": output.model_dump(),
+            "analysis_output": output.model_dump(mode="json", by_alias=True),
             "candidate_code": "",
             "tool_plan": [],
             "enrichment_hints": requested_queries,
@@ -3449,12 +3508,31 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
             },
         }
 
+    chart_policy_error = _chart_policy_error(output)
+    if chart_policy_error:
+        attempt_counters = (
+            state.get("attempt_counters")
+            if isinstance(state.get("attempt_counters"), dict)
+            else {}
+        )
+        return {
+            "analysis_output": output.model_dump(mode="json", by_alias=True),
+            "candidate_code": "",
+            "tool_plan": [],
+            "retry_target": "analysis_generate_code",
+            "retry_feedback": chart_policy_error,
+            "attempt_counters": {
+                **attempt_counters,
+                "generation": int(attempt_counters.get("generation") or 0) + 1,
+            },
+        }
+
     sanitized_output_contract = _sanitize_output_contract(output.output_contract)
     selected_tables = _normalize_table_names(output.selected_tables)
 
     attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
     return {
-        "analysis_output": output.model_dump(),
+        "analysis_output": output.model_dump(mode="json", by_alias=True),
         "candidate_code": candidate_code,
         "retry_target": "",
         "output_contract": sanitized_output_contract,
@@ -3548,13 +3626,14 @@ async def analysis_retry_decider_node(state: dict[str, Any], config: RunnableCon
 
     candidate_code = str(state.get("candidate_code") or "").strip()
     if not candidate_code:
+        existing_feedback = str(state.get("retry_feedback") or "").strip()
         if generation_attempts >= max_attempts:
             return {
-                "retry_feedback": "No code was produced after retry limit.",
+                "retry_feedback": existing_feedback or "No code was produced after retry limit.",
                 "retry_target": "analysis_finalize_failure",
             }
         return {
-            "retry_feedback": "No code was produced. Generate executable Python code.",
+            "retry_feedback": existing_feedback or "No code was produced. Generate executable Python code.",
             "retry_target": "analysis_generate_code",
         }
 

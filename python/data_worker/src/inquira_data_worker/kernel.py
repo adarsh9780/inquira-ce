@@ -48,6 +48,7 @@ class WorkspaceKernelManager:
         artifact_dir: str,
         timeout_seconds: int,
         output_contract: list[dict[str, str]] | None = None,
+        chart_spec: dict[str, Any] | None = None,
         emit: Callable[[dict[str, Any]], Any] | None = None,
     ) -> dict[str, Any]:
         session = await self._get_or_start(workspace_id, database_path, emit)
@@ -95,6 +96,19 @@ class WorkspaceKernelManager:
                         capture_output = await self._execute_request(session, capture_code)
                         if capture_output.stderr_parts:
                             primary.stderr_parts.extend(capture_output.stderr_parts)
+                    if chart_spec is not None:
+                        encoded_spec = json.dumps(chart_spec, ensure_ascii=True)
+                        chart_output = await self._execute_request(
+                            session,
+                            (
+                                "import json as _inquira_json\n"
+                                f"_inquira_export_chart_spec(_inquira_json.loads({encoded_spec!r}))"
+                            ),
+                        )
+                        if chart_output.stderr_parts:
+                            primary.stderr_parts.extend(chart_output.stderr_parts)
+                        if chart_output.error is not None:
+                            primary.error = chart_output.error
                     exports = await self._execute_request(session, f"_inquira_emit_exports({run_id!r})")
                     if exports.result_kind == "exports" and isinstance(exports.result, list):
                         artifacts = [item for item in exports.result if isinstance(item, dict)]

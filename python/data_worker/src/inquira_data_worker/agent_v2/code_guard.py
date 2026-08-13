@@ -172,6 +172,26 @@ def guard_code(
             ),
         )
 
+    plotly_patterns = (
+        r"\bimport\s+plotly\b",
+        r"\bfrom\s+plotly\b",
+        r"\bplotly\.",
+        r"\bpx\.",
+        r"\bgo\.Figure\s*\(",
+        r"\bexport_figure\s*\(",
+    )
+    if any(re.search(pattern, raw) for pattern in plotly_patterns):
+        return CodeGuardResult(
+            code=raw,
+            changed=False,
+            blocked=True,
+            should_retry=True,
+            reason=(
+                "Generated analysis code must only prepare dataframe or scalar data. "
+                "Describe charts with `chart_spec`; the runtime owns Plotly rendering."
+            ),
+        )
+
     if _materializes_unbounded_select_all(raw):
         return CodeGuardResult(
             code=raw,

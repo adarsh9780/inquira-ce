@@ -30,10 +30,11 @@ class ModelHandler(BaseHTTPRequestHandler):
             }
         elif schema_name == "AnalysisOutput":
             value = {
-                "code": "result = conn.sql('SELECT SUM(amount) AS total FROM sales').df()",
+                "code": "result = conn.sql('SELECT SUM(amount) AS total FROM sales').fetchone()[0]",
                 "explanation": "Sum the sales amount.",
                 "progress_message": "I prepared the total-sales calculation.",
-                "output_contract": [{"name": "result", "kind": "dataframe", "description": "Total sales"}],
+                "output_contract": [{"name": "result", "kind": "scalar", "description": "Total sales"}],
+                "chart_spec": None,
                 "search_schema_queries": [],
                 "selected_tables": ["sales"],
                 "join_keys": [],
@@ -174,7 +175,7 @@ def test_json_lines_process_runs_agent_from_model_to_duckdb_result(tmp_path: Pat
         result = response["result"]
         assert result["success"] is True
         assert result["answer"] == "Total sales are 30."
-        assert result["execution"]["result"]["rows"] == [{"total": 30.0}]
+        assert result["execution"]["result"] == 30
         assert "sales" in json.dumps(ModelHandler.requests)
         assert any(
             event["type"] == "agent_status" and event["data"].get("step") == "executing_code"

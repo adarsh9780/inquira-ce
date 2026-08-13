@@ -11,6 +11,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from inquira_data_worker.agent_v2.nodes import (
     _CONTEXT_ENRICHMENT_TOOL_PROMPT,
     _build_context_enrichment_user_prompt,
+    _chart_policy_error,
     _deterministic_context_prefetch_tools,
     _score_schema_context_confidence,
     _is_recoverable_structured_output_error,
@@ -40,6 +41,47 @@ from inquira_data_worker.agent_v2.coding_subagent.schema import AnalysisOutput
 from inquira_data_worker.agent_v2.coding_subagent.generator import StructuredOutputEmptyError
 import inquira_data_worker.agent_v2.nodes as nodes_module
 from inquira_data_worker.agent_v2.tools.validate_result import validate_and_summarize_result
+
+
+def _bar_chart_spec(logical_name: str = "summary") -> dict:
+    return {
+        "schema": "inquira.chart/v1",
+        "data": {"logical_name": logical_name},
+        "mark": "bar",
+        "encoding": {
+            "x": {"field": "region", "type": "nominal"},
+            "y": {"field": "sales", "type": "quantitative"},
+        },
+        "title": "Sales by region",
+    }
+
+
+def test_chart_policy_requires_specs_for_dataframes_but_not_scalars() -> None:
+    missing_chart = AnalysisOutput(
+        code="summary = conn.sql('SELECT region, SUM(sales) AS sales FROM sales GROUP BY region').df()",
+        output_contract=[{"name": "summary", "kind": "dataframe"}],
+    )
+    assert "require chart_spec" in _chart_policy_error(missing_chart)
+
+    scalar = AnalysisOutput(
+        code="total = conn.sql('SELECT SUM(sales) FROM sales').fetchone()[0]",
+        output_contract=[{"name": "total", "kind": "scalar"}],
+    )
+    assert _chart_policy_error(scalar) == ""
+
+    charted = AnalysisOutput(
+        code=missing_chart.code,
+        output_contract=missing_chart.output_contract,
+        chart_spec=_bar_chart_spec(),
+    )
+    assert _chart_policy_error(charted) == ""
+
+    wrong_source = AnalysisOutput(
+        code=missing_chart.code,
+        output_contract=missing_chart.output_contract,
+        chart_spec=_bar_chart_spec("other"),
+    )
+    assert "must reference a dataframe" in _chart_policy_error(wrong_source)
 
 
 def test_resolve_memory_limits_scales_with_context_window() -> None:
