@@ -3,10 +3,14 @@ import assert from 'node:assert/strict'
 import { readFileSync } from './sourceText.mjs'
 import { resolve } from 'node:path'
 
-test('chat keeps ephemeral progress hidden inside the analysis-details implementation', () => {
+test('chat exposes ephemeral progress while the agent is working', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/chat/ChatHistory.vue'), 'utf-8')
 
-  assert.equal(source.includes('const SHOW_EPHEMERAL_TRACE = false'), true)
+  assert.equal(source.includes('const SHOW_EPHEMERAL_TRACE = true'), true)
+  assert.equal(source.includes('isMessageRunning(message) && !collapsedLiveAnalysisMessageIds.value.has(messageId)'), true)
+  assert.equal(source.includes("isMessageRunning(message) ? 'Working' : 'Analysis details'"), true)
+  assert.equal(source.includes('class="live-progress-status"'), true)
+  assert.equal(source.includes('currentProgress(message).action'), true)
   assert.equal(source.includes('Analysis details'), true)
   assert.equal(source.includes('Final response'), false)
   assert.equal(source.includes('class="ephemeral-trace-list"'), true)

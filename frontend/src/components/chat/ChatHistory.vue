@@ -58,27 +58,36 @@
           <div
             v-if="hasAnalysisDetails(message)"
             class="mt-3 view-code-details"
-            :class="isAnalysisDetailsOpen(message.id) ? 'view-code-details-open' : ''"
+            :class="isAnalysisDetailsOpen(message) ? 'view-code-details-open' : ''"
           >
             <button
               type="button"
               class="view-code-toggle"
-              :aria-expanded="isAnalysisDetailsOpen(message.id)"
-              @click="toggleAnalysisDetails(message.id)"
+              :aria-expanded="isAnalysisDetailsOpen(message)"
+              @click="toggleAnalysisDetails(message)"
             >
               <span class="inline-flex items-center gap-1.5">
                 <CodeBracketIcon class="h-4 w-4" aria-hidden="true" />
-                <span>Analysis details</span>
+                <span>{{ isMessageRunning(message) ? 'Working' : 'Analysis details' }}</span>
+                <span v-if="isMessageRunning(message)" class="live-progress-dot" aria-hidden="true"></span>
                 <span class="view-code-caret" aria-hidden="true">↓</span>
               </span>
             </button>
             <div
               class="motion-disclosure"
-              :class="isAnalysisDetailsOpen(message.id) ? 'motion-disclosure-open' : ''"
-              :aria-hidden="!isAnalysisDetailsOpen(message.id)"
+              :class="isAnalysisDetailsOpen(message) ? 'motion-disclosure-open' : ''"
+              :aria-hidden="!isAnalysisDetailsOpen(message)"
             >
             <div class="motion-disclosure-content">
             <div class="view-code-panel">
+              <div v-if="isMessageRunning(message)" class="live-progress-status" role="status" aria-live="polite">
+                <div class="analyzing-spinner" aria-hidden="true"></div>
+                <div class="min-w-0">
+                  <p class="live-progress-action">{{ currentProgress(message).action }}</p>
+                  <p v-if="currentProgress(message).detail" class="live-progress-detail">{{ currentProgress(message).detail }}</p>
+                </div>
+              </div>
+
               <div v-if="reasoningRows(message).length" class="stream-reasoning-list">
                 <div v-for="row in reasoningRows(message)" :key="row.id" class="stream-reasoning-item">
                   <template v-if="row.sections?.length">
@@ -164,7 +173,7 @@
     </div>
 
     <!-- Loading indicator when analyzing - shown below last message -->
-    <div v-if="executionStore.isConversationRunning(conversationStore.activeConversationId) && displayedChatHistory.length > 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
+    <div v-if="executionStore.isConversationRunning(conversationStore.activeConversationId) && displayedChatHistory.length > 0 && !hasAssistantContent(displayedChatHistory.at(-1))" role="status" aria-live="polite" class="flex items-center justify-center py-6">
       <div class="analyzing-status">
         <div class="analyzing-spinner" aria-hidden="true"></div>
         <span class="analyzing-status-text">Analyzing your question...</span>
@@ -230,17 +239,35 @@ const chatContainer = ref<any>(null)
 const scrollHost = ref<any>(null)
 const end = ref<any>(null)
 const expandedAnalysisMessageIds = ref(new Set())
-const SHOW_EPHEMERAL_TRACE = false
+const collapsedLiveAnalysisMessageIds = ref(new Set())
+const SHOW_EPHEMERAL_TRACE = true
 const showScrollToBottomButton = ref(false)
 let shouldAutoScroll = true
 let mutationObserver: MutationObserver | null = null
 let lastScrollTop = 0
 
-function isAnalysisDetailsOpen(messageId: any) {
-  return expandedAnalysisMessageIds.value.has(messageId)
+function isMessageRunning(message: any) {
+  if (!executionStore.isConversationRunning(conversationStore.activeConversationId)) return false
+  const messageId = String(message?.id || '').trim()
+  return Boolean(messageId && messageId === String(lastMessageId.value || '').trim())
 }
 
-function toggleAnalysisDetails(messageId: any) {
+function isAnalysisDetailsOpen(message: any) {
+  const messageId = String(message?.id || '').trim()
+  if (expandedAnalysisMessageIds.value.has(messageId)) return true
+  return isMessageRunning(message) && !collapsedLiveAnalysisMessageIds.value.has(messageId)
+}
+
+function toggleAnalysisDetails(message: any) {
+  const messageId = String(message?.id || '').trim()
+  if (!messageId) return
+  if (isMessageRunning(message) && !expandedAnalysisMessageIds.value.has(messageId)) {
+    const nextCollapsed = new Set(collapsedLiveAnalysisMessageIds.value)
+    if (nextCollapsed.has(messageId)) nextCollapsed.delete(messageId)
+    else nextCollapsed.add(messageId)
+    collapsedLiveAnalysisMessageIds.value = nextCollapsed
+    return
+  }
   const next = new Set(expandedAnalysisMessageIds.value)
   if (next.has(messageId)) next.delete(messageId)
   else next.add(messageId)
@@ -451,7 +478,7 @@ function isToolActivityOutputCollapsed(message: any, activityIndex: any) {
 }
 
 function reasoningRows(message: any) {
-  if (hasFinalResponse(message)) return []
+  if (hasFinalResponse(message) && !isMessageRunning(message)) return []
   return streamReasoningEvents(message)
     .map((event, index) => ({
       id: `${message?.id || 'msg'}-reasoning-${String(event?.stage || 'intent')}-${index}`,
@@ -627,7 +654,7 @@ function normalizeEphemeralText(value: any) {
 }
 
 function ephemeralRows(message: any) {
-  if (hasFinalResponse(message)) return []
+  if (hasFinalResponse(message) && !isMessageRunning(message)) return []
   const events = streamTraceEvents(message)
   return events
     .filter((event) => {
@@ -679,10 +706,35 @@ function hasActionProgress(message: any) {
 
 function hasAnalysisDetails(message: any) {
   return Boolean(
+    isMessageRunning(message) ||
     reasoningRows(message).length > 0 ||
     hasActionProgress(message) ||
     shouldRenderCodeDetails(message)
   )
+}
+
+function currentProgress(message: any) {
+  const progressRows = ephemeralRows(message)
+  const latestProgress = progressRows.at(-1)
+  if (latestProgress?.action || latestProgress?.detail) {
+    return {
+      action: latestProgress.action || 'Analyzing your question',
+      detail: latestProgress.detail || '',
+    }
+  }
+  const latestReasoning = reasoningRows(message).at(-1)
+  const nextSection = Array.isArray(latestReasoning?.sections)
+    ? latestReasoning.sections.find((section: any) => section?.label === 'Next')
+    : null
+  if (nextSection?.text) {
+    return { action: 'Planning the next step', detail: nextSection.text }
+  }
+  const latestTool = toolActivityRows(message).at(-1)
+  if (latestTool?.tool) {
+    const tool = String(latestTool.tool).replace(/_/g, ' ')
+    return { action: `Using ${tool}`, detail: String(latestTool.explanation || '').trim() }
+  }
+  return { action: 'Analyzing your question', detail: 'Preparing the data and deciding the next step.' }
 }
 
 function hasAssistantContent(message: any) {
@@ -978,6 +1030,44 @@ watch(() => executionStore.isConversationRunning(conversationStore.activeConvers
   padding: 0.7rem 0.9rem 0.9rem;
 }
 
+.live-progress-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  color: var(--color-text-main);
+}
+
+.live-progress-status + .stream-reasoning-list,
+.live-progress-status + .stream-action-section {
+  padding-top: 0.75rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+}
+
+.live-progress-action {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text-main);
+}
+
+.live-progress-detail {
+  margin: 0.1875rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.live-progress-dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-accent) 12%, transparent);
+  animation: live-progress-pulse 1.5s var(--motion-ease-standard) infinite;
+}
+
 .view-code-meta-badge {
   display: inline-flex;
   align-items: center;
@@ -1086,9 +1176,17 @@ watch(() => executionStore.isConversationRunning(conversationStore.activeConvers
   }
 }
 
+@keyframes live-progress-pulse {
+  50% {
+    opacity: 0.55;
+    transform: scale(0.82);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .analyzing-spinner,
-  .analyzing-status-text::after {
+  .analyzing-status-text::after,
+  .live-progress-dot {
     animation: none;
   }
 }

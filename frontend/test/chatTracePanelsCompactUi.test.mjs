@@ -7,10 +7,12 @@ test('chat history renders the answer first and keeps technical work in analysis
   const chatHistoryPath = resolve(process.cwd(), 'src/components/chat/ChatHistory.vue')
   const source = readFileSync(chatHistoryPath, 'utf-8')
 
-  assert.equal(source.includes('const SHOW_EPHEMERAL_TRACE = false'), true)
+  assert.equal(source.includes('const SHOW_EPHEMERAL_TRACE = true'), true)
   assert.equal(source.includes('SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length'), true)
   assert.equal(source.includes('(SHOW_EPHEMERAL_TRACE && hasStreamTrace(message))'), true)
   assert.equal(source.includes('Analysis details'), true)
+  assert.equal(source.includes("if (hasFinalResponse(message) && !isMessageRunning(message)) return []"), true)
+  assert.equal(source.includes('collapsedLiveAnalysisMessageIds'), true)
   assert.equal(
     source.indexOf('v-if="message.explanation"') < source.indexOf('v-if="hasAnalysisDetails(message)"'),
     true,
