@@ -26,6 +26,19 @@ export interface FigureArtifact extends ArtifactBase {
   }
 }
 
+export interface ChartSpecArtifact extends ArtifactBase {
+  kind: 'chart_spec'
+  value: {
+    schema: 'inquira.chart/v1'
+    data: { logical_name: string; artifact_id?: string | null }
+    mark: string
+    encoding: Record<string, unknown>
+    title: string
+    description?: string | null
+    options?: Record<string, unknown>
+  }
+}
+
 export interface ScalarArtifact extends ArtifactBase {
   kind: 'scalar'
   value: unknown
@@ -41,7 +54,7 @@ export interface TextArtifact extends ArtifactBase {
   text: string
 }
 
-export type Artifact = DataframeArtifact | FigureArtifact | ScalarArtifact | JsonArtifact | TextArtifact
+export type Artifact = DataframeArtifact | FigureArtifact | ChartSpecArtifact | ScalarArtifact | JsonArtifact | TextArtifact
 
 export interface TableSort {
   columnId: string
