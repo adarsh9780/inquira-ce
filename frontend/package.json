@@ -23,7 +23,7 @@
     "@codemirror/commands": "^6.8.1",
     "@codemirror/lang-python": "^6.2.1",
     "@codemirror/search": "^6.5.11",
-    "@codemirror/state": "^6.5.2",
+    "@codemirror/state": "^6.7.1",
     "@codemirror/view": "^6.38.1",
     "@heroicons/vue": "^2.2.0",
     "@tailwindcss/vite": "^4.1.11",
