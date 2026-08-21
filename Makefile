@@ -11,7 +11,7 @@ WAILS ?= $(shell go env GOPATH)/bin/wails
 UV ?= uv
 NPM ?= npm
 
-GO_VERSION := 1.26.5
+GO_VERSION := 1.26.6
 NODE_VERSION := 24.18.0
 PYTHON_VERSION := 3.12.13
 UV_VERSION := 0.11.28

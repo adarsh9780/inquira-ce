@@ -2,7 +2,7 @@ module github.com/adarsh9780/inquira-ce
 
 go 1.26.0
 
-toolchain go1.26.5
+toolchain go1.26.6
 
 require (
 	github.com/UserExistsError/conpty v0.1.4
