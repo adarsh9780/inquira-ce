@@ -130,6 +130,7 @@ import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useConversationStore } from '../../stores/conversationStore'
 import { useWorkspaceActivation } from '../../composables/useWorkspaceActivation'
 import { useArtifactPresentation } from '../../composables/useArtifactPresentation'
+import { useActiveTurnCodeHydration } from '../../composables/useActiveTurnCodeHydration'
 import executionService from '../../services/executionService'
 import { toast } from '../../composables/useToast'
 import { buildExecutionViewModel } from '../../utils/executionViewModel'
@@ -162,6 +163,7 @@ const workspaceStore = useWorkspaceStore()
 const conversationStore = useConversationStore()
 const workspaceActivation = useWorkspaceActivation()
 const artifactPresentation = useArtifactPresentation()
+useActiveTurnCodeHydration()
 
 const editorContainer = ref<any>(null)
 const isRunning = ref(false)
