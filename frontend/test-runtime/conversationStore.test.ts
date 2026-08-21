@@ -47,6 +47,24 @@ describe('conversationStore', () => {
     expect(store.chatHistory[0]?.explanation).toBe('Final answer')
   })
 
+  it('hydrates persisted generated code from the native code_snapshot field', async () => {
+    vi.spyOn(conversationApi, 'listTurns').mockResolvedValue({
+      turns: [{
+        id: 'turn-1',
+        user_text: 'Show the top batsmen',
+        assistant_text: 'Here are the results.',
+        code_snapshot: 'result = conn.sql("SELECT 1").df()',
+      }],
+    } as any)
+    const store = useConversationStore()
+    store.setActiveConversationId('conversation-a')
+
+    await store.fetchConversationTurns({ conversationId: 'conversation-a', preferLatest: true })
+
+    expect(store.chatHistory[0]?.codeSnapshot).toBe('result = conn.sql("SELECT 1").df()')
+    expect(store.activeTurnCode).toBe('result = conn.sql("SELECT 1").df()')
+  })
+
   it('starts a local draft and creates it with the first-question title only when submission needs an id', async () => {
     const create = vi.spyOn(conversationApi, 'create').mockResolvedValue({
       id: 'conversation-new',

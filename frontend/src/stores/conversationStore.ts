@@ -43,6 +43,10 @@ export const useConversationStore = defineStore('conversations', () => {
     }
   }
 
+  function turnCodeSnapshot(turn: RecordValue | null | undefined) {
+    return String(turn?.code_snapshot ?? turn?.code ?? '')
+  }
+
   function stateFor(conversationId: unknown, create = true): RecordValue | null {
     const id = normalizeId(conversationId)
     if (!id) return null
@@ -326,7 +330,7 @@ export const useConversationStore = defineStore('conversations', () => {
       explanation: String(turn.assistant_text || turn.answer || ''),
       codeExplanation: '',
       analysisMetadata: turn.metadata || {},
-      codeSnapshot: String(turn.code || ''),
+      codeSnapshot: turnCodeSnapshot(turn),
       turnId: String(turn.id || ''),
       attachments: [],
       streamTrace: { ...emptyTrace(), toolResults: Array.isArray(turn.tool_events) ? turn.tool_events : [] },
@@ -393,7 +397,7 @@ export const useConversationStore = defineStore('conversations', () => {
   function setActiveTurnPayload(turn: any) {
     activeTurn.value = turn && typeof turn === 'object' ? turn : null
     activeTurnId.value = String(turn?.id || '')
-    activeTurnCode.value = String(turn?.code || '')
+    activeTurnCode.value = turnCodeSnapshot(activeTurn.value)
     if (activeConversationId.value) {
       patchConversationState(activeConversationId.value, {
         activeTurn: activeTurn.value,
