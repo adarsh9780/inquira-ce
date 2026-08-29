@@ -89,6 +89,7 @@ export interface NativeMethodMap {
   CancelAgentAnalysis: (workspaceId: string, clientRequestId: string) => Promise<boolean>
   CancelRuntimeProvisioning: () => Promise<boolean>
   ChooseCertificateBundle: () => Promise<string>
+	ChoosePrivateKey: () => Promise<string>
   ChooseLocalConnectionFile: () => Promise<unknown>
   ChoosePythonExecutable: () => Promise<string>
   CompleteModelOnboarding: () => Promise<NativeRecord>
@@ -114,6 +115,7 @@ export interface NativeMethodMap {
   GetFinalConversationTurn: (conversationId: string) => Promise<unknown>
   GetModelOnboardingStatus: () => Promise<NativeRecord>
   GetModelPreferences: (provider: string) => Promise<NativeRecord>
+	GetNetworkPreferences: () => Promise<NativeRecord>
   GetStartupState: () => Promise<unknown>
   GetTermsAndConditions: () => Promise<NativeRecord>
   GetTurnArtifactMetadata: (
@@ -192,12 +194,14 @@ export interface NativeMethodMap {
   StopTerminalSession: (sessionId: string) => Promise<unknown>
   UpdateConversation: (conversationId: string, title: string) => Promise<NativeRecord>
   UpdateModelPreferences: (request: NativeRecord) => Promise<NativeRecord>
+	UpdateNetworkPreferences: (request: NativeRecord) => Promise<NativeRecord>
   UpdateWorkspace: (request: NativeUpdateWorkspaceRequest) => Promise<NativeRecord>
   UpdateWorkspaceAIConfig: (
     workspaceId: string,
     request: NativeRecord,
   ) => Promise<NativeRecord>
   VerifyProviderAPIKey: (provider: string, apiKey: string) => Promise<NativeRecord>
+	VerifyProviderConfiguration: (request: NativeRecord) => Promise<NativeRecord>
   WriteTerminalSession: (sessionId: string, data: string) => Promise<void>
 }
 

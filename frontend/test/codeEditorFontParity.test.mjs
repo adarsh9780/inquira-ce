@@ -27,6 +27,6 @@ test('code editor uses the selected offline-safe mono token and semantic editor 
   assert.equal(codeTabSource.includes('hover:bg-white'), false)
   assert.equal(codeTabSource.includes('hover:text-green-600'), false)
   assert.equal(styleSource.includes('fonts.googleapis.com'), false)
-  assert.equal(styleSource.includes('--font-mono: "SFMono-Regular", "Cascadia Code", "Roboto Mono", monospace;'), true)
+	assert.equal(styleSource.includes('--font-mono: "JetBrains Mono", "Cascadia Code", monospace;'), true)
   assert.equal(styleSource.includes(':root[data-code-font="jetbrains-mono"]'), true)
 })

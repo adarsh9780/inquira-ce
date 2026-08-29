@@ -90,6 +90,59 @@
                   </div>
 
                   <div v-else>
+					<div v-if="provider === 'openai-compatible'" class="mb-5 space-y-4">
+						<label class="block">
+							<span class="input-label">Base URL</span>
+							<input v-model="compatibleBaseUrl" type="url" class="text-input font-mono" placeholder="https://models.company.example/v1" autocomplete="url" spellcheck="false" @input="clearMessages" />
+						</label>
+						<label class="block">
+							<span class="input-label">API version</span>
+							<input v-model="apiVersion" type="text" class="text-input font-mono" placeholder="Optional, for example 2024-10-21" autocomplete="off" spellcheck="false" />
+						</label>
+						<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+							<label class="block">
+								<span class="input-label">API key header</span>
+								<input v-model="apiKeyHeader" type="text" class="text-input font-mono" placeholder="Authorization or api-key" autocomplete="off" spellcheck="false" />
+							</label>
+							<label class="block">
+								<span class="input-label">Header prefix</span>
+								<input v-model="apiKeyPrefix" type="text" class="text-input font-mono" placeholder="Bearer or empty" autocomplete="off" spellcheck="false" />
+							</label>
+						</div>
+						<label class="block">
+							<span class="input-label">Proxy policy</span>
+							<HeaderDropdown :model-value="providerNetworkMode" :options="networkOptions" max-width-class="w-full" aria-label="Provider proxy policy" @update:model-value="providerNetworkMode = String($event || 'inherit')" />
+						</label>
+						<label v-if="providerNetworkMode === 'custom'" class="block">
+							<span class="input-label">Proxy URL</span>
+							<input v-model="providerProxyUrl" type="url" class="text-input font-mono" placeholder="http://proxy.company:8080" autocomplete="off" spellcheck="false" />
+						</label>
+						<label v-if="providerNetworkMode === 'custom'" class="block">
+							<span class="input-label">Bypass proxy for</span>
+							<input v-model="providerNoProxy" type="text" class="text-input font-mono" placeholder="localhost,.company.internal" autocomplete="off" spellcheck="false" />
+						</label>
+						<label class="block">
+							<span class="input-label">CA certificate bundle</span>
+							<span class="flex gap-2">
+								<input v-model="providerCaBundlePath" type="text" class="text-input min-w-0 flex-1 font-mono" placeholder="Optional PEM bundle" autocomplete="off" spellcheck="false" />
+								<button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="chooseCertificate">Browse</button>
+							</span>
+						</label>
+						<label class="block">
+							<span class="input-label">Client certificate</span>
+							<span class="flex gap-2">
+								<input v-model="providerClientCertificatePath" type="text" class="text-input min-w-0 flex-1 font-mono" placeholder="Optional PEM client certificate" autocomplete="off" spellcheck="false" />
+								<button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="chooseClientCertificate">Browse</button>
+							</span>
+						</label>
+						<label class="block">
+							<span class="input-label">Client private key</span>
+							<span class="flex gap-2">
+								<input v-model="providerClientKeyPath" type="text" class="text-input min-w-0 flex-1 font-mono" placeholder="Optional PEM private key" autocomplete="off" spellcheck="false" />
+								<button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="choosePrivateKey">Browse</button>
+							</span>
+						</label>
+					</div>
                     <label for="onboarding-api-key" class="input-label">{{ apiKeyLabel }}</label>
                     <div class="relative">
                       <input
@@ -106,7 +159,7 @@
                         <span aria-hidden="true">{{ showKey ? 'Hide' : 'Show' }}</span>
                       </button>
                     </div>
-                    <button type="button" class="mt-2 text-xs font-medium text-[var(--color-accent-text)] hover:underline" @click="openKeyPortal">
+					<button v-if="keyPortal" type="button" class="mt-2 text-xs font-medium text-[var(--color-accent-text)] hover:underline" @click="openKeyPortal">
                       Create a {{ providerLabel }} API key
                     </button>
                   </div>
@@ -148,6 +201,7 @@ import { computed, onMounted, ref } from 'vue'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import { useLLMConfig } from '../../composables/useLLMConfig'
 import { modelConnectionService } from '../../services/modelConnectionService'
+import { runtimeProvisionService } from '../../services/runtimeProvisionService'
 import { openExternalUrl } from '../../services/externalLinkService'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import logo from '../../assets/favicon.svg'
@@ -165,6 +219,16 @@ const {
   provider,
   apiKey,
   ollamaBaseUrl,
+	compatibleBaseUrl,
+	apiKeyHeader,
+	apiKeyPrefix,
+	apiVersion,
+	providerNetworkMode,
+	providerProxyUrl,
+	providerNoProxy,
+	providerCaBundlePath,
+	providerClientCertificatePath,
+	providerClientKeyPath,
   selectedProviderApiKeyPresent,
   usingMaskedKey,
   verifyError,
@@ -184,7 +248,15 @@ const actionError = ref(String(props.initialStatus?.error || ''))
 const providerOptions = [
   { value: 'openrouter', label: 'OpenRouter' },
   { value: 'openai', label: 'OpenAI' },
+	{ value: 'anthropic', label: 'Anthropic' },
+	{ value: 'openai-compatible', label: 'OpenAI compatible' },
   { value: 'ollama', label: 'Ollama (local)' },
+]
+const networkOptions = [
+	{ value: 'inherit', label: 'Use global/system proxy settings' },
+	{ value: 'system', label: 'Use operating-system proxy' },
+	{ value: 'custom', label: 'Use custom proxy' },
+	{ value: 'direct', label: 'Connect directly' },
 ]
 
 const journeySteps = [
@@ -196,13 +268,21 @@ const journeySteps = [
 const providerLabel = computed(() => {
   if (provider.value === 'openai') return 'OpenAI'
   if (provider.value === 'ollama') return 'Ollama'
+	if (provider.value === 'anthropic') return 'Anthropic'
+	if (provider.value === 'openai-compatible') return 'OpenAI compatible provider'
   return 'OpenRouter'
 })
 const apiKeyLabel = computed(() => `${providerLabel.value} API key`)
-const apiKeyPlaceholder = computed(() => (provider.value === 'openai' ? 'sk-…' : 'or-…'))
+const apiKeyPlaceholder = computed(() => {
+	if (provider.value === 'openai') return 'sk-…'
+	if (provider.value === 'openrouter') return 'or-…'
+	if (provider.value === 'anthropic') return 'sk-ant-…'
+	return 'Enter API key'
+})
 const connectionError = computed(() => String(actionError.value || verifyError.value || '').trim())
 const canConnect = computed(() => {
   if (provider.value === 'ollama') return Boolean(String(ollamaBaseUrl.value || '').trim())
+	if (provider.value === 'openai-compatible' && !String(compatibleBaseUrl.value || '').trim()) return false
   return Boolean(String(apiKey.value || '').trim())
 })
 const connectButtonLabel = computed(() => {
@@ -210,9 +290,12 @@ const connectButtonLabel = computed(() => {
   if (selectedProviderApiKeyPresent.value && usingMaskedKey.value) return `Use saved ${providerLabel.value} key`
   return 'Verify and save key'
 })
-const keyPortal = computed(() => (
-  provider.value === 'openai' ? 'https://platform.openai.com/api-keys' : 'https://openrouter.ai/keys'
-))
+const keyPortal = computed(() => {
+	if (provider.value === 'openai') return 'https://platform.openai.com/api-keys'
+	if (provider.value === 'openrouter') return 'https://openrouter.ai/keys'
+	if (provider.value === 'anthropic') return 'https://console.anthropic.com/settings/keys'
+	return ''
+})
 
 onMounted(async () => {
   try {
@@ -229,6 +312,33 @@ function clearMessages() {
 
 function handleApiKeyInput(event: Event) {
   setApiKey((event.target as HTMLInputElement).value)
+}
+
+async function chooseCertificate() {
+	try {
+		const selected = await runtimeProvisionService.chooseCertificateBundle()
+		if (selected) providerCaBundlePath.value = String(selected)
+	} catch (error) {
+		actionError.value = extractApiErrorMessage(error, 'Could not choose a certificate bundle.')
+	}
+}
+
+async function chooseClientCertificate() {
+	try {
+		const selected = await runtimeProvisionService.chooseCertificateBundle()
+		if (selected) providerClientCertificatePath.value = String(selected)
+	} catch (error) {
+		actionError.value = extractApiErrorMessage(error, 'Could not choose a client certificate.')
+	}
+}
+
+async function choosePrivateKey() {
+	try {
+		const selected = await runtimeProvisionService.choosePrivateKey()
+		if (selected) providerClientKeyPath.value = String(selected)
+	} catch (error) {
+		actionError.value = extractApiErrorMessage(error, 'Could not choose a private key.')
+	}
 }
 
 async function handleProviderSelect(nextProvider: unknown) {

@@ -53,6 +53,14 @@
             <PaintBrushIcon class="h-4 w-4 shrink-0" />
             <span>Appearance</span>
           </button>
+			<button
+				type="button"
+				:class="activeSection === 'network' ? activeNavClass : inactiveNavClass"
+				@click="openLeafSection('network')"
+			>
+				<GlobeAltIcon class="h-4 w-4 shrink-0" />
+				<span>Network &amp; proxy</span>
+			</button>
           <button
             type="button"
             :class="activeSection === 'account' ? activeNavClass : inactiveNavClass"
@@ -99,6 +107,10 @@
             <AppearanceTab />
           </section>
 
+			<section v-if="currentPanel === 'network'" :class="panelClass('network')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5 max-sm:px-4 max-sm:py-4">
+				<NetworkSettingsTab />
+			</section>
+
           <section v-if="currentPanel === 'account'" :class="panelClass('account')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5 max-sm:px-4 max-sm:py-4">
             <AccountTab />
           </section>
@@ -127,6 +139,7 @@ import {
   KeyIcon,
   PaintBrushIcon,
   UserIcon,
+	GlobeAltIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -144,6 +157,7 @@ const SetupTab = defineAsyncComponent(() => import('./tabs/SetupTab.vue'))
 const LLMSettingsTab = defineAsyncComponent(() => import('./tabs/LLMSettingsTab.vue'))
 const WorkspaceTab = defineAsyncComponent(() => import('./tabs/WorkspaceTab.vue'))
 const AppearanceTab = defineAsyncComponent(() => import('./tabs/AppearanceTab.vue'))
+const NetworkSettingsTab = defineAsyncComponent(() => import('./tabs/NetworkSettingsTab.vue'))
 const AccountTab = defineAsyncComponent(() => import('./tabs/AccountTab.vue'))
 
 const emit = defineEmits(['update:modelValue'])
@@ -172,6 +186,7 @@ const activeSectionTitle = computed(() => {
   if (activeSection.value === 'connections') return 'AI providers'
   if (activeSection.value === 'workspace') return 'Workspaces'
   if (activeSection.value === 'appearance') return 'Appearance'
+	if (activeSection.value === 'network') return 'Network & proxy'
   if (activeSection.value === 'account') return 'Account'
   return 'Settings'
 })
@@ -181,6 +196,7 @@ const activeSectionDescription = computed(() => {
   if (activeSection.value === 'connections') return 'Manage AI provider credentials shared by every workspace.'
   if (activeSection.value === 'workspace') return 'Manage workspace identity, runtime, models, privacy, and advanced controls.'
   if (activeSection.value === 'appearance') return 'Choose the theme and typography used throughout Inquira.'
+	if (activeSection.value === 'network') return 'Set the application-wide proxy and certificate trust used for AI provider calls.'
   if (activeSection.value === 'account') return 'Review local profile and application information.'
   return 'Customize application settings.'
 })
@@ -224,7 +240,8 @@ function normalizeTab(tab: unknown): string {
   const candidate = String(tab || '').toLowerCase()
   if (candidate === 'api' || candidate === 'llm') return 'connections'
   if (candidate === 'data' || candidate === 'models' || candidate.startsWith('workspace-')) return 'workspace'
-  if (candidate === 'setup' || candidate === 'connections' || candidate === 'workspace' || candidate === 'appearance' || candidate === 'account') {
+	if (candidate === 'proxy') return 'network'
+  if (candidate === 'setup' || candidate === 'connections' || candidate === 'workspace' || candidate === 'appearance' || candidate === 'network' || candidate === 'account') {
     return candidate
   }
   return 'setup'

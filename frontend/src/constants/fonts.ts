@@ -8,7 +8,7 @@ export const APP_FONT_OPTIONS: readonly FontOption[] = [
   {
     id: 'default',
     label: 'Default',
-    description: 'Current UI font stack (Manrope).',
+		description: 'Bundled Inter font for consistent cross-platform rendering.',
   },
   {
     id: 'ubuntu',

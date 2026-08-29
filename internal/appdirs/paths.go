@@ -8,6 +8,8 @@ import (
 
 const appDirectoryName = "Inquira"
 
+const rootEnvironmentVariable = "INQUIRA_HOME"
+
 // Paths contains every application-owned path used by the Go control plane.
 type Paths struct {
 	ConfigDir    string `json:"config_dir"`
@@ -19,6 +21,9 @@ type Paths struct {
 
 // Resolve returns platform-appropriate paths without creating them.
 func Resolve() (Paths, error) {
+	if root := configuredRoot(); root != "" {
+		return FromRoot(root), nil
+	}
 	configRoot, err := os.UserConfigDir()
 	if err != nil {
 		return Paths{}, fmt.Errorf("resolve user config directory: %w", err)
@@ -27,6 +32,13 @@ func Resolve() (Paths, error) {
 		return Paths{}, fmt.Errorf("resolve user config directory: empty path")
 	}
 	return FromRoot(filepath.Join(configRoot, appDirectoryName)), nil
+}
+
+func configuredRoot() string {
+	if root := filepath.Clean(os.Getenv(rootEnvironmentVariable)); root != "." && root != "" {
+		return root
+	}
+	return platformConfiguredRoot()
 }
 
 // FromRoot builds a path set rooted at root. It is primarily useful for tests.

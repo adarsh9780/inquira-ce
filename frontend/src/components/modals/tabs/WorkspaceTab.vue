@@ -447,19 +447,19 @@
                 </label>
                 <label v-if="runtimeConfig.mode === 'internal-mirror'" class="block sm:col-span-2">
                   <span class="input-label">Python download mirror</span>
-                  <input type="password" v-model="runtimeConfig.pythonInstallMirror" class="input-base input-outlined" placeholder="https://packages.company/python" autocomplete="off" spellcheck="false" :disabled="runtimeProvisioning" />
+					<input type="url" v-model="runtimeConfig.pythonInstallMirror" class="input-base input-outlined" placeholder="https://packages.company/python" autocomplete="off" spellcheck="false" :disabled="runtimeProvisioning" />
                 </label>
                 <label class="block sm:col-span-2">
                   <span class="input-label">Package index</span>
-                  <input type="password" v-model="runtimeConfig.defaultIndex" class="input-base input-outlined" placeholder="https://packages.company/simple (optional for managed Python)" autocomplete="off" spellcheck="false" :disabled="runtimeProvisioning" />
+					<input type="url" v-model="runtimeConfig.defaultIndex" class="input-base input-outlined" placeholder="https://packages.company/simple (optional for managed Python)" autocomplete="off" spellcheck="false" :disabled="runtimeProvisioning" />
                 </label>
                 <label class="block">
                   <span class="input-label">HTTP proxy</span>
-                  <input type="password" v-model="runtimeConfig.httpProxy" class="input-base input-outlined" placeholder="http://proxy.company:8080" autocomplete="off" spellcheck="false" :disabled="runtimeProvisioning" />
+					<input type="url" v-model="runtimeConfig.httpProxy" class="input-base input-outlined" placeholder="http://proxy.company:8080" autocomplete="off" spellcheck="false" :disabled="runtimeProvisioning" />
                 </label>
                 <label class="block">
                   <span class="input-label">HTTPS proxy</span>
-                  <input type="password" v-model="runtimeConfig.httpsProxy" class="input-base input-outlined" placeholder="https://proxy.company:8443" autocomplete="off" spellcheck="false" :disabled="runtimeProvisioning" />
+					<input type="url" v-model="runtimeConfig.httpsProxy" class="input-base input-outlined" placeholder="https://proxy.company:8443" autocomplete="off" spellcheck="false" :disabled="runtimeProvisioning" />
                 </label>
                 <label class="block sm:col-span-2">
                   <span class="input-label">Proxy bypass list</span>

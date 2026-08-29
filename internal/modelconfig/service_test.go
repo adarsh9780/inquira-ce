@@ -165,8 +165,75 @@ func TestAnthropicConfigurationUsesNativeHeadersAndRuntime(t *testing.T) {
 		t.Fatalf("Anthropic preferences = %#v", result)
 	}
 	runtimeConfig, err := service.RuntimeConfiguration(context.Background())
-	if err != nil || runtimeConfig.Provider != provider || runtimeConfig.APIKey != key || runtimeConfig.BaseURL != "" {
+	if err != nil || runtimeConfig.Provider != provider || runtimeConfig.APIKey != key || runtimeConfig.BaseURL != "https://api.anthropic.com/v1" {
 		t.Fatalf("Anthropic runtime = %#v, %v", runtimeConfig, err)
+	}
+}
+
+func TestOpenAICompatibleConfigurationUsesCustomEndpointAuthAndNetwork(t *testing.T) {
+	repository, err := OpenSQLite(filepath.Join(t.TempDir(), "inquira.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	secrets := &memorySecrets{values: map[string]string{}}
+	var requestedURLs []string
+	httpClient := roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		requestedURLs = append(requestedURLs, request.URL.String())
+		if request.Header.Get("api-key") != "enterprise-secret" || request.Header.Get("Authorization") != "" {
+			t.Fatalf("compatible auth headers = %#v", request.Header)
+		}
+		return response(http.StatusOK, `{"data":[{"id":"company-model"},{"id":"company-model-mini"}]}`), nil
+	})
+	var network NetworkSettings
+	service := NewService(repository, secrets, httpClient).WithHTTPClientFactory(func(settings NetworkSettings) (HTTPDoer, error) {
+		network = settings
+		return httpClient, nil
+	})
+	defer service.Close()
+
+	if _, err := service.UpdateNetworkPreferences(context.Background(), NetworkSettings{
+		Mode: NetworkModeCustom, ProxyURL: "http://proxy.company:8080", NoProxy: ".internal",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	key := "enterprise-secret"
+	mainModel := "company-model"
+	liteModel := "company-model-mini"
+	settings := ProviderSettings{
+		BaseURL: "https://models.company.example/v1", APIKeyHeader: "api-key", APIVersion: "2025-01-01",
+		Network: NetworkSettings{Mode: NetworkModeInherit},
+	}
+	result, err := service.SaveConfiguration(context.Background(), SaveRequest{
+		Provider: "openai-compatible", APIKey: &key, ProviderSettings: &settings,
+		SelectedModel: &mainModel, SelectedLiteModel: &liteModel,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(requestedURLs) < 2 || requestedURLs[0] != "https://models.company.example/v1/models?api-version=2025-01-01" {
+		t.Fatalf("compatible URLs = %#v", requestedURLs)
+	}
+	if network.Mode != NetworkModeCustom || network.ProxyURL != "http://proxy.company:8080" || network.NoProxy != ".internal" {
+		t.Fatalf("resolved network = %#v", network)
+	}
+	if !result.SelectedProviderAPIKeyPresent || result.SelectedProviderSettings.BaseURL != settings.BaseURL {
+		t.Fatalf("compatible preferences = %#v", result)
+	}
+	runtimeConfig, err := service.RuntimeConfiguration(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtimeConfig.Provider != "openai-compatible" || runtimeConfig.BaseURL != settings.BaseURL ||
+		runtimeConfig.APIKeyHeader != "api-key" || runtimeConfig.APIKeyPrefix != "" ||
+		runtimeConfig.ProxyURL != "http://proxy.company:8080" || runtimeConfig.Model != mainModel {
+		t.Fatalf("compatible runtime = %#v", runtimeConfig)
+	}
+	runtimeJSON, err := json.Marshal(runtimeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(runtimeJSON), `"api_key_prefix":""`) {
+		t.Fatalf("blank API key prefix must reach the worker: %s", runtimeJSON)
 	}
 }
 

@@ -93,7 +93,22 @@ func NewApp() *App {
 		app.initErr = err
 		return app
 	}
-	app.models = modelconfig.NewService(repository, modelconfig.OSKeychain{}, httpClient)
+	app.models = modelconfig.NewService(repository, modelconfig.OSKeychain{}, httpClient).WithHTTPClientFactory(
+		func(settings modelconfig.NetworkSettings) (modelconfig.HTTPDoer, error) {
+			proxyURL := ""
+			if settings.Mode == modelconfig.NetworkModeCustom {
+				proxyURL = settings.ProxyURL
+			}
+			return netclient.New(netclient.Config{
+				ProxyURL:              proxyURL,
+				NoProxy:               settings.NoProxy,
+				CABundlePath:          settings.CABundlePath,
+				ClientCertificatePath: settings.ClientCertificatePath,
+				ClientKeyPath:         settings.ClientKeyPath,
+				DisableProxy:          settings.Mode == modelconfig.NetworkModeDirect,
+			})
+		},
+	)
 	workspaceRepository, err := workspace.OpenSQLite(paths.DatabasePath)
 	if err != nil {
 		_ = app.models.Close()
@@ -509,6 +524,30 @@ func (a *App) VerifyProviderAPIKey(provider, apiKey string) (modelconfig.VerifyR
 		return modelconfig.VerifyResponse{}, err
 	}
 	return service.VerifyKey(a.appContext(), provider, apiKey)
+}
+
+func (a *App) VerifyProviderConfiguration(request modelconfig.VerifyRequest) (modelconfig.VerifyResponse, error) {
+	service, err := a.modelService()
+	if err != nil {
+		return modelconfig.VerifyResponse{}, err
+	}
+	return service.VerifyConfiguration(a.appContext(), request)
+}
+
+func (a *App) GetNetworkPreferences() (modelconfig.NetworkPreferencesResponse, error) {
+	service, err := a.modelService()
+	if err != nil {
+		return modelconfig.NetworkPreferencesResponse{}, err
+	}
+	return service.GetNetworkPreferences(a.appContext())
+}
+
+func (a *App) UpdateNetworkPreferences(settings modelconfig.NetworkSettings) (modelconfig.NetworkPreferencesResponse, error) {
+	service, err := a.modelService()
+	if err != nil {
+		return modelconfig.NetworkPreferencesResponse{}, err
+	}
+	return service.UpdateNetworkPreferences(a.appContext(), settings)
 }
 
 func (a *App) SaveProviderConfiguration(request modelconfig.SaveRequest) (modelconfig.PreferencesResponse, error) {
@@ -1042,6 +1081,16 @@ func (a *App) ChooseCertificateBundle() (string, error) {
 		Title: "Choose a PEM certificate bundle",
 		Filters: []runtime.FileFilter{
 			{DisplayName: "Certificate bundle", Pattern: "*.pem;*.crt;*.cer"},
+			{DisplayName: "All files", Pattern: "*"},
+		},
+	})
+}
+
+func (a *App) ChoosePrivateKey() (string, error) {
+	return runtime.OpenFileDialog(a.appContext(), runtime.OpenDialogOptions{
+		Title: "Choose a PEM private key",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "PEM private key", Pattern: "*.pem;*.key"},
 			{DisplayName: "All files", Pattern: "*"},
 		},
 	})

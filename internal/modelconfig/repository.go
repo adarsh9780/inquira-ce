@@ -97,6 +97,25 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 			return fmt.Errorf("record onboarding migration: %w", err)
 		}
 	}
+	var enterpriseNetworkMigrationApplied bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(
+		SELECT 1 FROM schema_migrations WHERE version = 3
+	)`).Scan(&enterpriseNetworkMigrationApplied); err != nil {
+		return fmt.Errorf("inspect enterprise network migration: %w", err)
+	}
+	if !enterpriseNetworkMigrationApplied {
+		if _, err := tx.ExecContext(ctx, `ALTER TABLE model_preferences
+			ADD COLUMN global_network_json TEXT NOT NULL DEFAULT '{"mode":"system"}'`); err != nil {
+			return fmt.Errorf("add global network preference: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `ALTER TABLE model_preferences
+			ADD COLUMN provider_settings_json TEXT NOT NULL DEFAULT '{}'`); err != nil {
+			return fmt.Errorf("add provider connection preferences: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations(version) VALUES (3)`); err != nil {
+			return fmt.Errorf("record enterprise network migration: %w", err)
+		}
+	}
 
 	defaults := defaultPreferences()
 	catalogs, err := json.Marshal(defaults.Catalogs)
@@ -127,11 +146,14 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 func (r *SQLiteRepository) Load(ctx context.Context) (Preferences, error) {
 	var preferences Preferences
 	var catalogsJSON string
+	var globalNetworkJSON string
+	var providerSettingsJSON string
 	err := r.db.QueryRowContext(ctx, `SELECT
 		llm_provider, selected_model, selected_lite_model, selected_coding_model,
 		llm_temperature, llm_max_tokens, llm_top_p, llm_top_k,
 		llm_frequency_penalty, llm_presence_penalty, slow_request_warning_seconds,
-		allow_llm_data_samples, model_onboarding_completed, ollama_base_url, provider_catalogs_json
+		allow_llm_data_samples, model_onboarding_completed, ollama_base_url, provider_catalogs_json,
+		global_network_json, provider_settings_json
 		FROM model_preferences WHERE id = 1`).Scan(
 		&preferences.LLMProvider, &preferences.SelectedModel,
 		&preferences.SelectedLiteModel, &preferences.SelectedCodingModel,
@@ -139,7 +161,7 @@ func (r *SQLiteRepository) Load(ctx context.Context) (Preferences, error) {
 		&preferences.TopK, &preferences.FrequencyPenalty,
 		&preferences.PresencePenalty, &preferences.SlowRequestWarningSeconds,
 		&preferences.AllowLLMDataSamples, &preferences.ModelOnboardingCompleted,
-		&preferences.OllamaBaseURL, &catalogsJSON,
+		&preferences.OllamaBaseURL, &catalogsJSON, &globalNetworkJSON, &providerSettingsJSON,
 	)
 	if err != nil {
 		return Preferences{}, fmt.Errorf("load model preferences: %w", err)
@@ -149,6 +171,14 @@ func (r *SQLiteRepository) Load(ctx context.Context) (Preferences, error) {
 		return Preferences{}, fmt.Errorf("decode provider catalogs: %w", err)
 	}
 	preferences.Catalogs = mergeCatalogs(catalogs)
+	if err := json.Unmarshal([]byte(globalNetworkJSON), &preferences.GlobalNetwork); err != nil {
+		return Preferences{}, fmt.Errorf("decode global network settings: %w", err)
+	}
+	preferences.GlobalNetwork = normalizeNetworkSettings(preferences.GlobalNetwork, false)
+	if err := json.Unmarshal([]byte(providerSettingsJSON), &preferences.ProviderSettings); err != nil {
+		return Preferences{}, fmt.Errorf("decode provider connection settings: %w", err)
+	}
+	preferences.ProviderSettings = mergeProviderSettings(preferences.ProviderSettings)
 	return preferences, nil
 }
 
@@ -157,19 +187,27 @@ func (r *SQLiteRepository) Save(ctx context.Context, preferences Preferences) er
 	if err != nil {
 		return fmt.Errorf("encode provider catalogs: %w", err)
 	}
+	globalNetwork, err := json.Marshal(normalizeNetworkSettings(preferences.GlobalNetwork, false))
+	if err != nil {
+		return fmt.Errorf("encode global network settings: %w", err)
+	}
+	providerSettings, err := json.Marshal(mergeProviderSettings(preferences.ProviderSettings))
+	if err != nil {
+		return fmt.Errorf("encode provider connection settings: %w", err)
+	}
 	_, err = r.db.ExecContext(ctx, `UPDATE model_preferences SET
 		llm_provider = ?, selected_model = ?, selected_lite_model = ?, selected_coding_model = ?,
 		llm_temperature = ?, llm_max_tokens = ?, llm_top_p = ?, llm_top_k = ?,
 		llm_frequency_penalty = ?, llm_presence_penalty = ?, slow_request_warning_seconds = ?,
 		allow_llm_data_samples = ?, model_onboarding_completed = ?,
-		ollama_base_url = ?, provider_catalogs_json = ?,
+		ollama_base_url = ?, provider_catalogs_json = ?, global_network_json = ?, provider_settings_json = ?,
 		updated_at = CURRENT_TIMESTAMP WHERE id = 1`,
 		preferences.LLMProvider, preferences.SelectedModel, preferences.SelectedLiteModel,
 		preferences.SelectedCodingModel, preferences.Temperature, preferences.MaxTokens,
 		preferences.TopP, preferences.TopK, preferences.FrequencyPenalty,
 		preferences.PresencePenalty, preferences.SlowRequestWarningSeconds,
 		preferences.AllowLLMDataSamples, preferences.ModelOnboardingCompleted,
-		preferences.OllamaBaseURL, string(catalogs),
+		preferences.OllamaBaseURL, string(catalogs), string(globalNetwork), string(providerSettings),
 	)
 	if err != nil {
 		return fmt.Errorf("save model preferences: %w", err)
@@ -188,5 +226,6 @@ func defaultPreferences() Preferences {
 		Temperature: 0.7, MaxTokens: 4096, TopP: 1, TopK: 0,
 		FrequencyPenalty: 0, PresencePenalty: 0, SlowRequestWarningSeconds: 120,
 		OllamaBaseURL: "http://localhost:11434", Catalogs: catalogs,
+		GlobalNetwork: defaultNetworkSettings(), ProviderSettings: defaultProviderSettings(),
 	}
 }

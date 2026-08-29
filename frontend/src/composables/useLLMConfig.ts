@@ -3,7 +3,7 @@ import { modelConnectionService } from '../services/modelConnectionService'
 import { extractApiErrorMessage } from '../utils/apiError'
 import { usePreferencesStore } from '../stores/preferencesStore'
 
-type Provider = 'openai' | 'openrouter' | 'ollama'
+type Provider = 'openai' | 'openrouter' | 'anthropic' | 'openai-compatible' | 'ollama'
 type RecordValue = Record<string, unknown>
 
 interface ModelMetadata {
@@ -36,6 +36,18 @@ function asRecord(value: unknown): RecordValue {
 const provider = ref<Provider | null>(null)
 const apiKey = ref('')
 const ollamaBaseUrl = ref('http://localhost:11434')
+const compatibleBaseUrl = ref('')
+const apiKeyHeader = ref('Authorization')
+const apiKeyPrefix = ref('Bearer')
+const apiVersion = ref('')
+const organization = ref('')
+const project = ref('')
+const providerNetworkMode = ref('inherit')
+const providerProxyUrl = ref('')
+const providerNoProxy = ref('')
+const providerCaBundlePath = ref('')
+const providerClientCertificatePath = ref('')
+const providerClientKeyPath = ref('')
 const keyVerified = ref(false)
 const mainModels = ref<string[]>([])
 const liteModels = ref<string[]>([])
@@ -78,7 +90,7 @@ function getPreferencesStore(): ReturnType<typeof usePreferencesStore> {
 function normalizeProvider(raw: unknown): Provider {
   const value = String(raw || '').trim().toLowerCase()
   if (value === 'api') return 'openrouter'
-  if (value === 'openai' || value === 'openrouter' || value === 'ollama') return value
+  if (value === 'openai' || value === 'openrouter' || value === 'anthropic' || value === 'openai-compatible' || value === 'ollama') return value
   return 'openrouter'
 }
 
@@ -312,6 +324,23 @@ function applyProviderModelState(
     }
   }
 
+	const rawProviderSettings = asRecord(prefs.selected_provider_settings)
+	const rawNetwork = asRecord(rawProviderSettings.network)
+	compatibleBaseUrl.value = normalized === 'openai-compatible'
+		? String(rawProviderSettings.base_url || '').trim()
+		: ''
+	apiKeyHeader.value = String(rawProviderSettings.api_key_header || 'Authorization').trim()
+	apiKeyPrefix.value = String(rawProviderSettings.api_key_prefix || '').trim()
+	apiVersion.value = String(rawProviderSettings.api_version || '').trim()
+	organization.value = String(rawProviderSettings.organization || '').trim()
+	project.value = String(rawProviderSettings.project || '').trim()
+	providerNetworkMode.value = String(rawNetwork.mode || 'inherit').trim().toLowerCase()
+	providerProxyUrl.value = String(rawNetwork.proxy_url || '').trim()
+	providerNoProxy.value = String(rawNetwork.no_proxy || '').trim()
+	providerCaBundlePath.value = String(rawNetwork.ca_bundle_path || '').trim()
+	providerClientCertificatePath.value = String(rawNetwork.client_certificate_path || '').trim()
+	providerClientKeyPath.value = String(rawNetwork.client_key_path || '').trim()
+
   syncProviderStateToAppStore(normalized)
 }
 
@@ -388,7 +417,23 @@ function resetForAuthBoundary(): void {
   apiKeyPresenceByProvider.value = {}
   selectedProviderApiKeyPresent.value = false
   modelMetaByProvider.value = {}
+	resetProviderConnectionFields()
   clearSensitiveState()
+}
+
+function resetProviderConnectionFields(): void {
+	compatibleBaseUrl.value = ''
+	apiKeyHeader.value = 'Authorization'
+	apiKeyPrefix.value = 'Bearer'
+	apiVersion.value = ''
+	organization.value = ''
+	project.value = ''
+	providerNetworkMode.value = 'inherit'
+	providerProxyUrl.value = ''
+	providerNoProxy.value = ''
+	providerCaBundlePath.value = ''
+	providerClientCertificatePath.value = ''
+	providerClientKeyPath.value = ''
 }
 
 function setProvider(nextProvider: unknown): void {
@@ -412,6 +457,36 @@ function setProvider(nextProvider: unknown): void {
   liteModels.value = []
   mainModel.value = null
   liteModel.value = null
+	resetProviderConnectionFields()
+}
+
+function currentProviderSettings(): RecordValue {
+	const selectedProvider = normalizeProvider(provider.value)
+	const fixedBaseUrls: Partial<Record<Provider, string>> = {
+		openai: 'https://api.openai.com/v1',
+		openrouter: 'https://openrouter.ai/api/v1',
+		anthropic: 'https://api.anthropic.com/v1',
+	}
+	return {
+		base_url: selectedProvider === 'ollama'
+			? String(ollamaBaseUrl.value || '').trim() || 'http://localhost:11434'
+			: selectedProvider === 'openai-compatible'
+				? String(compatibleBaseUrl.value || '').trim()
+				: fixedBaseUrls[selectedProvider] || '',
+		api_key_header: String(apiKeyHeader.value || '').trim(),
+		api_key_prefix: String(apiKeyPrefix.value || '').trim(),
+		api_version: String(apiVersion.value || '').trim(),
+		organization: String(organization.value || '').trim(),
+		project: String(project.value || '').trim(),
+		network: {
+			mode: String(providerNetworkMode.value || 'inherit').trim(),
+			proxy_url: String(providerProxyUrl.value || '').trim(),
+			no_proxy: String(providerNoProxy.value || '').trim(),
+			ca_bundle_path: String(providerCaBundlePath.value || '').trim(),
+			client_certificate_path: String(providerClientCertificatePath.value || '').trim(),
+			client_key_path: String(providerClientKeyPath.value || '').trim(),
+		},
+	}
 }
 
 function setApiKey(value: unknown): void {
@@ -455,7 +530,11 @@ async function verifyKey() {
 
   verifyLoading.value = true
   try {
-    const response = await modelConnectionService.verifyKey(selectedProvider, key)
+    const response = await modelConnectionService.verifyConfiguration({
+		provider: selectedProvider,
+		api_key: key,
+		provider_settings: currentProviderSettings(),
+	})
     if (response?.valid) {
       keyVerified.value = true
       return { ok: true, valid: true, error: '' }
@@ -488,7 +567,15 @@ async function saveKey() {
   }
 
   if (usingMaskedKey.value && apiKey.value === keyMask.value) {
-    return { ok: true }
+		const response = await modelConnectionService.setApiKey({
+			provider: selectedProvider,
+			provider_settings: currentProviderSettings(),
+			allow_llm_data_samples: Boolean(allowLlmDataSamples.value),
+		})
+		if (response && typeof response === 'object') {
+			applyProviderModelState(selectedProvider, response, true)
+		}
+		return { ok: true, response }
   }
 
   const key = String(apiKey.value || '').trim()
@@ -499,6 +586,7 @@ async function saveKey() {
   const response = await modelConnectionService.setApiKey({
     provider: selectedProvider,
     api_key: key,
+		provider_settings: currentProviderSettings(),
     allow_llm_data_samples: Boolean(allowLlmDataSamples.value),
   })
   apiKeyPresenceByProvider.value = {
@@ -587,6 +675,7 @@ async function refreshModels({ background = false }: { background?: boolean } = 
 
   try {
     const payload: RecordValue = { provider: selectedProvider }
+		payload.provider_settings = currentProviderSettings()
     if (selectedProvider === 'ollama') {
       payload.base_url = String(ollamaBaseUrl.value || '').trim() || 'http://localhost:11434'
     } else if (!usingMaskedKey.value) {
@@ -653,9 +742,10 @@ async function saveConfig() {
       allow_llm_data_samples: Boolean(allowLlmDataSamples.value),
     }
 
-    if (selectedProvider === 'ollama' || hasNewUnmaskedKey) {
+		if (selectedProvider === 'ollama' || hasNewUnmaskedKey || hasSavedProviderKey) {
       const securePayload: RecordValue = {
         provider: selectedProvider,
+			provider_settings: currentProviderSettings(),
         ...preferencePayload,
       }
       if (selectedProvider === 'ollama') {
@@ -665,15 +755,12 @@ async function saveConfig() {
         securePayload.api_key = enteredKey
       }
       await modelConnectionService.setApiKey(securePayload)
-    } else {
-      if (!hasSavedProviderKey) {
-        return {
-          ok: false,
-          stage: 'save_configuration',
-          error: `Save a ${providerLabel.value} API key before updating model preferences.`,
-        }
-      }
-      await modelConnectionService.updatePreferences(preferencePayload)
+		} else {
+			return {
+				ok: false,
+				stage: 'save_configuration',
+				error: `Save a ${providerLabel.value} API key before updating model preferences.`,
+			}
     }
     const response = await loadPreferences(selectedProvider, true)
     return { ok: true, response }
@@ -692,6 +779,8 @@ const providerLabel = computed(() => {
   if (provider.value === 'openai') return 'OpenAI'
   if (provider.value === 'openrouter') return 'OpenRouter'
   if (provider.value === 'ollama') return 'Ollama (local)'
+	if (provider.value === 'anthropic') return 'Anthropic'
+	if (provider.value === 'openai-compatible') return 'OpenAI compatible'
   return 'OpenRouter'
 })
 
@@ -726,6 +815,18 @@ export const useLLMConfig = () => {
     provider,
     apiKey,
     ollamaBaseUrl,
+		compatibleBaseUrl,
+		apiKeyHeader,
+		apiKeyPrefix,
+		apiVersion,
+		organization,
+		project,
+		providerNetworkMode,
+		providerProxyUrl,
+		providerNoProxy,
+		providerCaBundlePath,
+		providerClientCertificatePath,
+		providerClientKeyPath,
     keyVerified,
     mainModels,
     liteModels,

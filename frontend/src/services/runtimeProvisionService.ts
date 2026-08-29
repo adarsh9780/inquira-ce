@@ -102,6 +102,11 @@ export const runtimeProvisionService = {
     if (this.isNative()) return callWails('ChooseCertificateBundle')
     return Promise.reject(new Error('Certificate selection is available in the Wails application.'))
   },
+
+	choosePrivateKey() {
+		if (this.isNative()) return callWails('ChoosePrivateKey')
+		return Promise.reject(new Error('Private key selection is available in the Wails application.'))
+	},
 }
 
 export default runtimeProvisionService

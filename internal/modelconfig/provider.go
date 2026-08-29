@@ -15,34 +15,52 @@ type HTTPDoer interface {
 }
 
 type providerClient struct {
-	http HTTPDoer
+	http    HTTPDoer
+	factory HTTPClientFactory
 }
 
-func (c providerClient) verify(ctx context.Context, provider, key string) VerifyResponse {
+func (c providerClient) withNetwork(network NetworkSettings) (providerClient, error) {
+	if c.factory == nil {
+		return c, nil
+	}
+	httpClient, err := c.factory(network)
+	if err != nil {
+		return providerClient{}, err
+	}
+	c.http = httpClient
+	return c, nil
+}
+
+func (c providerClient) verify(ctx context.Context, provider, key string, settings ProviderSettings, network NetworkSettings) VerifyResponse {
 	provider = normalizeProvider(provider)
 	if provider == "ollama" {
 		return VerifyResponse{Valid: true}
+	}
+	active, err := c.withNetwork(network)
+	if err != nil {
+		return VerifyResponse{Error: "network_error"}
 	}
 	endpoint := "https://openrouter.ai/api/v1/auth/key"
 	if provider == "openai" {
 		endpoint = "https://api.openai.com/v1/models"
 	}
+	if provider == "openai-compatible" {
+		endpoint = providerEndpoint(settings.BaseURL, "/models", settings.APIVersion)
+	}
+	if provider == "anthropic" {
+		endpoint = "https://api.anthropic.com/v1/models"
+	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return VerifyResponse{Error: "network_error"}
 	}
-	if provider == "anthropic" {
-		endpoint = "https://api.anthropic.com/v1/models"
-		request, err = http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-		if err != nil {
-			return VerifyResponse{Error: "network_error"}
-		}
-		request.Header.Set("x-api-key", strings.TrimSpace(key))
-		request.Header.Set("anthropic-version", "2023-06-01")
-	} else {
-		request.Header.Set("Authorization", "Bearer "+strings.TrimSpace(key))
+	for header, value := range providerHeaders(provider, key, settings) {
+		request.Header.Set(header, value)
 	}
-	response, err := c.http.Do(request)
+	if provider == "anthropic" {
+		request.Header.Set("anthropic-version", "2023-06-01")
+	}
+	response, err := active.http.Do(request)
 	if err != nil {
 		return VerifyResponse{Error: "network_error"}
 	}
@@ -55,21 +73,29 @@ func (c providerClient) verify(ctx context.Context, provider, key string) Verify
 		return VerifyResponse{Error: "quota_exceeded"}
 	case response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden:
 		return VerifyResponse{Error: "invalid_key"}
+	case provider == "openai-compatible" && (response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusMethodNotAllowed):
+		// Some compatible gateways intentionally omit model discovery. The real
+		// chat request remains the final connection check for those endpoints.
+		return VerifyResponse{Valid: true}
 	default:
 		return VerifyResponse{Error: "network_error"}
 	}
 }
 
-func (c providerClient) refresh(ctx context.Context, provider, key, baseURL string) (Catalog, string, string, error) {
+func (c providerClient) refresh(ctx context.Context, provider, key string, settings ProviderSettings, network NetworkSettings) (Catalog, string, string, error) {
 	provider = normalizeProvider(provider)
+	active, err := c.withNetwork(network)
+	if err != nil {
+		return Catalog{}, "", "refresh_failed", err
+	}
 	if provider == "ollama" {
-		resolved := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+		resolved := strings.TrimRight(strings.TrimSpace(settings.BaseURL), "/")
 		if resolved == "" {
 			resolved = "http://localhost:11434"
 		}
 		resolved = strings.TrimSuffix(resolved, "/v1")
 		endpoint := resolved + "/api/tags"
-		response, err := c.get(ctx, endpoint, "", "")
+		response, err := active.get(ctx, endpoint, "", "")
 		if err != nil {
 			return Catalog{}, "", "ollama_unreachable", fmt.Errorf("Ollama not detected at %q", resolved)
 		}
@@ -86,7 +112,10 @@ func (c providerClient) refresh(ctx context.Context, provider, key, baseURL stri
 	if provider == "openai" {
 		endpoint = "https://api.openai.com/v1/models"
 	}
-	headers := map[string]string{"Authorization": "Bearer " + strings.TrimSpace(key)}
+	if provider == "openai-compatible" {
+		endpoint = providerEndpoint(settings.BaseURL, "/models", settings.APIVersion)
+	}
+	headers := providerHeaders(provider, key, settings)
 	if provider == "anthropic" {
 		endpoint = "https://api.anthropic.com/v1/models"
 		headers = map[string]string{
@@ -94,12 +123,12 @@ func (c providerClient) refresh(ctx context.Context, provider, key, baseURL stri
 			"anthropic-version": "2023-06-01",
 		}
 	}
-	payload, status, err := c.getWithHeaders(ctx, endpoint, headers)
+	payload, status, err := active.getWithHeaders(ctx, endpoint, headers)
 	if err != nil {
 		return Catalog{}, "", "refresh_failed", err
 	}
 	if provider == "openrouter" && status == http.StatusNotFound {
-		payload, status, err = c.getWithStatus(ctx, "https://openrouter.ai/api/v1/models", "Authorization", "Bearer "+strings.TrimSpace(key))
+		payload, status, err = active.getWithStatus(ctx, "https://openrouter.ai/api/v1/models", "Authorization", "Bearer "+strings.TrimSpace(key))
 		if err != nil {
 			return Catalog{}, "", "refresh_failed", err
 		}
@@ -108,7 +137,7 @@ func (c providerClient) refresh(ctx context.Context, provider, key, baseURL stri
 		return Catalog{}, "", "refresh_failed", fmt.Errorf("provider returned HTTP %d", status)
 	}
 	models := extractDataModels(payload)
-	if provider == "openai" {
+	if provider == "openai" || provider == "openai-compatible" {
 		models = filterOpenAIChatModels(models)
 	} else if provider == "anthropic" {
 		models = filterAnthropicChatModels(models)
@@ -123,6 +152,43 @@ func (c providerClient) refresh(ctx context.Context, provider, key, baseURL stri
 		catalog.AccountModelsURL = "https://openrouter.ai/settings"
 	}
 	return catalog, fmt.Sprintf("Refreshed %d %s models.", len(catalog.MainModels), provider), "", nil
+}
+
+func providerHeaders(provider, key string, settings ProviderSettings) map[string]string {
+	key = strings.TrimSpace(key)
+	if provider == "anthropic" {
+		return map[string]string{"x-api-key": key}
+	}
+	header := strings.TrimSpace(settings.APIKeyHeader)
+	if header == "" {
+		header = "Authorization"
+	}
+	value := key
+	if prefix := strings.TrimSpace(settings.APIKeyPrefix); prefix != "" {
+		value = prefix + " " + key
+	}
+	headers := map[string]string{header: value}
+	if organization := strings.TrimSpace(settings.Organization); organization != "" {
+		headers["OpenAI-Organization"] = organization
+	}
+	if project := strings.TrimSpace(settings.Project); project != "" {
+		headers["OpenAI-Project"] = project
+	}
+	return headers
+}
+
+func providerEndpoint(baseURL, endpointPath, apiVersion string) string {
+	parsed, err := url.Parse(strings.TrimRight(strings.TrimSpace(baseURL), "/"))
+	if err != nil {
+		return ""
+	}
+	parsed.Path = strings.TrimRight(parsed.Path, "/") + endpointPath
+	if version := strings.TrimSpace(apiVersion); version != "" {
+		query := parsed.Query()
+		query.Set("api-version", version)
+		parsed.RawQuery = query.Encode()
+	}
+	return parsed.String()
 }
 
 func (c providerClient) get(ctx context.Context, endpoint, header, value string) (map[string]any, error) {

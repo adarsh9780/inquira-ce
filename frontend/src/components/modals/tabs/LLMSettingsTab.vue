@@ -46,6 +46,34 @@
             </div>
 
             <div v-else class="space-y-4">
+              <div v-if="provider === 'openai-compatible'" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label class="input-group sm:col-span-2">
+                  <span class="input-label">Base URL</span>
+                  <input v-model="compatibleBaseUrl" type="url" class="text-input font-mono" placeholder="https://models.company.example/v1" autocomplete="url" spellcheck="false" />
+                  <span class="input-hint">Use the API root before <span class="font-mono">/chat/completions</span>. Azure-style API versions are supported below.</span>
+                </label>
+                <label class="input-group">
+                  <span class="input-label">API key header</span>
+                  <input v-model="apiKeyHeader" type="text" class="text-input font-mono" placeholder="Authorization or api-key" autocomplete="off" spellcheck="false" />
+                </label>
+                <label class="input-group">
+                  <span class="input-label">Header prefix</span>
+                  <input v-model="apiKeyPrefix" type="text" class="text-input font-mono" placeholder="Bearer (leave empty for api-key)" autocomplete="off" spellcheck="false" />
+                </label>
+                <label class="input-group">
+                  <span class="input-label">API version</span>
+                  <input v-model="apiVersion" type="text" class="text-input font-mono" placeholder="2024-10-21 (optional)" autocomplete="off" spellcheck="false" />
+                </label>
+                <label class="input-group">
+                  <span class="input-label">Organization</span>
+                  <input v-model="organization" type="text" class="text-input font-mono" placeholder="Optional organization ID" autocomplete="off" spellcheck="false" />
+                </label>
+                <label class="input-group sm:col-span-2">
+                  <span class="input-label">Project</span>
+                  <input v-model="project" type="text" class="text-input font-mono" placeholder="Optional project ID" autocomplete="off" spellcheck="false" />
+                </label>
+              </div>
+
               <div class="input-group">
                 <label class="input-label">{{ apiKeyLabel }}</label>
                 <div class="relative">
@@ -131,6 +159,56 @@
               </p>
             </div>
 
+            <div class="mt-5 border-t border-[var(--color-border)] pt-4">
+              <div class="mb-3">
+                <h4 class="text-sm font-semibold text-[var(--color-text-main)]">Provider network override</h4>
+                <p class="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">Inherit the global proxy by default, or choose a connection policy for this provider.</p>
+              </div>
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label class="input-group sm:col-span-2">
+                  <span class="input-label">Proxy policy</span>
+                  <HeaderDropdown
+                    :model-value="providerNetworkMode"
+                    :options="providerNetworkOptions"
+                    max-width-class="w-full"
+                    aria-label="Provider proxy policy"
+                    @update:model-value="providerNetworkMode = String($event || 'inherit')"
+                  />
+                </label>
+                <label v-if="providerNetworkMode === 'custom'" class="input-group sm:col-span-2">
+                  <span class="input-label">Proxy URL</span>
+                  <input v-model="providerProxyUrl" type="url" class="text-input font-mono" placeholder="http://proxy.company:8080" autocomplete="off" spellcheck="false" />
+                </label>
+                <label v-if="providerNetworkMode === 'custom'" class="input-group sm:col-span-2">
+                  <span class="input-label">Bypass proxy for</span>
+                  <input v-model="providerNoProxy" type="text" class="text-input font-mono" placeholder="localhost,.company.internal,10.0.0.0/8" autocomplete="off" spellcheck="false" />
+                </label>
+                <label class="input-group sm:col-span-2">
+                  <span class="input-label">CA certificate bundle</span>
+                  <span class="flex gap-2">
+                    <input v-model="providerCaBundlePath" type="text" class="text-input min-w-0 flex-1 font-mono" placeholder="Optional PEM certificate bundle" autocomplete="off" spellcheck="false" />
+                    <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="chooseProviderCertificate('ca')">Browse</button>
+                  </span>
+                </label>
+                <template v-if="provider === 'openai-compatible'">
+                  <label class="input-group sm:col-span-2">
+                    <span class="input-label">Client certificate</span>
+                    <span class="flex gap-2">
+                      <input v-model="providerClientCertificatePath" type="text" class="text-input min-w-0 flex-1 font-mono" placeholder="Optional PEM client certificate" autocomplete="off" spellcheck="false" />
+                      <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="chooseProviderCertificate('client')">Browse</button>
+                    </span>
+                  </label>
+                  <label class="input-group sm:col-span-2">
+                    <span class="input-label">Client private key</span>
+                    <span class="flex gap-2">
+                      <input v-model="providerClientKeyPath" type="text" class="text-input min-w-0 flex-1 font-mono" placeholder="Optional PEM private key" autocomplete="off" spellcheck="false" />
+                      <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="chooseProviderPrivateKey">Browse</button>
+                    </span>
+                  </label>
+                </template>
+              </div>
+            </div>
+
             <p v-if="refreshNotice" class="info-message-text">{{ refreshNotice }}</p>
           </div>
         </div>
@@ -185,7 +263,17 @@
                   <label class="model-select-label">Main Model</label>
                   <span class="model-select-badge font-mono">Agent Brain</span>
                 </div>
+				<input
+					v-if="provider === 'openai-compatible'"
+					v-model="mainModel"
+					type="text"
+					class="text-input font-mono"
+					placeholder="Provider model ID"
+					autocomplete="off"
+					spellcheck="false"
+				/>
                 <HeaderDropdown
+					v-else
                   :model-value="mainModel"
                   :options="mainOptions"
                   :backend-search="searchProviderModels"
@@ -206,7 +294,17 @@
                   <label class="model-select-label">Lite Model</label>
                   <span class="model-select-badge font-mono">Quick Tasks</span>
                 </div>
+				<input
+					v-if="provider === 'openai-compatible'"
+					v-model="liteModel"
+					type="text"
+					class="text-input font-mono"
+					placeholder="Provider lite model ID"
+					autocomplete="off"
+					spellcheck="false"
+				/>
                 <HeaderDropdown
+					v-else
                   :model-value="liteModel"
                   :options="liteOptions"
                   :searchable="true"
@@ -223,7 +321,7 @@
 
             <!-- Toggle options footer inside model card -->
             <div class="model-controls-footer">
-              <label v-if="provider !== 'ollama'" class="toggle-switch-label">
+				<label v-if="provider !== 'ollama' && provider !== 'openai-compatible'" class="toggle-switch-label">
                 <div class="relative flex items-center">
                   <input
                     v-model="showAllModels"
@@ -448,6 +546,7 @@ import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 import FloatingActionMenu from '../../ui/FloatingActionMenu.vue'
 import ConfirmationModal from '../ConfirmationModal.vue'
 import { modelConnectionService } from '../../../services/modelConnectionService'
+import { runtimeProvisionService } from '../../../services/runtimeProvisionService'
 import { useLLMConfig } from '../../../composables/useLLMConfig'
 import { useUiStore } from '../../../stores/uiStore'
 import { usePreferencesStore } from '../../../stores/preferencesStore'
@@ -478,6 +577,18 @@ const {
   provider,
   apiKey,
   ollamaBaseUrl,
+	compatibleBaseUrl,
+	apiKeyHeader,
+	apiKeyPrefix,
+	apiVersion,
+	organization,
+	project,
+	providerNetworkMode,
+	providerProxyUrl,
+	providerNoProxy,
+	providerCaBundlePath,
+	providerClientCertificatePath,
+	providerClientKeyPath,
   mainModels,
   liteModels,
   mainModel,
@@ -524,7 +635,15 @@ const credentialMenuItems = computed(() => [{ id: 'delete', label: 'Delete saved
 const providerOptions = [
   { value: 'openai', label: 'OpenAI' },
   { value: 'openrouter', label: 'OpenRouter' },
+	{ value: 'anthropic', label: 'Anthropic' },
+	{ value: 'openai-compatible', label: 'OpenAI compatible' },
   { value: 'ollama', label: 'Ollama (local)' },
+]
+const providerNetworkOptions = [
+	{ value: 'inherit', label: 'Use global proxy settings' },
+	{ value: 'system', label: 'Use system proxy' },
+	{ value: 'custom', label: 'Use custom proxy' },
+	{ value: 'direct', label: 'Connect directly' },
 ]
 
 const verifySuccessMessage = computed(() => String(verifySuccess.value || '').trim())
@@ -544,12 +663,23 @@ const statusBadgeText = computed(() => {
 })
 
 const refreshModelListTooltip = 'This icon refreshes list of models available based on selected provider.'
-const apiKeyLabel = computed(() => (provider.value === 'openai' ? 'OpenAI API key' : 'OpenRouter API key'))
-const apiKeyPlaceholder = computed(() => (provider.value === 'openai' ? 'sk-...' : 'or-...'))
-const providerDisplayName = computed(() => (provider.value === 'openai' ? 'OpenAI' : 'OpenRouter'))
+const apiKeyLabel = computed(() => `${providerDisplayName.value} API key`)
+const apiKeyPlaceholder = computed(() => {
+	if (provider.value === 'openrouter') return 'or-...'
+	if (provider.value === 'anthropic') return 'sk-ant-...'
+	return 'Enter API key'
+})
+const providerDisplayName = computed(() => {
+	if (provider.value === 'openai') return 'OpenAI'
+	if (provider.value === 'openrouter') return 'OpenRouter'
+	if (provider.value === 'anthropic') return 'Anthropic'
+	if (provider.value === 'openai-compatible') return 'OpenAI compatible provider'
+	return 'Ollama'
+})
 const providerApiKeyPortal = computed(() => {
   if (provider.value === 'openai') return 'https://platform.openai.com/api-keys'
   if (provider.value === 'openrouter') return 'https://openrouter.ai/keys'
+	if (provider.value === 'anthropic') return 'https://console.anthropic.com/settings/keys'
   return ''
 })
 const mainOptions = computed(() => buildModelOptions('main', mainModel.value))
@@ -560,8 +690,8 @@ const advancedFields = computed(() => {
     temperature: true,
     topP: true,
     topK: selectedProvider === 'openrouter' || selectedProvider === 'ollama',
-    frequencyPenalty: selectedProvider === 'openai',
-    presencePenalty: selectedProvider === 'openai',
+		frequencyPenalty: selectedProvider === 'openai' || selectedProvider === 'openai-compatible',
+		presencePenalty: selectedProvider === 'openai' || selectedProvider === 'openai-compatible',
   }
 })
 
@@ -585,6 +715,26 @@ watch(
 
 function handleApiKeyInput(event: Event) {
   setApiKey((event.target as HTMLInputElement).value)
+}
+
+async function chooseProviderCertificate(kind: 'ca' | 'client') {
+	try {
+		const selected = await runtimeProvisionService.chooseCertificateBundle()
+		if (!selected) return
+		if (kind === 'client') providerClientCertificatePath.value = String(selected)
+		else providerCaBundlePath.value = String(selected)
+	} catch (_error) {
+		toast.error('File picker failed', 'Could not choose a certificate file.')
+	}
+}
+
+async function chooseProviderPrivateKey() {
+	try {
+		const selected = await runtimeProvisionService.choosePrivateKey()
+		if (selected) providerClientKeyPath.value = String(selected)
+	} catch (_error) {
+		toast.error('File picker failed', 'Could not choose a private key file.')
+	}
 }
 
 function handleLiteModelSelect(value: string | number | null) {

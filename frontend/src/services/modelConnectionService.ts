@@ -53,6 +53,10 @@ export const modelConnectionService = {
     return callWails('VerifyProviderAPIKey', String(provider || ''), String(apiKey || ''))
   },
 
+  verifyConfiguration(payload: NativeRecord) {
+		return callWails('VerifyProviderConfiguration', payload || {})
+	},
+
   setApiKey(payload: NativeRecord) {
     return callWails('SaveProviderConfiguration', payload || {})
   },

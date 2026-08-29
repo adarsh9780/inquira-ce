@@ -37,53 +37,69 @@ type Preferences struct {
 	ModelOnboardingCompleted  bool
 	OllamaBaseURL             string
 	Catalogs                  map[string]Catalog
+	GlobalNetwork             NetworkSettings
+	ProviderSettings          map[string]ProviderSettings
 }
 
 type PreferencesResponse struct {
-	LLMProvider                    string             `json:"llm_provider"`
-	AvailableProviders             []string           `json:"available_providers"`
-	SelectedModel                  string             `json:"selected_model"`
-	SelectedLiteModel              string             `json:"selected_lite_model"`
-	SelectedCodingModel            string             `json:"selected_coding_model"`
-	LLMTemperature                 float64            `json:"llm_temperature"`
-	LLMMaxTokens                   int                `json:"llm_max_tokens"`
-	LLMTopP                        float64            `json:"llm_top_p"`
-	LLMTopK                        int                `json:"llm_top_k"`
-	LLMFrequencyPenalty            float64            `json:"llm_frequency_penalty"`
-	LLMPresencePenalty             float64            `json:"llm_presence_penalty"`
-	SlowRequestWarningSeconds      int                `json:"slow_request_warning_seconds"`
-	AllowLLMDataSamples            bool               `json:"allow_llm_data_samples"`
-	EnabledModels                  []string           `json:"enabled_models"`
-	APIKeyPresent                  bool               `json:"api_key_present"`
-	AvailableModels                []string           `json:"available_models"`
-	ProviderAvailableMainModels    []string           `json:"provider_available_main_models"`
-	ProviderAvailableLiteModels    []string           `json:"provider_available_lite_models"`
-	ProviderModelCatalogs          map[string]Catalog `json:"provider_model_catalogs"`
-	APIKeyPresentByProvider        map[string]bool    `json:"api_key_present_by_provider"`
-	SelectedProviderRequiresAPIKey bool               `json:"selected_provider_requires_api_key"`
-	SelectedProviderAPIKeyPresent  bool               `json:"selected_provider_api_key_present"`
-	Detail                         string             `json:"detail,omitempty"`
-	Warning                        string             `json:"warning,omitempty"`
-	Error                          string             `json:"error,omitempty"`
+	LLMProvider                    string                      `json:"llm_provider"`
+	AvailableProviders             []string                    `json:"available_providers"`
+	SelectedModel                  string                      `json:"selected_model"`
+	SelectedLiteModel              string                      `json:"selected_lite_model"`
+	SelectedCodingModel            string                      `json:"selected_coding_model"`
+	LLMTemperature                 float64                     `json:"llm_temperature"`
+	LLMMaxTokens                   int                         `json:"llm_max_tokens"`
+	LLMTopP                        float64                     `json:"llm_top_p"`
+	LLMTopK                        int                         `json:"llm_top_k"`
+	LLMFrequencyPenalty            float64                     `json:"llm_frequency_penalty"`
+	LLMPresencePenalty             float64                     `json:"llm_presence_penalty"`
+	SlowRequestWarningSeconds      int                         `json:"slow_request_warning_seconds"`
+	AllowLLMDataSamples            bool                        `json:"allow_llm_data_samples"`
+	EnabledModels                  []string                    `json:"enabled_models"`
+	APIKeyPresent                  bool                        `json:"api_key_present"`
+	AvailableModels                []string                    `json:"available_models"`
+	ProviderAvailableMainModels    []string                    `json:"provider_available_main_models"`
+	ProviderAvailableLiteModels    []string                    `json:"provider_available_lite_models"`
+	ProviderModelCatalogs          map[string]Catalog          `json:"provider_model_catalogs"`
+	APIKeyPresentByProvider        map[string]bool             `json:"api_key_present_by_provider"`
+	SelectedProviderRequiresAPIKey bool                        `json:"selected_provider_requires_api_key"`
+	SelectedProviderAPIKeyPresent  bool                        `json:"selected_provider_api_key_present"`
+	GlobalNetwork                  NetworkSettings             `json:"global_network"`
+	SelectedProviderSettings       ProviderSettings            `json:"selected_provider_settings"`
+	ProviderSettings               map[string]ProviderSettings `json:"provider_settings"`
+	Detail                         string                      `json:"detail,omitempty"`
+	Warning                        string                      `json:"warning,omitempty"`
+	Error                          string                      `json:"error,omitempty"`
 }
 
 // RuntimeConfiguration contains the provider settings needed by the local
 // Python worker for one model request. It must never be returned by a Wails
 // binding or persisted because it includes the provider credential.
 type RuntimeConfiguration struct {
-	Provider         string  `json:"provider"`
-	Model            string  `json:"model"`
-	LiteModel        string  `json:"lite_model,omitempty"`
-	CodingModel      string  `json:"coding_model,omitempty"`
-	APIKey           string  `json:"api_key,omitempty"`
-	BaseURL          string  `json:"base_url"`
-	Temperature      float64 `json:"temperature"`
-	MaxTokens        int     `json:"max_tokens"`
-	TopP             float64 `json:"top_p"`
-	TopK             int     `json:"top_k"`
-	FrequencyPenalty float64 `json:"frequency_penalty"`
-	PresencePenalty  float64 `json:"presence_penalty"`
-	AllowDataSamples bool    `json:"allow_data_samples"`
+	Provider              string  `json:"provider"`
+	Model                 string  `json:"model"`
+	LiteModel             string  `json:"lite_model,omitempty"`
+	CodingModel           string  `json:"coding_model,omitempty"`
+	APIKey                string  `json:"api_key,omitempty"`
+	BaseURL               string  `json:"base_url"`
+	Temperature           float64 `json:"temperature"`
+	MaxTokens             int     `json:"max_tokens"`
+	TopP                  float64 `json:"top_p"`
+	TopK                  int     `json:"top_k"`
+	FrequencyPenalty      float64 `json:"frequency_penalty"`
+	PresencePenalty       float64 `json:"presence_penalty"`
+	AllowDataSamples      bool    `json:"allow_data_samples"`
+	APIKeyHeader          string  `json:"api_key_header,omitempty"`
+	APIKeyPrefix          string  `json:"api_key_prefix"`
+	APIVersion            string  `json:"api_version,omitempty"`
+	Organization          string  `json:"organization,omitempty"`
+	Project               string  `json:"project,omitempty"`
+	ProxyMode             string  `json:"proxy_mode,omitempty"`
+	ProxyURL              string  `json:"proxy_url,omitempty"`
+	NoProxy               string  `json:"no_proxy,omitempty"`
+	CABundlePath          string  `json:"ca_bundle_path,omitempty"`
+	ClientCertificatePath string  `json:"client_certificate_path,omitempty"`
+	ClientKeyPath         string  `json:"client_key_path,omitempty"`
 }
 
 // RuntimeOverrides contains workspace-scoped choices layered over application
@@ -115,26 +131,34 @@ type UpdateRequest struct {
 }
 
 type SaveRequest struct {
-	Provider                  string   `json:"provider"`
-	APIKey                    *string  `json:"api_key"`
-	BaseURL                   *string  `json:"base_url"`
-	SelectedModel             *string  `json:"selected_model"`
-	SelectedLiteModel         *string  `json:"selected_lite_model"`
-	SelectedCodingModel       *string  `json:"selected_coding_model"`
-	LLMTemperature            *float64 `json:"llm_temperature"`
-	LLMMaxTokens              *int     `json:"llm_max_tokens"`
-	LLMTopP                   *float64 `json:"llm_top_p"`
-	LLMTopK                   *int     `json:"llm_top_k"`
-	LLMFrequencyPenalty       *float64 `json:"llm_frequency_penalty"`
-	LLMPresencePenalty        *float64 `json:"llm_presence_penalty"`
-	SlowRequestWarningSeconds *int     `json:"slow_request_warning_seconds"`
-	AllowLLMDataSamples       *bool    `json:"allow_llm_data_samples"`
+	Provider                  string            `json:"provider"`
+	APIKey                    *string           `json:"api_key"`
+	BaseURL                   *string           `json:"base_url"`
+	SelectedModel             *string           `json:"selected_model"`
+	SelectedLiteModel         *string           `json:"selected_lite_model"`
+	SelectedCodingModel       *string           `json:"selected_coding_model"`
+	LLMTemperature            *float64          `json:"llm_temperature"`
+	LLMMaxTokens              *int              `json:"llm_max_tokens"`
+	LLMTopP                   *float64          `json:"llm_top_p"`
+	LLMTopK                   *int              `json:"llm_top_k"`
+	LLMFrequencyPenalty       *float64          `json:"llm_frequency_penalty"`
+	LLMPresencePenalty        *float64          `json:"llm_presence_penalty"`
+	SlowRequestWarningSeconds *int              `json:"slow_request_warning_seconds"`
+	AllowLLMDataSamples       *bool             `json:"allow_llm_data_samples"`
+	ProviderSettings          *ProviderSettings `json:"provider_settings"`
 }
 
 type RefreshRequest struct {
-	Provider string  `json:"provider"`
-	APIKey   *string `json:"api_key"`
-	BaseURL  *string `json:"base_url"`
+	Provider         string            `json:"provider"`
+	APIKey           *string           `json:"api_key"`
+	BaseURL          *string           `json:"base_url"`
+	ProviderSettings *ProviderSettings `json:"provider_settings"`
+}
+
+type VerifyRequest struct {
+	Provider         string            `json:"provider"`
+	APIKey           string            `json:"api_key"`
+	ProviderSettings *ProviderSettings `json:"provider_settings"`
 }
 
 type VerifyResponse struct {

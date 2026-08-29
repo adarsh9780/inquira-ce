@@ -49,6 +49,8 @@ VIAddVersionKey "ProductName"     "${INFO_PRODUCTNAME}"
 ManifestDPIAware true
 
 !include "MUI.nsh"
+!include "LogicLib.nsh"
+!include "nsDialogs.nsh"
 
 !define MUI_ICON "..\icon.ico"
 !define MUI_UNICON "..\icon.ico"
@@ -59,6 +61,7 @@ ManifestDPIAware true
 !insertmacro MUI_PAGE_WELCOME # Welcome to the installer page.
 # !insertmacro MUI_PAGE_LICENSE "resources\eula.txt" # Adds a EULA page to the installer
 !insertmacro MUI_PAGE_DIRECTORY # In which folder install page.
+Page custom InquiraDataDirectoryPage InquiraDataDirectoryLeave
 !insertmacro MUI_PAGE_INSTFILES # Installing page.
 !insertmacro MUI_PAGE_FINISH # Finished installation page.
 
@@ -83,6 +86,60 @@ OutFile "..\..\bin\${INFO_PROJECTNAME}-${ARCH}-installer.exe" # Name of the inst
 !endif # Default installing folder ($PROGRAMFILES is Program Files folder).
 ShowInstDetails show # This will always show the installation details.
 
+Var InquiraDataRoot
+Var InquiraDataRootText
+
+Function InquiraDataDirectoryPage
+  !insertmacro MUI_HEADER_TEXT "Choose data and runtime location" "Select an approved folder for Inquira app data, UV, and Python packages."
+  nsDialogs::Create 1018
+  Pop $0
+  ${If} $0 == error
+    Abort
+  ${EndIf}
+
+  ${If} $InquiraDataRoot == ""
+    ReadRegStr $InquiraDataRoot HKCU "Software\Inquira" "DataRoot"
+    ${If} $InquiraDataRoot == ""
+      StrCpy $InquiraDataRoot "$LOCALAPPDATA\Inquira"
+    ${EndIf}
+  ${EndIf}
+
+  ${NSD_CreateLabel} 0 0 100% 28u "Inquira unpacks its bundled UV runtime and keeps workspace data in this folder. Choose a location allowed by your organization."
+  Pop $0
+  ${NSD_CreateDirRequest} 0 38u 78% 13u "$InquiraDataRoot"
+  Pop $InquiraDataRootText
+  ${NSD_CreateBrowseButton} 80% 37u 20% 15u "Browse..."
+  Pop $0
+  ${NSD_OnClick} $0 InquiraBrowseDataDirectory
+  ${NSD_CreateLabel} 0 62u 100% 30u "This location is separate from the application installation folder and is preserved when Inquira is uninstalled."
+  Pop $0
+
+  nsDialogs::Show
+FunctionEnd
+
+Function InquiraBrowseDataDirectory
+  ${NSD_GetText} $InquiraDataRootText $InquiraDataRoot
+  nsDialogs::SelectFolderDialog "Choose Inquira data and runtime folder" "$InquiraDataRoot"
+  Pop $0
+  ${If} $0 != error
+    ${NSD_SetText} $InquiraDataRootText $0
+  ${EndIf}
+FunctionEnd
+
+Function InquiraDataDirectoryLeave
+  ${NSD_GetText} $InquiraDataRootText $InquiraDataRoot
+  ${If} $InquiraDataRoot == ""
+    MessageBox MB_ICONEXCLAMATION|MB_OK "Choose a folder for Inquira data and runtime files."
+    Abort
+  ${EndIf}
+  ClearErrors
+  CreateDirectory "$InquiraDataRoot"
+  ${If} ${Errors}
+    MessageBox MB_ICONSTOP|MB_OK "Inquira cannot create the selected folder. Choose a location where you have write access."
+    Abort
+  ${EndIf}
+FunctionEnd
+
 Function .onInit
    !insertmacro wails.checkArchitecture
 FunctionEnd
@@ -95,6 +152,8 @@ Section
     SetOutPath $INSTDIR
 
     !insertmacro wails.files
+
+    WriteRegStr HKCU "Software\Inquira" "DataRoot" "$InquiraDataRoot"
 
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
     CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"

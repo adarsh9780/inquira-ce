@@ -28,7 +28,7 @@ test('centered dialog animations do not compose competing transform translations
 test('inactive settings panels are removed from keyboard and accessibility navigation', () => {
   const source = read('src/components/modals/SettingsModal.vue')
 
-  assert.equal((source.match(/v-if="currentPanel ===/g) || []).length, 5)
+	assert.equal((source.match(/v-if="currentPanel ===/g) || []).length, 6)
   assert.doesNotMatch(source, /handleDialogKeydown/)
 })
 

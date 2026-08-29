@@ -30,7 +30,7 @@ func TestSQLiteRepositoryMigratesAndPersistsModelPreferences(t *testing.T) {
 	if err := repository.db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&migrationCount); err != nil {
 		t.Fatal(err)
 	}
-	if migrationCount != 2 {
+	if migrationCount != 3 {
 		t.Fatalf("migration count = %d", migrationCount)
 	}
 
@@ -38,6 +38,12 @@ func TestSQLiteRepositoryMigratesAndPersistsModelPreferences(t *testing.T) {
 	preferences.SelectedModel = "gpt-4.1"
 	preferences.AllowLLMDataSamples = true
 	preferences.ModelOnboardingCompleted = true
+	preferences.GlobalNetwork = NetworkSettings{Mode: NetworkModeCustom, ProxyURL: "http://proxy.company:8080", NoProxy: "localhost"}
+	compatible := preferences.ProviderSettings["openai-compatible"]
+	compatible.BaseURL = "https://models.company.example/v1"
+	compatible.APIKeyHeader = "api-key"
+	compatible.APIKeyPrefix = ""
+	preferences.ProviderSettings["openai-compatible"] = compatible
 	if err := repository.Save(context.Background(), preferences); err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
@@ -48,6 +54,9 @@ func TestSQLiteRepositoryMigratesAndPersistsModelPreferences(t *testing.T) {
 	}
 	if reloaded.LLMProvider != "openai" || reloaded.SelectedModel != "gpt-4.1" || !reloaded.AllowLLMDataSamples || !reloaded.ModelOnboardingCompleted {
 		t.Fatalf("persisted preferences = %#v", reloaded)
+	}
+	if reloaded.GlobalNetwork.ProxyURL != "http://proxy.company:8080" || reloaded.ProviderSettings["openai-compatible"].BaseURL != "https://models.company.example/v1" || reloaded.ProviderSettings["openai-compatible"].APIKeyPrefix != "" {
+		t.Fatalf("persisted enterprise settings = %#v %#v", reloaded.GlobalNetwork, reloaded.ProviderSettings["openai-compatible"])
 	}
 }
 

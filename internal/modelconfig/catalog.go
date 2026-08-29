@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-var supportedProviders = []string{"openrouter", "openai", "anthropic", "ollama"}
+var supportedProviders = []string{"openrouter", "openai", "anthropic", "openai-compatible", "ollama"}
 
 func normalizeProvider(provider string) string {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
@@ -14,6 +14,8 @@ func normalizeProvider(provider string) string {
 		return "ollama"
 	case "anthropic":
 		return "anthropic"
+	case "openai-compatible", "compatible":
+		return "openai-compatible"
 	case "api", "openrouter":
 		return "openrouter"
 	default:
@@ -34,6 +36,10 @@ func defaultCatalogs() map[string]Catalog {
 		"anthropic": newDefaultCatalog("anthropic",
 			[]string{"claude-3-5-sonnet-latest", "claude-3-7-sonnet-latest"},
 			[]string{"claude-3-5-haiku-latest"},
+		),
+		"openai-compatible": newDefaultCatalog("openai-compatible",
+			[]string{"gpt-4o"},
+			[]string{"gpt-4o-mini"},
 		),
 		"ollama": withBaseURL(newDefaultCatalog("ollama",
 			[]string{"llama3.2", "qwen2.5-coder:7b", "mistral", "deepseek-r1:8b"},

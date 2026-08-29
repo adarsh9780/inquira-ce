@@ -21,7 +21,7 @@ const DEFAULT_MODELS = [
 export const usePreferencesStore = defineStore('preferences', () => {
   let persistChange: (() => void) | null = null
   const llmProvider = ref('openrouter')
-  const availableProviders = ref(['openrouter', 'openai', 'anthropic', 'ollama'])
+	const availableProviders = ref(['openrouter', 'openai', 'anthropic', 'openai-compatible', 'ollama'])
   const selectedModel = ref('google/gemini-2.5-flash')
   const selectedLiteModel = ref('google/gemini-2.5-flash-lite')
   const selectedCodingModel = ref('google/gemini-2.5-flash')
@@ -113,7 +113,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
     llmProvider.value = String(prefs.provider || prefs.llm_provider || llmProvider.value)
     availableProviders.value = normalizeModels(prefs.available_providers || prefs.providers)
     if (availableProviders.value.length === 0) {
-      availableProviders.value = ['openrouter', 'openai', 'anthropic', 'ollama']
+		availableProviders.value = ['openrouter', 'openai', 'anthropic', 'openai-compatible', 'ollama']
     }
     selectedModel.value = String(prefs.main_model || prefs.selected_model || selectedModel.value)
     selectedLiteModel.value = String(prefs.lite_model || selectedLiteModel.value)
@@ -142,7 +142,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
   function reset() {
     llmProvider.value = 'openrouter'
-    availableProviders.value = ['openrouter', 'openai', 'anthropic', 'ollama']
+		availableProviders.value = ['openrouter', 'openai', 'anthropic', 'openai-compatible', 'ollama']
     selectedModel.value = 'google/gemini-2.5-flash'
     selectedLiteModel.value = 'google/gemini-2.5-flash-lite'
     selectedCodingModel.value = 'google/gemini-2.5-flash'

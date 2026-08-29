@@ -127,7 +127,18 @@ const form = reactive<{
 const config = computed(() => localConfig.value)
 const hasOverrides = computed(() => Object.entries(config.value?.overrides || {}).some(([key, value]) => key !== 'allow_llm_data_samples' && value !== null && value !== ''))
 const useDefaults = ref(true)
-const providerOptions = computed(() => (preferencesStore.availableProviders || []).map((value) => ({ value, label: value === 'openrouter' ? 'OpenRouter' : value === 'openai' ? 'OpenAI' : value === 'ollama' ? 'Ollama (local)' : value })))
+const providerOptions = computed(() => (preferencesStore.availableProviders || []).map((value) => ({
+	value,
+	label: value === 'openrouter'
+		? 'OpenRouter'
+		: value === 'openai'
+			? 'OpenAI'
+			: value === 'anthropic'
+				? 'Anthropic'
+				: value === 'openai-compatible'
+					? 'OpenAI compatible'
+					: value === 'ollama' ? 'Ollama (local)' : value,
+})))
 const modelOptions = (values: unknown) => (Array.isArray(values) ? values : []).map((value) => ({ value: String(value), label: String(value) }))
 const mainModelOptions = computed(() => modelOptions(providerCatalog.value?.provider_available_main_models || preferencesStore.providerMainModels))
 const liteModelOptions = computed(() => modelOptions(providerCatalog.value?.provider_available_lite_models || preferencesStore.providerLiteModels))

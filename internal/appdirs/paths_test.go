@@ -29,3 +29,19 @@ func TestFromRootAndEnsure(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveUsesConfiguredApplicationRoot(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "approved-location", "Inquira")
+	t.Setenv(rootEnvironmentVariable, root)
+
+	paths, err := Resolve()
+	if err != nil {
+		t.Fatalf("Resolve() error = %v", err)
+	}
+	if paths.ConfigDir != filepath.Clean(root) {
+		t.Fatalf("ConfigDir = %q, want %q", paths.ConfigDir, root)
+	}
+	if paths.RuntimeDir != filepath.Join(root, "runtime") {
+		t.Fatalf("RuntimeDir = %q", paths.RuntimeDir)
+	}
+}

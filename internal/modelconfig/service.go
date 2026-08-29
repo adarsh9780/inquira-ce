@@ -20,6 +20,11 @@ func NewService(repository Repository, secrets SecretStore, httpClient HTTPDoer)
 	return &Service{repository: repository, secrets: secrets, provider: providerClient{http: httpClient}}
 }
 
+func (s *Service) WithHTTPClientFactory(factory HTTPClientFactory) *Service {
+	s.provider.factory = factory
+	return s
+}
+
 func (s *Service) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -126,14 +131,15 @@ func (s *Service) runtimeConfiguration(ctx context.Context, overrides RuntimeOve
 			return RuntimeConfiguration{}, apperror.New("missing_key", "Connect a model provider before starting an analysis.")
 		}
 	}
-	baseURL := map[string]string{
-		"openai":     "https://api.openai.com/v1",
-		"openrouter": "https://openrouter.ai/api/v1",
-		"ollama":     strings.TrimRight(strings.TrimSpace(preferences.OllamaBaseURL), "/"),
-	}[provider]
+	providerSettings := preferences.ProviderSettings[provider]
+	baseURL := strings.TrimRight(strings.TrimSpace(providerSettings.BaseURL), "/")
 	if baseURL == "" && provider == "ollama" {
-		baseURL = "http://localhost:11434"
+		baseURL = strings.TrimRight(strings.TrimSpace(preferences.OllamaBaseURL), "/")
+		if baseURL == "" {
+			baseURL = "http://localhost:11434"
+		}
 	}
+	network := resolvedNetworkSettings(preferences, provider)
 	maxTokens := preferences.MaxTokens
 	if overrides.MaxTokens != nil {
 		maxTokens = *overrides.MaxTokens
@@ -160,7 +166,40 @@ func (s *Service) runtimeConfiguration(ctx context.Context, overrides RuntimeOve
 		TopK:             preferences.TopK,
 		FrequencyPenalty: preferences.FrequencyPenalty, PresencePenalty: preferences.PresencePenalty,
 		AllowDataSamples: allowDataSamples,
+		APIKeyHeader:     providerSettings.APIKeyHeader, APIKeyPrefix: providerSettings.APIKeyPrefix,
+		APIVersion: providerSettings.APIVersion, Organization: providerSettings.Organization, Project: providerSettings.Project,
+		ProxyMode: network.Mode, ProxyURL: network.ProxyURL, NoProxy: network.NoProxy,
+		CABundlePath: network.CABundlePath, ClientCertificatePath: network.ClientCertificatePath,
+		ClientKeyPath: network.ClientKeyPath,
 	}, nil
+}
+
+func (s *Service) GetNetworkPreferences(ctx context.Context) (NetworkPreferencesResponse, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	preferences, err := s.repository.Load(ctx)
+	if err != nil {
+		return NetworkPreferencesResponse{}, apperror.Wrap("settings_read_failed", "Could not load network settings.", err)
+	}
+	return NetworkPreferencesResponse{Global: normalizeNetworkSettings(preferences.GlobalNetwork, false)}, nil
+}
+
+func (s *Service) UpdateNetworkPreferences(ctx context.Context, settings NetworkSettings) (NetworkPreferencesResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	settings = normalizeNetworkSettings(settings, false)
+	if err := validateNetworkSettings(settings, false); err != nil {
+		return NetworkPreferencesResponse{}, apperror.Wrap("invalid_network_settings", "Check the proxy and certificate settings.", err)
+	}
+	preferences, err := s.repository.Load(ctx)
+	if err != nil {
+		return NetworkPreferencesResponse{}, apperror.Wrap("settings_read_failed", "Could not load network settings.", err)
+	}
+	preferences.GlobalNetwork = settings
+	if err := s.repository.Save(ctx, preferences); err != nil {
+		return NetworkPreferencesResponse{}, apperror.Wrap("settings_write_failed", "Could not save network settings.", err)
+	}
+	return NetworkPreferencesResponse{Global: settings}, nil
 }
 
 func (s *Service) GetOnboardingStatus(ctx context.Context) (OnboardingStatus, error) {
@@ -219,11 +258,37 @@ func (s *Service) UpdatePreferences(ctx context.Context, request UpdateRequest) 
 }
 
 func (s *Service) VerifyKey(ctx context.Context, provider, key string) (VerifyResponse, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	provider = normalizeProvider(provider)
 	if provider != "ollama" && strings.TrimSpace(key) == "" {
 		return VerifyResponse{}, apperror.New("missing_key", "API key cannot be empty.")
 	}
-	return s.provider.verify(ctx, provider, key), nil
+	preferences, err := s.repository.Load(ctx)
+	if err != nil {
+		return VerifyResponse{}, apperror.Wrap("settings_read_failed", "Could not load model settings.", err)
+	}
+	settings := preferences.ProviderSettings[provider]
+	return s.provider.verify(ctx, provider, key, settings, resolvedNetworkSettings(preferences, provider)), nil
+}
+
+func (s *Service) VerifyConfiguration(ctx context.Context, request VerifyRequest) (VerifyResponse, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	provider := normalizeProvider(request.Provider)
+	if provider != "ollama" && strings.TrimSpace(request.APIKey) == "" {
+		return VerifyResponse{}, apperror.New("missing_key", "API key cannot be empty.")
+	}
+	preferences, err := s.repository.Load(ctx)
+	if err != nil {
+		return VerifyResponse{}, apperror.Wrap("settings_read_failed", "Could not load model settings.", err)
+	}
+	settings := mergedRequestedProviderSettings(preferences.ProviderSettings[provider], request.ProviderSettings, nil)
+	if err := validateProviderSettings(provider, settings); err != nil {
+		return VerifyResponse{}, apperror.Wrap("invalid_provider_settings", "Check the provider connection settings.", err)
+	}
+	preferences.ProviderSettings[provider] = settings
+	return s.provider.verify(ctx, provider, request.APIKey, settings, resolvedNetworkSettings(preferences, provider)), nil
 }
 
 func (s *Service) SaveConfiguration(ctx context.Context, request SaveRequest) (PreferencesResponse, error) {
@@ -234,6 +299,11 @@ func (s *Service) SaveConfiguration(ctx context.Context, request SaveRequest) (P
 		return PreferencesResponse{}, apperror.Wrap("settings_read_failed", "Could not load model settings.", err)
 	}
 	provider := normalizeProvider(request.Provider)
+	settings := mergedRequestedProviderSettings(preferences.ProviderSettings[provider], request.ProviderSettings, request.BaseURL)
+	if err := validateProviderSettings(provider, settings); err != nil {
+		return PreferencesResponse{}, apperror.Wrap("invalid_provider_settings", "Check the provider connection settings.", err)
+	}
+	preferences.ProviderSettings[provider] = settings
 	key := strings.TrimSpace(valueOrEmpty(request.APIKey))
 	if provider != "ollama" {
 		if key == "" {
@@ -246,7 +316,7 @@ func (s *Service) SaveConfiguration(ctx context.Context, request SaveRequest) (P
 			return PreferencesResponse{}, apperror.New("missing_key", "An API key is required for this provider.")
 		}
 		if request.APIKey != nil {
-			verification := s.provider.verify(ctx, provider, key)
+			verification := s.provider.verify(ctx, provider, key, settings, resolvedNetworkSettings(preferences, provider))
 			if !verification.Valid {
 				return PreferencesResponse{}, apperror.New(verification.Error, verifyMessage(verification.Error))
 			}
@@ -268,13 +338,8 @@ func (s *Service) SaveConfiguration(ctx context.Context, request SaveRequest) (P
 	if err := applyUpdate(&preferences, update); err != nil {
 		return PreferencesResponse{}, err
 	}
-	baseURL := preferences.OllamaBaseURL
-	if request.BaseURL != nil {
-		baseURL = strings.TrimRight(strings.TrimSpace(*request.BaseURL), "/")
-		if !isValidBaseURL(baseURL) {
-			return PreferencesResponse{}, apperror.New("invalid_base_url", "Enter a valid Ollama HTTP or HTTPS URL.")
-		}
-		preferences.OllamaBaseURL = baseURL
+	if provider == "ollama" {
+		preferences.OllamaBaseURL = settings.BaseURL
 	}
 
 	// Persist the credential and requested defaults even if a provider's model
@@ -284,7 +349,7 @@ func (s *Service) SaveConfiguration(ctx context.Context, request SaveRequest) (P
 		return PreferencesResponse{}, apperror.Wrap("settings_write_failed", "Could not save model settings.", err)
 	}
 
-	catalog, detail, _, refreshErr := s.provider.refresh(ctx, provider, key, baseURL)
+	catalog, detail, _, refreshErr := s.provider.refresh(ctx, provider, key, settings, resolvedNetworkSettings(preferences, provider))
 	if refreshErr == nil {
 		preferences.Catalogs[provider] = catalog
 		normalizeSelections(&preferences, provider)
@@ -311,6 +376,11 @@ func (s *Service) RefreshModels(ctx context.Context, request RefreshRequest) (Pr
 		return PreferencesResponse{}, apperror.Wrap("settings_read_failed", "Could not load model settings.", err)
 	}
 	provider := normalizeProvider(request.Provider)
+	settings := mergedRequestedProviderSettings(preferences.ProviderSettings[provider], request.ProviderSettings, request.BaseURL)
+	if err := validateProviderSettings(provider, settings); err != nil {
+		return PreferencesResponse{}, apperror.Wrap("invalid_provider_settings", "Check the provider connection settings.", err)
+	}
+	preferences.ProviderSettings[provider] = settings
 	key := strings.TrimSpace(valueOrEmpty(request.APIKey))
 	if key == "" && provider != "ollama" {
 		key, err = s.secrets.Get(provider)
@@ -318,11 +388,7 @@ func (s *Service) RefreshModels(ctx context.Context, request RefreshRequest) (Pr
 			return PreferencesResponse{}, apperror.Wrap("keychain_read_failed", "Could not read the saved API key.", err)
 		}
 	}
-	baseURL := preferences.OllamaBaseURL
-	if request.BaseURL != nil && strings.TrimSpace(*request.BaseURL) != "" {
-		baseURL = strings.TrimRight(strings.TrimSpace(*request.BaseURL), "/")
-	}
-	catalog, detail, errorCode, err := s.provider.refresh(ctx, provider, key, baseURL)
+	catalog, detail, errorCode, err := s.provider.refresh(ctx, provider, key, settings, resolvedNetworkSettings(preferences, provider))
 	if err != nil {
 		message := "Could not refresh the provider model list. Check your network, proxy, and certificate settings."
 		if errorCode == "ollama_unreachable" {
@@ -333,6 +399,8 @@ func (s *Service) RefreshModels(ctx context.Context, request RefreshRequest) (Pr
 	preferences.Catalogs[provider] = catalog
 	if provider == "ollama" {
 		preferences.OllamaBaseURL = catalog.BaseURL
+		settings.BaseURL = catalog.BaseURL
+		preferences.ProviderSettings[provider] = settings
 	}
 	if preferences.LLMProvider == provider {
 		normalizeSelections(&preferences, provider)
@@ -427,9 +495,29 @@ func (s *Service) response(preferences Preferences, provider string) (Preference
 		EnabledModels:             mainModels, AvailableModels: mainModels,
 		ProviderAvailableMainModels: mainModels, ProviderAvailableLiteModels: append([]string{}, catalog.LiteModels...),
 		ProviderModelCatalogs: preferences.Catalogs, APIKeyPresentByProvider: presence,
-		APIKeyPresent: selectedPresent, SelectedProviderRequiresAPIKey: provider != "ollama",
+		GlobalNetwork: preferences.GlobalNetwork, SelectedProviderSettings: preferences.ProviderSettings[provider],
+		ProviderSettings: preferences.ProviderSettings,
+		APIKeyPresent:    selectedPresent, SelectedProviderRequiresAPIKey: provider != "ollama",
 		SelectedProviderAPIKeyPresent: selectedPresent,
 	}, nil
+}
+
+func mergedRequestedProviderSettings(current ProviderSettings, requested *ProviderSettings, legacyBaseURL *string) ProviderSettings {
+	settings := current
+	if requested != nil {
+		settings = *requested
+	}
+	if legacyBaseURL != nil && strings.TrimSpace(*legacyBaseURL) != "" {
+		settings.BaseURL = strings.TrimRight(strings.TrimSpace(*legacyBaseURL), "/")
+	}
+	settings.BaseURL = strings.TrimRight(strings.TrimSpace(settings.BaseURL), "/")
+	settings.APIKeyHeader = strings.TrimSpace(settings.APIKeyHeader)
+	settings.APIKeyPrefix = strings.TrimSpace(settings.APIKeyPrefix)
+	settings.APIVersion = strings.TrimSpace(settings.APIVersion)
+	settings.Organization = strings.TrimSpace(settings.Organization)
+	settings.Project = strings.TrimSpace(settings.Project)
+	settings.Network = normalizeNetworkSettings(settings.Network, true)
+	return settings
 }
 
 func applyUpdate(preferences *Preferences, request UpdateRequest) error {
@@ -496,6 +584,27 @@ func applyUpdate(preferences *Preferences, request UpdateRequest) error {
 func normalizeSelections(preferences *Preferences, provider string) {
 	provider = normalizeProvider(provider)
 	catalog := preferences.Catalogs[provider]
+	if provider == "openai-compatible" {
+		preferences.SelectedModel = strings.TrimSpace(preferences.SelectedModel)
+		preferences.SelectedLiteModel = strings.TrimSpace(preferences.SelectedLiteModel)
+		preferences.SelectedCodingModel = strings.TrimSpace(preferences.SelectedCodingModel)
+		if preferences.SelectedModel == "" {
+			preferences.SelectedModel = catalog.DefaultMainModel
+		}
+		if preferences.SelectedLiteModel == "" {
+			preferences.SelectedLiteModel = preferences.SelectedModel
+		}
+		if preferences.SelectedCodingModel == "" {
+			preferences.SelectedCodingModel = preferences.SelectedModel
+		}
+		catalog.MainModels = unique(append([]string{preferences.SelectedModel, preferences.SelectedCodingModel}, catalog.MainModels...))
+		catalog.LiteModels = unique(append([]string{preferences.SelectedLiteModel}, catalog.LiteModels...))
+		catalog.DefaultMainModel = preferences.SelectedModel
+		catalog.DefaultLiteModel = preferences.SelectedLiteModel
+		catalog.Models = modelEntries(provider, catalog.MainModels, catalog.LiteModels, "configured")
+		preferences.Catalogs[provider] = catalog
+		return
+	}
 	if !contains(catalog.MainModels, preferences.SelectedModel) {
 		preferences.SelectedModel = catalog.DefaultMainModel
 	}
