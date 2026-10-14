@@ -141,7 +141,7 @@ jobs:
           cache: true
 
       - name: Restore release frontend
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: inquira-frontend-${{ needs.guard.outputs.tag }}
           path: frontend/dist
@@ -220,7 +220,7 @@ jobs:
           cache: true
 
       - name: Restore release frontend
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: inquira-frontend-${{ needs.guard.outputs.tag }}
           path: frontend/dist
@@ -337,13 +337,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Download macOS installer
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: inquira-macos-${{ needs.guard.outputs.tag }}
           path: artifacts/macos
 
       - name: Download Windows installer
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: inquira-windows-${{ needs.guard.outputs.tag }}
           path: artifacts/windows
