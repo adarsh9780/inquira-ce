@@ -113,7 +113,7 @@ jobs:
           npm run build --prefix frontend
 
       - name: Upload release frontend
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: inquira-frontend-${{ needs.guard.outputs.tag }}
           path: frontend/dist
@@ -192,7 +192,7 @@ jobs:
             "build/bin/Inquira-${INQUIRA_BUILD_VERSION}-macOS-arm64.dmg"
 
       - name: Upload macOS installer
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: inquira-macos-${{ needs.guard.outputs.tag }}
           path: build/bin/Inquira-${{ needs.guard.outputs.version }}-macOS-arm64.dmg
@@ -300,7 +300,7 @@ jobs:
           Write-Host "Windows Authenticode status: $($signature.Status) (unsigned distribution is currently expected)."
 
       - name: Upload Windows installer
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: inquira-windows-${{ needs.guard.outputs.tag }}
           path: build/bin/Inquira-${{ needs.guard.outputs.version }}-windows-x64-setup.exe
